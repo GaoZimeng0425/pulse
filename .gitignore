@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# Xcode
+build/
+DerivedData/
+xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.moved-aside
+
+# SwiftPM / Swift(应用项目:Package.resolved 应提交,不入 ignore)
+.build/
+.swiftpm/
