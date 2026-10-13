@@ -5,6 +5,8 @@ import AppKit
 /// 组 CPU% 降序,系统组参榜)。排序随每轮采样实时刷新(@Observable)。
 struct DashboardView: View {
     let monitor: SystemMonitor
+    /// 设置窗入口(工单 07):头部齿轮按钮。
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         VStack(spacing: 12) {
@@ -34,6 +36,14 @@ struct DashboardView: View {
                     .monospacedDigit()
             }
             Spacer()
+            Button {
+                openSettings()
+            } label: {
+                Image(systemName: "gearshape")
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .help("设置项目根目录")
         }
     }
 

@@ -11,7 +11,8 @@ struct GroupingPipeline {
 
     /// 出生登记表随轮次增长(内存版,重启即失——P0 决定)。
     private(set) var lineage = LineageRegistry()
-    let configuration: GroupingConfiguration
+    /// 归组配置:`projectRoots` 允许热更新(setProjectRoots,工单 07),其余构造时定型。
+    private(set) var configuration: GroupingConfiguration
     let displayLimit: Int
 
     init(
@@ -20,6 +21,13 @@ struct GroupingPipeline {
     ) {
         self.configuration = configuration
         self.displayLimit = displayLimit
+    }
+
+    /// 更新项目根列表(工单 07 设置窗):立即写入配置,**下一轮 update 即以新根归组**
+    /// ——增删根 ≤1 轮采样生效;清空列表 = 回到 03 的降级路径。
+    /// 热更新行为单测见 GroupingPipelineTests"项目根热更新"用例。
+    mutating func setProjectRoots(_ roots: [String]) {
+        configuration.projectRoots = roots
     }
 
     /// 一轮采样的推进。新出生进程的 CPU%(差分为 nil,无前值)按 0 计——

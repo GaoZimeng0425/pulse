@@ -62,6 +62,13 @@ final class SystemMonitor {
         Task { await sampler.setPopoverVisible(visible) }
     }
 
+    /// 项目根变更(工单 07 设置窗):立即写入管线配置,**下一轮采样即以新根归组**
+    /// (增删 ≤1 轮生效);清空列表 = 回到 03 的降级路径。传播逻辑在
+    /// GroupingPipelineTests"项目根热更新"用例单测,此处仅 MainActor 粘合。
+    func setProjectRoots(_ roots: [String]) {
+        pipeline.setProjectRoots(roots)
+    }
+
     /// 一轮采样落地:菜单栏负载 + 出生登记、归组、截 Top-5(纯逻辑在 GroupingPipeline)。
     private func apply(_ update: SamplingUpdate) {
         systemCPULoad = update.diff.systemCPULoad
