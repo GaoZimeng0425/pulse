@@ -52,18 +52,18 @@ final class SamplerTests: XCTestCase {
     }
 
     /// 线程安全的交付记录(deliver 从 actor 上下文同步调用)。
-    private final class LoadBox: @unchecked Sendable {
+    private final class DeliveryBox: @unchecked Sendable {
         private let lock = NSLock()
-        private var values: [Double] = []
+        private var updates: [SamplingUpdate] = []
 
-        func append(_ value: Double) {
+        func append(_ update: SamplingUpdate) {
             lock.lock(); defer { lock.unlock() }
-            values.append(value)
+            updates.append(update)
         }
 
-        var delivered: [Double] {
+        var delivered: [SamplingUpdate] {
             lock.lock(); defer { lock.unlock() }
-            return values
+            return updates
         }
     }
 
@@ -105,9 +105,9 @@ final class SamplerTests: XCTestCase {
     private func drain(
         _ sampler: Sampler,
         timeline: FakeTimeline
-    ) async -> (delivered: [Double], timeline: FakeTimeline) {
-        let box = LoadBox()
-        let task = Task { await sampler.run { box.append($0.systemCPULoad) } }
+    ) async -> (delivered: [SamplingUpdate], timeline: FakeTimeline) {
+        let box = DeliveryBox()
+        let task = Task { await sampler.run { box.append($0) } }
         await task.value
         return (box.delivered, timeline)
     }
@@ -119,12 +119,29 @@ final class SamplerTests: XCTestCase {
         let timeline = FakeTimeline(start: base, sleepBudget: 2)
 
         let (delivered, clock) = await drain(makeSampler(timeline: timeline), timeline: timeline)
+        let loads = delivered.map(\.diff.systemCPULoad)
+
+        XCTAssertEqual(loads.count, 3)
+        XCTAssertEqual(loads[0], 0, accuracy: 0.0001)
+        XCTAssertEqual(loads[1], 2.5, accuracy: 0.0001)
+        XCTAssertEqual(loads[2], 5, accuracy: 0.0001)
+        XCTAssertEqual(clock.sleepRequests, [5, 5])
+    }
+
+    /// 每轮交付携带采出该差分的快照本身(工单 05:出生登记与归组的输入)。
+    func testDeliveredUpdateCarriesTheSampledSnapshot() async {
+        let timeline = FakeTimeline(start: base, sleepBudget: 2)
+
+        let (delivered, _) = await drain(makeSampler(timeline: timeline), timeline: timeline)
 
         XCTAssertEqual(delivered.count, 3)
-        XCTAssertEqual(delivered[0], 0, accuracy: 0.0001)
-        XCTAssertEqual(delivered[1], 2.5, accuracy: 0.0001)
-        XCTAssertEqual(delivered[2], 5, accuracy: 0.0001)
-        XCTAssertEqual(clock.sleepRequests, [5, 5])
+        for update in delivered {
+            XCTAssertEqual(update.diff.takenAt, update.snapshot.takenAt)
+            XCTAssertEqual(update.diff.processCPU.count, update.snapshot.processes.count)
+        }
+        // 第二轮快照含 p10/p20 两个进程,差分条目一一致。
+        XCTAssertEqual(delivered[1].snapshot.processes.map(\.pid), [10, 20])
+        XCTAssertEqual(delivered[1].diff.processCPU.map(\.pid), [10, 20])
     }
 
     func testOpenPopoverCadenceWaitsOneSecond() async {
@@ -135,12 +152,13 @@ final class SamplerTests: XCTestCase {
         await sampler.setPopoverVisible(true)
 
         let (delivered, clock) = await drain(sampler, timeline: timeline)
+        let loads = delivered.map(\.diff.systemCPULoad)
 
-        XCTAssertEqual(delivered.count, 4)
-        XCTAssertEqual(delivered[0], 0, accuracy: 0.0001)
-        XCTAssertEqual(delivered[1], 2.5, accuracy: 0.0001)
-        XCTAssertEqual(delivered[2], 5, accuracy: 0.0001)
-        XCTAssertEqual(delivered[3], 0, accuracy: 0.0001)
+        XCTAssertEqual(loads.count, 4)
+        XCTAssertEqual(loads[0], 0, accuracy: 0.0001)
+        XCTAssertEqual(loads[1], 2.5, accuracy: 0.0001)
+        XCTAssertEqual(loads[2], 5, accuracy: 0.0001)
+        XCTAssertEqual(loads[3], 0, accuracy: 0.0001)
         XCTAssertEqual(clock.sleepRequests, [1, 1, 1])
     }
 
@@ -152,10 +170,11 @@ final class SamplerTests: XCTestCase {
             makeSampler(timeline: timeline, maxSleepSlice: 2),
             timeline: timeline
         )
+        let loads = delivered.map(\.diff.systemCPULoad)
 
-        XCTAssertEqual(delivered.count, 2)
-        XCTAssertEqual(delivered[0], 0, accuracy: 0.0001)
-        XCTAssertEqual(delivered[1], 2.5, accuracy: 0.0001)
+        XCTAssertEqual(loads.count, 2)
+        XCTAssertEqual(loads[0], 0, accuracy: 0.0001)
+        XCTAssertEqual(loads[1], 2.5, accuracy: 0.0001)
         XCTAssertEqual(clock.sleepRequests, [2, 2, 1])
     }
 }

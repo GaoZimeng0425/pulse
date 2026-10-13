@@ -39,6 +39,13 @@ struct SamplingScheduler: Sendable {
     }
 }
 
+/// 一轮采样的完整产出:快照本身 + 它的差分结果(同 takenAt)。
+/// 快照是出生登记与归组(工单 05)的输入,差分是组 CPU% 与系统负载的来源。
+struct SamplingUpdate: Sendable {
+    let snapshot: ProcessSnapshot
+    let diff: CPUDiffResult
+}
+
 /// 采样 actor:以自适应节奏驱动 ProcessSource,产出 CPU 差分并交付。
 ///
 /// - 时钟与睡眠可注入:测试用假时间轴确定性跑完整条管线,零真实等待。
@@ -77,9 +84,9 @@ actor Sampler {
         scheduler.setPopoverVisible(visible)
     }
 
-    /// 采样主循环:采样节奏上每到点即采一张快照、差分、交付,直至任务取消
-    /// 或 sleep 抛错。deliver 从 actor 上下文同步调用。
-    func run(deliver: @escaping @Sendable (CPUDiffResult) -> Void) async {
+    /// 采样主循环:采样节奏上每到点即采一张快照、差分、连同快照一起交付,
+    /// 直至任务取消或 sleep 抛错。deliver 从 actor 上下文同步调用。
+    func run(deliver: @escaping @Sendable (SamplingUpdate) -> Void) async {
         while !Task.isCancelled {
             let wait = scheduler.delay(until: clock())
             if wait <= 0 {
@@ -91,7 +98,7 @@ actor Sampler {
                 )
                 previousSnapshot = snapshot
                 scheduler.recordSample(at: clock())
-                deliver(diff)
+                deliver(SamplingUpdate(snapshot: snapshot, diff: diff))
             } else {
                 do {
                     try await sleep(min(wait, maxSleepSlice))
