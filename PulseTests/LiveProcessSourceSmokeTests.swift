@@ -84,4 +84,45 @@ final class LiveProcessSourceSmokeTests: XCTestCase {
         XCTAssertTrue(shell.cwd == "/private/tmp" || shell.cwd == "/tmp", "应能读到子进程 cwd,实际:\(shell.cwd ?? "nil")")
         XCTAssertNotNil(shell.startTime, "子进程启动时刻应可读")
     }
+
+    // MARK: CPU 累计时间刻度校准(工单 04 采样的量纲地基)
+
+    private func ownCPUNanoseconds() -> UInt64? {
+        source.snapshot().processes.first { $0.pid == getpid() }?.cpuTimeNanoseconds
+    }
+
+    /// POSIX getrusage 的 ru_utime/ru_stime(微秒)做基准——独立于 proc_info 的另一条内核记账路径。
+    private func ownRusageCPUSeconds() -> Double {
+        var usage = rusage()
+        _ = getrusage(RUSAGE_SELF, &usage)
+        let user = Double(usage.ru_utime.tv_sec) + Double(usage.ru_utime.tv_usec) / 1e6
+        let system = Double(usage.ru_stime.tv_sec) + Double(usage.ru_stime.tv_usec) / 1e6
+        return user + system
+    }
+
+    func testCPUTimeFieldMatchesPOSIXReferenceScale() {
+        // 实测教训(工单 04):本机(Apple Silicon,timebase 125/3 ns/tick)的
+        // pti_total_user/system 是 mach_absolute_time 原始 tick 而非纳秒,
+        // 不换算会把所有 CPU% 缩小 ~41.7 倍。校准法:本进程按 getrusage 计量烧
+        // ≥0.4s CPU,快照读回的累计纳秒差应等于实际烧掉的秒数(±0.2s 容差)。
+        guard let before = ownCPUNanoseconds() else {
+            return XCTFail("自身进程应在快照里")
+        }
+        let rusageBefore = ownRusageCPUSeconds()
+
+        var sink: Double = 0
+        while ownRusageCPUSeconds() - rusageBefore < 0.4 {
+            for i in 0..<10_000 { sink += Double(i) * 0.5 }
+        }
+        _ = sink
+
+        let burned = ownRusageCPUSeconds() - rusageBefore
+        guard let after = ownCPUNanoseconds() else {
+            return XCTFail("自身进程应在快照里")
+        }
+        let deltaSeconds = Double(after - before) / 1_000_000_000
+
+        print("[smoke] 刻度校准:烧 \(String(format: "%.3f", burned))s CPU,快照读回 \(String(format: "%.3f", deltaSeconds))s")
+        XCTAssertEqual(deltaSeconds, burned, accuracy: 0.2, "快照 CPU 累计时间必须与 getrusage 同刻度(缩小 ~41.7 倍 = 拿到的是 mach tick 而非纳秒)")
+    }
 }

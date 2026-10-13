@@ -11,11 +11,13 @@ struct Probe {
         return n > 0 ? String(cString: buf) : "<denied>"
     }
 
+    // 注意(工单 04 实测):pti_total_user/system 是 mach_absolute_time 原始 tick
+    // 而非纳秒(Apple Silicon timebase 125/3 ns/tick),换算见 LiveProcessSource.nanoseconds(fromTicks:)。
     func taskInfo() -> String {
         var t = proc_taskinfo()
         let n = proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &t, Int32(MemoryLayout<proc_taskinfo>.size))
         guard n > 0 else { return "taskinfo <denied rc=\(n)>" }
-        return "taskinfo ok rss=\(t.pti_resident_size) cpu_user_ns=\(t.pti_total_user) cpu_sys_ns=\(t.pti_total_system)"
+        return "taskinfo ok rss=\(t.pti_resident_size) cpu_user_tick=\(t.pti_total_user) cpu_sys_tick=\(t.pti_total_system)"
     }
 
     func rusage() -> String {

@@ -27,11 +27,9 @@ struct GroupSummary: Identifiable, Equatable {
     }
 }
 
-/// 工程骨架的静态假数据:菜单栏假"42%" + 三张组卡(P0 验收锚点场景)。
+/// 工程骨架的静态假数据:三张组卡(P0 验收锚点场景)。
+/// 菜单栏数字已接真实采样(工单 04);组卡待归组引擎接入后替换(工单 05)。
 enum FakeSnapshot {
-    /// 系统CPU负载(0–100% 口径),菜单栏数字用。假数据。
-    static let systemCPULoad: Double = 42
-
     /// 静态组卡,组 CPU% 降序:门禁项目组 / OrbStack / 常驻 WaifuX。
     static let topGroups: [GroupSummary] = [
         GroupSummary(
