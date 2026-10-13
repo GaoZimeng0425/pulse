@@ -147,6 +147,12 @@ enum GroupingEngine {
         }
         .sorted { $0.cpuPercent == $1.cpuPercent ? $0.id < $1.id : $0.cpuPercent > $1.cpuPercent }
     }
+
+    /// spec App 归属判定的路径谓词:可执行路径含 `.app/Contents/MacOS/` 即 bundle 内进程。
+    /// 父链面包屑(工单 06)复用同一口径,判定只有这一份。
+    static func isBundleExecutablePath(_ executablePath: String?) -> Bool {
+        executablePath?.contains(".app/Contents/MacOS/") ?? false
+    }
 }
 
 // MARK: - 归属判定

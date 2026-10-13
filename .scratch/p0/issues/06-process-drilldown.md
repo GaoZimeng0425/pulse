@@ -6,11 +6,13 @@
 
 **Status:** ready-for-agent
 
-- [ ] 点组卡展开/收起进程列表,列表按 CPU% 降序
-- [ ] 每行含进程名、pid、CPU%、内存
-- [ ] 点进程行显示 cwd 与完整 argv,长 argv 不破坏布局、可复制
-- [ ] 显示启动时长;父链面包屑按"进程 ← 父 ← 祖先 ← 归宿"渲染
-- [ ] 组内进程数较多(数十行)时滚动流畅
-- [ ] 下钻数据来自最近一轮采样,不额外触发采集
+- [x] 点组卡展开/收起进程列表,列表按 CPU% 降序
+- [x] 每行含进程名、pid、CPU%、内存
+- [x] 点进程行显示 cwd 与完整 argv,长 argv 不破坏布局、可复制
+- [x] 显示启动时长;父链面包屑按"进程 ← 父 ← 祖先 ← 归宿"渲染
+- [x] 组内进程数较多(数十行)时滚动流畅
+- [x] 下钻数据来自最近一轮采样,不额外触发采集
 
 ## Comments
+
+- 06 实现:纯逻辑在 `PulseFormat.uptime`/`processName`、`ParentChainQuery`(活链优先、断链/重挂回查出生登记,bundle 祖先或 launchd 为终点)、`DrilldownState`(行/详情视图模型,顺序沿用引擎契约);UI 在 `ProcessDrilldownView`(LazyVStack + 可滚动可复制 argv)+ `DashboardView` 组卡展开。列表高度上限 480 的贴合度留给工单 09 手动 QA。

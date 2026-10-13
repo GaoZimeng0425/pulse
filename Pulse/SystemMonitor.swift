@@ -19,6 +19,9 @@ final class SystemMonitor {
     private(set) var systemCPULoad: Double = 0
     /// Top-5 组(GLOSSARY 组),组 CPU% 降序;首轮采样前为空,弹窗呈空态。
     private(set) var topGroups: [ProcessGroup] = []
+    /// 最近一轮采样留下的下钻输入(工单 06):组卡展开 / 进程详情从这里只读取数,
+    /// 下钻不触发额外采集;首轮采样前为 nil(与 topGroups 同空态)。
+    private(set) var drilldown: DrilldownState?
 
     private let sampler: Sampler
     private var pipeline: GroupingPipeline
@@ -62,11 +65,17 @@ final class SystemMonitor {
         Task { await sampler.setPopoverVisible(visible) }
     }
 
-    /// 一轮采样落地:菜单栏负载 + 出生登记、归组、截 Top-5(纯逻辑在 GroupingPipeline)。
+    /// 一轮采样落地:菜单栏负载 + 出生登记、归组、截 Top-5(纯逻辑在 GroupingPipeline),
+    /// 同时构账下钻输入(快照 + 累计登记表 + 进程差分,同轮一致)。
     private func apply(_ update: SamplingUpdate) {
         systemCPULoad = update.diff.systemCPULoad
         topGroups = pipeline.update(
             snapshot: update.snapshot,
+            processCPU: update.diff.processCPU
+        )
+        drilldown = DrilldownState(
+            snapshot: update.snapshot,
+            lineage: pipeline.lineage,
             processCPU: update.diff.processCPU
         )
     }
