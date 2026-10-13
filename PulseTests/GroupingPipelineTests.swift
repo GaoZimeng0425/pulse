@@ -217,6 +217,66 @@ final class GroupingPipelineTests: XCTestCase {
         XCTAssertEqual(groups[0].memoryBytes, 512_000_000)
     }
 
+    // MARK: 项目根热更新(工单 07:设置窗增删 ≤1 轮采样生效)
+
+    /// 项目根为空 → dev 门禁链走 03 降级路径(父链上溯归宿主 Zcode);
+    /// 设根后**下一轮**即出"项目名 @ worktree"组——成员从宿主组转移到项目组。
+    func testSettingProjectRootsRegroupsOnNextSweep() {
+        let tree = { self.gateTree(
+            zcodeCPU: 0, nodeCPU: 0, cargoCPU: 0, rustcCPU: 0, windowServerCPU: 0
+        ) }
+        let source = SyntheticProcessSource(snapshots: [
+            ProcessSnapshot(takenAt: base, processes: tree()),
+            ProcessSnapshot(takenAt: base.addingTimeInterval(5), processes: tree()),
+        ])
+        var pipeline = GroupingPipeline(configuration: GroupingConfiguration(projectRoots: []))
+
+        // 首轮:无项目根 → 无项目组;dev 链沿父链上溯归宿主(散落的 rustc/node
+        // 表现为"App 归属",spec 工单 07 的起点状态)。
+        let (firstGroups, firstSnapshot) = sweep(source, previous: nil, pipeline: &pipeline)
+        XCTAssertEqual(firstGroups.count, 2)
+        XCTAssertFalse(firstGroups.contains { $0.category == .project })
+        let firstHost = firstGroups.first { $0.name == "Zcode" }
+        XCTAssertEqual(firstHost?.processes.count, 8) // 宿主 + node + cargo + rustc×5
+
+        // 设置窗添加项目根(工单 07)。
+        pipeline.setProjectRoots([octokRoot])
+
+        // 下一轮(≤1 轮)即以新根归组:项目组出现,宿主组只剩宿主自己。
+        let (secondGroups, _) = sweep(source, previous: firstSnapshot, pipeline: &pipeline)
+        XCTAssertTrue(secondGroups.contains { $0.name == "octok-client @ \(worktreeName)" })
+        let project = secondGroups.first { $0.category == .project }
+        XCTAssertEqual(project?.processes.count, 7) // node + cargo + rustc×5
+        XCTAssertEqual(secondGroups.first { $0.name == "Zcode" }?.processes.count, 1)
+    }
+
+    /// 删除全部项目根 → 下一轮项目组消失,dev 链降级回 03 路径(宿主组),不报错。
+    func testRemovingProjectRootsDegradesOnNextSweep() {
+        let tree = { self.gateTree(
+            zcodeCPU: 0, nodeCPU: 0, cargoCPU: 0, rustcCPU: 0, windowServerCPU: 0
+        ) }
+        let source = SyntheticProcessSource(snapshots: [
+            ProcessSnapshot(takenAt: base, processes: tree()),
+            ProcessSnapshot(takenAt: base.addingTimeInterval(5), processes: tree()),
+        ])
+        var pipeline = GroupingPipeline(
+            configuration: GroupingConfiguration(projectRoots: [octokRoot])
+        )
+
+        // 首轮:有根 → 项目组在。
+        let (firstGroups, firstSnapshot) = sweep(source, previous: nil, pipeline: &pipeline)
+        XCTAssertTrue(firstGroups.contains { $0.name == "octok-client @ \(worktreeName)" })
+
+        // 设置窗清空项目根(工单 07)。
+        pipeline.setProjectRoots([])
+
+        // 下一轮(≤1 轮):项目组消失,成员全部回到父链上溯的宿主组。
+        let (secondGroups, _) = sweep(source, previous: firstSnapshot, pipeline: &pipeline)
+        XCTAssertFalse(secondGroups.contains { $0.category == .project })
+        XCTAssertEqual(secondGroups.count, 2) // Zcode + 系统
+        XCTAssertEqual(secondGroups.first { $0.name == "Zcode" }?.processes.count, 8)
+    }
+
     // MARK: 出生登记跨轮持续
 
     /// 中间父进程(cargo/node)已死、rustc 被重挂 launchd 且 cwd 不可读:

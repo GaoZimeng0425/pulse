@@ -2,8 +2,17 @@ import SwiftUI
 
 @main
 struct PulseApp: App {
+    /// 项目根配置(工单 07):UserDefaults 持久,设置窗编辑的唯一事实来源。
+    @State private var rootsStore: ProjectRootsStore
     /// 采样管线持有者:app 生命周期内常驻(@State 在 App 中只创建一次)。
-    @State private var monitor = SystemMonitor()
+    /// 拉起即喂入已持久化的项目根——重启后项目归因即刻可用。
+    @State private var monitor: SystemMonitor
+
+    init() {
+        let store = ProjectRootsStore()
+        _rootsStore = State(initialValue: store)
+        _monitor = State(initialValue: SystemMonitor(projectRoots: store.projectRoots))
+    }
 
     var body: some Scene {
         MenuBarExtra {
@@ -16,8 +25,18 @@ struct PulseApp: App {
             MenuBarLoadLabel(monitor: monitor)
                 // 菜单栏标签常驻:app 拉起即开始采样(start 幂等)。
                 .task { monitor.start() }
+                // 设置窗(唯一的项目根编辑入口)增删后,标签视图在此捕获变更,
+                // 下一轮采样即以新根归组(工单 07,≤1 轮生效)。
+                .onChange(of: rootsStore.projectRoots) { _, roots in
+                    monitor.setProjectRoots(roots)
+                }
         }
         .menuBarExtraStyle(.window)
+
+        // 设置窗(工单 07):项目根目录列表增删;入口在弹窗头部齿轮按钮。
+        Settings {
+            ProjectRootsSettingsView(store: rootsStore)
+        }
     }
 }
 

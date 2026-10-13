@@ -6,6 +6,8 @@ import AppKit
 /// 组卡下钻(工单 06):点卡展开组内进程平铺,数据只读最近一轮采样。
 struct DashboardView: View {
     let monitor: SystemMonitor
+    /// 设置窗入口(工单 07):头部齿轮按钮。
+    @Environment(\.openSettings) private var openSettings
 
     /// 下钻列表滚动上限:系统组可达数百进程,超出即滚动(LazyVStack 保证流畅)。
     private static let drilldownListMaxHeight: CGFloat = 480
@@ -72,6 +74,14 @@ struct DashboardView: View {
                     .monospacedDigit()
             }
             Spacer()
+            Button {
+                openSettings()
+            } label: {
+                Image(systemName: "gearshape")
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .help("设置项目根目录")
         }
     }
 

@@ -12,11 +12,13 @@
 		0768A25F3BC010CBFDB706E9 /* PulseFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C772B1E878BAEDA9C022C6C /* PulseFormatTests.swift */; };
 		0AC65ED3BAE50360BFE8D689 /* ParentChainQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91BEE952FDD7E25ABCCEED94 /* ParentChainQuery.swift */; };
 		0B2D3F53EE597649EDE9B7B7 /* GroupingPipelineSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32DF241AAD5F8798ADDE0FC2 /* GroupingPipelineSmokeTests.swift */; };
+		0E7CC3EE21A1321E89D78BFC /* ProjectRootsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF43629A17EF4D982135C6DC /* ProjectRootsStoreTests.swift */; };
 		147F6F94C76480C6FE76BCF0 /* ProcessDrilldownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC06CE2AAADC2E6B644F4619 /* ProcessDrilldownView.swift */; };
 		154454A04341DB4CA585E4B9 /* DrilldownStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 135674B4363F7A3923D5D6C1 /* DrilldownStateTests.swift */; };
 		1A6FBBAA8FFC5AB748E47788 /* BundleDisplayNameReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B5633EC929F85A22B2BB45E /* BundleDisplayNameReaderTests.swift */; };
 		2A294741604ED11BCA7E7E11 /* PulseApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D5309CAF2CC1BC7C626E937 /* PulseApp.swift */; };
 		3891285DCA8188E59A9EC34E /* GroupCategoryDisplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B7ADC75304AC8AC8EF1CED3 /* GroupCategoryDisplayTests.swift */; };
+		3B0AEF0F7AC596C838890C69 /* ProjectRootsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1E06F0A25EE07740DA1C192 /* ProjectRootsSettingsView.swift */; };
 		483BBEC3A583A42F733AC387 /* SystemMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 405D7B0A83AFBAA5FAEA4A5D /* SystemMonitor.swift */; };
 		51A6E49B73921A3FC725B604 /* BundleDisplayNameReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFC9AB4EF78C90578BF978B2 /* BundleDisplayNameReader.swift */; };
 		53BF4BF8378F0983A51FC4A8 /* SamplingSchedulerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C1A01E0236973380C357F35 /* SamplingSchedulerTests.swift */; };
@@ -36,6 +38,7 @@
 		E559247BAA70D0A1868BD156 /* LiveProcessSourceSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A992F5F503CAD7CB90DD838 /* LiveProcessSourceSmokeTests.swift */; };
 		EB6A8D530686F8BEE362E0AD /* ProcessSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF564398ED42F94AAC5F11A4 /* ProcessSource.swift */; };
 		EE3566C6FB14C20C796F9706 /* PulseFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A05454E2790B918CCFBFDA4 /* PulseFormat.swift */; };
+		F18B3E2174933BF6C17110CD /* ProjectRootsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCA4A32138D3658BE3DDD03F /* ProjectRootsStore.swift */; };
 		F9C9339D3FA1CB16491CF1F3 /* LineageRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 016B3CA5A832E0E81BFBE1C7 /* LineageRegistry.swift */; };
 		FDE435939BE1165CF3D5121F /* ParentChainQueryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A05CDA8C1EBF16044C21BFD /* ParentChainQueryTests.swift */; };
 /* End PBXBuildFile section */
@@ -82,6 +85,9 @@
 		C03A9EBCB9547AAD3B2FF3F9 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		C1B6EB298AF64E7F67498D19 /* ProcessDrilldown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessDrilldown.swift; sourceTree = "<group>"; };
 		C51EAD0B99672798A7F56077 /* LiveProcessSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveProcessSource.swift; sourceTree = "<group>"; };
+		DCA4A32138D3658BE3DDD03F /* ProjectRootsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRootsStore.swift; sourceTree = "<group>"; };
+		DF43629A17EF4D982135C6DC /* ProjectRootsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRootsStoreTests.swift; sourceTree = "<group>"; };
+		E1E06F0A25EE07740DA1C192 /* ProjectRootsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRootsSettingsView.swift; sourceTree = "<group>"; };
 		F037E709135740FF3012BA47 /* SyntheticProcessSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyntheticProcessSourceTests.swift; sourceTree = "<group>"; };
 		F3D0353305807063B3A9F254 /* GroupingEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupingEngineTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -103,6 +109,8 @@
 				BC06CE2AAADC2E6B644F4619 /* ProcessDrilldownView.swift */,
 				59315D07799E52E9D8CCB971 /* ProcessSnapshot.swift */,
 				BF564398ED42F94AAC5F11A4 /* ProcessSource.swift */,
+				E1E06F0A25EE07740DA1C192 /* ProjectRootsSettingsView.swift */,
+				DCA4A32138D3658BE3DDD03F /* ProjectRootsStore.swift */,
 				9D5309CAF2CC1BC7C626E937 /* PulseApp.swift */,
 				2A05454E2790B918CCFBFDA4 /* PulseFormat.swift */,
 				86039569010AE499E8718A99 /* Sampler.swift */,
@@ -142,6 +150,7 @@
 				3A992F5F503CAD7CB90DD838 /* LiveProcessSourceSmokeTests.swift */,
 				4A05CDA8C1EBF16044C21BFD /* ParentChainQueryTests.swift */,
 				922EBEDDF974C9C5C567A5C8 /* ProcArgsParserTests.swift */,
+				DF43629A17EF4D982135C6DC /* ProjectRootsStoreTests.swift */,
 				0C772B1E878BAEDA9C022C6C /* PulseFormatTests.swift */,
 				1CB6B4D9A1C6B08A03143AD4 /* SamplerTests.swift */,
 				0C1A01E0236973380C357F35 /* SamplingSchedulerTests.swift */,
@@ -238,6 +247,7 @@
 				E559247BAA70D0A1868BD156 /* LiveProcessSourceSmokeTests.swift in Sources */,
 				FDE435939BE1165CF3D5121F /* ParentChainQueryTests.swift in Sources */,
 				616D7878CF54B2A29104277C /* ProcArgsParserTests.swift in Sources */,
+				0E7CC3EE21A1321E89D78BFC /* ProjectRootsStoreTests.swift in Sources */,
 				0768A25F3BC010CBFDB706E9 /* PulseFormatTests.swift in Sources */,
 				D59097C6CBF4D30B09091C87 /* SamplerTests.swift in Sources */,
 				53BF4BF8378F0983A51FC4A8 /* SamplingSchedulerTests.swift in Sources */,
@@ -262,6 +272,8 @@
 				147F6F94C76480C6FE76BCF0 /* ProcessDrilldownView.swift in Sources */,
 				9C83A4041E9F900BA5A1F008 /* ProcessSnapshot.swift in Sources */,
 				EB6A8D530686F8BEE362E0AD /* ProcessSource.swift in Sources */,
+				3B0AEF0F7AC596C838890C69 /* ProjectRootsSettingsView.swift in Sources */,
+				F18B3E2174933BF6C17110CD /* ProjectRootsStore.swift in Sources */,
 				2A294741604ED11BCA7E7E11 /* PulseApp.swift in Sources */,
 				EE3566C6FB14C20C796F9706 /* PulseFormat.swift in Sources */,
 				6B9E437AF9EE748C4237292E /* Sampler.swift in Sources */,
