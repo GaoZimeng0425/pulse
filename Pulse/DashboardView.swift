@@ -16,6 +16,9 @@ struct DashboardView: View {
     @State private var expandedGroupIDs: Set<String> = []
     /// 展开详情的进程(跨组唯一):下钻期间进程退出时详情安静收起。
     @State private var selectedProcessID: pid_t?
+    /// 处置结果汇总(工单 08):**有失败才弹**;全成功保持安静——
+    /// 行 / 组消失交给下轮采样自然反映,不假装成功也不报喜打扰。
+    @State private var killFailureReport: KillReport?
 
     var body: some View {
         VStack(spacing: 12) {
@@ -36,20 +39,35 @@ struct DashboardView: View {
         }
         .padding(16)
         .frame(width: 340)
+        .alert(
+            killFailureReport?.failureAlertTitle ?? "",
+            isPresented: Binding(
+                get: { killFailureReport?.hasFailures == true },
+                set: { if !$0 { killFailureReport = nil } }
+            )
+        ) {
+            Button("知道了") { killFailureReport = nil }
+        } message: {
+            Text(killFailureReport?.failureAlertMessage ?? "")
+        }
     }
 
     /// 单个组卡 + 展开后的下钻区。展开只读 monitor.drilldown(最近一轮采样),
     /// 不触发额外采集。
     private func groupSection(for group: ProcessGroup) -> some View {
         VStack(spacing: 6) {
-            GroupCardView(group: group, isExpanded: expandedGroupIDs.contains(group.id)) {
-                toggleExpansion(of: group.id)
-            }
+            GroupCardView(
+                group: group,
+                isExpanded: expandedGroupIDs.contains(group.id),
+                onToggle: { toggleExpansion(of: group.id) },
+                onEndGroup: { requestEndGroup(group) }
+            )
             if expandedGroupIDs.contains(group.id), let drilldown = monitor.drilldown {
                 ProcessDrilldownView(
                     group: group,
                     drilldown: drilldown,
-                    selectedProcessID: $selectedProcessID
+                    selectedProcessID: $selectedProcessID,
+                    onEndProcess: requestEndProcess
                 )
             }
         }
@@ -59,6 +77,31 @@ struct DashboardView: View {
         if !expandedGroupIDs.insert(groupID).inserted {
             expandedGroupIDs.remove(groupID)
         }
+    }
+
+    // MARK: 处置(工单 08)——不主动杀、确认后才杀
+
+    /// 进程详情"结束进程":确认(点名 name+pid)→ SIGTERM;有失败才弹汇总。
+    private func requestEndProcess(_ target: KillTarget) {
+        let targets = [target]
+        let confirmed = KillConfirmationDialog.confirm(
+            title: KillCopy.confirmationTitle(for: targets),
+            informativeText: KillCopy.confirmationMessage(for: targets),
+            actionTitle: KillCopy.singleActionTitle
+        )
+        guard confirmed else { return }
+        killFailureReport = monitor.terminate(targets)
+    }
+
+    /// 组卡"结束整组":确认(列进程数)→ 对最新一轮采样的组员逐个 SIGTERM。
+    private func requestEndGroup(_ group: ProcessGroup) {
+        let confirmed = KillConfirmationDialog.confirm(
+            title: KillCopy.groupConfirmationTitle(groupName: group.name),
+            informativeText: KillCopy.groupConfirmationMessage(processCount: group.processes.count),
+            actionTitle: KillCopy.groupActionTitle
+        )
+        guard confirmed else { return }
+        killFailureReport = monitor.terminateGroup(id: group.id)
     }
 
     private var header: some View {
@@ -98,10 +141,12 @@ struct DashboardView: View {
 /// 组卡四要素(工单 05):组名+图标 / 组 CPU%(单核累加,>100% 合法)/ 内存 / "N 进程"。
 /// bundle 组用真实应用图标(NSWorkspace);项目与兜底类别用 SF Symbol;孤儿进程橙色调。
 /// 工单 06:整卡可点,展开 / 收起组内进程列表(尾部 chevron 指示)。
+/// 工单 08:卡上提供"结束整组"入口(确认对话框把关,见 KillConfirmationDialog)。
 struct GroupCardView: View {
     let group: ProcessGroup
     let isExpanded: Bool
     let onToggle: () -> Void
+    let onEndGroup: () -> Void
 
     var body: some View {
         Button(action: onToggle) {
@@ -128,6 +173,7 @@ struct GroupCardView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.tertiary)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                endGroupButton
             }
             .padding(10)
             .background(cardBackground, in: .rect(cornerRadius: 10))
@@ -136,6 +182,21 @@ struct GroupCardView: View {
         .buttonStyle(.plain)
         .accessibilityLabel("\(group.name),\(group.processes.count) 进程")
         .accessibilityHint(isExpanded ? "收起组内进程列表" : "展开组内进程列表")
+    }
+
+    /// "结束整组"入口:xmark.octagon 图标按钮(borderless:嵌在卡内可独立点按)。
+    /// 点击只是请求确认——真正发信号前必有确认对话框(不主动杀)。
+    private var endGroupButton: some View {
+        Button(action: onEndGroup) {
+            Image(systemName: "xmark.octagon")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.red)
+                .frame(width: 22, height: 22)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.borderless)
+        .help("结束整组(需确认)")
+        .accessibilityLabel("结束整组 \(group.name)")
     }
 
     /// bundle 组:读 .app 目录的真实应用图标;其余:类别 SF Symbol(孤儿橙色)。
@@ -172,6 +233,26 @@ extension GroupCategory {
         case .backgroundService: "gearshape"
         case .orphan: "exclamationmark.triangle"
         }
+    }
+}
+
+// MARK: - 处置确认对话框(工单 08)
+
+/// 确认对话框(NSAlert):"确认后才杀"的唯一关口。
+/// **取消按钮先添加 = NSAlert 默认按钮**——默认焦点与回车键都落在"取消"(防误触);
+/// "结束"按钮无键盘等价键,只有明确点击才执行。
+/// 文案构造在 KillCopy(纯函数,单测见 KillCopyTests);焦点次序属 UI,按 spec 以手动验收。
+enum KillConfirmationDialog {
+    @MainActor
+    static func confirm(title: String, informativeText: String, actionTitle: String) -> Bool {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = informativeText
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: KillCopy.cancelButtonTitle) // 先加 = 默认焦点(回车 = 取消)
+        let actionButton = alert.addButton(withTitle: actionTitle)
+        actionButton.keyEquivalent = "" // 不给"结束"任何键盘触发
+        return alert.runModal() == NSApplication.ModalResponse.alertSecondButtonReturn
     }
 }
 
@@ -256,7 +337,8 @@ extension GroupCategory {
                 memoryBytes: 2_400_000_000
             ),
             isExpanded: false,
-            onToggle: {}
+            onToggle: {},
+            onEndGroup: {}
         )
         GroupCardView(
             group: ProcessGroup(
@@ -271,7 +353,8 @@ extension GroupCategory {
                 memoryBytes: 120_000_000
             ),
             isExpanded: true,
-            onToggle: {}
+            onToggle: {},
+            onEndGroup: {}
         )
         GroupCardView(
             group: ProcessGroup(
@@ -286,7 +369,8 @@ extension GroupCategory {
                 memoryBytes: 30_000_000
             ),
             isExpanded: false,
-            onToggle: {}
+            onToggle: {},
+            onEndGroup: {}
         )
     }
     .padding(16)

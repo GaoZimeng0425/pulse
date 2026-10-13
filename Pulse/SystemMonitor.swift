@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import Darwin
 
 /// 呈现层模型(spec 命名 SystemMonitor):持有采样管线,把每轮采样变成可观察状态。
 /// 菜单栏数字 = 系统 CPU 负载(GLOSSARY:0–100%,全部核的占用率);
@@ -25,13 +26,15 @@ final class SystemMonitor {
 
     private let sampler: Sampler
     private var pipeline: GroupingPipeline
+    private let killService: any KillService
     private var samplingTask: Task<Void, Never>?
     private var started = false
 
     init(
         source: any ProcessSource = LiveProcessSource(),
         logicalCoreCount: Int = ProcessInfo.processInfo.activeProcessorCount,
-        projectRoots: [String] = []
+        projectRoots: [String] = [],
+        killService: any KillService = LiveKillService()
     ) {
         self.sampler = Sampler(source: source, logicalCoreCount: logicalCoreCount)
         self.pipeline = GroupingPipeline(
@@ -41,6 +44,7 @@ final class SystemMonitor {
             ),
             displayLimit: Self.displayGroupLimit
         )
+        self.killService = killService
     }
 
     /// 启动采样循环(默认弹窗关闭节奏 5s):菜单栏数字与组卡从拉起就是真的。
@@ -70,6 +74,27 @@ final class SystemMonitor {
     /// GroupingPipelineTests"项目根热更新"用例单测,此处仅 MainActor 粘合。
     func setProjectRoots(_ roots: [String]) {
         pipeline.setProjectRoots(roots)
+    }
+
+    /// 结束进程(工单 08):UI 确认后调用——SIGTERM 逐目标投递,
+    /// 永不包含自身 pid(getpid),失败逐目标浮出(KillReport)。
+    /// 下轮采样自然反映消失;此处仅 MainActor 粘合(编排单测见 KillActionTests)。
+    func terminate(_ targets: [KillTarget]) -> KillReport {
+        KillReport(outcomes: KillAction.terminate(
+            targets,
+            excluding: getpid(),
+            service: killService
+        ))
+    }
+
+    /// 结束整组(工单 08):执行瞬间从**最新一轮采样**的组里重取成员
+    /// (确认对话框打开期间可能又采了一轮,以最新存活名单为准);
+    /// 组已消失 → 空报告(无需处置,也无失败可报)。
+    func terminateGroup(id groupID: String) -> KillReport {
+        guard let group = topGroups.first(where: { $0.id == groupID }) else {
+            return KillReport(outcomes: [])
+        }
+        return terminate(group.killTargets)
     }
 
     /// 一轮采样落地:菜单栏负载 + 出生登记、归组、截 Top-5(纯逻辑在 GroupingPipeline),

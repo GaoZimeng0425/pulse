@@ -6,11 +6,14 @@ import AppKit
 /// 组卡展开后的下钻区:组内进程平铺列表(既定顺序 = 进程 CPU% 降序)。
 /// 点进程行展开 / 收起详情。数据只读最近一轮采样(DrilldownState),
 /// 展开与选中都不触发额外采集;LazyVStack 保证数十行滚动流畅。
+/// 工单 08:进程详情的"结束进程"动作经 onEndProcess 上抛(确认对话框在 DashboardView)。
 struct ProcessDrilldownView: View {
     let group: ProcessGroup
     let drilldown: DrilldownState
     /// 当前展开详情的进程(跨组唯一):nil = 全部收起。
     @Binding var selectedProcessID: pid_t?
+    /// 处置请求上抛(工单 08):请求 ≠ 执行,确认对话框把关后才发信号。
+    let onEndProcess: (KillTarget) -> Void
 
     var body: some View {
         LazyVStack(spacing: 0) {
@@ -19,7 +22,7 @@ struct ProcessDrilldownView: View {
                     selectedProcessID = selectedProcessID == row.pid ? nil : row.pid
                 }
                 if selectedProcessID == row.pid, let detail = drilldown.detail(for: row.pid) {
-                    ProcessDetailView(detail: detail)
+                    ProcessDetailView(detail: detail, onEnd: onEndProcess)
                 }
             }
         }
@@ -72,8 +75,11 @@ struct ProcessRowView: View {
 
 /// 进程详情(点进程行展开):cwd、完整 argv(可滚动 / 可复制,长 argv 不破坏布局)、
 /// 启动时长("已 25 分钟")、父链面包屑一行("rustc ← cargo ← node ← Zcode")。
+/// 工单 08:详情尾部"结束进程"入口(请求上抛,确认对话框把关后才发信号)。
 struct ProcessDetailView: View {
     let detail: ProcessDetailModel
+    /// 处置请求上抛(工单 08):请求 ≠ 执行。
+    let onEnd: (KillTarget) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -97,12 +103,30 @@ struct ProcessDetailView: View {
                 Text(PulseFormat.uptime(startedAt: detail.process.startTime, now: Date()))
                     .monospacedDigit()
             }
+            endProcessRow
         }
         .font(.caption)
         .padding(10)
         .background(Color.primary.opacity(0.06), in: .rect(cornerRadius: 8))
         .padding(.horizontal, 6)
         .padding(.bottom, 4)
+    }
+
+    /// "结束进程"入口:点击只发起请求,确认对话框(取消为默认焦点)把关。
+    private var endProcessRow: some View {
+        HStack {
+            Spacer()
+            Button {
+                onEnd(detail.process.killTarget)
+            } label: {
+                Label("结束进程", systemImage: "xmark.octagon")
+                    .font(.caption.weight(.semibold))
+            }
+            .buttonStyle(.bordered)
+            .tint(.red)
+            .controlSize(.small)
+            .help("结束该进程(需确认)")
+        }
     }
 
     /// 完整 argv:一个参数一行(参数边界一目了然,长参数换行不破坏布局),
@@ -214,9 +238,14 @@ struct ProcessDetailView: View {
         cpuPercent: 95,
         memoryBytes: 280_000_000
     )
-    return ProcessDrilldownView(group: group, drilldown: state, selectedProcessID: .constant(100))
-        .padding(16)
-        .frame(width: 340)
+    return ProcessDrilldownView(
+        group: group,
+        drilldown: state,
+        selectedProcessID: .constant(100),
+        onEndProcess: { _ in }
+    )
+    .padding(16)
+    .frame(width: 340)
 }
 
 #Preview("进程行") {
