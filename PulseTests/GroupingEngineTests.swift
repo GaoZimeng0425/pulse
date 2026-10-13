@@ -1,0 +1,439 @@
+import XCTest
+@testable import Pulse
+
+/// 归组引擎(工单 03):三层归属 + 兜底三分类,全部以合成进程树为夹具(spec 测试决策)。
+/// 断言只看外部行为——"这棵树归出这些组";期望值全部为独立字面量,不经实现同源计算。
+final class GroupingEngineTests: XCTestCase {
+    private let octokRoot = "/Users/x/work/octok-client"
+
+    private func worktree(_ name: String) -> String {
+        octokRoot + "/.worktrees/" + name
+    }
+
+    /// 工单 03 验收锚点:rustc×4 ← cargo ← node ← Zcode,cwd 全在 octok-client 的 worktree 里。
+    private func octokGateTree() -> [RawProcess] {
+        [
+            RawProcess(
+                pid: 10,
+                parentPID: 1,
+                executablePath: "/Applications/Zcode.app/Contents/MacOS/Zcode",
+                physicalFootprintBytes: 300_000_000
+            ),
+            RawProcess(
+                pid: 11,
+                parentPID: 10,
+                executablePath: "/usr/local/bin/node",
+                argv: ["node", "server.js"],
+                cwd: worktree("skill-manage-read-and-index"),
+                physicalFootprintBytes: 80_000_000
+            ),
+            RawProcess(
+                pid: 12,
+                parentPID: 11,
+                executablePath: "/Users/x/.cargo/bin/cargo",
+                argv: ["cargo", "test"],
+                cwd: worktree("skill-manage-read-and-index"),
+                physicalFootprintBytes: 50_000_000
+            ),
+            RawProcess(
+                pid: 100,
+                parentPID: 12,
+                executablePath: "/Users/x/.rustup/toolchains/stable/bin/rustc",
+                argv: ["rustc", "--crate-name", "octok"],
+                cwd: worktree("skill-manage-read-and-index"),
+                physicalFootprintBytes: 200_000_000
+            ),
+            RawProcess(
+                pid: 101,
+                parentPID: 12,
+                executablePath: "/Users/x/.rustup/toolchains/stable/bin/rustc",
+                argv: ["rustc", "--crate-name", "octok"],
+                cwd: worktree("skill-manage-read-and-index"),
+                physicalFootprintBytes: 200_000_000
+            ),
+            RawProcess(
+                pid: 102,
+                parentPID: 12,
+                executablePath: "/Users/x/.rustup/toolchains/stable/bin/rustc",
+                argv: ["rustc", "--crate-name", "octok"],
+                cwd: worktree("skill-manage-read-and-index"),
+                physicalFootprintBytes: 200_000_000
+            ),
+            RawProcess(
+                pid: 103,
+                parentPID: 12,
+                executablePath: "/Users/x/.rustup/toolchains/stable/bin/rustc",
+                argv: ["rustc", "--crate-name", "octok"],
+                cwd: worktree("skill-manage-read-and-index"),
+                physicalFootprintBytes: 200_000_000
+            ),
+        ]
+    }
+
+    /// 各进程 CPU%(工单 04 差分器的输出,按 pid 传入引擎)。
+    private func octokGateCPU() -> [pid_t: Double] {
+        [10: 3, 11: 5, 12: 10, 100: 90, 101: 92, 102: 88, 103: 91]
+    }
+
+    // MARK: - 三层归属
+
+    /// 验收锚点:整棵门禁链归"项目 @ worktree",组 CPU% 为各进程之和(超过 100% 合法)。
+    func testOctokGateTreeGroupsIntoWorktreeProjectWithSummedCPU() {
+        let snapshot = ProcessSnapshot(processes: octokGateTree())
+        let groups = GroupingEngine.groups(
+            from: snapshot,
+            configuration: GroupingConfiguration(projectRoots: [octokRoot]),
+            cpuPercentByPID: octokGateCPU()
+        )
+
+        XCTAssertEqual(groups.count, 2)
+        let project = groups[0]
+        XCTAssertEqual(project.name, "octok-client @ skill-manage-read-and-index")
+        XCTAssertEqual(project.category, .project)
+        XCTAssertEqual(project.id, "project:/Users/x/work/octok-client@skill-manage-read-and-index")
+        XCTAssertEqual(project.processes.count, 6)
+        // 组 CPU% = 5 + 10 + 90 + 92 + 88 + 91:单核 100% 累加,超过 100% 合法
+        XCTAssertEqual(project.cpuPercent, 376, accuracy: 0.0001)
+        XCTAssertEqual(project.memoryBytes, 930_000_000)
+        // 组内进程按 CPU% 降序:92% 的 rustc(101)排最前
+        XCTAssertEqual(project.processes.first?.pid, 101)
+
+        // 拉起链顶端的 Zcode 单独成 App 组,组列表按组 CPU% 降序排在项目组之后
+        let app = groups[1]
+        XCTAssertEqual(app.name, "Zcode")
+        XCTAssertEqual(app.category, .app)
+        XCTAssertEqual(app.bundlePath, "/Applications/Zcode.app")
+        XCTAssertEqual(app.processes.map(\.pid), [10])
+        XCTAssertEqual(app.cpuPercent, 3, accuracy: 0.0001)
+    }
+
+    /// 嵌套 Helper.app(Renderer / GPU)与路径受限的 Helper 全部跟随宿主,应用仅一组。
+    func testChromeHelpersAllFollowHostBundleIntoOneGroup() {
+        let helperNested =
+            "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Helper.app/Contents/MacOS/Google Chrome Helper"
+        let snapshot = ProcessSnapshot(processes: [
+            RawProcess(
+                pid: 200,
+                parentPID: 1,
+                executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                physicalFootprintBytes: 400_000_000
+            ),
+            RawProcess(
+                pid: 201,
+                parentPID: 200,
+                executablePath: helperNested,
+                argv: ["Google Chrome Helper", "--type=renderer"],
+                physicalFootprintBytes: 900_000_000
+            ),
+            RawProcess(
+                pid: 202,
+                parentPID: 200,
+                executablePath: helperNested,
+                argv: ["Google Chrome Helper", "--type=gpu-process"],
+                physicalFootprintBytes: 150_000_000
+            ),
+            // 路径受限(proc_pidpath 失败)的 Helper:靠父链上溯跟随宿主
+            RawProcess(
+                pid: 203,
+                parentPID: 200,
+                argv: ["Google Chrome Helper", "--type=utility"],
+                physicalFootprintBytes: 50_000_000
+            ),
+        ])
+
+        let groups = GroupingEngine.groups(
+            from: snapshot,
+            cpuPercentByPID: [200: 15, 201: 120, 202: 30, 203: 8]
+        )
+
+        XCTAssertEqual(groups.count, 1)
+        let chrome = groups[0]
+        XCTAssertEqual(chrome.name, "Google Chrome")
+        XCTAssertEqual(chrome.category, .app)
+        XCTAssertEqual(chrome.bundlePath, "/Applications/Google Chrome.app")
+        XCTAssertEqual(chrome.processes.count, 4)
+        // 15 + 120 + 30 + 8
+        XCTAssertEqual(chrome.cpuPercent, 173, accuracy: 0.0001)
+        XCTAssertEqual(chrome.memoryBytes, 1_500_000_000)
+    }
+
+    /// 活链优先:进程被重挂到另一个活着的 App 下时,当前父链赢过出生登记。
+    func testLiveChainTakesPrecedenceOverBirthRegistry() {
+        let born = ProcessSnapshot(processes: [
+            RawProcess(pid: 20, parentPID: 1, executablePath: "/Applications/Aaa.app/Contents/MacOS/aaa"),
+            RawProcess(pid: 21, parentPID: 20, executablePath: "/usr/local/bin/node", argv: ["node"]),
+        ])
+        let registry = LineageRegistry().registeringBirths(in: born)
+
+        // 21 被重挂到另一个活着的 App 下:活链(Bbb)必须赢过出生登记(Aaa)
+        let after = ProcessSnapshot(processes: [
+            RawProcess(pid: 30, parentPID: 1, executablePath: "/Applications/Bbb.app/Contents/MacOS/bbb"),
+            RawProcess(pid: 21, parentPID: 30, executablePath: "/usr/local/bin/node", argv: ["node"]),
+        ])
+
+        let groups = GroupingEngine.groups(from: after, lineage: registry)
+
+        XCTAssertEqual(groups.count, 1)
+        XCTAssertEqual(groups[0].name, "Bbb")
+        XCTAssertEqual(Set(groups[0].processes.map(\.pid)), [21, 30])
+    }
+
+    /// 无项目根配置:dev 进程的项目归因整体失效,门禁链沿父链上溯跟随宿主 App,正常降级。
+    func testEmptyProjectRootsDegradeDevChainToHostAppBundle() {
+        let groups = GroupingEngine.groups(
+            from: ProcessSnapshot(processes: octokGateTree()),
+            configuration: GroupingConfiguration(), // 无项目根
+            cpuPercentByPID: octokGateCPU()
+        )
+
+        XCTAssertEqual(groups.count, 1)
+        let host = groups[0]
+        XCTAssertEqual(host.name, "Zcode")
+        XCTAssertEqual(host.category, .app)
+        // node / cargo / rustc×4 全部经父链上溯跟随宿主
+        XCTAssertEqual(host.processes.count, 7)
+        // 3 + 5 + 10 + 90 + 92 + 88 + 91
+        XCTAssertEqual(host.cpuPercent, 379, accuracy: 0.0001)
+    }
+
+    /// cwd 不可读(PROC_PIDVNODEPATHINFO 受限)时,argv 中的路径次之兜底项目归因。
+    func testProjectAttributionViaArgvPathWhenCwdUnavailable() {
+        let snapshot = ProcessSnapshot(processes: [
+            RawProcess(
+                pid: 21,
+                parentPID: 1,
+                executablePath: "/usr/local/bin/node",
+                argv: ["node", octokRoot + "/server.js"],
+                physicalFootprintBytes: 120_000_000
+            ),
+        ])
+
+        let groups = GroupingEngine.groups(
+            from: snapshot,
+            configuration: GroupingConfiguration(projectRoots: [octokRoot]),
+            cpuPercentByPID: [21: 30]
+        )
+
+        XCTAssertEqual(groups.count, 1)
+        XCTAssertEqual(groups[0].category, .project)
+        // 命中的不是 worktree 目录:显示纯项目名
+        XCTAssertEqual(groups[0].name, "octok-client")
+        XCTAssertEqual(groups[0].processes.map(\.pid), [21])
+    }
+
+    /// 并行 worktree 各自成组、互不混淆(用户故事 10)。
+    func testParallelWorktreesFormDistinctGroups() {
+        let snapshot = ProcessSnapshot(processes: [
+            RawProcess(
+                pid: 100,
+                parentPID: 1,
+                executablePath: "/Users/x/.rustup/toolchains/stable/bin/rustc",
+                argv: ["rustc"],
+                cwd: worktree("alpha"),
+                physicalFootprintBytes: 100_000_000
+            ),
+            RawProcess(
+                pid: 101,
+                parentPID: 1,
+                executablePath: "/Users/x/.rustup/toolchains/stable/bin/rustc",
+                argv: ["rustc"],
+                cwd: worktree("beta"),
+                physicalFootprintBytes: 100_000_000
+            ),
+        ])
+
+        let groups = GroupingEngine.groups(
+            from: snapshot,
+            configuration: GroupingConfiguration(projectRoots: [octokRoot]),
+            cpuPercentByPID: [100: 80, 101: 70]
+        )
+
+        XCTAssertEqual(groups.count, 2)
+        // 按组 CPU% 降序:alpha 在前
+        XCTAssertEqual(groups.map(\.name), ["octok-client @ alpha", "octok-client @ beta"])
+        XCTAssertNotEqual(groups[0].id, groups[1].id)
+    }
+
+    /// 多个项目根同时命中时取最具体的(最长)根。
+    func testLongestProjectRootWins() {
+        let snapshot = ProcessSnapshot(processes: [
+            RawProcess(
+                pid: 100,
+                parentPID: 1,
+                executablePath: "/Users/x/.rustup/toolchains/stable/bin/rustc",
+                argv: ["rustc"],
+                cwd: worktree("gamma"),
+                physicalFootprintBytes: 100_000_000
+            ),
+        ])
+
+        let groups = GroupingEngine.groups(
+            from: snapshot,
+            configuration: GroupingConfiguration(projectRoots: [
+                "/Users/x/work", // 更宽泛的根
+                octokRoot,
+            ]),
+            cpuPercentByPID: [100: 50]
+        )
+
+        XCTAssertEqual(groups.count, 1)
+        XCTAssertEqual(groups[0].name, "octok-client @ gamma")
+    }
+
+    // MARK: - 出生登记
+
+    /// 中间父进程(cargo)已死、rustc 被重挂到 launchd 且 cwd 不可读:出生登记回查仍归对。
+    func testDeadMidChainParentStillAttributesViaBirthRegistry() {
+        let fullTree = octokGateTree()
+        let registered = LineageRegistry().registeringBirths(
+            in: ProcessSnapshot(processes: fullTree)
+        )
+
+        // cargo(12) 已死,rustc(100) 被重挂到 launchd 且 cwd 已不可读——活链断了
+        let after = ProcessSnapshot(processes: [
+            fullTree[0], // Zcode(10)
+            RawProcess(
+                pid: 100,
+                parentPID: 1,
+                executablePath: fullTree[3].executablePath,
+                argv: ["rustc", "--crate-name", "octok"],
+                physicalFootprintBytes: 200_000_000
+            ),
+        ])
+
+        let groups = GroupingEngine.groups(
+            from: after,
+            lineage: registered,
+            configuration: GroupingConfiguration(projectRoots: [octokRoot]),
+            cpuPercentByPID: [10: 3, 100: 90]
+        )
+
+        // 出生登记回查:rustc 出生时的父链经 cargo(出生时 cwd 在 worktree)→ 项目组
+        let project = groups.first { $0.category == .project }
+        XCTAssertNotNil(project)
+        XCTAssertEqual(project?.name, "octok-client @ skill-manage-read-and-index")
+        XCTAssertEqual(project?.processes.map(\.pid), [100])
+        XCTAssertEqual(project?.cpuPercent ?? 0, 90, accuracy: 0.0001)
+    }
+
+    /// 登记是纯函数:返回新表,不改动原表。
+    func testRegisteringBirthsReturnsNewRegistryWithoutMutatingOriginal() {
+        let original = LineageRegistry()
+        let snapshot = ProcessSnapshot(processes: octokGateTree())
+
+        let updated = original.registeringBirths(in: snapshot)
+
+        XCTAssertNotEqual(updated, original)
+        XCTAssertEqual(original, LineageRegistry())
+        XCTAssertEqual(updated.entries.count, 7)
+        // 只登记首次出现:重复登记不产生新记录
+        XCTAssertEqual(updated.registeringBirths(in: snapshot).entries.count, 7)
+    }
+
+    // MARK: - 兜底三分类
+
+    /// 断链(父不在快照)且出生登记无记录:落"孤儿进程"。
+    func testUnregisteredBrokenChainProcessFallsToOrphanGroup() {
+        let snapshot = ProcessSnapshot(processes: [
+            RawProcess(
+                pid: 777,
+                parentPID: 1, // launchd 不在快照中:父链断
+                executablePath: "/opt/homebrew/bin/waifud",
+                argv: ["waifud"],
+                physicalFootprintBytes: 30_000_000
+            ),
+        ])
+
+        // 出生登记为空(如 Pulse 启动晚于进程出生)
+        let groups = GroupingEngine.groups(from: snapshot, cpuPercentByPID: [777: 7])
+
+        XCTAssertEqual(groups.count, 1)
+        let orphan = groups[0]
+        XCTAssertEqual(orphan.name, "孤儿进程")
+        XCTAssertEqual(orphan.category, .orphan)
+        XCTAssertEqual(orphan.processes.map(\.pid), [777])
+        XCTAssertEqual(orphan.cpuPercent, 7, accuracy: 0.0001)
+    }
+
+    /// WindowServer(自身路径在 .app bundle 里)与内核:落"系统",不另成 App 组。
+    func testWindowServerAndKernelTaskFallToSystemGroupDespiteBundlePath() {
+        let snapshot = ProcessSnapshot(processes: [
+            RawProcess(
+                pid: 128,
+                parentPID: 1,
+                executablePath: "/System/Library/CoreServices/WindowServer.app/Contents/MacOS/WindowServer",
+                physicalFootprintBytes: 90_000_000
+            ),
+            RawProcess(
+                pid: 0,
+                parentPID: 0,
+                executablePath: "/System/Library/Kernels/kernel_task",
+                physicalFootprintBytes: 500_000_000
+            ),
+        ])
+
+        let groups = GroupingEngine.groups(from: snapshot, cpuPercentByPID: [128: 40, 0: 25])
+
+        XCTAssertEqual(groups.count, 1)
+        let system = groups[0]
+        XCTAssertEqual(system.name, "系统")
+        XCTAssertEqual(system.category, .system)
+        XCTAssertNil(system.bundlePath)
+        XCTAssertEqual(system.processes.count, 2)
+        XCTAssertEqual(system.cpuPercent, 65, accuracy: 0.0001)
+        XCTAssertEqual(system.memoryBytes, 590_000_000)
+    }
+
+    /// 活着的 launchd 下的常驻服务(postgres):落"后台服务";launchd 自身落"系统"。
+    func testLaunchdResidentServiceFallsToBackgroundServiceGroup() {
+        let snapshot = ProcessSnapshot(processes: [
+            RawProcess(
+                pid: 1,
+                parentPID: 0,
+                executablePath: "/sbin/launchd",
+                physicalFootprintBytes: 20_000_000
+            ),
+            RawProcess(
+                pid: 500,
+                parentPID: 1,
+                executablePath: "/usr/local/postgres/bin/postgres",
+                argv: ["postgres", "-D", "/usr/local/postgres/data"],
+                physicalFootprintBytes: 400_000_000
+            ),
+        ])
+
+        let groups = GroupingEngine.groups(from: snapshot, cpuPercentByPID: [1: 0.5, 500: 12])
+
+        XCTAssertEqual(groups.count, 2)
+        let service = groups[0]
+        XCTAssertEqual(service.name, "后台服务")
+        XCTAssertEqual(service.category, .backgroundService)
+        XCTAssertEqual(service.processes.map(\.pid), [500])
+        XCTAssertEqual(service.cpuPercent, 12, accuracy: 0.0001)
+
+        let system = groups[1]
+        XCTAssertEqual(system.name, "系统")
+        XCTAssertEqual(system.processes.map(\.pid), [1])
+    }
+
+    // MARK: - 纯函数
+
+    /// 引擎为纯函数:同输入同输出,不持任何跨调用状态。
+    func testEngineIsPureSameInputsProduceEqualOutputs() {
+        let snapshot = ProcessSnapshot(
+            takenAt: Date(timeIntervalSince1970: 1000),
+            processes: octokGateTree()
+        )
+        let lineage = LineageRegistry().registeringBirths(in: snapshot)
+        let configuration = GroupingConfiguration(projectRoots: [octokRoot])
+
+        let first = GroupingEngine.groups(
+            from: snapshot, lineage: lineage, configuration: configuration, cpuPercentByPID: octokGateCPU()
+        )
+        let second = GroupingEngine.groups(
+            from: snapshot, lineage: lineage, configuration: configuration, cpuPercentByPID: octokGateCPU()
+        )
+
+        XCTAssertEqual(first, second)
+    }
+}
