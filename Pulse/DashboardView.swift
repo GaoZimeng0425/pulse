@@ -1,7 +1,9 @@
 import SwiftUI
 
-/// 弹窗主页:Top 组卡(静态假数据),组 CPU% 降序平铺。
+/// 弹窗主页:头部系统 CPU 负载为真实采样数字;组卡仍为静态假数据(工单 05 接入归组)。
 struct DashboardView: View {
+    let monitor: SystemMonitor
+
     var body: some View {
         VStack(spacing: 12) {
             header
@@ -21,7 +23,7 @@ struct DashboardView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Pulse")
                     .font(.headline)
-                Text("系统 CPU 负载 \(PulseFormat.cpuPercent(FakeSnapshot.systemCPULoad))")
+                Text("系统 CPU 负载 \(PulseFormat.cpuPercent(monitor.systemCPULoad))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
@@ -31,7 +33,7 @@ struct DashboardView: View {
     }
 
     private var footer: some View {
-        Text("静态假数据 · 采样尚未接入")
+        Text("组卡为静态假数据 · 归组尚未接入")
             .font(.caption2)
             .foregroundStyle(.tertiary)
     }

@@ -25,6 +25,20 @@ struct LiveProcessSource: ProcessSource {
     private static let procArgsBufferSize = 1 << 20
     /// 进程列表缓冲(pid 数),远超实际进程数。
     private static let pidListCapacity = 16_384
+    /// mach 时间基准(本机实测 125/3 ns/tick;Intel 上为 1/1,即 tick == 纳秒)。
+    /// pti_total_user/system 实为 mach_absolute_time 原始 tick 而非纳秒——
+    /// 工单 04 用 getrusage 基准校准发现:不换算 CPU% 会缩小 ~41.7 倍
+    /// (刻度校准测试见 LiveProcessSourceSmokeTests)。
+    private static let timebase: mach_timebase_info_data_t = {
+        var info = mach_timebase_info_data_t()
+        mach_timebase_info(&info)
+        return info
+    }()
+
+    /// tick → 纳秒。整数乘除(ticks ≤ 开机时长 × 24MHz,×125 远不溢出 UInt64)。
+    private static func nanoseconds(fromTicks ticks: UInt64) -> UInt64 {
+        ticks * UInt64(timebase.numer) / UInt64(timebase.denom)
+    }
 
     func snapshot() -> ProcessSnapshot {
         let takenAt = Date()
@@ -42,6 +56,7 @@ struct LiveProcessSource: ProcessSource {
             guard let kinfo = Self.kernelProcessInfo(pid: pid) else { continue }
             let task = Self.taskInfo(pid: pid)
             let usage = Self.resourceUsage(pid: pid)
+            let cpuTicks = task.map { $0.pti_total_user + $0.pti_total_system } ?? 0
 
             processes.append(
                 RawProcess(
@@ -50,7 +65,7 @@ struct LiveProcessSource: ProcessSource {
                     executablePath: Self.executablePath(pid: pid, buffer: &pathBuffer),
                     argv: ProcArgsParser.argv(of: pid, into: &procArgsBuffer),
                     cwd: Self.currentWorkingDirectory(pid: pid),
-                    cpuTimeNanoseconds: task.map { $0.pti_total_user + $0.pti_total_system } ?? 0,
+                    cpuTimeNanoseconds: Self.nanoseconds(fromTicks: cpuTicks),
                     residentMemoryBytes: task?.pti_resident_size ?? 0,
                     physicalFootprintBytes: usage?.ri_phys_footprint ?? 0,
                     diskBytesRead: usage?.ri_diskio_bytesread ?? 0,
