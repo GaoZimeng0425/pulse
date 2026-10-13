@@ -1,0 +1,50 @@
+name: Pulse
+options:
+  bundleIdPrefix: com.gaozimeng
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+targets:
+  Pulse:
+    type: application
+    platform: macOS
+    sources:
+      - path: Pulse
+    settings:
+      base:
+        PRODUCT_NAME: Pulse
+        PRODUCT_BUNDLE_IDENTIFIER: com.gaozimeng.pulse
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_LSUIElement: YES
+        ENABLE_APP_SANDBOX: NO
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+        DEVELOPMENT_TEAM: ""
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+  PulseTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: PulseTests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.gaozimeng.pulse.tests
+    dependencies:
+      - target: Pulse
+schemes:
+  Pulse:
+    build:
+      targets:
+        Pulse: all
+        PulseTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - PulseTests

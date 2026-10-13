@@ -6,11 +6,11 @@
 
 **Status:** ready-for-agent
 
-- [ ] App 启动后不出现在 Dock,仅菜单栏可见
-- [ ] 菜单栏显示假 CPU 数字,点击弹出窗口
-- [ ] 弹窗显示 ≥3 张静态组卡(假数据),文案中文
-- [ ] 工程无 App Sandbox 能力勾选;本地运行无需任何权限弹窗
-- [ ] 测试 target 存在且 `xcodebuild test` 通过
-- [ ] P0 零第三方依赖,仅系统框架
+- [x] App 启动后不出现在 Dock,仅菜单栏可见
+- [x] 菜单栏显示假 CPU 数字,点击弹出窗口
+- [x] 弹窗显示 ≥3 张静态组卡(假数据),文案中文
+- [x] 工程无 App Sandbox 能力勾选;本地运行无需任何权限弹窗
+- [x] 测试 target 存在且 `xcodebuild test` 通过
+- [x] P0 零第三方依赖,仅系统框架
 
 ## Comments
