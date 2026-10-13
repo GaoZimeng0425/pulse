@@ -9,7 +9,14 @@
 /* Begin PBXBuildFile section */
 		0768A25F3BC010CBFDB706E9 /* PulseFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C772B1E878BAEDA9C022C6C /* PulseFormatTests.swift */; };
 		2A294741604ED11BCA7E7E11 /* PulseApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D5309CAF2CC1BC7C626E937 /* PulseApp.swift */; };
+		616D7878CF54B2A29104277C /* ProcArgsParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 922EBEDDF974C9C5C567A5C8 /* ProcArgsParserTests.swift */; };
 		68820A72998494281B77A725 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03A9EBCB9547AAD3B2FF3F9 /* DashboardView.swift */; };
+		906C33A688BF48D564DAD3FC /* ProcArgsParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0BF7D6AA1DBB63B3727EB5F /* ProcArgsParser.swift */; };
+		90E51900C14DD298679E2C5B /* LiveProcessSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = C51EAD0B99672798A7F56077 /* LiveProcessSource.swift */; };
+		9C83A4041E9F900BA5A1F008 /* ProcessSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59315D07799E52E9D8CCB971 /* ProcessSnapshot.swift */; };
+		A94FE8284BA99E78188EAEA4 /* SyntheticProcessSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F037E709135740FF3012BA47 /* SyntheticProcessSourceTests.swift */; };
+		E559247BAA70D0A1868BD156 /* LiveProcessSourceSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A992F5F503CAD7CB90DD838 /* LiveProcessSourceSmokeTests.swift */; };
+		EB6A8D530686F8BEE362E0AD /* ProcessSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF564398ED42F94AAC5F11A4 /* ProcessSource.swift */; };
 		EE3566C6FB14C20C796F9706 /* PulseFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A05454E2790B918CCFBFDA4 /* PulseFormat.swift */; };
 		F60B826C301CC4C16C7763C3 /* GroupSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57819C3CD948E1FA1758D62D /* GroupSummary.swift */; };
 /* End PBXBuildFile section */
@@ -28,10 +35,17 @@
 		0C772B1E878BAEDA9C022C6C /* PulseFormatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PulseFormatTests.swift; sourceTree = "<group>"; };
 		13FEF2D2118D74C3572DF349 /* Pulse.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Pulse.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2A05454E2790B918CCFBFDA4 /* PulseFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PulseFormat.swift; sourceTree = "<group>"; };
+		3A992F5F503CAD7CB90DD838 /* LiveProcessSourceSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveProcessSourceSmokeTests.swift; sourceTree = "<group>"; };
 		4FBA30D234A433E58E16508B /* PulseTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PulseTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		57819C3CD948E1FA1758D62D /* GroupSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupSummary.swift; sourceTree = "<group>"; };
+		59315D07799E52E9D8CCB971 /* ProcessSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessSnapshot.swift; sourceTree = "<group>"; };
+		922EBEDDF974C9C5C567A5C8 /* ProcArgsParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcArgsParserTests.swift; sourceTree = "<group>"; };
 		9D5309CAF2CC1BC7C626E937 /* PulseApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PulseApp.swift; sourceTree = "<group>"; };
+		B0BF7D6AA1DBB63B3727EB5F /* ProcArgsParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcArgsParser.swift; sourceTree = "<group>"; };
+		BF564398ED42F94AAC5F11A4 /* ProcessSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessSource.swift; sourceTree = "<group>"; };
 		C03A9EBCB9547AAD3B2FF3F9 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		C51EAD0B99672798A7F56077 /* LiveProcessSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveProcessSource.swift; sourceTree = "<group>"; };
+		F037E709135740FF3012BA47 /* SyntheticProcessSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyntheticProcessSourceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -40,6 +54,10 @@
 			children = (
 				C03A9EBCB9547AAD3B2FF3F9 /* DashboardView.swift */,
 				57819C3CD948E1FA1758D62D /* GroupSummary.swift */,
+				C51EAD0B99672798A7F56077 /* LiveProcessSource.swift */,
+				B0BF7D6AA1DBB63B3727EB5F /* ProcArgsParser.swift */,
+				59315D07799E52E9D8CCB971 /* ProcessSnapshot.swift */,
+				BF564398ED42F94AAC5F11A4 /* ProcessSource.swift */,
 				9D5309CAF2CC1BC7C626E937 /* PulseApp.swift */,
 				2A05454E2790B918CCFBFDA4 /* PulseFormat.swift */,
 			);
@@ -67,7 +85,10 @@
 		FCB0E6001B954CCA450AA55C /* PulseTests */ = {
 			isa = PBXGroup;
 			children = (
+				3A992F5F503CAD7CB90DD838 /* LiveProcessSourceSmokeTests.swift */,
+				922EBEDDF974C9C5C567A5C8 /* ProcArgsParserTests.swift */,
 				0C772B1E878BAEDA9C022C6C /* PulseFormatTests.swift */,
+				F037E709135740FF3012BA47 /* SyntheticProcessSourceTests.swift */,
 			);
 			path = PulseTests;
 			sourceTree = "<group>";
@@ -150,7 +171,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E559247BAA70D0A1868BD156 /* LiveProcessSourceSmokeTests.swift in Sources */,
+				616D7878CF54B2A29104277C /* ProcArgsParserTests.swift in Sources */,
 				0768A25F3BC010CBFDB706E9 /* PulseFormatTests.swift in Sources */,
+				A94FE8284BA99E78188EAEA4 /* SyntheticProcessSourceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -160,6 +184,10 @@
 			files = (
 				68820A72998494281B77A725 /* DashboardView.swift in Sources */,
 				F60B826C301CC4C16C7763C3 /* GroupSummary.swift in Sources */,
+				90E51900C14DD298679E2C5B /* LiveProcessSource.swift in Sources */,
+				906C33A688BF48D564DAD3FC /* ProcArgsParser.swift in Sources */,
+				9C83A4041E9F900BA5A1F008 /* ProcessSnapshot.swift in Sources */,
+				EB6A8D530686F8BEE362E0AD /* ProcessSource.swift in Sources */,
 				2A294741604ED11BCA7E7E11 /* PulseApp.swift in Sources */,
 				EE3566C6FB14C20C796F9706 /* PulseFormat.swift in Sources */,
 			);

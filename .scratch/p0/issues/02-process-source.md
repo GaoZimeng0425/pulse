@@ -6,11 +6,11 @@
 
 **Status:** ready-for-agent
 
-- [ ] 协议 + 快照模型定义完成,纯 Swift 值类型
-- [ ] Live 实现一轮采集本机返回 >0 个进程,耗时毫秒级
-- [ ] 冒烟测试:能读到本机 zsh/登录 shell 的可执行路径;能读到自身 argv 与 cwd
-- [ ] KERN_PROCARGS2 解析跳过第一个字符串(execpath),argv 完整
-- [ ] root 进程(如 pid 1)采集受限时静默降级,不崩溃不报错
-- [ ] SyntheticProcessSource 可注入任意合成进程树(供 03/05 使用)
+- [x] 协议 + 快照模型定义完成,纯 Swift 值类型
+- [x] Live 实现一轮采集本机返回 >0 个进程,耗时毫秒级
+- [x] 冒烟测试:能读到本机 zsh/登录 shell 的可执行路径;能读到自身 argv 与 cwd
+- [x] KERN_PROCARGS2 解析跳过第一个字符串(execpath),argv 完整
+- [x] root 进程(如 pid 1)采集受限时静默降级,不崩溃不报错
+- [x] SyntheticProcessSource 可注入任意合成进程树(供 03/05 使用)
 
 ## Comments
