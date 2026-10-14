@@ -5,7 +5,14 @@ import Foundation
 enum PulseFormat {
     /// 百分比 → "42%":四舍五入到整数。组 CPU% 可超过 100("445%"),系统 CPU 负载 0–100。
     static func cpuPercent(_ value: Double) -> String {
-        "\(Int(value.rounded()))%"
+        "\(cpuPercentNumber(value))%"
+    }
+
+    /// 百分比数字部分 → "445"(P0.6-02):大数字与单位分层排版用——
+    /// 数字走圆体大字,单位 "%" 由视图以小字基线对齐拼接;取整口径与
+    /// cpuPercent 同源,两个出口不会差 1%。
+    static func cpuPercentNumber(_ value: Double) -> String {
+        String(Int(value.rounded()))
     }
 
     /// 字节 → 人类可读内存:十进制单位(与活动监视器一致)。

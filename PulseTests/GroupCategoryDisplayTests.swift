@@ -18,4 +18,10 @@ final class GroupCategoryDisplayTests: XCTestCase {
     func testOrphanCardStyleIsOrangeHighlighted() {
         XCTAssertEqual(GroupCategory.orphan.cardStyle.iconColor, .orange)
     }
+
+    /// P0.6-02 强调色接入样式表后,孤儿一行的强调色仍是橙——
+    /// "孤儿橙"语义不随指标色体系改变(其余类别用 CPU 指标强调色,视觉验收)。
+    func testOrphanCardAccentStaysOrange() {
+        XCTAssertEqual(GroupCategory.orphan.cardStyle.accentColor, .orange)
+    }
 }

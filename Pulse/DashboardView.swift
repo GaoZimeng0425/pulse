@@ -91,6 +91,7 @@ struct DashboardView: View {
             GroupCardView(
                 group: group,
                 isExpanded: expandedGroupIDs.contains(group.id),
+                meterFraction: MeterNormalization.fraction(group.cpuPercent, leader: groupCPULeader),
                 onToggle: { toggleExpansion(of: group.id) },
                 onEndGroup: { requestEndGroup(group) }
             )
@@ -103,6 +104,12 @@ struct DashboardView: View {
                 )
             }
         }
+    }
+
+    /// 组卡 meter 的归一榜首(工单 P0.6-02):当前榜单(全部组)CPU% 最大者。
+    /// 弹窗与主窗口共用同一口径;空载/首轮采样前为 0 → 条不画填充。
+    private var groupCPULeader: Double {
+        monitor.allGroups.map(\.cpuPercent).max() ?? 0
     }
 
     private func toggleExpansion(of groupID: String) {
@@ -132,9 +139,8 @@ struct DashboardView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Pulse")
                     .font(.headline)
-                Text("系统 CPU 负载 \(PulseFormat.cpuPercent(monitor.systemCPULoad))")
+                loadLine
                     .font(.caption)
-                    .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
             Spacer()
@@ -147,6 +153,15 @@ struct DashboardView: View {
             .foregroundStyle(.secondary)
             .help("设置项目根目录")
         }
+    }
+
+    /// 系统 CPU 负载读数(工单 P0.6-02):文案不变,数值用 CPU 指标强调色——
+    /// "CPU 指标驱动负载/meter/CPU 读数"的负载面。
+    private var loadLine: Text {
+        Text("系统 CPU 负载 ")
+            .foregroundStyle(.secondary)
+            + Text(PulseFormat.cpuPercent(monitor.systemCPULoad))
+                .foregroundStyle(Metric.cpu.accentColor)
     }
 
     /// 极端空载 / 首轮采样前:无组可显示,给一行安静文案而不是坏 UI。
@@ -166,35 +181,40 @@ struct DashboardView: View {
 struct GroupCardView: View {
     let group: ProcessGroup
     let isExpanded: Bool
+    /// 占比 meter 条(工单 P0.6-02):组 CPU% 按当前榜单(全部组)榜首归一,
+    /// 由调用方算好传入——归一是榜单级口径,卡内不自算。
+    let meterFraction: Double
     let onToggle: () -> Void
     let onEndGroup: () -> Void
 
     var body: some View {
         Button(action: onToggle) {
-            HStack(spacing: 12) {
-                icon
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(group.name)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Text("\(group.processes.count) 进程")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            VStack(spacing: 8) {
+                HStack(spacing: 12) {
+                    icon
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(group.name)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Text("\(group.processes.count) 进程")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        cpuFigure
+                        Text(PulseFormat.memory(group.memoryBytes))
+                            .font(.system(.caption, design: .rounded).monospacedDigit().weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    endGroupButton
                 }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(PulseFormat.cpuPercent(group.cpuPercent))
-                        .font(.title3.monospacedDigit().weight(.semibold))
-                    Text(PulseFormat.memory(group.memoryBytes))
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                endGroupButton
+                MeterBar(fraction: meterFraction, tint: group.category.cardStyle.accentColor)
             }
             .padding(10)
             .background(group.category.cardStyle.cardBackground, in: .rect(cornerRadius: 10))
@@ -203,6 +223,21 @@ struct GroupCardView: View {
         .buttonStyle(.plain)
         .accessibilityLabel("\(group.name),\(group.processes.count) 进程")
         .accessibilityHint(isExpanded ? "收起组内进程列表" : "展开组内进程列表")
+    }
+
+    /// 组 CPU 大数字(工单 P0.6-02,参考文档 §1.2 figure 规格):圆体加粗 +
+    /// tabular 数字 + 负字距,单位 "%" 小一号、基线对齐;紧凑行数值档 22px。
+    /// 数字本体保持墨色(Vitals 同款:大数字用 --ink,色彩交给 meter 条)。
+    private var cpuFigure: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 2) {
+            Text(PulseFormat.cpuPercentNumber(group.cpuPercent))
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .kerning(-0.4)
+            Text("%")
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(.secondary)
+        }
     }
 
     /// "结束整组"入口:xmark.octagon 图标按钮(borderless:嵌在卡内可独立点按)。
@@ -238,12 +273,16 @@ struct GroupCardView: View {
 }
 
 /// 组卡样式表(工单 05/09,评审 T6):每个类别一份完整样式
-/// (SF Symbol + 图标色 + 卡片底色)。孤儿进程的橙色高亮(GLOSSARY:
+/// (SF Symbol + 图标色 + 卡片底色 + 指标强调色)。孤儿进程的橙色高亮(GLOSSARY:
 /// 它往往正是问题所在)是表中的一行,而非散落在视图里的 `.orphan` 特判。
 struct GroupCardStyle {
     let symbolName: String
     let iconColor: Color
     let cardBackground: AnyShapeStyle
+    /// 指标强调色(工单 P0.6-02):驱动卡内 meter 条(轨道 14% / 填充纯色);
+    /// 工单 03 tab 化后按当前 tab 的指标覆盖同一入口。现实映射:组卡读数以
+    /// CPU 为主(CPU 指标驱动 meter/读数),孤儿一行仍橙——语义不变。
+    let accentColor: Color
 }
 
 extension GroupCategory {
@@ -252,18 +291,35 @@ extension GroupCategory {
     var cardStyle: GroupCardStyle {
         switch self {
         case .app:
-            GroupCardStyle(symbolName: "shippingbox", iconColor: .secondary, cardBackground: AnyShapeStyle(.quaternary))
+            GroupCardStyle(
+                symbolName: "shippingbox", iconColor: .secondary,
+                cardBackground: AnyShapeStyle(.quaternary),
+                accentColor: Metric.cpu.accentColor
+            )
         case .project:
-            GroupCardStyle(symbolName: "hammer", iconColor: .secondary, cardBackground: AnyShapeStyle(.quaternary))
+            GroupCardStyle(
+                symbolName: "hammer", iconColor: .secondary,
+                cardBackground: AnyShapeStyle(.quaternary),
+                accentColor: Metric.cpu.accentColor
+            )
         case .system:
-            GroupCardStyle(symbolName: "cpu", iconColor: .secondary, cardBackground: AnyShapeStyle(.quaternary))
+            GroupCardStyle(
+                symbolName: "cpu", iconColor: .secondary,
+                cardBackground: AnyShapeStyle(.quaternary),
+                accentColor: Metric.cpu.accentColor
+            )
         case .backgroundService:
-            GroupCardStyle(symbolName: "gearshape", iconColor: .secondary, cardBackground: AnyShapeStyle(.quaternary))
+            GroupCardStyle(
+                symbolName: "gearshape", iconColor: .secondary,
+                cardBackground: AnyShapeStyle(.quaternary),
+                accentColor: Metric.cpu.accentColor
+            )
         case .orphan:
             GroupCardStyle(
                 symbolName: "exclamationmark.triangle",
                 iconColor: .orange,
-                cardBackground: AnyShapeStyle(Color.orange.opacity(0.15))
+                cardBackground: AnyShapeStyle(Color.orange.opacity(0.15)),
+                accentColor: .orange
             )
         }
     }
@@ -414,6 +470,7 @@ struct KillFailureAlert: ViewModifier {
 }
 
 #Preview("组卡") {
+    // meter 榜首 = 三张卡里最高的 445%(榜首归一的验收锚点)。
     VStack(spacing: 12) {
         GroupCardView(
             group: ProcessGroup(
@@ -428,6 +485,7 @@ struct KillFailureAlert: ViewModifier {
                 memoryBytes: 2_400_000_000
             ),
             isExpanded: false,
+            meterFraction: MeterNormalization.fraction(445, leader: 445),
             onToggle: {},
             onEndGroup: {}
         )
@@ -444,6 +502,7 @@ struct KillFailureAlert: ViewModifier {
                 memoryBytes: 120_000_000
             ),
             isExpanded: true,
+            meterFraction: MeterNormalization.fraction(12, leader: 445),
             onToggle: {},
             onEndGroup: {}
         )
@@ -460,6 +519,7 @@ struct KillFailureAlert: ViewModifier {
                 memoryBytes: 30_000_000
             ),
             isExpanded: false,
+            meterFraction: MeterNormalization.fraction(7, leader: 445),
             onToggle: {},
             onEndGroup: {}
         )

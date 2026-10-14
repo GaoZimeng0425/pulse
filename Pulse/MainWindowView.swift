@@ -53,6 +53,7 @@ struct MainWindowView: View {
             GroupCardView(
                 group: group,
                 isExpanded: expandedGroupIDs.contains(group.id),
+                meterFraction: MeterNormalization.fraction(group.cpuPercent, leader: groupCPULeader),
                 onToggle: { toggleExpansion(of: group.id) },
                 onEndGroup: {
                     killFailureReport = KillRequestFlow.endGroup(group, monitor: monitor)
@@ -71,6 +72,12 @@ struct MainWindowView: View {
         }
     }
 
+    /// 组卡 meter 的归一榜首(工单 P0.6-02):与弹窗同一口径——当前榜单
+    /// (主窗口 = 全部组)CPU% 最大者,两处榜单的条宽直接可比。
+    private var groupCPULeader: Double {
+        monitor.allGroups.map(\.cpuPercent).max() ?? 0
+    }
+
     private func toggleExpansion(of groupID: String) {
         if !expandedGroupIDs.insert(groupID).inserted {
             expandedGroupIDs.remove(groupID)
@@ -86,16 +93,23 @@ struct MainWindowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Pulse")
                     .font(.headline)
-                Text(
-                    "系统 CPU 负载 \(PulseFormat.cpuPercent(monitor.systemCPULoad))"
-                        + " · 共 \(monitor.allGroups.count) 组"
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
+                loadLine
+                    .font(.caption)
+                    .monospacedDigit()
             }
             Spacer()
         }
+    }
+
+    /// 系统 CPU 负载读数(工单 P0.6-02):文案不变,数值用 CPU 指标强调色
+    /// (与弹窗头部同一处理)。
+    private var loadLine: Text {
+        Text("系统 CPU 负载 ")
+            .foregroundStyle(.secondary)
+            + Text(PulseFormat.cpuPercent(monitor.systemCPULoad))
+                .foregroundStyle(Metric.cpu.accentColor)
+            + Text(" · 共 \(monitor.allGroups.count) 组")
+                .foregroundStyle(.secondary)
     }
 
     /// 极端空载 / 首轮采样前:与弹窗同一句安静文案,大画布上居中。
@@ -131,11 +145,19 @@ struct SortableProcessTableView: View {
         // rows(for:) 保持引擎既定序(进程 CPU% 降序)——排序叠加其上:
         // 同值次键 pid 升序,排序跨采样轮稳定,进窗口默认观感与弹窗一致。
         let rows = order.sorted(drilldown.rows(for: group))
+        // 进程行 meter 榜首(工单 P0.6-02):当前表内 CPU% 最大者——
+        // 无论按哪列排序,meter 恒以 CPU 占比取值(CPU 指标驱动 meter),
+        // 换列排序只换行序,不换条的口径。
+        let cpuLeader = rows.map(\.cpuPercent).max() ?? 0
         VStack(spacing: 0) {
             tableHeader
             LazyVStack(spacing: 0) {
                 ForEach(rows) { row in
-                    ProcessRowView(row: row, isSelected: selectedProcessID == row.pid) {
+                    ProcessRowView(
+                        row: row,
+                        isSelected: selectedProcessID == row.pid,
+                        meterFraction: MeterNormalization.fraction(row.cpuPercent, leader: cpuLeader)
+                    ) {
                         selectedProcessID = selectedProcessID == row.pid ? nil : row.pid
                     }
                     if selectedProcessID == row.pid, let detail = drilldown.detail(for: row.pid) {

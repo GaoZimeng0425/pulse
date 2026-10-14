@@ -34,28 +34,37 @@ struct ProcessDrilldownView: View {
 // MARK: - 进程行
 
 /// 进程行四要素(工单 06):进程名 / pid / CPU% / 内存;选中态高亮。
+/// P0.6-02:主窗口进程表传入 meterFraction 时在行内附 6pt 占比 meter 条
+/// (CPU 指标强调色,榜首归一);弹窗下钻行保持紧凑(缺省 nil 不画条)。
 struct ProcessRowView: View {
     let row: ProcessRowModel
     let isSelected: Bool
+    /// 占比条取值(榜首归一):nil = 不画。进程行无类别语境,条恒用 CPU 指标强调色。
+    var meterFraction: Double?
     let onToggle: () -> Void
 
     var body: some View {
         Button(action: onToggle) {
-            HStack(spacing: 8) {
-                Text(row.name)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Text("\(row.pid)")
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 12)
-                Text(PulseFormat.cpuPercent(row.cpuPercent))
-                    .monospacedDigit()
-                    .frame(minWidth: 44, alignment: .trailing)
-                Text(PulseFormat.memory(row.memoryBytes))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                    .frame(minWidth: 56, alignment: .trailing)
+            VStack(spacing: 4) {
+                HStack(spacing: 8) {
+                    Text(row.name)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Text("\(row.pid)")
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 12)
+                    Text(PulseFormat.cpuPercent(row.cpuPercent))
+                        .monospacedDigit()
+                        .frame(minWidth: 44, alignment: .trailing)
+                    Text(PulseFormat.memory(row.memoryBytes))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .frame(minWidth: 56, alignment: .trailing)
+                }
+                if let meterFraction {
+                    MeterBar(fraction: meterFraction, tint: Metric.cpu.accentColor)
+                }
             }
             .font(.caption)
             .padding(.horizontal, 10)
@@ -249,14 +258,22 @@ struct ProcessDetailView: View {
 }
 
 #Preview("进程行") {
+    // 上两行 = 主窗口形态(带榜首归一 meter,90 为榜首);末行 = 弹窗下钻形态(无条)。
     VStack(spacing: 4) {
         ProcessRowView(
             row: ProcessRowModel(pid: 100, name: "rustc", cpuPercent: 90, memoryBytes: 200_000_000),
             isSelected: true,
+            meterFraction: MeterNormalization.fraction(90, leader: 90),
             onToggle: {}
         )
         ProcessRowView(
             row: ProcessRowModel(pid: 11, name: "node", cpuPercent: 5, memoryBytes: 80_000_000),
+            isSelected: false,
+            meterFraction: MeterNormalization.fraction(5, leader: 90),
+            onToggle: {}
+        )
+        ProcessRowView(
+            row: ProcessRowModel(pid: 12, name: "esbuild", cpuPercent: 2, memoryBytes: 40_000_000),
             isSelected: false,
             onToggle: {}
         )

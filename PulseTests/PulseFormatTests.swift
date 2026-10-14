@@ -15,6 +15,14 @@ final class PulseFormatTests: XCTestCase {
         XCTAssertEqual(PulseFormat.cpuPercent(42.6), "43%")
     }
 
+    // MARK: cpuPercentNumber(工单 P0.6-02:大数字与单位分层的数字部分)
+
+    func testCPUPercentNumberStripsUnitForFigureTypography() {
+        XCTAssertEqual(PulseFormat.cpuPercentNumber(445), "445")
+        XCTAssertEqual(PulseFormat.cpuPercentNumber(0), "0")
+        XCTAssertEqual(PulseFormat.cpuPercentNumber(42.6), "43")
+    }
+
     // MARK: memory
 
     func testMemoryBelowOneGBShowsWholeMegabytes() {
