@@ -9,7 +9,8 @@ struct DashboardView: View {
     /// 设置窗入口(工单 07):头部齿轮按钮。
     @Environment(\.openSettings) private var openSettings
 
-    /// 下钻列表滚动上限:系统组可达数百进程,超出即滚动(LazyVStack 保证流畅)。
+    /// 下钻列表滚动上限:系统组可达数百进程,超出即滚动(组内行由
+    /// ProcessDrilldownView 的 LazyVStack 惰性渲染,保证滚动流畅)。
     private static let drilldownListMaxHeight: CGFloat = 480
 
     /// 展开中的组(按稳定组 id):跨采样轮次保持,组消失时残留 id 无害。
@@ -27,14 +28,19 @@ struct DashboardView: View {
                 emptyState
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 12) {
+                    // 注意必须是普通 VStack(非 Lazy):组卡需要即时构卡参与
+                    // 布局;组内数十行的惰性渲染由 ProcessDrilldownView 承担。
+                    VStack(spacing: 12) {
                         ForEach(monitor.topGroups) { group in
                             groupSection(for: group)
                         }
                     }
                 }
                 .scrollBounceBehavior(.basedOnSize)
-                .frame(maxHeight: Self.drilldownListMaxHeight)
+                // 固定高度(而非 maxHeight):MenuBarExtra 按内容理想尺寸定窗,
+                // ScrollView 的理想高度恒为 0,弹窗会被压扁成只剩头部
+                // (工单 09 实机走查发现)。固定值与菜单栏工具惯例一致(Vitals 同款)。
+                .frame(height: Self.drilldownListMaxHeight)
             }
         }
         .padding(16)

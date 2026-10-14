@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 @main
 struct PulseApp: App {
@@ -42,17 +43,74 @@ struct PulseApp: App {
 
 /// 菜单栏标签:系统 CPU 负载真实数字,超过 70% 变红。
 /// 独立成 View,保证 @Observable 的读取落在视图 body 内——负载变化即时刷新菜单栏。
+///
+/// 变红的实现路径(工单 09 实机走查修正):MenuBarExtra 的 label 会被系统重绘成
+/// NSStatusItem 标题,SwiftUI 的 foregroundStyle / AttributedString 颜色一律被
+/// 剥掉(实测 macOS 26 上数字永远是默认色,只有 Shape 能保住颜色)。因此把
+/// 「波形图标 + 数字」用 ImageRenderer 预绘成**带颜色的位图**,以
+/// `.renderingMode(.original)` 交给系统——这是 SwiftUI 栈下唯一可靠的方式。
 struct MenuBarLoadLabel: View {
     let monitor: SystemMonitor
+    /// 菜单栏深浅外观:正常态文字用白/黑随外观,红色态固定系统红。
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        HStack(spacing: 3) {
-            Image(systemName: "waveform.path.ecg")
-            Text(PulseFormat.cpuPercent(monitor.systemCPULoad))
-                .monospacedDigit()
-        }
-        .foregroundStyle(
-            monitor.systemCPULoad > SystemMonitor.redThreshold ? Color.red : Color.primary
+        let loadText = PulseFormat.cpuPercent(monitor.systemCPULoad)
+        Image(
+            nsImage: MenuBarBadgeRenderer.image(
+                loadText: loadText,
+                isRed: monitor.systemCPULoad > SystemMonitor.redThreshold,
+                colorScheme: colorScheme
+            )
         )
+        .renderingMode(.original)
+        .accessibilityLabel("系统 CPU 负载")
+        .accessibilityValue(loadText)
+    }
+}
+
+/// 菜单栏徽标位图渲染器:SwiftUI 视图 → ImageRenderer → NSImage,按
+/// (数字, 是否红, 外观) 缓存——每轮采样最多一次位图化,且值不变时零开销。
+@MainActor
+enum MenuBarBadgeRenderer {
+    private static var cache: [String: NSImage] = [:]
+
+    static func image(loadText: String, isRed: Bool, colorScheme: ColorScheme) -> NSImage {
+        let key = "\(loadText)|\(isRed)|\(colorScheme)"
+        if let cached = cache[key] { return cached }
+
+        let color: Color = isRed ? .red : (colorScheme == .dark ? .white : .black)
+        let renderer = ImageRenderer(
+            content: HStack(spacing: 3) {
+                Image(systemName: "waveform.path.ecg")
+                Text(loadText).monospacedDigit()
+            }
+            // 与系统菜单栏字号对齐(约 13pt 小号)。
+            .font(.system(size: NSFont.systemFontSize(for: .small)))
+            .foregroundStyle(color)
+            .padding(1)
+        )
+        renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
+
+        let rendered: NSImage
+        if let nsImage = renderer.nsImage {
+            rendered = nsImage
+        } else {
+            // ImageRenderer 失效兜底:退回纯文本 label(不变色,但数字可见)。
+            let fallback = NSImage(size: NSSize(width: 56, height: 18))
+            fallback.lockFocus()
+            (loadText as NSString).draw(
+                at: NSPoint(x: 1, y: 2),
+                withAttributes: [
+                    .font: NSFont.menuBarFont(ofSize: 0),
+                    .foregroundColor: isRed ? NSColor.systemRed : NSColor.labelColor,
+                ]
+            )
+            fallback.unlockFocus()
+            rendered = fallback
+        }
+        rendered.isTemplate = false // 绝不让系统把颜色又模板化掉
+        cache[key] = rendered
+        return rendered
     }
 }
