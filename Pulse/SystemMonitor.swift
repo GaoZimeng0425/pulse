@@ -19,6 +19,10 @@ final class SystemMonitor {
     /// 全部组(GLOSSARY 组),组 CPU% 降序,每轮整体刷新;首轮采样前为空。
     /// 弹窗与主窗口都读这里(用户拍板:弹窗不再截 Top-5,滚动展示全部)。
     private(set) var allGroups: [ProcessGroup] = []
+    /// 采样历史(工单 P0.6-01):系统负载 + 每组 CPU%/内存的近期窗口
+    /// (~60 点),随每轮 apply 推进;走势图与 avg/peak 统计读这里。
+    /// 纯逻辑在 SampleHistoryStore(单测见 SampleHistoryTests),此处仅粘合。
+    private(set) var history = SampleHistoryStore()
     /// 最近一轮采样留下的下钻输入(工单 06):组卡展开 / 进程详情从这里只读取数,
     /// 下钻不触发额外采集;首轮采样前为 nil。
     private(set) var drilldown: DrilldownState?
@@ -124,6 +128,13 @@ final class SystemMonitor {
             processCPU: update.diff.processCPU
         )
         allGroups = pipeline.allGroups
+        // 采样历史(工单 P0.6-01)随同一轮推进:在场组追加,消失组逐出。
+        history.advance(
+            systemCPULoad: update.systemCPULoad,
+            groups: allGroups.map { group in
+                GroupSample(id: group.id, cpuPercent: group.cpuPercent, memoryBytes: group.memoryBytes)
+            }
+        )
         drilldown = DrilldownState(
             snapshot: update.snapshot,
             lineage: pipeline.lineage,

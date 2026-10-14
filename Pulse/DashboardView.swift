@@ -90,6 +90,7 @@ struct DashboardView: View {
         VStack(spacing: 6) {
             GroupCardView(
                 group: group,
+                history: monitor.history.series(forGroup: group.id),
                 isExpanded: expandedGroupIDs.contains(group.id),
                 meterFraction: MeterNormalization.fraction(group.cpuPercent, leader: groupCPULeader),
                 onToggle: { toggleExpansion(of: group.id) },
@@ -132,36 +133,52 @@ struct DashboardView: View {
         killFailureReport = KillRequestFlow.endGroup(group, monitor: monitor)
     }
 
+    /// 头部(工单 P0.6-01):系统 CPU 负载从单轮瞬时数字升级为
+    /// "当轮值 + 窗口均值/峰值 + 小趋势条"(0–100 固定语义域归一);
+    /// <2 轮时趋势只剩轨道与垫底柱、统计对不显示——不出坏图。
+    /// P0.6-02:趋势条与读数数值换 CPU 指标强调色(替换 01 的占位蓝)。
     private var header: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "waveform.path.ecg")
-                .foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Image(systemName: "waveform.path.ecg")
+                    .foregroundStyle(.secondary)
                 Text("Pulse")
                     .font(.headline)
-                loadLine
-                    .font(.caption)
-                    .monospacedDigit()
+                Spacer()
+                Button {
+                    openSettings()
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .help("设置项目根目录")
             }
-            Spacer()
-            Button {
-                openSettings()
-            } label: {
-                Image(systemName: "gearshape")
-            }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
-            .help("设置项目根目录")
+            loadLine
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+            StripChartView(
+                values: monitor.history.systemCPULoad.values,
+                tint: Metric.cpu.accentColor,
+                domainMax: 100
+            )
+            .frame(height: 14)
         }
     }
 
-    /// 系统 CPU 负载读数(工单 P0.6-02):文案不变,数值用 CPU 指标强调色——
-    /// "CPU 指标驱动负载/meter/CPU 读数"的负载面。
+    /// 头部负载读数(工单 01+02 合流):当轮值常驻,数值用 CPU 指标强调色
+    /// (CPU 指标驱动负载/meter/CPU 读数);窗口统计 ≥2 轮后附"均值/峰值"对
+    /// (工单 01 的口径,副文随外层 secondary,不抢数值的强调色)。
     private var loadLine: Text {
-        Text("系统 CPU 负载 ")
-            .foregroundStyle(.secondary)
+        var line = Text("系统 CPU 负载 ")
             + Text(PulseFormat.cpuPercent(monitor.systemCPULoad))
                 .foregroundStyle(Metric.cpu.accentColor)
+        if let stats = monitor.history.systemCPULoad.statistics, stats.count >= 2 {
+            line = line
+                + Text(" · 均值 \(PulseFormat.cpuPercent(stats.average))")
+                + Text(" · 峰值 \(PulseFormat.cpuPercent(stats.peak))")
+        }
+        return line
     }
 
     /// 极端空载 / 首轮采样前:无组可显示,给一行安静文案而不是坏 UI。
@@ -178,8 +195,11 @@ struct DashboardView: View {
 /// bundle 组用真实应用图标(NSWorkspace);项目与兜底类别用 SF Symbol;孤儿进程橙色调。
 /// 工单 06:整卡可点,展开 / 收起组内进程列表(尾部 chevron 指示)。
 /// 工单 08:卡上提供"结束整组"入口(确认对话框把关,见 KillConfirmationDialog)。
+/// 工单 P0.6-01:卡底 strip 走势 + 均值/峰值统计行(读采样历史窗口)。
 struct GroupCardView: View {
     let group: ProcessGroup
+    /// 该组的近期采样序列(nil = 无历史:预览或首轮采样前,卡底不画走势)。
+    var history: GroupSeries? = nil
     let isExpanded: Bool
     /// 占比 meter 条(工单 P0.6-02):组 CPU% 按当前榜单(全部组)榜首归一,
     /// 由调用方算好传入——归一是榜单级口径,卡内不自算。
@@ -214,7 +234,29 @@ struct GroupCardView: View {
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
                     endGroupButton
                 }
+                // 占比 meter 条(工单 P0.6-02):榜单榜首归一的 CPU 占比,
+                // 直接承接右上大数字——数字与条同色系(类别 accentColor,孤儿橙)。
                 MeterBar(fraction: meterFraction, tint: group.category.cardStyle.accentColor)
+                // 卡底 strip 走势(工单 P0.6-01):44 柱形态、最新在最右,
+                // 数据不足的旧槽位 2% 垫底——空窗口只剩轨道与垫底柱,不出坏图。
+                // P0.6-02:占位强调色换类别 accentColor(与 meter 同源)。
+                if let history {
+                    StripChartView(
+                        values: history.cpuPercent.values,
+                        tint: group.category.cardStyle.accentColor
+                    )
+                    .frame(height: 36)
+                    // 统计行:窗口均值/峰值对(≥2 轮才显示,单点无"势"可言)。
+                    if let stats = history.cpuPercent.statistics, stats.count >= 2 {
+                        Text(
+                            "均值 \(PulseFormat.cpuPercent(stats.average))"
+                                + " · 峰值 \(PulseFormat.cpuPercent(stats.peak))"
+                        )
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
             }
             .padding(10)
             .background(group.category.cardStyle.cardBackground, in: .rect(cornerRadius: 10))
@@ -470,8 +512,15 @@ struct KillFailureAlert: ViewModifier {
 }
 
 #Preview("组卡") {
-    // meter 榜首 = 三张卡里最高的 445%(榜首归一的验收锚点)。
-    VStack(spacing: 12) {
+    /// 预览用合成序列(工单 P0.6-01):走势与统计行的验收锚点。
+    func history(capacity: Int = 60, cpu: [Double]) -> GroupSeries {
+        var series = GroupSeries(capacity: capacity)
+        cpu.forEach { series.cpuPercent.append($0) }
+        series.memoryBytes.append(2_400_000_000)
+        return series
+    }
+    // meter 榜首 = 三张卡里最高的 445%(P0.6-02 榜首归一的验收锚点)。
+    return VStack(spacing: 12) {
         GroupCardView(
             group: ProcessGroup(
                 id: "project:octok",
@@ -484,6 +533,10 @@ struct KillFailureAlert: ViewModifier {
                 cpuPercent: 445,
                 memoryBytes: 2_400_000_000
             ),
+            // 满窗锯齿:strip 全满 + "均值/峰值"统计行可见。
+            history: history(cpu: (0..<44).map { i in
+                Double(300 + (i % 7) * 25 + i)
+            }),
             isExpanded: false,
             meterFraction: MeterNormalization.fraction(445, leader: 445),
             onToggle: {},
@@ -501,6 +554,8 @@ struct KillFailureAlert: ViewModifier {
                 cpuPercent: 12,
                 memoryBytes: 120_000_000
             ),
+            // 单点(刚启动第 1 轮):一根柱 + 垫底槽,统计行不出现——空窗口不坏图。
+            history: history(cpu: [12]),
             isExpanded: true,
             meterFraction: MeterNormalization.fraction(12, leader: 445),
             onToggle: {},
@@ -518,6 +573,7 @@ struct KillFailureAlert: ViewModifier {
                 cpuPercent: 7,
                 memoryBytes: 30_000_000
             ),
+            history: history(cpu: [7, 5, 9, 4, 6]),
             isExpanded: false,
             meterFraction: MeterNormalization.fraction(7, leader: 445),
             onToggle: {},
