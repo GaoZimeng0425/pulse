@@ -1,11 +1,11 @@
 import SwiftUI
 import AppKit
 
-/// 弹窗主页:头部系统 CPU 负载为真实采样数字,下方全部组卡(真归组,
-/// 组 CPU% 降序,系统组参榜,滚动展示不截断——用户拍板弃 Top-5)。
-/// 排序随每轮采样实时刷新(@Observable)。
-/// 组卡下钻(工单 06):点卡展开组内进程平铺,数据只读最近一轮采样。
-/// 底部操作排:打开主窗口(主按钮)+ 退出(单一菜单栏形态下的全部出口)。
+/// 弹窗主页(工单 P0.6-03 tab 化):标题排 + 图标 tab(总览 / CPU / 内存)+
+/// 各 tab 内容 + 底部操作排。tab 内容模型在 MetricTabContent(纯逻辑,单测覆盖),
+/// 这里只做粘合:总览 = 系统负载卡(带 strip,已有)+ 瘦身组卡列表;CPU = 面积图
+/// 主卡(全尺寸走势图的归位处)+ 组排行;内存 = Memory by App 环形卡 + 内存组排行。
+/// 组卡下钻(工单 06)与处置编排(工单 08)不变;排序随每轮采样实时刷新。
 struct DashboardView: View {
     let monitor: SystemMonitor
     /// 设置窗入口(工单 07):头部齿轮按钮。
@@ -15,8 +15,11 @@ struct DashboardView: View {
 
     /// 下钻列表滚动上限:系统组可达数百进程,超出即滚动(组内行由
     /// ProcessDrilldownView 的 LazyVStack 惰性渲染,保证滚动流畅)。
+    /// tab 化后三个 tab 共用同一高度约束。
     private static let drilldownListMaxHeight: CGFloat = 480
 
+    /// 当前 tab(工单 03):图标 tab 点击或 ←/→ 切换,内容模型由此折叠。
+    @State private var tabSelection = MetricTabSelection()
     /// 展开中的组(按稳定组 id):跨采样轮次保持,组消失时残留 id 无害。
     @State private var expandedGroupIDs: Set<String> = []
     /// 展开详情的进程(跨组唯一):下钻期间进程退出时详情安静收起。
@@ -27,24 +30,13 @@ struct DashboardView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            header
+            titleRow
+            MetricIconTabBar(selection: $tabSelection)
             if monitor.allGroups.isEmpty {
                 emptyState
             } else {
-                ScrollView {
-                    // 注意必须是普通 VStack(非 Lazy):组卡需要即时构卡参与
-                    // 布局;组内数十行的惰性渲染由 ProcessDrilldownView 承担。
-                    VStack(spacing: 12) {
-                        ForEach(monitor.allGroups) { group in
-                            groupSection(for: group)
-                        }
-                    }
-                }
-                .scrollBounceBehavior(.basedOnSize)
-                // 固定高度(而非 maxHeight):MenuBarExtra 按内容理想尺寸定窗,
-                // ScrollView 的理想高度恒为 0,弹窗会被压扁成只剩头部
-                // (工单 09 实机走查发现)。固定值与菜单栏工具惯例一致(Vitals 同款)。
-                .frame(height: Self.drilldownListMaxHeight)
+                pinnedTabCard
+                groupList
             }
             Divider()
                 .padding(.horizontal, -4)
@@ -53,6 +45,51 @@ struct DashboardView: View {
         .padding(16)
         .frame(width: 340)
         .modifier(KillFailureAlert(report: $killFailureReport))
+    }
+
+    /// 当前 tab 的展示内容(纯逻辑折叠):榜单序、微图资格、组卡口径、内存分段。
+    private var content: MetricTabContent {
+        MetricTabContent.build(groups: monitor.allGroups, tab: tabSelection.current)
+    }
+
+    /// 各 tab 固定在滚动区之上的主卡(工单 03):总览 = 系统负载卡(带 strip,
+    /// 唯一保留 strip 的头部);CPU = 面积图主卡(均值/峰值对归位于此);
+    /// 内存 = Memory by App 环形卡。
+    @ViewBuilder
+    private var pinnedTabCard: some View {
+        switch tabSelection.current {
+        case .overview:
+            loadBlock
+        case .cpu:
+            CPULoadMainCardView(
+                currentLoad: monitor.systemCPULoad,
+                statistics: monitor.history.systemCPULoad.statistics,
+                trendValues: monitor.history.systemCPULoad.values
+            )
+        case .memory:
+            MemoryRingCardView(
+                segments: content.memorySegments,
+                totalBytes: content.memoryTotalBytes
+            )
+        }
+    }
+
+    /// 组卡滚动列表:榜单序随 tab(总览/CPU = CPU% 降序,内存 = 内存降序)。
+    /// 注意必须是普通 VStack(非 Lazy):组卡需要即时构卡参与
+    /// 布局;组内数十行的惰性渲染由 ProcessDrilldownView 承担。
+    private var groupList: some View {
+        ScrollView {
+            VStack(spacing: 12) {
+                ForEach(content.ranking) { group in
+                    groupSection(for: group)
+                }
+            }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        // 固定高度(而非 maxHeight):MenuBarExtra 按内容理想尺寸定窗,
+        // ScrollView 的理想高度恒为 0,弹窗会被压扁成只剩头部
+        // (工单 09 实机走查发现)。固定值与菜单栏工具惯例一致(Vitals 同款)。
+        .frame(height: Self.drilldownListMaxHeight)
     }
 
     /// 底部操作排(用户拍板:合并为单一菜单栏项后的窗口/退出口):
@@ -85,14 +122,15 @@ struct DashboardView: View {
     }
 
     /// 单个组卡 + 展开后的下钻区。展开只读 monitor.drilldown(最近一轮采样),
-    /// 不触发额外采集。
+    /// 不触发额外采集。meter 榜首与微图资格都由内容模型给出(当前 tab 口径)。
     private func groupSection(for group: ProcessGroup) -> some View {
         VStack(spacing: 6) {
             GroupCardView(
                 group: group,
-                history: monitor.history.series(forGroup: group.id),
+                metric: content.metric,
                 isExpanded: expandedGroupIDs.contains(group.id),
-                meterFraction: MeterNormalization.fraction(group.cpuPercent, leader: groupCPULeader),
+                meterFraction: meterFraction(for: group),
+                microGraphValues: microGraphValues(for: group),
                 onToggle: { toggleExpansion(of: group.id) },
                 onEndGroup: { requestEndGroup(group) }
             )
@@ -107,10 +145,32 @@ struct DashboardView: View {
         }
     }
 
-    /// 组卡 meter 的归一榜首(工单 P0.6-02):当前榜单(全部组)CPU% 最大者。
-    /// 弹窗与主窗口共用同一口径;空载/首轮采样前为 0 → 条不画填充。
-    private var groupCPULeader: Double {
-        monitor.allGroups.map(\.cpuPercent).max() ?? 0
+    /// 组卡 meter 归一(工单 02 口径,随 tab 换指标):CPU tab 按 CPU% 榜首、
+    /// 内存 tab 按内存榜首归一,由内容模型给榜首。
+    private func meterFraction(for group: ProcessGroup) -> Double {
+        switch content.metric {
+        case .cpu:
+            return MeterNormalization.fraction(group.cpuPercent, leader: content.cpuLeader)
+        case .memory:
+            return MeterNormalization.fraction(
+                Double(group.memoryBytes),
+                leader: Double(content.memoryLeaderBytes)
+            )
+        }
+    }
+
+    /// 26×14 微图数据(工单 03 纠偏):榜单前 3 名才有;序列随口径取 CPU% 或内存,
+    /// 无历史(首轮采样前)则不画。
+    private func microGraphValues(for group: ProcessGroup) -> [Double]? {
+        guard content.microGraphGroupIDs.contains(group.id),
+              let series = monitor.history.series(forGroup: group.id)
+        else { return nil }
+        switch content.metric {
+        case .cpu:
+            return series.cpuPercent.values
+        case .memory:
+            return series.memoryBytes.values.map(Double.init)
+        }
     }
 
     private func toggleExpansion(of groupID: String) {
@@ -133,27 +193,30 @@ struct DashboardView: View {
         killFailureReport = KillRequestFlow.endGroup(group, monitor: monitor)
     }
 
-    /// 头部(工单 P0.6-01):系统 CPU 负载从单轮瞬时数字升级为
-    /// "当轮值 + 窗口均值/峰值 + 小趋势条"(0–100 固定语义域归一);
-    /// <2 轮时趋势只剩轨道与垫底柱、统计对不显示——不出坏图。
-    /// P0.6-02:趋势条与读数数值换 CPU 指标强调色(替换 01 的占位蓝)。
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Image(systemName: "waveform.path.ecg")
-                    .foregroundStyle(.secondary)
-                Text("Pulse")
-                    .font(.headline)
-                Spacer()
-                Button {
-                    openSettings()
-                } label: {
-                    Image(systemName: "gearshape")
-                }
-                .buttonStyle(.borderless)
+    /// 标题排:app 身份 + 设置入口(齿轮),常驻所有 tab 之上。
+    private var titleRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "waveform.path.ecg")
                 .foregroundStyle(.secondary)
-                .help("设置项目根目录")
+            Text("Pulse")
+                .font(.headline)
+            Spacer()
+            Button {
+                openSettings()
+            } label: {
+                Image(systemName: "gearshape")
             }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .help("设置项目根目录")
+        }
+    }
+
+    /// 系统负载卡(总览 tab,工单 P0.6-01/02):当轮值 + 窗口均值/峰值 +
+    /// 小趋势条(0–100 固定语义域);<2 轮时趋势只剩轨道与垫底柱、统计对不显示。
+    /// 工单 03 纠偏后这是组卡之外唯一保留 strip 的头部。
+    private var loadBlock: some View {
+        VStack(alignment: .leading, spacing: 4) {
             loadLine
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
@@ -166,9 +229,8 @@ struct DashboardView: View {
         }
     }
 
-    /// 头部负载读数(工单 01+02 合流):当轮值常驻,数值用 CPU 指标强调色
-    /// (CPU 指标驱动负载/meter/CPU 读数);窗口统计 ≥2 轮后附"均值/峰值"对
-    /// (工单 01 的口径,副文随外层 secondary,不抢数值的强调色)。
+    /// 头部负载读数(工单 01+02 合流):当轮值常驻,数值用 CPU 指标强调色;
+    /// 窗口统计 ≥2 轮后附"均值/峰值"对(副文随外层 secondary,不抢数值强调色)。
     private var loadLine: Text {
         var line = Text("系统 CPU 负载 ")
             + Text(PulseFormat.cpuPercent(monitor.systemCPULoad))
@@ -181,7 +243,7 @@ struct DashboardView: View {
         return line
     }
 
-    /// 极端空载 / 首轮采样前:无组可显示,给一行安静文案而不是坏 UI。
+    /// 极端空载 / 首轮采样前:无组可显示,给一行安静文案而不是坏 UI(所有 tab 同)。
     private var emptyState: some View {
         Text("暂无活动组")
             .font(.caption)
@@ -191,26 +253,29 @@ struct DashboardView: View {
     }
 }
 
-/// 组卡四要素(工单 05):组名+图标 / 组 CPU%(单核累加,>100% 合法)/ 内存 / "N 进程"。
-/// bundle 组用真实应用图标(NSWorkspace);项目与兜底类别用 SF Symbol;孤儿进程橙色调。
+/// 组卡(紧凑行形态,工单 03 用户现场纠偏):Vitals 的应用行是紧凑行——
+/// 大数字 + meter(+ 榜单前几名的 26×14 迷你微图),**不再有全尺寸 strip 与
+/// 均值/峰值统计对**(全尺寸走势图归位指标 tab 主卡)。
+/// 读数口径随 tab:CPU tab = CPU% 大数字 + 内存副文;内存 tab 互换。
+/// bundle 组用真实应用图标(NSWorkspace);项目与兜底类别用 SF Symbol;孤儿橙。
 /// 工单 06:整卡可点,展开 / 收起组内进程列表(尾部 chevron 指示)。
 /// 工单 08:卡上提供"结束整组"入口(确认对话框把关,见 KillConfirmationDialog)。
-/// 工单 P0.6-01:卡底 strip 走势 + 均值/峰值统计行(读采样历史窗口)。
 struct GroupCardView: View {
     let group: ProcessGroup
-    /// 该组的近期采样序列(nil = 无历史:预览或首轮采样前,卡底不画走势)。
-    var history: GroupSeries? = nil
+    /// 读数口径(工单 03):大数字、副文、meter 榜首与微图序列随它切换。
+    var metric: GroupCardMetric = .cpu
     let isExpanded: Bool
-    /// 占比 meter 条(工单 P0.6-02):组 CPU% 按当前榜单(全部组)榜首归一,
-    /// 由调用方算好传入——归一是榜单级口径,卡内不自算。
+    /// 占比 meter 条:榜首归一,由调用方按当前 tab 口径算好传入。
     let meterFraction: Double
+    /// 26×14 迷你微图序列(nil = 无资格或无历史,行内不画)。
+    var microGraphValues: [Double]? = nil
     let onToggle: () -> Void
     let onEndGroup: () -> Void
 
     var body: some View {
         Button(action: onToggle) {
             VStack(spacing: 8) {
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
                     icon
                     VStack(alignment: .leading, spacing: 2) {
                         Text(group.name)
@@ -221,12 +286,15 @@ struct GroupCardView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    Spacer()
+                    Spacer(minLength: 6)
+                    if let microGraphValues {
+                        // 紧凑行微图(参考文档 §3-1 变体:26×14、无轨道、gap-px)。
+                        StripChartView(values: microGraphValues, tint: accent, style: .compact)
+                            .frame(width: 26, height: 14)
+                    }
                     VStack(alignment: .trailing, spacing: 2) {
-                        cpuFigure
-                        Text(PulseFormat.memory(group.memoryBytes))
-                            .font(.system(.caption, design: .rounded).monospacedDigit().weight(.semibold))
-                            .foregroundStyle(.secondary)
+                        valueFigure
+                        secondaryValue
                     }
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
@@ -234,29 +302,9 @@ struct GroupCardView: View {
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
                     endGroupButton
                 }
-                // 占比 meter 条(工单 P0.6-02):榜单榜首归一的 CPU 占比,
-                // 直接承接右上大数字——数字与条同色系(类别 accentColor,孤儿橙)。
-                MeterBar(fraction: meterFraction, tint: group.category.cardStyle.accentColor)
-                // 卡底 strip 走势(工单 P0.6-01):44 柱形态、最新在最右,
-                // 数据不足的旧槽位 2% 垫底——空窗口只剩轨道与垫底柱,不出坏图。
-                // P0.6-02:占位强调色换类别 accentColor(与 meter 同源)。
-                if let history {
-                    StripChartView(
-                        values: history.cpuPercent.values,
-                        tint: group.category.cardStyle.accentColor
-                    )
-                    .frame(height: 36)
-                    // 统计行:窗口均值/峰值对(≥2 轮才显示,单点无"势"可言)。
-                    if let stats = history.cpuPercent.statistics, stats.count >= 2 {
-                        Text(
-                            "均值 \(PulseFormat.cpuPercent(stats.average))"
-                                + " · 峰值 \(PulseFormat.cpuPercent(stats.peak))"
-                        )
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
+                // 占比 meter 条(工单 P0.6-02):榜单榜首归一,直接承接大数字——
+                // 数字与条同色系;色随 tab 口径换指标强调色,孤儿一行仍橙。
+                MeterBar(fraction: meterFraction, tint: accent)
             }
             .padding(10)
             .background(group.category.cardStyle.cardBackground, in: .rect(cornerRadius: 10))
@@ -267,19 +315,57 @@ struct GroupCardView: View {
         .accessibilityHint(isExpanded ? "收起组内进程列表" : "展开组内进程列表")
     }
 
-    /// 组 CPU 大数字(工单 P0.6-02,参考文档 §1.2 figure 规格):圆体加粗 +
-    /// tabular 数字 + 负字距,单位 "%" 小一号、基线对齐;紧凑行数值档 22px。
-    /// 数字本体保持墨色(Vitals 同款:大数字用 --ink,色彩交给 meter 条)。
-    private var cpuFigure: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 2) {
-            Text(PulseFormat.cpuPercentNumber(group.cpuPercent))
-                .font(.system(size: 22, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .kerning(-0.4)
-            Text("%")
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(.secondary)
+    /// 卡内强调色:CPU 口径走类别样式表(孤儿橙,语义不变);内存口径换内存
+    /// 指标强调色——孤儿一行仍橙(GLOSSARY:它往往正是问题所在)。
+    private var accent: Color {
+        if metric == .memory, group.category != .orphan {
+            return Metric.memory.accentColor
         }
+        return group.category.cardStyle.accentColor
+    }
+
+    /// 大数字(工单 03,参考文档 §1.2 figure 规格):圆体加粗 + tabular 数字 +
+    /// 负字距,单位小一号、基线对齐;紧凑行数值档 22px(CPU)/ 20px(内存带小数)。
+    /// 数字本体保持墨色(Vitals 同款:大数字用 --ink,色彩交给 meter 条)。
+    @ViewBuilder
+    private var valueFigure: some View {
+        switch metric {
+        case .cpu:
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(PulseFormat.cpuPercentNumber(group.cpuPercent))
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .kerning(-0.4)
+                Text("%")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+        case .memory:
+            let figure = PulseFormat.memoryFigure(group.memoryBytes)
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(figure.value)
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .kerning(-0.3)
+                Text(figure.unit)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    /// 副文:与主读数互补的另一指标(CPU 口径 → 内存;内存口径 → CPU%)。
+    private var secondaryValue: some View {
+        Group {
+            switch metric {
+            case .cpu:
+                Text(PulseFormat.memory(group.memoryBytes))
+            case .memory:
+                Text("CPU \(PulseFormat.cpuPercent(group.cpuPercent))")
+            }
+        }
+        .font(.system(.caption, design: .rounded).monospacedDigit().weight(.semibold))
+        .foregroundStyle(.secondary)
     }
 
     /// "结束整组"入口:xmark.octagon 图标按钮(borderless:嵌在卡内可独立点按)。
@@ -321,9 +407,8 @@ struct GroupCardStyle {
     let symbolName: String
     let iconColor: Color
     let cardBackground: AnyShapeStyle
-    /// 指标强调色(工单 P0.6-02):驱动卡内 meter 条(轨道 14% / 填充纯色);
-    /// 工单 03 tab 化后按当前 tab 的指标覆盖同一入口。现实映射:组卡读数以
-    /// CPU 为主(CPU 指标驱动 meter/读数),孤儿一行仍橙——语义不变。
+    /// 指标强调色:CPU 口径下驱动卡内 meter/微图(孤儿橙)。工单 03 tab 化后
+    /// 内存口径由 GroupCardView 按当前 tab 的指标另行覆盖(孤儿仍橙,语义不变)。
     let accentColor: Color
 }
 
@@ -511,15 +596,9 @@ struct KillFailureAlert: ViewModifier {
         .task { monitor.start() }
 }
 
-#Preview("组卡") {
-    /// 预览用合成序列(工单 P0.6-01):走势与统计行的验收锚点。
-    func history(capacity: Int = 60, cpu: [Double]) -> GroupSeries {
-        var series = GroupSeries(capacity: capacity)
-        cpu.forEach { series.cpuPercent.append($0) }
-        series.memoryBytes.append(2_400_000_000)
-        return series
-    }
-    // meter 榜首 = 三张卡里最高的 445%(P0.6-02 榜首归一的验收锚点)。
+#Preview("组卡(紧凑行,CPU 口径)") {
+    // meter 榜首 = 三张卡里最高的 445%(P0.6-02 榜首归一的验收锚点);
+    // 微图:前两名给满窗锯齿序列,第三名短序列——紧凑行形态的验收锚点。
     return VStack(spacing: 12) {
         GroupCardView(
             group: ProcessGroup(
@@ -533,12 +612,9 @@ struct KillFailureAlert: ViewModifier {
                 cpuPercent: 445,
                 memoryBytes: 2_400_000_000
             ),
-            // 满窗锯齿:strip 全满 + "均值/峰值"统计行可见。
-            history: history(cpu: (0..<44).map { i in
-                Double(300 + (i % 7) * 25 + i)
-            }),
             isExpanded: false,
             meterFraction: MeterNormalization.fraction(445, leader: 445),
+            microGraphValues: (0..<13).map { i in Double(0.4 + Double(i % 5) * 0.15) },
             onToggle: {},
             onEndGroup: {}
         )
@@ -554,10 +630,9 @@ struct KillFailureAlert: ViewModifier {
                 cpuPercent: 12,
                 memoryBytes: 120_000_000
             ),
-            // 单点(刚启动第 1 轮):一根柱 + 垫底槽,统计行不出现——空窗口不坏图。
-            history: history(cpu: [12]),
             isExpanded: true,
             meterFraction: MeterNormalization.fraction(12, leader: 445),
+            microGraphValues: [12],
             onToggle: {},
             onEndGroup: {}
         )
@@ -573,9 +648,49 @@ struct KillFailureAlert: ViewModifier {
                 cpuPercent: 7,
                 memoryBytes: 30_000_000
             ),
-            history: history(cpu: [7, 5, 9, 4, 6]),
             isExpanded: false,
             meterFraction: MeterNormalization.fraction(7, leader: 445),
+            onToggle: {},
+            onEndGroup: {}
+        )
+    }
+    .padding(16)
+    .frame(width: 340)
+}
+
+#Preview("组卡(内存口径,内存 tab)") {
+    // 内存口径:大数字 = 内存,副文 = CPU%,meter/微图用内存强调色(孤儿仍橙)。
+    return VStack(spacing: 12) {
+        GroupCardView(
+            group: ProcessGroup(
+                id: "bundle:browser",
+                name: "浏览器",
+                category: .app,
+                bundlePath: "/Applications/Safari.app",
+                processes: [RawProcess(pid: 400, parentPID: 1, physicalFootprintBytes: 3_100_000_000)],
+                cpuPercent: 40,
+                memoryBytes: 3_100_000_000
+            ),
+            metric: .memory,
+            isExpanded: false,
+            meterFraction: MeterNormalization.fraction(3_100_000_000, leader: 3_100_000_000),
+            microGraphValues: (0..<13).map { i in Double(2_600_000_000 + UInt64(i) * 40_000_000) },
+            onToggle: {},
+            onEndGroup: {}
+        )
+        GroupCardView(
+            group: ProcessGroup(
+                id: "orphan",
+                name: "孤儿进程",
+                category: .orphan,
+                bundlePath: nil,
+                processes: [RawProcess(pid: 300, parentPID: 1, physicalFootprintBytes: 30_000_000)],
+                cpuPercent: 7,
+                memoryBytes: 30_000_000
+            ),
+            metric: .memory,
+            isExpanded: false,
+            meterFraction: MeterNormalization.fraction(30_000_000, leader: 3_100_000_000),
             onToggle: {},
             onEndGroup: {}
         )

@@ -34,6 +34,26 @@ final class PulseFormatTests: XCTestCase {
         XCTAssertEqual(PulseFormat.memory(2_400_000_000), "2.4 GB")
     }
 
+    // MARK: memoryFigure(工单 P0.6-03:内存大数字与单位分层)
+
+    func testMemoryFigureSplitsValueAndUnitForFigureTypography() {
+        // 内存 tab 组卡大数字:数字走圆体大字,单位("GB"/"MB")小一号基线对齐。
+        let gb = PulseFormat.memoryFigure(2_400_000_000)
+        XCTAssertEqual(gb.value, "2.4")
+        XCTAssertEqual(gb.unit, "GB")
+
+        let mb = PulseFormat.memoryFigure(512_000_000)
+        XCTAssertEqual(mb.value, "512")
+        XCTAssertEqual(mb.unit, "MB")
+    }
+
+    func testMemoryFigureOfZeroSplitsIntoZeroAndMB() {
+        // 零内存:"0" + "MB"(空态由调用方先兜底,这里只钉不崩、可拆)。
+        let zero = PulseFormat.memoryFigure(0)
+        XCTAssertEqual(zero.value, "0")
+        XCTAssertEqual(zero.unit, "MB")
+    }
+
     // MARK: uptime(工单 06:启动时长,"已 25 分钟")
 
     private let now = Date(timeIntervalSinceReferenceDate: 10_000_000)

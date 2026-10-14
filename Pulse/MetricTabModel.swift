@@ -1,0 +1,205 @@
+import Foundation
+
+// MARK: - 指标 tab 内容模型(工单 P0.6-03):弹窗图标 tab / 主窗口药丸 tab 的共享逻辑
+
+/// 指标 tab(工单 03):弹窗与主窗口共用同一组 tab——总览 / CPU / 内存,
+/// 后续指标(磁盘/网络,P1+)按 `Metric` 令牌表加 case 即可。
+/// 展示序(`allCases`)同时是键盘 ←/→ 的移动轴:总览最左、内存最右。
+enum MetricTab: String, CaseIterable, Identifiable, Sendable {
+    case overview
+    case cpu
+    case memory
+
+    var id: String { rawValue }
+
+    /// 中文标题:药丸 tab 文字、无障碍标签共用。
+    var title: String {
+        switch self {
+        case .overview: "总览"
+        case .cpu: "CPU"
+        case .memory: "内存"
+        }
+    }
+
+    /// 图标 tab 的 SF Symbol(弹窗顶部无文字 tab)。
+    var symbolName: String {
+        switch self {
+        case .overview: "square.grid.2x2"
+        case .cpu: "cpu"
+        case .memory: "memorychip"
+        }
+    }
+
+    /// 选中态强调色色源(工单 02 令牌表):总览以系统 CPU 负载为主视角取 cpu,
+    /// CPU/内存各取自家令牌——选中胶囊、meter、图表全由它派生。
+    var accent: Metric {
+        switch self {
+        case .overview: .cpu
+        case .cpu: .cpu
+        case .memory: .memory
+        }
+    }
+}
+
+/// tab 选中状态 + 键盘切换语义(纯逻辑):←/→ 沿展示序移动,
+/// **两端夹紧不回绕**——可预期的键盘行为,不做环游。
+/// 视图焦点与按键接线(SwiftUI)属手动验收,这里只钉状态机。
+struct MetricTabSelection: Equatable, Sendable {
+    var current: MetricTab = .overview
+
+    init(current: MetricTab = .overview) {
+        self.current = current
+    }
+
+    /// ← 键:切向展示序前一个;已在最左则不动。
+    mutating func moveLeft() {
+        move(offset: -1)
+    }
+
+    /// → 键:切向展示序后一个;已在最右则不动。
+    mutating func moveRight() {
+        move(offset: 1)
+    }
+
+    private mutating func move(offset: Int) {
+        let tabs = MetricTab.allCases
+        guard let index = tabs.firstIndex(of: current) else { return }
+        current = tabs[clamped(index + offset, in: tabs.startIndex..<tabs.count)]
+    }
+}
+
+private func clamped(_ value: Int, in range: Range<Int>) -> Int {
+    Swift.min(Swift.max(value, range.lowerBound), range.upperBound - 1)
+}
+
+// MARK: - 组卡读数口径(工单 03 纠偏:应用行回紧凑形态)
+
+/// 组卡的大数字口径:CPU tab(与总览)以 CPU% 为主读数、内存为副文;
+/// 内存 tab 互换(内存大数字 + CPU% 副文)。meter 与微图随口径同换。
+enum GroupCardMetric: Equatable, Sendable {
+    case cpu
+    case memory
+}
+
+// MARK: - 内存环形分段(Memory by App 卡)
+
+/// Memory by App 环形卡(工单 03)的一段:top-5 组各一段,尾部聚合成"其他"段
+/// (`isOther = true`,图例用通用符号)。fraction = 该段字节 / 全部组内存合计。
+struct MemoryRingSegment: Identifiable, Equatable, Sendable {
+    let id: String
+    let name: String
+    /// App 组的 .app bundle 目录(图例取应用图标);"其他"段与其余类别为 nil。
+    let bundlePath: String?
+    /// 组类别(图例兜底符号);"其他"段为 nil。
+    let category: GroupCategory?
+    let bytes: UInt64
+    /// 0–1,占全部组内存合计的比例。
+    let fraction: Double
+    let isOther: Bool
+}
+
+// MARK: - 单 tab 展示内容(纯逻辑)
+
+/// 单个 tab 的展示内容(工单 03):由全部组 + tab 一次性折叠出该 tab UI 所需的
+/// 全部口径——组卡榜单、微图资格、组卡读数口径、内存环形分段与两个 meter 榜首。
+/// "哪个 tab 展示什么"只有这一个出处,弹窗与主窗口共用;单测即本接缝。
+struct MetricTabContent: Equatable, Sendable {
+    /// 26×14 微图资格:当前榜单前 3 名(参考文档 §2 紧凑行"部分带微图")。
+    static let microGraphLimit = 3
+    /// Memory by App 环形分段:top-5 + 其他(工单 03 拍板口径)。
+    static let memorySegmentLimit = 5
+    /// "其他"聚合段的稳定 id。
+    static let otherSegmentID = "other"
+
+    let tab: MetricTab
+    /// 本 tab 的组卡榜单(降序口径随 tab;同值次键 id 升序,跨采样轮稳定)。
+    let ranking: [ProcessGroup]
+    /// 有 26×14 微图资格的组 id 集合(榜单前缀)。
+    let microGraphGroupIDs: Set<String>
+    /// 组卡读数口径(大数字/meter/微图随它切换)。
+    let metric: GroupCardMetric
+    /// Memory by App 环形分段;空组或全零内存 → 空(由空态兜底,不出坏图)。
+    let memorySegments: [MemoryRingSegment]
+    /// 全部组内存合计(环心大数字)。
+    let memoryTotalBytes: UInt64
+    /// 内存 meter 归一榜首(工单 02 口径:当前全部组的最大值)。
+    let memoryLeaderBytes: UInt64
+    /// CPU meter 归一榜首。
+    let cpuLeader: Double
+
+    /// 折叠入口:总览/CPU tab 按组 CPU% 降序(与引擎既定序一致),内存 tab 按
+    /// 内存降序;分段基于全部组(与榜单口径无关,内存 tab 之外的 tab 也可渲染)。
+    static func build(groups: [ProcessGroup], tab: MetricTab) -> MetricTabContent {
+        let ranked: [ProcessGroup]
+        let metric: GroupCardMetric
+        switch tab {
+        case .overview, .cpu:
+            ranked = groups.sorted { lhs, rhs in
+                if lhs.cpuPercent != rhs.cpuPercent { return lhs.cpuPercent > rhs.cpuPercent }
+                return lhs.id < rhs.id
+            }
+            metric = .cpu
+        case .memory:
+            ranked = groups.sorted { lhs, rhs in
+                if lhs.memoryBytes != rhs.memoryBytes { return lhs.memoryBytes > rhs.memoryBytes }
+                return lhs.id < rhs.id
+            }
+            metric = .memory
+        }
+
+        let totalBytes = groups.reduce(UInt64(0)) { $0 + $1.memoryBytes }
+
+        return MetricTabContent(
+            tab: tab,
+            ranking: ranked,
+            microGraphGroupIDs: Set(ranked.prefix(microGraphLimit).map(\.id)),
+            metric: metric,
+            memorySegments: segments(for: groups, totalBytes: totalBytes),
+            memoryTotalBytes: totalBytes,
+            memoryLeaderBytes: groups.map(\.memoryBytes).max() ?? 0,
+            cpuLeader: groups.map(\.cpuPercent).max() ?? 0
+        )
+    }
+
+    /// 环形分段:零内存组先剔除(0 字节的段不可见、图例只添噪声),top-5 各一段,
+    /// 尾部聚合"其他"(余量 > 0 才造);全零/空 → 空。
+    private static func segments(for groups: [ProcessGroup], totalBytes: UInt64) -> [MemoryRingSegment] {
+        guard totalBytes > 0 else { return [] }
+
+        let rankedByMemory = groups
+            .filter { $0.memoryBytes > 0 }
+            .sorted { lhs, rhs in
+                if lhs.memoryBytes != rhs.memoryBytes { return lhs.memoryBytes > rhs.memoryBytes }
+                return lhs.id < rhs.id
+            }
+        let top = rankedByMemory.prefix(memorySegmentLimit)
+
+        var segments = top.map { group in
+            MemoryRingSegment(
+                id: group.id,
+                name: group.name,
+                bundlePath: group.bundlePath,
+                category: group.category,
+                bytes: group.memoryBytes,
+                fraction: Double(group.memoryBytes) / Double(totalBytes),
+                isOther: false
+            )
+        }
+
+        let otherBytes = totalBytes - top.reduce(UInt64(0)) { $0 + $1.memoryBytes }
+        if otherBytes > 0 {
+            segments.append(
+                MemoryRingSegment(
+                    id: otherSegmentID,
+                    name: "其他",
+                    bundlePath: nil,
+                    category: nil,
+                    bytes: otherBytes,
+                    fraction: Double(otherBytes) / Double(totalBytes),
+                    isOther: true
+                )
+            )
+        }
+        return segments
+    }
+}

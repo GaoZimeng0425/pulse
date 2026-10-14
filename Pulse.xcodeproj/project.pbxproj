@@ -17,6 +17,7 @@
 		154454A04341DB4CA585E4B9 /* DrilldownStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 135674B4363F7A3923D5D6C1 /* DrilldownStateTests.swift */; };
 		1A6FBBAA8FFC5AB748E47788 /* BundleDisplayNameReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B5633EC929F85A22B2BB45E /* BundleDisplayNameReaderTests.swift */; };
 		2A294741604ED11BCA7E7E11 /* PulseApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D5309CAF2CC1BC7C626E937 /* PulseApp.swift */; };
+		2F681644821F7D9946A73E92 /* MetricTabModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9378B86940EBE30E057F718D /* MetricTabModelTests.swift */; };
 		340C1F8AE9D292893F8047B6 /* KillService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EEBE923D7AD04F0AA114D2F /* KillService.swift */; };
 		3598E8EB4005ED5ED236302F /* CoreTickDifferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 157B382FB4BC0949D81F02BD /* CoreTickDifferTests.swift */; };
 		3891285DCA8188E59A9EC34E /* GroupCategoryDisplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B7ADC75304AC8AC8EF1CED3 /* GroupCategoryDisplayTests.swift */; };
@@ -60,9 +61,11 @@
 		EEE4D157B2E938236769FDA1 /* ProcessTableOrder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F13DD6C844380A38162F05E /* ProcessTableOrder.swift */; };
 		F05648644AF378208F009F6C /* KillActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E04EA088E4D30C0FF3A1CB75 /* KillActionTests.swift */; };
 		F18B3E2174933BF6C17110CD /* ProjectRootsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCA4A32138D3658BE3DDD03F /* ProjectRootsStore.swift */; };
+		F788B059C21776EE62FE4E14 /* MetricTabModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE61AAB8A3AD499BFDAD5BEF /* MetricTabModel.swift */; };
 		F9C9339D3FA1CB16491CF1F3 /* LineageRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 016B3CA5A832E0E81BFBE1C7 /* LineageRegistry.swift */; };
 		FA39C087AD11F34D92DFDDFF /* KillEndToEndTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94AE23A1D17532F33018843D /* KillEndToEndTests.swift */; };
 		FDE435939BE1165CF3D5121F /* ParentChainQueryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A05CDA8C1EBF16044C21BFD /* ParentChainQueryTests.swift */; };
+		FEEBF3F50A4A4E78CEB7791C /* MetricTabViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA4729652A528B0AD0592677 /* MetricTabViews.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -108,10 +111,13 @@
 		8F13DD6C844380A38162F05E /* ProcessTableOrder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessTableOrder.swift; sourceTree = "<group>"; };
 		91BEE952FDD7E25ABCCEED94 /* ParentChainQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParentChainQuery.swift; sourceTree = "<group>"; };
 		922EBEDDF974C9C5C567A5C8 /* ProcArgsParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcArgsParserTests.swift; sourceTree = "<group>"; };
+		9378B86940EBE30E057F718D /* MetricTabModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricTabModelTests.swift; sourceTree = "<group>"; };
 		94AE23A1D17532F33018843D /* KillEndToEndTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KillEndToEndTests.swift; sourceTree = "<group>"; };
 		9905BF005BD3EB506349DE3E /* SampleHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleHistoryTests.swift; sourceTree = "<group>"; };
 		9D5309CAF2CC1BC7C626E937 /* PulseApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PulseApp.swift; sourceTree = "<group>"; };
 		A5770D8A3B1DB2980B7B412C /* GroupingPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupingPipeline.swift; sourceTree = "<group>"; };
+		AA4729652A528B0AD0592677 /* MetricTabViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricTabViews.swift; sourceTree = "<group>"; };
+		AE61AAB8A3AD499BFDAD5BEF /* MetricTabModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricTabModel.swift; sourceTree = "<group>"; };
 		AFC9AB4EF78C90578BF978B2 /* BundleDisplayNameReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundleDisplayNameReader.swift; sourceTree = "<group>"; };
 		B0BF7D6AA1DBB63B3727EB5F /* ProcArgsParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcArgsParser.swift; sourceTree = "<group>"; };
 		B1CFF8BCDEC12DA39EA8F8D3 /* KillTargetMappingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KillTargetMappingTests.swift; sourceTree = "<group>"; };
@@ -153,6 +159,8 @@
 				1F99A0A803B159AF36A4BD82 /* MainWindowView.swift */,
 				CDD3F4E919A4F4E221C8DA95 /* MeterBar.swift */,
 				15A129D11862CB2382425940 /* MetricAccent.swift */,
+				AE61AAB8A3AD499BFDAD5BEF /* MetricTabModel.swift */,
+				AA4729652A528B0AD0592677 /* MetricTabViews.swift */,
 				91BEE952FDD7E25ABCCEED94 /* ParentChainQuery.swift */,
 				6BF3D781EE905DA6D3A9F9B6 /* PathNormalization.swift */,
 				B0BF7D6AA1DBB63B3727EB5F /* ProcArgsParser.swift */,
@@ -213,6 +221,7 @@
 				F937470B1B173E43976933F8 /* MainWindowModelTests.swift */,
 				1E785F53B70C02534AC3EBF8 /* MeterBarTests.swift */,
 				FD1902314E98C2C8F685D0D9 /* MetricAccentTests.swift */,
+				9378B86940EBE30E057F718D /* MetricTabModelTests.swift */,
 				4A05CDA8C1EBF16044C21BFD /* ParentChainQueryTests.swift */,
 				922EBEDDF974C9C5C567A5C8 /* ProcArgsParserTests.swift */,
 				DF43629A17EF4D982135C6DC /* ProjectRootsStoreTests.swift */,
@@ -322,6 +331,7 @@
 				80E1D933B7837B2709826B4B /* MainWindowModelTests.swift in Sources */,
 				E9FB46EA364DC9CBF4A6BA36 /* MeterBarTests.swift in Sources */,
 				5E698B91C352218AEC7DF667 /* MetricAccentTests.swift in Sources */,
+				2F681644821F7D9946A73E92 /* MetricTabModelTests.swift in Sources */,
 				FDE435939BE1165CF3D5121F /* ParentChainQueryTests.swift in Sources */,
 				616D7878CF54B2A29104277C /* ProcArgsParserTests.swift in Sources */,
 				0E7CC3EE21A1321E89D78BFC /* ProjectRootsStoreTests.swift in Sources */,
@@ -350,6 +360,8 @@
 				62EF4B86389A2829933D1EDE /* MainWindowView.swift in Sources */,
 				EBE6B448AA908BA66471F4A1 /* MeterBar.swift in Sources */,
 				3FA77C4232F6EE6783FBBA03 /* MetricAccent.swift in Sources */,
+				F788B059C21776EE62FE4E14 /* MetricTabModel.swift in Sources */,
+				FEEBF3F50A4A4E78CEB7791C /* MetricTabViews.swift in Sources */,
 				0AC65ED3BAE50360BFE8D689 /* ParentChainQuery.swift in Sources */,
 				EE6EF3EE2DCD7A9E9DD151DB /* PathNormalization.swift in Sources */,
 				906C33A688BF48D564DAD3FC /* ProcArgsParser.swift in Sources */,

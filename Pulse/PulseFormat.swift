@@ -27,6 +27,15 @@ enum PulseFormat {
         return "\(bytes / 1_000_000) MB"
     }
 
+    /// 内存大数字与单位分层(工单 P0.6-03,内存 tab 组卡):("2.4", "GB")——
+    /// 数字走圆体大字,单位小一号、基线对齐(参考文档 §1.2 figure 规格)。
+    /// 与 memory() 同源同格式,只是拆开交付;两个出口不会差一个字。
+    static func memoryFigure(_ bytes: UInt64) -> (value: String, unit: String) {
+        let text = memory(bytes)
+        guard let separator = text.firstIndex(of: " ") else { return (text, "") }
+        return (String(text[..<separator]), String(text[text.index(after: separator)...]))
+    }
+
     /// 启动时长(工单 06):("已 25 分钟")。
     /// 秒 → 分 → 时 → 天逐级取整(<60 秒 "已 40 秒";<60 分 "已 25 分钟";
     /// <24 小时 "已 3 小时";≥24 小时 "已 3 天"——用户故事 13 的"常驻 3 天")。
