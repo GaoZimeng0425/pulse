@@ -15,6 +15,9 @@ struct GroupingPipeline {
 
     /// 出生登记表随轮次增长(内存版,重启即失——P0 决定)。
     private(set) var lineage = LineageRegistry()
+    /// 全部组(工单 P0.5-01):最近一轮 update 截取**之前**的完整榜单,
+    /// 与 Top 组同序同源——主窗口读这里,弹窗读 update 的返回值。
+    private(set) var allGroups: [ProcessGroup] = []
     /// 归组配置:`projectRoots` 允许热更新(setProjectRoots,工单 07),其余构造时定型。
     private(set) var configuration: GroupingConfiguration
     let displayLimit: Int
@@ -54,6 +57,7 @@ struct GroupingPipeline {
             configuration: configuration,
             cpuPercentByPID: processCPU.cpuPercentByPID
         )
+        allGroups = groups
         return Array(groups.prefix(displayLimit))
     }
 }

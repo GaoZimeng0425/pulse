@@ -27,11 +27,13 @@
 		51A6E49B73921A3FC725B604 /* BundleDisplayNameReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFC9AB4EF78C90578BF978B2 /* BundleDisplayNameReader.swift */; };
 		53BF4BF8378F0983A51FC4A8 /* SamplingSchedulerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C1A01E0236973380C357F35 /* SamplingSchedulerTests.swift */; };
 		616D7878CF54B2A29104277C /* ProcArgsParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 922EBEDDF974C9C5C567A5C8 /* ProcArgsParserTests.swift */; };
+		62EF4B86389A2829933D1EDE /* MainWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F99A0A803B159AF36A4BD82 /* MainWindowView.swift */; };
 		68820A72998494281B77A725 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03A9EBCB9547AAD3B2FF3F9 /* DashboardView.swift */; };
 		699E7D697AF017DD08E2E9E0 /* CPUDifferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52CBC2FEBBED6BCB5A8AE107 /* CPUDifferTests.swift */; };
 		6B9E437AF9EE748C4237292E /* Sampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86039569010AE499E8718A99 /* Sampler.swift */; };
 		6CBEE611BA0F9C722030FA75 /* KillTargetMappingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1CFF8BCDEC12DA39EA8F8D3 /* KillTargetMappingTests.swift */; };
 		75364487780EFF56E510D046 /* GroupingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E978B9526EA1C54372E33CC /* GroupingEngine.swift */; };
+		80E1D933B7837B2709826B4B /* MainWindowModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F937470B1B173E43976933F8 /* MainWindowModelTests.swift */; };
 		906C33A688BF48D564DAD3FC /* ProcArgsParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0BF7D6AA1DBB63B3727EB5F /* ProcArgsParser.swift */; };
 		90E51900C14DD298679E2C5B /* LiveProcessSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = C51EAD0B99672798A7F56077 /* LiveProcessSource.swift */; };
 		976E0BE556A60E169ABD2609 /* BirthScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C63C1ECC09721E8533BE5DAA /* BirthScanner.swift */; };
@@ -48,6 +50,7 @@
 		EB6A8D530686F8BEE362E0AD /* ProcessSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF564398ED42F94AAC5F11A4 /* ProcessSource.swift */; };
 		EE3566C6FB14C20C796F9706 /* PulseFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A05454E2790B918CCFBFDA4 /* PulseFormat.swift */; };
 		EE6EF3EE2DCD7A9E9DD151DB /* PathNormalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BF3D781EE905DA6D3A9F9B6 /* PathNormalization.swift */; };
+		EEE4D157B2E938236769FDA1 /* ProcessTableOrder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F13DD6C844380A38162F05E /* ProcessTableOrder.swift */; };
 		F05648644AF378208F009F6C /* KillActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E04EA088E4D30C0FF3A1CB75 /* KillActionTests.swift */; };
 		F18B3E2174933BF6C17110CD /* ProjectRootsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCA4A32138D3658BE3DDD03F /* ProjectRootsStore.swift */; };
 		F9C9339D3FA1CB16491CF1F3 /* LineageRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 016B3CA5A832E0E81BFBE1C7 /* LineageRegistry.swift */; };
@@ -77,6 +80,7 @@
 		157B382FB4BC0949D81F02BD /* CoreTickDifferTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreTickDifferTests.swift; sourceTree = "<group>"; };
 		1B7ADC75304AC8AC8EF1CED3 /* GroupCategoryDisplayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupCategoryDisplayTests.swift; sourceTree = "<group>"; };
 		1CB6B4D9A1C6B08A03143AD4 /* SamplerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SamplerTests.swift; sourceTree = "<group>"; };
+		1F99A0A803B159AF36A4BD82 /* MainWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowView.swift; sourceTree = "<group>"; };
 		2A05454E2790B918CCFBFDA4 /* PulseFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PulseFormat.swift; sourceTree = "<group>"; };
 		32DF241AAD5F8798ADDE0FC2 /* GroupingPipelineSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupingPipelineSmokeTests.swift; sourceTree = "<group>"; };
 		3876B006CE48D758E7238556 /* CPUDiffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CPUDiffer.swift; sourceTree = "<group>"; };
@@ -90,6 +94,7 @@
 		6E978B9526EA1C54372E33CC /* GroupingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupingEngine.swift; sourceTree = "<group>"; };
 		86039569010AE499E8718A99 /* Sampler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sampler.swift; sourceTree = "<group>"; };
 		8C71FCD146BC0C56EF25AEE9 /* AcceptanceAnchorEndToEndTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcceptanceAnchorEndToEndTests.swift; sourceTree = "<group>"; };
+		8F13DD6C844380A38162F05E /* ProcessTableOrder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessTableOrder.swift; sourceTree = "<group>"; };
 		91BEE952FDD7E25ABCCEED94 /* ParentChainQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParentChainQuery.swift; sourceTree = "<group>"; };
 		922EBEDDF974C9C5C567A5C8 /* ProcArgsParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcArgsParserTests.swift; sourceTree = "<group>"; };
 		94AE23A1D17532F33018843D /* KillEndToEndTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KillEndToEndTests.swift; sourceTree = "<group>"; };
@@ -114,6 +119,7 @@
 		E1E06F0A25EE07740DA1C192 /* ProjectRootsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRootsSettingsView.swift; sourceTree = "<group>"; };
 		F037E709135740FF3012BA47 /* SyntheticProcessSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyntheticProcessSourceTests.swift; sourceTree = "<group>"; };
 		F3D0353305807063B3A9F254 /* GroupingEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupingEngineTests.swift; sourceTree = "<group>"; };
+		F937470B1B173E43976933F8 /* MainWindowModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowModelTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -130,6 +136,7 @@
 				0EEBE923D7AD04F0AA114D2F /* KillService.swift */,
 				016B3CA5A832E0E81BFBE1C7 /* LineageRegistry.swift */,
 				C51EAD0B99672798A7F56077 /* LiveProcessSource.swift */,
+				1F99A0A803B159AF36A4BD82 /* MainWindowView.swift */,
 				91BEE952FDD7E25ABCCEED94 /* ParentChainQuery.swift */,
 				6BF3D781EE905DA6D3A9F9B6 /* PathNormalization.swift */,
 				B0BF7D6AA1DBB63B3727EB5F /* ProcArgsParser.swift */,
@@ -137,6 +144,7 @@
 				BC06CE2AAADC2E6B644F4619 /* ProcessDrilldownView.swift */,
 				59315D07799E52E9D8CCB971 /* ProcessSnapshot.swift */,
 				BF564398ED42F94AAC5F11A4 /* ProcessSource.swift */,
+				8F13DD6C844380A38162F05E /* ProcessTableOrder.swift */,
 				E1E06F0A25EE07740DA1C192 /* ProjectRootsSettingsView.swift */,
 				DCA4A32138D3658BE3DDD03F /* ProjectRootsStore.swift */,
 				9D5309CAF2CC1BC7C626E937 /* PulseApp.swift */,
@@ -184,6 +192,7 @@
 				C53D2D1E33AFAC1704FD224A /* KillServiceTests.swift */,
 				B1CFF8BCDEC12DA39EA8F8D3 /* KillTargetMappingTests.swift */,
 				3A992F5F503CAD7CB90DD838 /* LiveProcessSourceSmokeTests.swift */,
+				F937470B1B173E43976933F8 /* MainWindowModelTests.swift */,
 				4A05CDA8C1EBF16044C21BFD /* ParentChainQueryTests.swift */,
 				922EBEDDF974C9C5C567A5C8 /* ProcArgsParserTests.swift */,
 				DF43629A17EF4D982135C6DC /* ProjectRootsStoreTests.swift */,
@@ -289,6 +298,7 @@
 				CADC6FC231286ABD06F04C67 /* KillServiceTests.swift in Sources */,
 				6CBEE611BA0F9C722030FA75 /* KillTargetMappingTests.swift in Sources */,
 				E559247BAA70D0A1868BD156 /* LiveProcessSourceSmokeTests.swift in Sources */,
+				80E1D933B7837B2709826B4B /* MainWindowModelTests.swift in Sources */,
 				FDE435939BE1165CF3D5121F /* ParentChainQueryTests.swift in Sources */,
 				616D7878CF54B2A29104277C /* ProcArgsParserTests.swift in Sources */,
 				0E7CC3EE21A1321E89D78BFC /* ProjectRootsStoreTests.swift in Sources */,
@@ -313,6 +323,7 @@
 				340C1F8AE9D292893F8047B6 /* KillService.swift in Sources */,
 				F9C9339D3FA1CB16491CF1F3 /* LineageRegistry.swift in Sources */,
 				90E51900C14DD298679E2C5B /* LiveProcessSource.swift in Sources */,
+				62EF4B86389A2829933D1EDE /* MainWindowView.swift in Sources */,
 				0AC65ED3BAE50360BFE8D689 /* ParentChainQuery.swift in Sources */,
 				EE6EF3EE2DCD7A9E9DD151DB /* PathNormalization.swift in Sources */,
 				906C33A688BF48D564DAD3FC /* ProcArgsParser.swift in Sources */,
@@ -320,6 +331,7 @@
 				147F6F94C76480C6FE76BCF0 /* ProcessDrilldownView.swift in Sources */,
 				9C83A4041E9F900BA5A1F008 /* ProcessSnapshot.swift in Sources */,
 				EB6A8D530686F8BEE362E0AD /* ProcessSource.swift in Sources */,
+				EEE4D157B2E938236769FDA1 /* ProcessTableOrder.swift in Sources */,
 				3B0AEF0F7AC596C838890C69 /* ProjectRootsSettingsView.swift in Sources */,
 				F18B3E2174933BF6C17110CD /* ProjectRootsStore.swift in Sources */,
 				2A294741604ED11BCA7E7E11 /* PulseApp.swift in Sources */,

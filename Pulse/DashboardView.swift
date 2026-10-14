@@ -8,6 +8,8 @@ struct DashboardView: View {
     let monitor: SystemMonitor
     /// 设置窗入口(工单 07):头部齿轮按钮。
     @Environment(\.openSettings) private var openSettings
+    /// 主窗口入口(工单 P0.5-01 入口一):头部"在窗口中打开"按钮。
+    @Environment(\.openWindow) private var openWindow
 
     /// 下钻列表滚动上限:系统组可达数百进程,超出即滚动(组内行由
     /// ProcessDrilldownView 的 LazyVStack 惰性渲染,保证滚动流畅)。
@@ -45,17 +47,7 @@ struct DashboardView: View {
         }
         .padding(16)
         .frame(width: 340)
-        .alert(
-            killFailureReport?.failureAlertTitle ?? "",
-            isPresented: Binding(
-                get: { killFailureReport?.hasFailures == true },
-                set: { if !$0 { killFailureReport = nil } }
-            )
-        ) {
-            Button("知道了") { killFailureReport = nil }
-        } message: {
-            Text(killFailureReport?.failureAlertMessage ?? "")
-        }
+        .modifier(KillFailureAlert(report: $killFailureReport))
     }
 
     /// 单个组卡 + 展开后的下钻区。展开只读 monitor.drilldown(最近一轮采样),
@@ -86,28 +78,17 @@ struct DashboardView: View {
     }
 
     // MARK: 处置(工单 08)——不主动杀、确认后才杀
+    // P0.5-01:确认 + 执行 + 失败汇总的编排抽到 KillRequestFlow(主窗口同流程共用),
+    // 弹窗行为不变(同一对话框、同一"有失败才弹"口径)。
 
     /// 进程详情"结束进程":确认(点名 name+pid)→ SIGTERM;有失败才弹汇总。
     private func requestEndProcess(_ target: KillTarget) {
-        let targets = [target]
-        let confirmed = KillConfirmationDialog.confirm(
-            title: KillCopy.confirmationTitle(for: targets),
-            informativeText: KillCopy.confirmationMessage(for: targets),
-            actionTitle: KillCopy.singleActionTitle
-        )
-        guard confirmed else { return }
-        killFailureReport = monitor.terminate(targets)
+        killFailureReport = KillRequestFlow.endProcess(target, monitor: monitor)
     }
 
     /// 组卡"结束整组":确认(列进程数)→ 对最新一轮采样的组员逐个 SIGTERM。
     private func requestEndGroup(_ group: ProcessGroup) {
-        let confirmed = KillConfirmationDialog.confirm(
-            title: KillCopy.groupConfirmationTitle(groupName: group.name),
-            informativeText: KillCopy.groupConfirmationMessage(processCount: group.processes.count),
-            actionTitle: KillCopy.groupActionTitle
-        )
-        guard confirmed else { return }
-        killFailureReport = monitor.terminateGroup(id: group.id)
+        killFailureReport = KillRequestFlow.endGroup(group, monitor: monitor)
     }
 
     private var header: some View {
@@ -123,6 +104,17 @@ struct DashboardView: View {
                     .monospacedDigit()
             }
             Spacer()
+            // 入口一(工单 P0.5-01):在窗口中打开全部组(Top-5 之外也在)。
+            // openWindow 对已开的窗口 = 聚焦,关掉的窗口 = 重新打开。
+            Button {
+                openWindow(id: MainWindowSceneID.value)
+            } label: {
+                Image(systemName: "macwindow")
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .help("在窗口中打开(全部组)")
+            .accessibilityLabel("在窗口中打开")
             Button {
                 openSettings()
             } label: {
@@ -276,6 +268,59 @@ enum KillConfirmationDialog {
         let actionButton = alert.addButton(withTitle: actionTitle)
         actionButton.keyEquivalent = "" // 不给"结束"任何键盘触发
         return alert.runModal() == NSApplication.ModalResponse.alertSecondButtonReturn
+    }
+}
+
+// MARK: - 处置编排与失败弹窗(工单 08;P0.5-01 起弹窗与主窗口共用)
+
+/// 处置请求编排:确认对话框把关 → 确认后才发信号;返回失败汇总——
+/// 全成功返回 nil 保持安静(行 / 组消失交给下轮采样自然反映)。
+/// 原为 DashboardView 私有逻辑,工单 P0.5-01 主窗口需要同一流程,抽出共用;
+/// 对话框构造(KillCopy)、焦点次序与"有失败才弹"口径与 P0 完全一致。
+@MainActor
+enum KillRequestFlow {
+    /// 进程详情"结束进程"(单目标,确认时点名 name+pid)。
+    static func endProcess(_ target: KillTarget, monitor: SystemMonitor) -> KillReport? {
+        let targets = [target]
+        let confirmed = KillConfirmationDialog.confirm(
+            title: KillCopy.confirmationTitle(for: targets),
+            informativeText: KillCopy.confirmationMessage(for: targets),
+            actionTitle: KillCopy.singleActionTitle
+        )
+        guard confirmed else { return nil }
+        let report = monitor.terminate(targets)
+        return report.hasFailures ? report : nil
+    }
+
+    /// 组卡"结束整组"(确认时列进程数)→ 对最新一轮采样的组员逐个 SIGTERM。
+    static func endGroup(_ group: ProcessGroup, monitor: SystemMonitor) -> KillReport? {
+        let confirmed = KillConfirmationDialog.confirm(
+            title: KillCopy.groupConfirmationTitle(groupName: group.name),
+            informativeText: KillCopy.groupConfirmationMessage(processCount: group.processes.count),
+            actionTitle: KillCopy.groupActionTitle
+        )
+        guard confirmed else { return nil }
+        let report = monitor.terminateGroup(id: group.id)
+        return report.hasFailures ? report : nil
+    }
+}
+
+/// 处置失败汇总弹窗:**有失败才弹**(标题 / 正文 / "知道了"按钮与工单 08 一致)。
+struct KillFailureAlert: ViewModifier {
+    @Binding var report: KillReport?
+
+    func body(content: Content) -> some View {
+        content.alert(
+            report?.failureAlertTitle ?? "",
+            isPresented: Binding(
+                get: { report?.hasFailures == true },
+                set: { if !$0 { report = nil } }
+            )
+        ) {
+            Button("知道了") { report = nil }
+        } message: {
+            Text(report?.failureAlertMessage ?? "")
+        }
     }
 }
 

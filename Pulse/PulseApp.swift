@@ -34,10 +34,54 @@ struct PulseApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        // 设置窗(工单 07):项目根目录列表增删;入口在弹窗头部齿轮按钮。
+        // 主窗口(工单 P0.5-01):全部组(非 Top-5)+ 可排序进程表 + 详情下钻。
+        // 两个入口打开它——弹窗头部"在窗口中打开"按钮 + 下方第二菜单栏项;
+        // 窗口内容不触碰 setPopoverVisible:关窗只藏窗,采样节奏不受影响(spec)。
+        Window("Pulse", id: MainWindowSceneID.value) {
+            MainWindowView(monitor: monitor)
+                // 菜单栏标签拉起即启动采样(start 幂等);此处再提一次,
+                // 让预览 / 理论上的窗口先行场景同样有数据。
+                .task { monitor.start() }
+        }
+        .defaultSize(width: 880, height: 620)
+
+        // 第二菜单栏项(工单 P0.5-01 入口二):紧凑图标 + 原生下拉菜单——
+        // 打开主窗口 / 设置… / 退出 Pulse(终于有体面的退出)。
+        // 原有 CPU 数字弹窗项保持不动(spec:上方 MenuBarExtra)。
+        MenuBarExtra {
+            AppMenuExtraContent()
+        } label: {
+            Image(systemName: "waveform.path.ecg")
+        }
+        .menuBarExtraStyle(.menu)
+
+        // 设置窗(工单 07):项目根目录列表增删;入口在弹窗头部齿轮按钮
+        //(P0.5 起菜单栏菜单亦有"设置…"入口)。
         Settings {
             ProjectRootsSettingsView(store: rootsStore)
         }
+    }
+}
+
+/// 第二菜单栏项内容(工单 P0.5-01):原生菜单三件套。`.menu` 样式下
+/// 内容即菜单项(Button 渲染为菜单项);退出走 NSApplication.terminate,
+/// LSUIElement 应用由菜单栏体系持有,terminate 是唯一体面的退出路径。
+struct AppMenuExtraContent: View {
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        Button("打开主窗口") {
+            openWindow(id: MainWindowSceneID.value)
+        }
+        Button("设置…") {
+            openSettings()
+        }
+        Divider()
+        Button("退出 Pulse") {
+            NSApplication.shared.terminate(nil)
+        }
+        .keyboardShortcut("q", modifiers: .command)
     }
 }
 
