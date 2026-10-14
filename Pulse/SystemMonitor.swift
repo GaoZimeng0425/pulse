@@ -13,18 +13,14 @@ import Darwin
 final class SystemMonitor {
     /// 系统 CPU 负载超过该值菜单栏变红(spec:70%)。
     static let redThreshold: Double = 70
-    /// 弹窗展示组数(spec:Top-5)。
-    static let displayGroupLimit = 5
 
     /// 系统 CPU 负载,0–100%,随采样跳动。
     private(set) var systemCPULoad: Double = 0
-    /// Top-5 组(GLOSSARY 组),组 CPU% 降序;首轮采样前为空,弹窗呈空态。
-    private(set) var topGroups: [ProcessGroup] = []
-    /// 全部组(工单 P0.5-01):同一榜单截取之前的完整列表,主窗口读这里。
-    /// 与 topGroups 同序同源、每轮整体刷新;首轮采样前为空,窗口呈空态。
+    /// 全部组(GLOSSARY 组),组 CPU% 降序,每轮整体刷新;首轮采样前为空。
+    /// 弹窗与主窗口都读这里(用户拍板:弹窗不再截 Top-5,滚动展示全部)。
     private(set) var allGroups: [ProcessGroup] = []
     /// 最近一轮采样留下的下钻输入(工单 06):组卡展开 / 进程详情从这里只读取数,
-    /// 下钻不触发额外采集;首轮采样前为 nil(与 topGroups 同空态)。
+    /// 下钻不触发额外采集;首轮采样前为 nil。
     private(set) var drilldown: DrilldownState?
 
     private let sampler: Sampler
@@ -50,8 +46,7 @@ final class SystemMonitor {
             configuration: GroupingConfiguration(
                 projectRoots: projectRoots,
                 bundleDisplayName: BundleDisplayNameReader.shared.displayName
-            ),
-            displayLimit: Self.displayGroupLimit
+            )
         )
         self.killService = killService
     }
@@ -110,8 +105,7 @@ final class SystemMonitor {
     /// 结束整组(工单 08):执行瞬间从**最新一轮采样**的组里重取成员
     /// (确认对话框打开期间可能又采了一轮,以最新存活名单为准);
     /// 组已消失 → 空报告(无需处置,也无失败可报)。
-    /// 工单 P0.5-01:查全组列表(主窗口可见 Top-5 之外的组也要能处置;
-    /// topGroups 是它的前缀,弹窗路径行为不变)。
+    /// 工单 P0.5-01:查全组列表(主窗口与弹窗可见的组都要能处置)。
     func terminateGroup(id groupID: String) -> KillReport {
         guard let group = allGroups.first(where: { $0.id == groupID }) else {
             return KillReport(outcomes: [])
@@ -119,13 +113,13 @@ final class SystemMonitor {
         return terminate(group.killTargets)
     }
 
-    /// 一轮采样落地:菜单栏负载 + 出生登记、归组、截 Top-5(纯逻辑在 GroupingPipeline),
+    /// 一轮采样落地:菜单栏负载 + 出生登记、归组(纯逻辑在 GroupingPipeline),
     /// 同时构建下钻输入(快照 + 累计登记表 + 进程差分,同轮一致)。
     /// 出生扫描的登记表先并入——扫描间隙出生的短命父进程由此参与本轮归组。
     private func apply(_ update: SamplingUpdate) {
         systemCPULoad = update.systemCPULoad
         pipeline.mergeBirths(birthLineage)
-        topGroups = pipeline.update(
+        pipeline.update(
             snapshot: update.snapshot,
             processCPU: update.diff.processCPU
         )

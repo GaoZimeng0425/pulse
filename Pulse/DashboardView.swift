@@ -1,14 +1,16 @@
 import SwiftUI
 import AppKit
 
-/// 弹窗主页:头部系统 CPU 负载为真实采样数字,下方 Top-5 组卡(真归组,
-/// 组 CPU% 降序,系统组参榜)。排序随每轮采样实时刷新(@Observable)。
+/// 弹窗主页:头部系统 CPU 负载为真实采样数字,下方全部组卡(真归组,
+/// 组 CPU% 降序,系统组参榜,滚动展示不截断——用户拍板弃 Top-5)。
+/// 排序随每轮采样实时刷新(@Observable)。
 /// 组卡下钻(工单 06):点卡展开组内进程平铺,数据只读最近一轮采样。
+/// 底部操作排:打开主窗口(主按钮)+ 退出(单一菜单栏形态下的全部出口)。
 struct DashboardView: View {
     let monitor: SystemMonitor
     /// 设置窗入口(工单 07):头部齿轮按钮。
     @Environment(\.openSettings) private var openSettings
-    /// 主窗口入口(工单 P0.5-01 入口一):头部"在窗口中打开"按钮。
+    /// 主窗口入口:底部"打开主窗口"按钮。
     @Environment(\.openWindow) private var openWindow
 
     /// 下钻列表滚动上限:系统组可达数百进程,超出即滚动(组内行由
@@ -26,14 +28,14 @@ struct DashboardView: View {
     var body: some View {
         VStack(spacing: 12) {
             header
-            if monitor.topGroups.isEmpty {
+            if monitor.allGroups.isEmpty {
                 emptyState
             } else {
                 ScrollView {
                     // 注意必须是普通 VStack(非 Lazy):组卡需要即时构卡参与
                     // 布局;组内数十行的惰性渲染由 ProcessDrilldownView 承担。
                     VStack(spacing: 12) {
-                        ForEach(monitor.topGroups) { group in
+                        ForEach(monitor.allGroups) { group in
                             groupSection(for: group)
                         }
                     }
@@ -44,10 +46,39 @@ struct DashboardView: View {
                 // (工单 09 实机走查发现)。固定值与菜单栏工具惯例一致(Vitals 同款)。
                 .frame(height: Self.drilldownListMaxHeight)
             }
+            Divider()
+                .padding(.horizontal, -4)
+            footer
         }
         .padding(16)
         .frame(width: 340)
         .modifier(KillFailureAlert(report: $killFailureReport))
+    }
+
+    /// 底部操作排(用户拍板:合并为单一菜单栏项后的窗口/退出口):
+    /// "打开主窗口"为主按钮(openWindow 对已开窗口 = 聚焦);退出为次按钮,
+    /// NSApplication.terminate 是 LSUIElement 应用体面的退出路径。
+    private var footer: some View {
+        HStack(spacing: 12) {
+            Button {
+                openWindow(id: MainWindowSceneID.value)
+            } label: {
+                Label("打开主窗口", systemImage: "macwindow")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            Button {
+                NSApplication.shared.terminate(nil)
+            } label: {
+                Image(systemName: "power")
+                    .frame(width: 24, height: 24)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .help("退出 Pulse")
+            .accessibilityLabel("退出 Pulse")
+        }
     }
 
     /// 单个组卡 + 展开后的下钻区。展开只读 monitor.drilldown(最近一轮采样),
@@ -104,17 +135,6 @@ struct DashboardView: View {
                     .monospacedDigit()
             }
             Spacer()
-            // 入口一(工单 P0.5-01):在窗口中打开全部组(Top-5 之外也在)。
-            // openWindow 对已开的窗口 = 聚焦,关掉的窗口 = 重新打开。
-            Button {
-                openWindow(id: MainWindowSceneID.value)
-            } label: {
-                Image(systemName: "macwindow")
-            }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
-            .help("在窗口中打开(全部组)")
-            .accessibilityLabel("在窗口中打开")
             Button {
                 openSettings()
             } label: {
