@@ -1,6 +1,6 @@
 # P0:菜单栏"App 视角"监视器(采样 + 三层归组 + Top-5 弹窗)
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 

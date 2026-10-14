@@ -4,7 +4,7 @@
 
 **Blocked by:** 07, 08。
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] 验收锚点场景通过:三个真实负载各自正确归组、可完整下钻
 - [x] 常驻内存 < 30MB(活动监视器核对 Pulse 进程)

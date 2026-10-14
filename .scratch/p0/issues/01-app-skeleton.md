@@ -4,7 +4,7 @@
 
 **Blocked by:** 无(可立即开工)。
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] App 启动后不出现在 Dock,仅菜单栏可见
 - [x] 菜单栏显示假 CPU 数字,点击弹出窗口

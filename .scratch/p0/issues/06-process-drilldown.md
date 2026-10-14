@@ -4,7 +4,7 @@
 
 **Blocked by:** 05。
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] 点组卡展开/收起进程列表,列表按 CPU% 降序
 - [x] 每行含进程名、pid、CPU%、内存

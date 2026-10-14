@@ -4,7 +4,7 @@
 
 **Blocked by:** 02(快照模型与 Synthetic 源)。
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] 合成夹具:octok-client 树(rustc×N ← cargo ← node ← ZCode.app)归组为"项目 @ worktree",组 CPU% 为 N 个 rustc 之和(可超 100%)
 - [x] Chrome Helper(Renderer/GPU/XPC)全部跟随宿主 App 归属,应用仅一组

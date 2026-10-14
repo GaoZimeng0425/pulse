@@ -4,7 +4,7 @@
 
 **Blocked by:** 01(工程骨架与测试 target)。
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] 协议 + 快照模型定义完成,纯 Swift 值类型
 - [x] Live 实现一轮采集本机返回 >0 个进程,耗时毫秒级
