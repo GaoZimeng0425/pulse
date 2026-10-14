@@ -52,6 +52,7 @@ struct MainWindowView: View {
         VStack(spacing: 6) {
             GroupCardView(
                 group: group,
+                history: monitor.history.series(forGroup: group.id),
                 isExpanded: expandedGroupIDs.contains(group.id),
                 onToggle: { toggleExpansion(of: group.id) },
                 onEndGroup: {
