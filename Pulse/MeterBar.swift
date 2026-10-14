@@ -21,17 +21,38 @@ struct MeterBar: View {
     let fraction: Double
     let tint: Color
 
+    /// Vitals 同款缓动:0.6s cubic-bezier(.2,.7,.2,1)。
+    private static let widthAnimation: Animation = .timingCurve(0.2, 0.7, 0.2, 1, duration: 0.6)
+
+    /// 实际绘制的占比:跟随 fraction,但在**独立的**动画事务里追平。
+    /// 不能在 fraction 变化的那一轮直接挂动画(`.animation(_:value:)` /
+    /// 作用域动画都不行):榜单换序与 fraction 变化同轮发生,那一轮的
+    /// 动画事务会连带条的位置变化——条从旧行位置滑到新行,卡片其余部分
+    /// 却瞬移(实机 bug)。onChange 晚于本轮更新触发,换序已无动画落定,
+    /// 此时再 withAnimation 只动宽度。
+    @State private var displayedFraction: Double
+
+    init(fraction: Double, tint: Color) {
+        self.fraction = fraction
+        self.tint = tint
+        _displayedFraction = State(initialValue: fraction)
+    }
+
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
                 Capsule().fill(tint.opacity(0.14))
                 Capsule()
                     .fill(tint)
-                    .frame(width: proxy.size.width * fraction)
+                    .frame(width: proxy.size.width * displayedFraction)
             }
         }
         .frame(height: 6)
-        .animation(.timingCurve(0.2, 0.7, 0.2, 1, duration: 0.6), value: fraction)
+        .onChange(of: fraction) { _, newValue in
+            withAnimation(Self.widthAnimation) {
+                displayedFraction = newValue
+            }
+        }
         // 占比信息已由行内数字文本承载(无障碍读数不重复),条本身按装饰处理。
         .accessibilityHidden(true)
     }
