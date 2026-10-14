@@ -61,6 +61,9 @@ struct DashboardView: View {
     private var footer: some View {
         HStack(spacing: 12) {
             Button {
+                // LSUIElement 应用激活策略为 .accessory:openWindow 只建窗不抢前台,
+                // 窗口会开在其他应用后面(实机反馈"点了没反应")——先激活再开窗。
+                NSApplication.shared.activate(ignoringOtherApps: true)
                 openWindow(id: MainWindowSceneID.value)
             } label: {
                 Label("打开主窗口", systemImage: "macwindow")
