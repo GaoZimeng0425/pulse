@@ -20,15 +20,10 @@ final class GroupingPipelineTests: XCTestCase {
     private func sweep(
         _ source: SyntheticProcessSource,
         previous: ProcessSnapshot?,
-        pipeline: inout GroupingPipeline,
-        logicalCoreCount: Int = 4
+        pipeline: inout GroupingPipeline
     ) -> (groups: [ProcessGroup], snapshot: ProcessSnapshot) {
         let snapshot = source.snapshot()
-        let diff = CPUDiffer.diff(
-            previous: previous,
-            current: snapshot,
-            logicalCoreCount: logicalCoreCount
-        )
+        let diff = CPUDiffer.diff(previous: previous, current: snapshot)
         let groups = pipeline.update(snapshot: snapshot, processCPU: diff.processCPU)
         return (groups, snapshot)
     }
@@ -337,5 +332,72 @@ final class GroupingPipelineTests: XCTestCase {
         XCTAssertNotNil(project, "出生登记回查应让断链 rustc 仍归项目组")
         XCTAssertEqual(project?.name, "octok-client @ \(worktreeName)")
         XCTAssertEqual(project?.processes.map(\.pid), [100])
+    }
+
+    // MARK: 出生扫描并入(评审 S1:独立 2s 扫描 ↔ 采样轮兜底)
+
+    /// 采样间隙出生又退场的短命父进程(cargo):只有出生扫描捕捉到——
+    /// mergeBirths 并入后,下一轮采样里被重挂 launchd 的子进程仍归项目组;
+    /// 不并入(对照组)则归孤儿——正是扫描存在的意义。
+    func testMergedScannerBirthsCoverParentsThatDiedBetweenSamples() {
+        // 出生扫描捕捉到的快照:rustc 出生时父是 cargo,cargo 的 cwd 在 worktree。
+        // (采样从未见到这两个进程——它们在两轮采样之间来去。)
+        let scannerBirths = LineageRegistry().registeringBirths(
+            in: ProcessSnapshot(processes: [
+                RawProcess(
+                    pid: 12,
+                    parentPID: 11,
+                    executablePath: "/Users/x/.cargo/bin/cargo",
+                    argv: ["cargo", "test"],
+                    cwd: worktree(worktreeName)
+                ),
+                RawProcess(
+                    pid: 100,
+                    parentPID: 12,
+                    executablePath: "/Users/x/.rustup/toolchains/stable/bin/rustc",
+                    argv: ["rustc", "--crate-name", "octok"],
+                    cwd: worktree(worktreeName)
+                ),
+            ])
+        )
+        // 采样见到的是:node(仍在,cwd 可读)与被重挂 launchd 的 rustc(cwd 失效)。
+        let live = ProcessSnapshot(takenAt: base, processes: [
+            RawProcess(
+                pid: 11,
+                parentPID: 1,
+                executablePath: "/usr/local/bin/node",
+                argv: ["node"],
+                cwd: worktree(worktreeName)
+            ),
+            RawProcess(
+                pid: 100,
+                parentPID: 1, // cargo(12)已死:被重挂 launchd
+                executablePath: "/Users/x/.rustup/toolchains/stable/bin/rustc",
+                argv: ["rustc", "--crate-name", "octok"]
+            ),
+        ])
+
+        // 对照组:不并入扫描登记 → rustc 断链无记录,落孤儿。
+        var withoutMerge = GroupingPipeline(
+            configuration: GroupingConfiguration(projectRoots: [octokRoot])
+        )
+        let unmergedGroups = withoutMerge.update(snapshot: live, processCPU: [])
+        XCTAssertEqual(
+            unmergedGroups.first { $0.processes.contains { $0.pid == 100 } }?.category,
+            .orphan,
+            "无出生记录的断链 rustc 应落孤儿(对照组)"
+        )
+
+        // 实验组:并入扫描登记 → 同一快照下 rustc 经 cargo 的出生记录归项目组。
+        var withMerge = GroupingPipeline(
+            configuration: GroupingConfiguration(projectRoots: [octokRoot])
+        )
+        withMerge.mergeBirths(scannerBirths)
+        let mergedGroups = withMerge.update(snapshot: live, processCPU: [])
+
+        let project = mergedGroups.first { $0.category == .project }
+        XCTAssertNotNil(project, "扫描登记的 cargo 出生记录应让断链 rustc 归项目组")
+        XCTAssertEqual(project?.name, "octok-client @ \(worktreeName)")
+        XCTAssertEqual(project?.processes.map(\.pid), [11, 100])
     }
 }

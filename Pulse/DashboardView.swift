@@ -182,7 +182,7 @@ struct GroupCardView: View {
                 endGroupButton
             }
             .padding(10)
-            .background(cardBackground, in: .rect(cornerRadius: 10))
+            .background(group.category.cardStyle.cardBackground, in: .rect(cornerRadius: 10))
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -205,7 +205,8 @@ struct GroupCardView: View {
         .accessibilityLabel("结束整组 \(group.name)")
     }
 
-    /// bundle 组:读 .app 目录的真实应用图标;其余:类别 SF Symbol(孤儿橙色)。
+    /// bundle 组:读 .app 目录的真实应用图标;其余:类别样式表的 SF Symbol
+    /// (符号与图标色都取自 cardStyle,孤儿的高亮只是表里的一行)。
     @ViewBuilder
     private var icon: some View {
         if let bundlePath = group.bundlePath {
@@ -214,31 +215,47 @@ struct GroupCardView: View {
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 26, height: 26)
         } else {
-            Image(systemName: group.category.cardSymbolName)
+            Image(systemName: group.category.cardStyle.symbolName)
                 .frame(width: 28)
-                .foregroundStyle(group.category == .orphan ? Color.orange : Color.secondary)
+                .foregroundStyle(group.category.cardStyle.iconColor)
         }
-    }
-
-    /// 孤儿进程组卡整体呈橙色系(GLOSSARY:它往往正是问题所在)。
-    private var cardBackground: AnyShapeStyle {
-        group.category == .orphan
-            ? AnyShapeStyle(Color.orange.opacity(0.15))
-            : AnyShapeStyle(.quaternary)
     }
 }
 
+/// 组卡样式表(工单 05/09,评审 T6):每个类别一份完整样式
+/// (SF Symbol + 图标色 + 卡片底色)。孤儿进程的橙色高亮(GLOSSARY:
+/// 它往往正是问题所在)是表中的一行,而非散落在视图里的 `.orphan` 特判。
+struct GroupCardStyle {
+    let symbolName: String
+    let iconColor: Color
+    let cardBackground: AnyShapeStyle
+}
+
 extension GroupCategory {
-    /// 组卡图标的 SF Symbol:bundle 组由 UI 直接取应用图标,此映射服务项目与
-    /// 兜底类别(spec:符号图);各类别符号互不相同——"可辨识的类别标记"。
-    var cardSymbolName: String {
+    /// 组卡的类别样式:bundle 组由 UI 直接取应用图标,此表服务项目与兜底类别
+    /// (spec:符号图 + 孤儿橙色);各类别符号互不相同——"可辨识的类别标记"。
+    var cardStyle: GroupCardStyle {
         switch self {
-        case .app: "shippingbox"
-        case .project: "hammer"
-        case .system: "cpu"
-        case .backgroundService: "gearshape"
-        case .orphan: "exclamationmark.triangle"
+        case .app:
+            GroupCardStyle(symbolName: "shippingbox", iconColor: .secondary, cardBackground: AnyShapeStyle(.quaternary))
+        case .project:
+            GroupCardStyle(symbolName: "hammer", iconColor: .secondary, cardBackground: AnyShapeStyle(.quaternary))
+        case .system:
+            GroupCardStyle(symbolName: "cpu", iconColor: .secondary, cardBackground: AnyShapeStyle(.quaternary))
+        case .backgroundService:
+            GroupCardStyle(symbolName: "gearshape", iconColor: .secondary, cardBackground: AnyShapeStyle(.quaternary))
+        case .orphan:
+            GroupCardStyle(
+                symbolName: "exclamationmark.triangle",
+                iconColor: .orange,
+                cardBackground: AnyShapeStyle(Color.orange.opacity(0.15))
+            )
         }
+    }
+
+    /// 组卡图标的 SF Symbol(样式表的符号字段,单测经此断言映射完备且互异)。
+    var cardSymbolName: String {
+        cardStyle.symbolName
     }
 }
 

@@ -66,4 +66,11 @@ struct ProcessSnapshot: Equatable, Sendable {
         self.takenAt = takenAt
         self.processes = processes
     }
+
+    /// pid → 进程映射(评审 T4,共享构建;重复 pid 保留首个)——
+    /// 归组引擎的父链上溯与父链面包屑查询(ParentChainQuery)共用,
+    /// 此前两处各写一份。
+    var processesByPID: [pid_t: RawProcess] {
+        Dictionary(processes.map { ($0.pid, $0) }, uniquingKeysWith: { first, _ in first })
+    }
 }

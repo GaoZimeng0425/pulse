@@ -20,9 +20,10 @@ import Darwin
 /// 大缓冲整轮复用,~800 pid 一轮保持在毫秒级。
 struct LiveProcessSource: ProcessSource {
     /// proc_pidpath 缓冲上限(libproc 的 PROC_PIDPATHINFO_MAXSIZE,宏不导入 Swift)。
-    private static let pathBufferSize = 4096
+    /// internal:出生扫描器(LiveBirthScanSource)复用同一批调用与缓冲上限。
+    static let pathBufferSize = 4096
     /// KERN_PROCARGS2 缓冲:argc + execpath + argv + envp,1 MiB 覆盖 ARG_MAX。
-    private static let procArgsBufferSize = 1 << 20
+    static let procArgsBufferSize = 1 << 20
     /// 进程列表缓冲(pid 数),远超实际进程数。
     private static let pidListCapacity = 16_384
     /// mach 时间基准(本机实测 125/3 ns/tick;Intel 上为 1/1,即 tick == 纳秒)。
@@ -79,15 +80,17 @@ struct LiveProcessSource: ProcessSource {
     }
 
     // MARK: - Darwin 调用(每个都对应 docs/probe.swift 中已验证的写法)
+    // 下列四个为 internal:出生扫描器(LiveBirthScanSource,评审 S1)复用同一批
+    // 调用做轻量新 pid 探测——单测冒烟与缓冲上限共用一处事实。
 
-    private static func listPIDs() -> [pid_t] {
+    static func listPIDs() -> [pid_t] {
         var buffer = [pid_t](repeating: 0, count: pidListCapacity)
         let count = proc_listallpids(&buffer, Int32(buffer.count))
         guard count > 0 else { return [] }
         return Array(buffer.prefix(Int(count)))
     }
 
-    private static func kernelProcessInfo(pid: pid_t) -> kinfo_proc? {
+    static func kernelProcessInfo(pid: pid_t) -> kinfo_proc? {
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
         var info = kinfo_proc()
         var length = MemoryLayout<kinfo_proc>.size
@@ -105,7 +108,7 @@ struct LiveProcessSource: ProcessSource {
         )
     }
 
-    private static func executablePath(pid: pid_t, buffer: inout [CChar]) -> String? {
+    static func executablePath(pid: pid_t, buffer: inout [CChar]) -> String? {
         // 本 SDK 的 proc_pidpath 缓冲长度形参是 UInt32(探针用字面量 4096 故未暴露)。
         let length = proc_pidpath(pid, &buffer, UInt32(buffer.count))
         guard length > 0 else { return nil }
@@ -131,7 +134,7 @@ struct LiveProcessSource: ProcessSource {
         return rc == 0 ? info : nil
     }
 
-    private static func currentWorkingDirectory(pid: pid_t) -> String? {
+    static func currentWorkingDirectory(pid: pid_t) -> String? {
         var info = proc_vnodepathinfo()
         let length = proc_pidinfo(
             pid, PROC_PIDVNODEPATHINFO, 0, &info, Int32(MemoryLayout<proc_vnodepathinfo>.size)

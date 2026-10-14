@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - 下钻状态(工单 06):最近一轮采样留给下钻 UI 的只读输入
 
-/// 下钻状态:一次采样落地时由 SystemMonitor 构账、之后只读。
+/// 下钻状态:一次采样落地时由 SystemMonitor 构建、之后只读。
 /// 组卡展开 / 进程详情全部从这里取数——**下钻绝不触发额外采集**(spec),
 /// 展开只是读最近一轮采样的既有数据。
 struct DrilldownState: Equatable, Sendable {
@@ -17,12 +17,7 @@ struct DrilldownState: Equatable, Sendable {
     init(snapshot: ProcessSnapshot, lineage: LineageRegistry, processCPU: [ProcessCPU]) {
         self.snapshot = snapshot
         self.lineage = lineage
-        var cpuPercentByPID: [pid_t: Double] = [:]
-        cpuPercentByPID.reserveCapacity(processCPU.count)
-        for entry in processCPU {
-            cpuPercentByPID[entry.pid] = entry.cpuPercent ?? 0
-        }
-        self.cpuPercentByPID = cpuPercentByPID
+        self.cpuPercentByPID = processCPU.cpuPercentByPID
     }
 
     /// 组内进程行(展开列表):保持组的既定顺序(引擎契约:进程 CPU% 降序、次键 pid 升序)。

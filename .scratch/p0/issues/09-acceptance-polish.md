@@ -66,3 +66,11 @@
 **回归测试**:117 全绿(116 + 新增验收 E2E 1)。UI 两修复按 spec"UI 不写单元测试"决策,
 以实机像素/AX 证据验收;E2E 加固了失败路径清场(此前中断曾泄漏 4 个忙循环烧了一夜 CPU,
 已清理并双保险兜底)。
+
+### 评审遗留:Deferred review findings(P1 材料,只记录不重构)
+
+- **D1**:(executablePath, cwd, argv)三元组在 `RawProcess` 与出生登记
+  `LineageRegistry.Entry` 里重复出现,可收拢为一个小值类型(如 `ProcessIdentity`)。
+  P0 保持字段平铺,避免为此动采集层结构。
+- **D2**:项目根 `[String]` 与前缀编码的组 id(`"project:<root>@<worktree>"`)可引入
+  标记类型(ProjectRoot / GroupIdentity)取代裸字符串约定。P0 以前缀约定 + 注释维持。

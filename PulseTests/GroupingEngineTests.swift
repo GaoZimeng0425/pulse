@@ -384,8 +384,9 @@ final class GroupingEngineTests: XCTestCase {
         XCTAssertEqual(system.memoryBytes, 590_000_000)
     }
 
-    /// 活着的 launchd 下的常驻服务(postgres):落"后台服务";launchd 自身落"系统"。
-    func testLaunchdResidentServiceFallsToBackgroundServiceGroup() {
+    /// 活着的 launchd 之下、可执行位于 launchd 域(/Library/LaunchDaemons 等):
+    /// 落"后台服务";launchd 自身落"系统"。
+    func testLaunchdDomainDaemonUnderLiveLaunchdFallsToBackgroundServiceGroup() {
         let snapshot = ProcessSnapshot(processes: [
             RawProcess(
                 pid: 1,
@@ -396,8 +397,8 @@ final class GroupingEngineTests: XCTestCase {
             RawProcess(
                 pid: 500,
                 parentPID: 1,
-                executablePath: "/usr/local/postgres/bin/postgres",
-                argv: ["postgres", "-D", "/usr/local/postgres/data"],
+                executablePath: "/Library/LaunchDaemons/com.example.tunnel.helper",
+                argv: ["com.example.tunnel.helper"],
                 physicalFootprintBytes: 400_000_000
             ),
         ])
@@ -414,6 +415,198 @@ final class GroupingEngineTests: XCTestCase {
         let system = groups[1]
         XCTAssertEqual(system.name, "系统")
         XCTAssertEqual(system.processes.map(\.pid), [1])
+    }
+
+    /// 重启后(无出生记录)的 launchd 域守护:/System/Library 下的可执行、
+    /// 现挂在活 launchd 之下 → 仍落"后台服务"(spec:后台服务 = launchd 域推断)。
+    func testRestartedSystemDaemonWithoutBirthRecordStaysBackgroundService() {
+        let snapshot = ProcessSnapshot(processes: [
+            RawProcess(
+                pid: 1,
+                parentPID: 0,
+                executablePath: "/sbin/launchd",
+                physicalFootprintBytes: 20_000_000
+            ),
+            RawProcess(
+                pid: 501,
+                parentPID: 1,
+                executablePath: "/System/Library/CoreServices/rememberd",
+                argv: ["rememberd"],
+                physicalFootprintBytes: 60_000_000
+            ),
+        ])
+
+        // 出生登记为空:Pulse 重启后的真实形态(launchd 在现场,活链可达)。
+        let groups = GroupingEngine.groups(from: snapshot, cpuPercentByPID: [501: 3])
+
+        XCTAssertEqual(groups.count, 2)
+        let daemon = groups.first { $0.processes.contains { $0.pid == 501 } }
+        XCTAssertEqual(daemon?.name, "后台服务")
+        XCTAssertEqual(daemon?.category, .backgroundService)
+    }
+
+    /// 用户级 LaunchAgent 域(~/Library/LaunchAgents):同样按"后台服务"。
+    func testUserLaunchAgentsDomainDaemonFallsToBackgroundService() {
+        let snapshot = ProcessSnapshot(processes: [
+            RawProcess(
+                pid: 1,
+                parentPID: 0,
+                executablePath: "/sbin/launchd"
+            ),
+            RawProcess(
+                pid: 502,
+                parentPID: 1,
+                executablePath: "/Users/x/Library/LaunchAgents/com.example.sync",
+                argv: ["com.example.sync"],
+                physicalFootprintBytes: 40_000_000
+            ),
+        ])
+
+        let groups = GroupingEngine.groups(from: snapshot, cpuPercentByPID: [502: 2])
+
+        XCTAssertEqual(groups.count, 2)
+        let daemon = groups.first { $0.processes.contains { $0.pid == 502 } }
+        XCTAssertEqual(daemon?.category, .backgroundService)
+    }
+
+    /// 父为活 launchd 但可执行不在 launchd 域(评审 S3:不再一律算后台服务):
+    /// 落"孤儿进程"——重启后无出生记录的自装/homebrew 常驻是典型形态。
+    func testNonDomainExecutableUnderLiveLaunchdFallsToOrphanGroup() {
+        let snapshot = ProcessSnapshot(processes: [
+            RawProcess(
+                pid: 1,
+                parentPID: 0,
+                executablePath: "/sbin/launchd",
+                physicalFootprintBytes: 20_000_000
+            ),
+            RawProcess(
+                pid: 500,
+                parentPID: 1,
+                executablePath: "/usr/local/postgres/bin/postgres",
+                argv: ["postgres", "-D", "/usr/local/postgres/data"],
+                physicalFootprintBytes: 400_000_000
+            ),
+        ])
+
+        // 无出生记录(Pulse 重启后):现父是 launchd ≠ launchd 域服务。
+        let groups = GroupingEngine.groups(from: snapshot, cpuPercentByPID: [500: 12])
+
+        XCTAssertEqual(groups.count, 2)
+        let postgres = groups.first { $0.processes.contains { $0.pid == 500 } }
+        XCTAssertEqual(postgres?.name, "孤儿进程")
+        XCTAssertEqual(postgres?.category, .orphan)
+    }
+
+    /// 有出生记录、出生时父即 launchd:可执行在 launchd 域 → 后台服务;
+    /// 不在域内(出生即挂在 launchd 下的用户进程)→ 孤儿。
+    func testLaunchdBornRecordClassifiesByExecutableDomain() {
+        let registered = LineageRegistry().registeringBirths(
+            in: ProcessSnapshot(processes: [
+                RawProcess(pid: 1, parentPID: 0, executablePath: "/sbin/launchd"),
+                RawProcess(
+                    pid: 600,
+                    parentPID: 1,
+                    executablePath: "/Library/LaunchAgents/com.example.agentd",
+                    argv: ["com.example.agentd"]
+                ),
+                RawProcess(
+                    pid: 601,
+                    parentPID: 1,
+                    executablePath: "/opt/homebrew/bin/waifud",
+                    argv: ["waifud"]
+                ),
+            ])
+        )
+        // 现场与出生一致(仍在 launchd 之下)。
+        let snapshot = ProcessSnapshot(processes: [
+            RawProcess(pid: 1, parentPID: 0, executablePath: "/sbin/launchd"),
+            RawProcess(
+                pid: 600,
+                parentPID: 1,
+                executablePath: "/Library/LaunchAgents/com.example.agentd",
+                argv: ["com.example.agentd"]
+            ),
+            RawProcess(
+                pid: 601,
+                parentPID: 1,
+                executablePath: "/opt/homebrew/bin/waifud",
+                argv: ["waifud"]
+            ),
+        ])
+
+        let groups = GroupingEngine.groups(from: snapshot, lineage: registered)
+
+        let agentd = groups.first { $0.processes.contains { $0.pid == 600 } }
+        XCTAssertEqual(agentd?.category, .backgroundService, "launchd 域可执行 → 后台服务")
+        let waifud = groups.first { $0.processes.contains { $0.pid == 601 } }
+        XCTAssertEqual(waifud?.category, .orphan, "非域可执行 → 孤儿进程")
+    }
+
+    /// launchd 域路径谓词(S3 判定的唯一口径):系统域、两级 LaunchAgents/Daemons、
+    /// 用户级 LaunchAgents 命中;一般安装位 / 应用 / nil 不命中。
+    func testLaunchdDomainExecutablePathPredicate() {
+        XCTAssertTrue(GroupingEngine.isLaunchdDomainExecutablePath("/Library/LaunchAgents/com.x"))
+        XCTAssertTrue(GroupingEngine.isLaunchdDomainExecutablePath("/Library/LaunchDaemons/com.x"))
+        XCTAssertTrue(GroupingEngine.isLaunchdDomainExecutablePath("/System/Library/CoreServices/foo"))
+        XCTAssertTrue(GroupingEngine.isLaunchdDomainExecutablePath("/Users/x/Library/LaunchAgents/com.x"))
+        // 相近但不属于域的位置不误伤。
+        XCTAssertFalse(GroupingEngine.isLaunchdDomainExecutablePath("/Library/Application Support/com.x"))
+        XCTAssertFalse(GroupingEngine.isLaunchdDomainExecutablePath("/usr/local/postgres/bin/postgres"))
+        XCTAssertFalse(GroupingEngine.isLaunchdDomainExecutablePath("/opt/homebrew/bin/waifud"))
+        XCTAssertFalse(GroupingEngine.isLaunchdDomainExecutablePath("/Applications/Foo.app/Contents/MacOS/Foo"))
+        XCTAssertFalse(GroupingEngine.isLaunchdDomainExecutablePath(nil))
+        XCTAssertFalse(GroupingEngine.isLaunchdDomainExecutablePath(""))
+    }
+
+    // MARK: - 项目归因(评审 S4:不看可执行名,名单闸解除)
+
+    /// 名单外工具(zig)的 cwd 命中项目根 → 照样归"项目名 @ worktree"。
+    func testUnlistedToolWithCwdUnderRootAttributesToProject() {
+        let snapshot = ProcessSnapshot(processes: [
+            RawProcess(
+                pid: 210,
+                parentPID: 1,
+                executablePath: "/usr/local/bin/zig",
+                argv: ["zig", "build", "test"],
+                cwd: worktree("unlisted"),
+                physicalFootprintBytes: 90_000_000
+            ),
+        ])
+
+        let groups = GroupingEngine.groups(
+            from: snapshot,
+            configuration: GroupingConfiguration(projectRoots: [octokRoot]),
+            cpuPercentByPID: [210: 60]
+        )
+
+        XCTAssertEqual(groups.count, 1)
+        XCTAssertEqual(groups[0].name, "octok-client @ unlisted")
+        XCTAssertEqual(groups[0].category, .project)
+        XCTAssertEqual(groups[0].processes.map(\.pid), [210])
+        XCTAssertEqual(groups[0].cpuPercent, 60, accuracy: 0.0001)
+    }
+
+    /// 名单外工具的 argv 路径命中项目根(cwd 受限)→ 同样归项目组。
+    func testUnlistedToolViaArgvPathAttributesToProject() {
+        let snapshot = ProcessSnapshot(processes: [
+            RawProcess(
+                pid: 211,
+                parentPID: 1,
+                executablePath: "/usr/local/bin/bazel",
+                argv: ["bazel", "test", octokRoot + "/..."],
+                physicalFootprintBytes: 70_000_000
+            ),
+        ])
+
+        let groups = GroupingEngine.groups(
+            from: snapshot,
+            configuration: GroupingConfiguration(projectRoots: [octokRoot]),
+            cpuPercentByPID: [211: 40]
+        )
+
+        XCTAssertEqual(groups.count, 1)
+        XCTAssertEqual(groups[0].name, "octok-client")
+        XCTAssertEqual(groups[0].category, .project)
     }
 
     // MARK: - 纯函数

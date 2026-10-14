@@ -6,7 +6,8 @@ import Darwin
 /// 拉起会话)"——本机不可召唤那条确切链,用**同构的真实负载**做可复现代理:
 /// 真实目录树 `<tmp>/accept-demo/.worktrees/skill-demo` + 配为项目根,
 /// 真实 zsh 宿主(cwd=worktree)拉起 3 个真实 node 忙循环(cwd 继承)。
-/// node ∈ dev 名单、cwd 命中项目根下的 `.worktrees/skill-demo`
+/// 项目归因不看可执行名(评审 S4:名单闸已解除)——zsh 宿主与 node 的 cwd
+/// 都命中项目根下的 `.worktrees/skill-demo`
 /// → 应归组为 "accept-demo @ skill-demo",组 CPU% = 忙循环之和(>100% 即证累加口径)。
 /// (不用 /usr/bin/python3:它是 Xcode Python.app 的壳,App 归属层会先于项目归因
 /// 抢走它——三层顺序的正确行为,恰好不适合做项目组代理。)
@@ -17,9 +18,8 @@ import Darwin
 /// 杀完整组后复扫:组员从进程表消失。
 final class AcceptanceAnchorEndToEndTests: XCTestCase {
     private let source = LiveProcessSource()
-    private let coreCount = ProcessInfo.processInfo.activeProcessorCount
 
-    /// 轮询采样直到谓词命中或超时;返回命中的快照。
+    /// 按轮等待采样,直到谓词命中或超时;返回命中的快照。
     private func sweepUntil(
         timeout: TimeInterval = 8,
         _ predicate: (ProcessSnapshot) -> Bool
@@ -163,11 +163,7 @@ final class AcceptanceAnchorEndToEndTests: XCTestCase {
         _ = pipeline.update(snapshot: settled, processCPU: [])
         Thread.sleep(forTimeInterval: 2.0)
         let second = source.snapshot()
-        let diff = CPUDiffer.diff(
-            previous: settled,
-            current: second,
-            logicalCoreCount: coreCount
-        )
+        let diff = CPUDiffer.diff(previous: settled, current: second)
         let groups = pipeline.update(snapshot: second, processCPU: diff.processCPU)
 
         // 6. 锚点断言:项目组 "accept-demo @ skill-demo" 在 Top-5,组 CPU% 为循环之和。
@@ -178,7 +174,10 @@ final class AcceptanceAnchorEndToEndTests: XCTestCase {
         )
         XCTAssertEqual(anchor.category, .project)
         XCTAssertGreaterThan(anchor.cpuPercent, 100, "忙循环之和的组 CPU% 应超单核(累加口径)")
-        XCTAssertEqual(anchor.processes.count, 3, "组员 = 3 个 node(宿主 zsh 非 dev,不入项目组)")
+        XCTAssertEqual(
+            anchor.processes.count, 4,
+            "组员 = 3 个 node + zsh 宿主(评审 S4:cwd 命中即归项目,不看可执行名)"
+        )
 
         // 7. 下钻断言(工单 06 验收面):cwd / argv / 面包屑走真实数据。
         let drilldown = DrilldownState(
@@ -189,17 +188,22 @@ final class AcceptanceAnchorEndToEndTests: XCTestCase {
         for process in anchor.processes {
             XCTAssertEqual(
                 process.cwd, worktreePath,
-                "忙循环 cwd 应继承宿主 = worktree(spec:项目归因 cwd 优先)"
+                "组员 cwd 应为 worktree(node 继承宿主;zsh 宿主自带)——项目归因 cwd 优先"
             )
             XCTAssertFalse(process.argv.isEmpty, "KERN_PROCARGS2 应取到完整 argv")
         }
         let rows = drilldown.rows(for: anchor)
-        XCTAssertEqual(rows.count, 3)
-        XCTAssertEqual(rows.map(\.name), Array(repeating: "node", count: 3), "行名 = 可执行文件名")
-        // 引擎契约:组内进程按 CPU% 降序——忙循环各自满核,互差在噪声内。
-        let rowCPUs = rows.map(\.cpuPercent)
-        XCTAssertGreaterThan(rowCPUs.min() ?? 0, 0, "忙循环都应有正 CPU%")
-        XCTAssertLessThanOrEqual((rowCPUs.max() ?? 0) - (rowCPUs.min() ?? 0), 60)
+        XCTAssertEqual(rows.count, 4)
+        XCTAssertEqual(
+            rows.filter { $0.name == "node" }.count, 3,
+            "行名 = 可执行文件名:3 个 node"
+        )
+        XCTAssertEqual(rows.filter { $0.name == "zsh" }.count, 1, "宿主 zsh 也在组内(行名按可执行文件名)")
+        // 引擎契约:组内进程按 CPU% 降序——忙循环各自满核,互差在噪声内
+        // (宿主 zsh 处于 wait,不计入此断言)。
+        let nodeCPUs = rows.filter { $0.name == "node" }.map(\.cpuPercent)
+        XCTAssertGreaterThan(nodeCPUs.min() ?? 0, 0, "忙循环都应有正 CPU%")
+        XCTAssertLessThanOrEqual((nodeCPUs.max() ?? 0) - (nodeCPUs.min() ?? 0), 60)
 
         let topPID = try XCTUnwrap(rows.first?.pid)
         let detail = try XCTUnwrap(drilldown.detail(for: topPID), "点进程行应能展开详情")

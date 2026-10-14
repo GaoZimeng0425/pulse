@@ -12,6 +12,9 @@ import Foundation
 /// 3. 终点——bundle 祖先(App 归属)或 launchd(出生即在 launchd 之下,
 ///    后台服务口径);无记录可查则止于最后已知进程,不臆造祖先。
 ///
+/// 显示名与进程行 / 处置目标同口径:直接走 `PulseFormat.processName`
+/// (评审 T5:不再经由本类型的中转包装)。
+///
 /// 环(异常父链)按已访问 pid 终止;查询的 pid 不在快照(下钻期间进程退出)返回空。
 enum ParentChainQuery {
     /// pid 的面包屑显示名序列,自身在前、有归属的祖先殿后。
@@ -20,13 +23,16 @@ enum ParentChainQuery {
         in snapshot: ProcessSnapshot,
         lineage: LineageRegistry
     ) -> [String] {
-        let processesByPID = Dictionary(
-            snapshot.processes.map { ($0.pid, $0) },
-            uniquingKeysWith: { first, _ in first }
-        )
+        let processesByPID = snapshot.processesByPID
         guard let process = processesByPID[pid] else { return [] }
 
-        var names = [displayName(executablePath: process.executablePath, argv: process.argv, pid: process.pid)]
+        var names = [
+            PulseFormat.processName(
+                executablePath: process.executablePath,
+                argv: process.argv,
+                pid: process.pid
+            )
+        ]
         var visited: Set<pid_t> = [pid]
 
         // MARK: 活链:沿存活 ppid 向上,直到 bundle 祖先 / 链断 / 遇 launchd。
@@ -54,7 +60,13 @@ enum ParentChainQuery {
                     liveChainBroken = true // 中间父已死 / 父链成环
                     break
                 }
-                names.append(displayName(executablePath: parent.executablePath, argv: parent.argv, pid: parent.pid))
+                names.append(
+                    PulseFormat.processName(
+                        executablePath: parent.executablePath,
+                        argv: parent.argv,
+                        pid: parent.pid
+                    )
+                )
                 if GroupingEngine.isBundleExecutablePath(parent.executablePath) {
                     return names // 有归属的祖先(bundle):终点
                 }
@@ -74,14 +86,24 @@ enum ParentChainQuery {
             guard visited.insert(parentPID).inserted else { break } // 登记链成环
             if let parentRecord = lineage.entries[parentPID] {
                 names.append(
-                    displayName(executablePath: parentRecord.executablePath, argv: parentRecord.argv, pid: parentPID)
+                    PulseFormat.processName(
+                        executablePath: parentRecord.executablePath,
+                        argv: parentRecord.argv,
+                        pid: parentPID
+                    )
                 )
                 if GroupingEngine.isBundleExecutablePath(parentRecord.executablePath) {
                     break // 有归属的祖先(bundle,按出生记录):终点
                 }
                 currentPID = parentPID
             } else if let parent = processesByPID[parentPID] {
-                names.append(displayName(executablePath: parent.executablePath, argv: parent.argv, pid: parent.pid))
+                names.append(
+                    PulseFormat.processName(
+                        executablePath: parent.executablePath,
+                        argv: parent.argv,
+                        pid: parent.pid
+                    )
+                )
                 if GroupingEngine.isBundleExecutablePath(parent.executablePath) {
                     break
                 }
@@ -93,17 +115,14 @@ enum ParentChainQuery {
         return names
     }
 
-    // MARK: 显示名
-
-    /// 与进程行同口径的显示名(路径 basename → argv[0] → "pid N")。
-    private static func displayName(executablePath: String?, argv: [String], pid: pid_t) -> String {
-        PulseFormat.processName(executablePath: executablePath, argv: argv, pid: pid)
-    }
-
     /// launchd 的名字:快照里有它就用真实路径名,否则用通名。
     private static func launchdName(in processesByPID: [pid_t: RawProcess]) -> String {
         if let launchd = processesByPID[1] {
-            return displayName(executablePath: launchd.executablePath, argv: launchd.argv, pid: 1)
+            return PulseFormat.processName(
+                executablePath: launchd.executablePath,
+                argv: launchd.argv,
+                pid: 1
+            )
         }
         return "launchd"
     }

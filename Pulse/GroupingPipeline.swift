@@ -3,6 +3,10 @@ import Foundation
 /// 采样 → 组卡的纯粘合逻辑(工单 05):持有出生登记表与归组配置,
 /// 每轮采样"登记新出生 pid → 引擎归组 → 截组 CPU% 降序前 displayLimit 个"。
 ///
+/// 出生登记有两个来源(评审 S1):独立出生扫描(BirthScanner,~2s 节奏,
+/// 经 `mergeBirths` 并入)与每轮采样的 `registeringBirths` 兜底——
+/// 后者仍保留,覆盖扫描间隙的漏网。
+///
 /// 值类型状态机:SystemMonitor(呈现层)每轮把快照与差分进程 CPU% 喂进来,
 /// 拿到弹窗要显示的 Top 组;单测用 SyntheticProcessSource 序列驱动。
 struct GroupingPipeline {
@@ -30,6 +34,12 @@ struct GroupingPipeline {
         configuration.projectRoots = roots
     }
 
+    /// 并入出生扫描器(BirthScanner)在外部登记的出生(评审 S1):只补缺,
+    /// 不改既有记录;扫描间隙出生、又在下一轮采样前退场的短命父进程由此留下快照。
+    mutating func mergeBirths(_ external: LineageRegistry) {
+        lineage = lineage.merging(external)
+    }
+
     /// 一轮采样的推进。新出生进程的 CPU%(差分为 nil,无前值)按 0 计——
     /// 与引擎"缺失条目按 0 计"口径一致,首轮榜单全 0 属正常。
     mutating func update(
@@ -38,17 +48,11 @@ struct GroupingPipeline {
     ) -> [ProcessGroup] {
         lineage = lineage.registeringBirths(in: snapshot)
 
-        var cpuPercentByPID: [pid_t: Double] = [:]
-        cpuPercentByPID.reserveCapacity(processCPU.count)
-        for entry in processCPU {
-            cpuPercentByPID[entry.pid] = entry.cpuPercent ?? 0
-        }
-
         let groups = GroupingEngine.groups(
             from: snapshot,
             lineage: lineage,
             configuration: configuration,
-            cpuPercentByPID: cpuPercentByPID
+            cpuPercentByPID: processCPU.cpuPercentByPID
         )
         return Array(groups.prefix(displayLimit))
     }

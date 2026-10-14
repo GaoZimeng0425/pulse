@@ -9,7 +9,7 @@ import Darwin
 final class KillEndToEndTests: XCTestCase {
     private let source = LiveProcessSource()
 
-    /// 轮询采 snapshot 直到谓词命中或超时;返回最后一张快照。
+    /// 按轮等待采样,直到谓词命中或超时;返回最后一张快照。
     private func sweepUntil(
         timeout: TimeInterval = 8,
         _ predicate: (ProcessSnapshot) -> Bool

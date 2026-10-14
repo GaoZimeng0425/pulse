@@ -5,6 +5,11 @@ import Darwin
 
 /// 处置服务接缝:对单个 pid 发信号。协议之上全部纯逻辑(KillAction);
 /// 单测用假实现断言目标 / 顺序 / 失败隔离,真实现 `LiveKillService` 调 kill(2)。
+///
+/// 接缝说明(评审 T1):与 `ProcessSource` 一样,这是项目为单测预留的
+/// **第二个编译期测试注入接缝**——目的是让编排逻辑可离线断言,
+/// 生产运行期只有一个真实现、不做运行时替换;这不是插件机制
+/// (见 ADR-0003:编译期测试接缝 ≠ 运行时插件)。
 protocol KillService: Sendable {
     /// 向 pid 发送信号,同步返回投递结果(kill(2) 不阻塞,无需异步)。
     func send(signal: Int32, to pid: pid_t) -> KillSignalResult

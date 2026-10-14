@@ -1,7 +1,8 @@
 import XCTest
 @testable import Pulse
 
-/// 接缝:Sampler 采样 actor——驱动 ProcessSource、按节奏等待、产出差分。
+/// 接缝:Sampler 采样 actor——驱动 ProcessSource(进程明细)与
+/// CoreTickSource(每核 tick,评审 S6 的系统负载口径)、按节奏等待、产出差分。
 /// 时钟与睡眠全部注入假实现(推进即瞬时),整条管线确定性跑完,零真实等待;
 /// 假 sleep 在预算耗尽时抛错结束循环,测试 await 任务值即拿到自然终止的完整结果。
 final class SamplerTests: XCTestCase {
@@ -73,9 +74,8 @@ final class SamplerTests: XCTestCase {
         RawProcess(pid: pid, parentPID: 1, cpuTimeNanoseconds: cpuNanos)
     }
 
-    /// 三张快照(5s 间隔,4 逻辑核):
-    /// 首采无前值 → 0;第二张:p10 烧 0.5s → 10%,负载 10/4 = 2.5;
-    /// 第三张:p10 再 0.5s、p20(上张新出生)烧 0.5s → 合计 20%,负载 5。
+    /// 三张快照(5s 间隔):首采无前值;第二张 p10 烧 0.5s → 10%;
+    /// 第三张 p10 再 0.5s、p20(上张新出生)烧 0.5s → 10% + 10%。
     private lazy var snapshotSequence: [ProcessSnapshot] = [
         ProcessSnapshot(takenAt: base, processes: [proc(10, cpuNanos: 0)]),
         ProcessSnapshot(
@@ -88,13 +88,21 @@ final class SamplerTests: XCTestCase {
         ),
     ]
 
+    /// 配套的每核 tick 序列(两核,与快照同取):系统负载 0 → 25% → 75%
+    /// —— 与进程 CPU 无关的独立口径(评审 S6:系统总数不再从进程推导)。
+    private lazy var tickSequence: [CoreTickSample] = [
+        CoreTickSample(busyTicks: [0, 0], totalTicks: [100, 100], takenAt: base),
+        CoreTickSample(busyTicks: [50, 0], totalTicks: [200, 200], takenAt: base.addingTimeInterval(5)),
+        CoreTickSample(busyTicks: [100, 100], totalTicks: [300, 300], takenAt: base.addingTimeInterval(10)),
+    ]
+
     private func makeSampler(
         timeline: FakeTimeline,
         maxSleepSlice: TimeInterval = .infinity
     ) -> Sampler {
         Sampler(
             source: SyntheticProcessSource(snapshots: snapshotSequence),
-            logicalCoreCount: 4,
+            coreTicks: SyntheticCoreTickSource(samples: tickSequence),
             clock: timeline.clock,
             sleep: timeline.sleeper,
             maxSleepSlice: maxSleepSlice
@@ -114,18 +122,26 @@ final class SamplerTests: XCTestCase {
 
     // MARK: 管线与节奏
 
-    func testPipelineDeliversDiffSequenceAtClosedCadence() async {
-        // 弹窗关闭:首采立即、之后每 5s 一采;交付 0 → 2.5% → 5%。
+    func testPipelineDeliversDiffAndLoadSequenceAtClosedCadence() async {
+        // 弹窗关闭:首采立即、之后每 5s 一采。
+        // 进程 CPU:首采 nil → 10% → 20%;系统负载(每核 tick):0 → 25% → 75%。
         let timeline = FakeTimeline(start: base, sleepBudget: 2)
 
         let (delivered, clock) = await drain(makeSampler(timeline: timeline), timeline: timeline)
-        let loads = delivered.map(\.diff.systemCPULoad)
+        let loads = delivered.map(\.systemCPULoad)
+        let p10 = delivered.map { update in
+            update.diff.processCPU.first { $0.pid == 10 }?.cpuPercent ?? -1
+        }
 
         XCTAssertEqual(loads.count, 3)
         XCTAssertEqual(loads[0], 0, accuracy: 0.0001)
-        XCTAssertEqual(loads[1], 2.5, accuracy: 0.0001)
-        XCTAssertEqual(loads[2], 5, accuracy: 0.0001)
+        XCTAssertEqual(loads[1], 25, accuracy: 0.0001)
+        XCTAssertEqual(loads[2], 75, accuracy: 0.0001)
         XCTAssertEqual(clock.sleepRequests, [5, 5])
+
+        XCTAssertNil(delivered[0].diff.processCPU.first { $0.pid == 10 }?.cpuPercent)
+        XCTAssertEqual(p10[1], 10, accuracy: 0.0001)
+        XCTAssertEqual(p10[2], 10, accuracy: 0.0001)
     }
 
     /// 每轮交付携带采出该差分的快照本身(工单 05:出生登记与归组的输入)。
@@ -146,18 +162,18 @@ final class SamplerTests: XCTestCase {
 
     func testOpenPopoverCadenceWaitsOneSecond() async {
         // 弹窗打开:等待间隔切换为 1s。预算 3 次睡眠 → 4 次交付;
-        // 源耗尽后停在末张,墙钟为 0 → 负载退化路径为 0。
+        // 源耗尽后停在末张(tick 不再前进)→ 负载退化路径为 0。
         let timeline = FakeTimeline(start: base, sleepBudget: 3)
         let sampler = makeSampler(timeline: timeline)
         await sampler.setPopoverVisible(true)
 
         let (delivered, clock) = await drain(sampler, timeline: timeline)
-        let loads = delivered.map(\.diff.systemCPULoad)
+        let loads = delivered.map(\.systemCPULoad)
 
         XCTAssertEqual(loads.count, 4)
         XCTAssertEqual(loads[0], 0, accuracy: 0.0001)
-        XCTAssertEqual(loads[1], 2.5, accuracy: 0.0001)
-        XCTAssertEqual(loads[2], 5, accuracy: 0.0001)
+        XCTAssertEqual(loads[1], 25, accuracy: 0.0001)
+        XCTAssertEqual(loads[2], 75, accuracy: 0.0001)
         XCTAssertEqual(loads[3], 0, accuracy: 0.0001)
         XCTAssertEqual(clock.sleepRequests, [1, 1, 1])
     }
@@ -170,11 +186,11 @@ final class SamplerTests: XCTestCase {
             makeSampler(timeline: timeline, maxSleepSlice: 2),
             timeline: timeline
         )
-        let loads = delivered.map(\.diff.systemCPULoad)
+        let loads = delivered.map(\.systemCPULoad)
 
         XCTAssertEqual(loads.count, 2)
         XCTAssertEqual(loads[0], 0, accuracy: 0.0001)
-        XCTAssertEqual(loads[1], 2.5, accuracy: 0.0001)
+        XCTAssertEqual(loads[1], 25, accuracy: 0.0001)
         XCTAssertEqual(clock.sleepRequests, [2, 2, 1])
     }
 }

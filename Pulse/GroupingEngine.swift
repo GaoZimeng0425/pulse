@@ -32,15 +32,16 @@ struct ProcessGroup: Identifiable, Equatable, Sendable {
 
 // MARK: - 配置
 
-/// 归组配置:项目根列表 + dev / 系统可执行文件名单 + bundle 显示名解析。
+/// 归组配置:项目根列表 + 系统可执行文件名单 + bundle 显示名解析。
 /// 全部为调用方注入的纯数据/纯函数——引擎不读磁盘:
 /// CFBundleName 由 UI 层注入读取器(工单 05),缺省退化为 bundle 目录名去掉 .app 后缀。
+///
+/// 项目归因不设可执行名门槛(评审 S4):到达项目归因层(未先被 App 归属)
+/// 的进程,只要 cwd / argv 路径命中项目根即归项目——zig / bazel 等"名单外"
+/// 工具与 rustc / node 同权。历史上的 dev 可执行名单已随该评审移除。
 struct GroupingConfiguration: Sendable {
     /// 项目根(GLOSSARY):用户配置的绝对路径(已展开 ~)。引擎只做路径前缀匹配。
     var projectRoots: [String]
-    /// 视作"dev 类进程"的可执行文件名——项目归因的准入门槛。
-    /// 名单外(且自身不在 bundle 里)的进程不做项目归因,走父链上溯与兜底。
-    var devExecutableNames: Set<String>
     /// 知名系统进程的可执行文件名(kernel_task / WindowServer / launchd)。
     /// 优先于 App 归属判定(WindowServer 自身路径就在 .app bundle 里),
     /// 且系统归属不可被子进程继承——launchd 的孩子们仍按自己的链路归组。
@@ -50,30 +51,13 @@ struct GroupingConfiguration: Sendable {
 
     init(
         projectRoots: [String] = [],
-        devExecutableNames: Set<String> = GroupingConfiguration.defaultDevExecutableNames,
         systemExecutableNames: Set<String> = GroupingConfiguration.defaultSystemExecutableNames,
         bundleDisplayName: @escaping @Sendable (String) -> String? = { _ in nil }
     ) {
         self.projectRoots = projectRoots
-        self.devExecutableNames = devExecutableNames
         self.systemExecutableNames = systemExecutableNames
         self.bundleDisplayName = bundleDisplayName
     }
-
-    /// 缺省 dev 可执行文件名单:编译器 / 构建器 / 运行时 / 测试器等通用工具。
-    static let defaultDevExecutableNames: Set<String> = [
-        "rustc", "cargo", "clippy-driver",
-        "node", "npm", "npx", "yarn", "pnpm", "bun", "deno",
-        "vitest", "jest", "mocha", "karma",
-        "tsc", "tsx", "babel", "esbuild", "webpack", "vite", "next",
-        "python", "python3", "pip", "pip3", "uv",
-        "go", "make", "cmake", "ninja", "meson",
-        "clang", "clang++", "cc", "c++", "gcc", "g++", "ld", "lld",
-        "swift", "swiftc",
-        "ruby", "rake", "bundle", "gem",
-        "java", "javac", "gradle", "mvn", "dotnet",
-        "php", "composer",
-    ]
 
     /// 缺省系统进程名单(spec 兜底三分类举例 + launchd 本体)。
     static let defaultSystemExecutableNames: Set<String> = ["kernel_task", "WindowServer", "launchd"]
@@ -89,14 +73,17 @@ struct GroupingConfiguration: Sendable {
 /// 每个进程的判定顺序:
 /// 1. App 归属——自身可执行路径含 `.app/Contents/MacOS/`(取最外层 .app,
 ///    Chrome Helper 的嵌套 Helper.app 因此跟随宿主 Google Chrome.app);
-/// 2. 项目归因——dev 类进程按 cwd 优先、argv 中路径次之与项目根前缀匹配,
-///    命中 `.worktrees/<名>` 显示"项目名 @ 名"。放在父链上溯之前:
-///    验收锚点要求 rustc ← cargo ← node ← Zcode 归"项目 @ worktree",
-///    而不是归到拉起它的 Zcode;
+/// 2. 项目归因——按 cwd 优先、argv 中路径次之与项目根前缀匹配,
+///    命中 `.worktrees/<名>` 显示"项目名 @ 名"。不看可执行名(评审 S4:
+///    名单闸已解除——cwd/argv 命中即归项目,zig 与 rustc 同权)。
+///    放在父链上溯之前:验收锚点要求 rustc ← cargo ← node ← Zcode
+///    归"项目 @ worktree",而不是归到拉起它的 Zcode;
 /// 3. 父链上溯——非 bundle、无项目归因的进程沿活 ppid 链向上找有归属的祖先;
 ///    断链(中间父进程已死 / 被重挂到 launchd)时回查出生登记的父链;
-/// 4. 兜底三分类——系统(知名系统进程,优先于第 1 步)/ 后台服务(出生或现挂
-///    在活 launchd 之下)/ 孤儿进程(断链且登记无归属可继承)。
+/// 4. 兜底三分类——系统(知名系统进程,优先于第 1 步)/ 后台服务(launchd 域
+///    推断:出生或现挂在 launchd 之下,且可执行位于 launchd 域,
+///    见 `isLaunchdDomainExecutablePath`)/ 孤儿进程(其余断链者——含
+///    父为 launchd 但可执行不在域内、且无归属可继承的进程,评审 S3)。
 ///
 /// CPU 接缝:进程 CPU% 由工单 04 的差分器从相邻快照算出后按 pid 传入;
 /// 引擎只做求和,不接触时间。缺失条目按 0 计。
@@ -153,6 +140,24 @@ enum GroupingEngine {
     static func isBundleExecutablePath(_ executablePath: String?) -> Bool {
         executablePath?.contains(".app/Contents/MacOS/") ?? false
     }
+
+    /// 后台服务的 launchd 域推断谓词(评审 S3,spec"后台服务 = launchd 域推断"):
+    /// 可执行位于系统域(/Library/LaunchAgents|LaunchDaemons、/System/Library)
+    /// 或用户级 LaunchAgent 域(任意家目录下 ~/Library/LaunchAgents)。
+    /// 挂在 launchd 之下但可执行不在这些域内(典型:homebrew / 自装常驻)不算
+    /// 后台服务,按孤儿进程处理——重启后不再把一切 launchd 子进程误并为后台服务。
+    /// 判定只有这一份;P1 可升级为真实读取 launchd 任务清单。
+    static func isLaunchdDomainExecutablePath(_ executablePath: String?) -> Bool {
+        guard let path = executablePath, !path.isEmpty else { return false }
+        if path.hasPrefix("/Library/LaunchAgents/")
+            || path.hasPrefix("/Library/LaunchDaemons/")
+            || path.hasPrefix("/System/Library/")
+        {
+            return true
+        }
+        // 用户级 LaunchAgent 域:任意家目录(/Users/<名>/Library/LaunchAgents)。
+        return path.hasPrefix("/Users/") && path.contains("/Library/LaunchAgents/")
+    }
 }
 
 // MARK: - 归属判定
@@ -193,12 +198,9 @@ private final class Resolver {
     init(snapshot: ProcessSnapshot, lineage: LineageRegistry, configuration: GroupingConfiguration) {
         self.configuration = configuration
         self.normalizedRoots = configuration.projectRoots
-            .map(Self.normalizedRootPath)
+            .map(PathNormalization.normalize)
             .sorted { $0.count > $1.count }
-        self.processesByPID = Dictionary(
-            snapshot.processes.map { ($0.pid, $0) },
-            uniquingKeysWith: { first, _ in first }
-        )
+        self.processesByPID = snapshot.processesByPID
         self.lineage = lineage
     }
 
@@ -215,14 +217,24 @@ private final class Resolver {
         if let attribution = resolution.attribution {
             return attribution
         }
-        // 三层全部落空 → 兜底三分类。
-        if let birth = lineage.entries[process.pid] {
-            // 出生时父即 launchd:launchd 域服务;出生时有真实父(现已死)且登记链
-            // 无归属可继承:孤儿进程。
-            return birth.parentPID == 1 ? .backgroundServiceGroup : .orphanGroup
+        // 三层全部落空 → 兜底三分类(评审 S3):后台服务 = 挂在 launchd 之下
+        // (出生时或现在)且可执行位于 launchd 域;其余——含父为 launchd 但
+        // 可执行不在域内的重启后无名者——一律孤儿进程。
+        let birth = lineage.entries[process.pid]
+        let underLaunchd: Bool
+        let domainCandidatePath: String?
+        if let birth {
+            // 出生时父即 launchd 才可能算 launchd 域服务;出生时有真实父
+            // (现已死)且登记链无归属可继承 → 孤儿。
+            underLaunchd = birth.parentPID == 1
+            domainCandidatePath = birth.executablePath ?? process.executablePath
+        } else {
+            underLaunchd = resolution.reachedLiveLaunchd
+            domainCandidatePath = process.executablePath
         }
-        // 无出生记录:现挂在存活的 launchd 之下按后台服务,链断在别处按孤儿。
-        return resolution.reachedLiveLaunchd ? .backgroundServiceGroup : .orphanGroup
+        return underLaunchd && GroupingEngine.isLaunchdDomainExecutablePath(domainCandidatePath)
+            ? .backgroundServiceGroup
+            : .orphanGroup
     }
 
     // MARK: 三层归属:自身 → 活链 → 登记链
@@ -266,8 +278,10 @@ private final class Resolver {
         return resolution
     }
 
-    /// 进程自身可判定的两层归属:App 归属(bundle)→ 项目归因(dev + 项目根前缀)。
+    /// 进程自身可判定的两层归属:App 归属(bundle)→ 项目归因(项目根前缀)。
     /// 这两层可被子进程与登记链继承;系统 / 兜底归属不可继承。
+    /// 项目归因不看可执行名(评审 S4):到达此层的非 bundle 进程,
+    /// cwd / argv 路径命中项目根即归项目。
     private func layerSelf(
         executablePath: String?,
         cwd: String?,
@@ -281,9 +295,6 @@ private final class Resolver {
                 bundlePath: bundle
             )
         }
-        guard configuration.devExecutableNames
-            .contains(executableName(executablePath: executablePath, argv: argv))
-        else { return nil }
         // 项目归因:cwd 优先,argv 中的路径次之。
         guard let match = projectMatch(cwd) ?? argvProjectMatch(argv) else { return nil }
         let projectName = Self.rootDisplayName(match.root)
@@ -351,7 +362,7 @@ private final class Resolver {
     /// 项目根前缀匹配(按路径组件对齐;多根命中取最长根)。
     private func projectMatch(_ path: String?) -> ProjectMatch? {
         guard let path else { return nil }
-        let normalized = Self.normalizedRootPath(path)
+        let normalized = PathNormalization.normalize(path)
         for root in normalizedRoots {
             if normalized == root || normalized.hasPrefix(root + "/") {
                 let remainder = normalized == root
@@ -375,15 +386,6 @@ private final class Resolver {
             }
         }
         return nil
-    }
-
-    /// 轻量归一:去掉尾部 "/"(根路径 "/" 除外)。不做文件系统访问。
-    private static func normalizedRootPath(_ path: String) -> String {
-        var result = path
-        while result.count > 1 && result.hasSuffix("/") {
-            result.removeLast()
-        }
-        return result
     }
 
     /// 最外层 .app bundle 目录:可执行路径含 `.app/Contents/MacOS/` 即为 bundle 内进程

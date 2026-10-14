@@ -119,7 +119,7 @@ final class DrilldownStateTests: XCTestCase {
     }
 
     /// 详情 = 原始记录(cwd / argv / 启动时刻的来源)+ 面包屑原料(自身在前),
-    /// 全部取自构账时那份快照与登记表。
+    /// 全部取自构建时那份快照与登记表。
     func testDetailCarriesRawProcessAndParentChainNames() {
         let snapshot = ProcessSnapshot(takenAt: now, processes: gateTree())
         let lineage = LineageRegistry().registeringBirths(in: snapshot)

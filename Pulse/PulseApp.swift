@@ -47,7 +47,8 @@ struct PulseApp: App {
 /// 变红的实现路径(工单 09 实机走查修正):MenuBarExtra 的 label 会被系统重绘成
 /// NSStatusItem 标题,SwiftUI 的 foregroundStyle / AttributedString 颜色一律被
 /// 剥掉(实测 macOS 26 上数字永远是默认色,只有 Shape 能保住颜色)。因此把
-/// 「波形图标 + 数字」用 ImageRenderer 预绘成**带颜色的位图**,以
+/// 「单一数字」(spec:菜单栏只放一个数字,评审 S2 去掉波形符号——图标与
+/// 名称仍保留在弹窗头部)用 ImageRenderer 预绘成**带颜色的位图**,以
 /// `.renderingMode(.original)` 交给系统——这是 SwiftUI 栈下唯一可靠的方式。
 struct MenuBarLoadLabel: View {
     let monitor: SystemMonitor
@@ -71,6 +72,7 @@ struct MenuBarLoadLabel: View {
 
 /// 菜单栏徽标位图渲染器:SwiftUI 视图 → ImageRenderer → NSImage,按
 /// (数字, 是否红, 外观) 缓存——每轮采样最多一次位图化,且值不变时零开销。
+/// 徽标只含数字本身(spec 单一数字口径)。
 @MainActor
 enum MenuBarBadgeRenderer {
     private static var cache: [String: NSImage] = [:]
@@ -81,14 +83,11 @@ enum MenuBarBadgeRenderer {
 
         let color: Color = isRed ? .red : (colorScheme == .dark ? .white : .black)
         let renderer = ImageRenderer(
-            content: HStack(spacing: 3) {
-                Image(systemName: "waveform.path.ecg")
-                Text(loadText).monospacedDigit()
-            }
-            // 与系统菜单栏字号对齐(约 13pt 小号)。
-            .font(.system(size: NSFont.systemFontSize(for: .small)))
-            .foregroundStyle(color)
-            .padding(1)
+            content: Text(loadText).monospacedDigit()
+                // 与系统菜单栏字号对齐(约 13pt 小号)。
+                .font(.system(size: NSFont.systemFontSize(for: .small)))
+                .foregroundStyle(color)
+                .padding(1)
         )
         renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
 

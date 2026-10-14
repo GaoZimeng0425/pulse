@@ -3,11 +3,11 @@ import Observation
 import Darwin
 
 /// 呈现层模型(spec 命名 SystemMonitor):持有采样管线,把每轮采样变成可观察状态。
-/// 菜单栏数字 = 系统 CPU 负载(GLOSSARY:0–100%,全部核的占用率);
+/// 菜单栏数字 = 系统 CPU 负载(GLOSSARY:0–100%,每核 tick 口径,评审 S6);
 /// 弹窗 = Top-5 组(组 CPU% 降序,系统组参榜)。
 ///
 /// UI 粘合层,按 spec 测试决策不写单元测试;采样 / 差分 / 归组 / 截取逻辑分别在
-/// Sampler / CPUDiffer / GroupingEngine / GroupingPipeline 里被单测覆盖。
+/// Sampler / CPUDiffer+CoreTickDiffer / GroupingEngine / GroupingPipeline 里被单测覆盖。
 @Observable
 @MainActor
 final class SystemMonitor {
@@ -25,6 +25,10 @@ final class SystemMonitor {
     private(set) var drilldown: DrilldownState?
 
     private let sampler: Sampler
+    /// 独立出生扫描(评审 S1):~2s 节奏登记新 pid,与采样节奏解耦。
+    private let birthScanner: BirthScanner
+    /// 出生扫描最近交付的登记表:每轮采样落地时并入管线(只补缺)。
+    private var birthLineage = LineageRegistry()
     private var pipeline: GroupingPipeline
     private let killService: any KillService
     private var samplingTask: Task<Void, Never>?
@@ -32,11 +36,13 @@ final class SystemMonitor {
 
     init(
         source: any ProcessSource = LiveProcessSource(),
-        logicalCoreCount: Int = ProcessInfo.processInfo.activeProcessorCount,
+        coreTicks: any CoreTickSource = LiveCoreTickSource(),
         projectRoots: [String] = [],
-        killService: any KillService = LiveKillService()
+        killService: any KillService = LiveKillService(),
+        birthScanSource: any BirthScanSource = LiveBirthScanSource()
     ) {
-        self.sampler = Sampler(source: source, logicalCoreCount: logicalCoreCount)
+        self.sampler = Sampler(source: source, coreTicks: coreTicks)
+        self.birthScanner = BirthScanner(source: birthScanSource)
         self.pipeline = GroupingPipeline(
             configuration: GroupingConfiguration(
                 projectRoots: projectRoots,
@@ -47,11 +53,21 @@ final class SystemMonitor {
         self.killService = killService
     }
 
-    /// 启动采样循环(默认弹窗关闭节奏 5s):菜单栏数字与组卡从拉起就是真的。
+    /// 启动采样循环(默认弹窗关闭节奏 5s)与独立出生扫描(~2s 节奏):
+    /// 菜单栏数字与组卡从拉起就是真的,采样间隙出生的短命父进程也留得下快照。
     /// 幂等;由 UI 的 `.task` 触发。weak self:循环与 app 同寿命,不构成保留环。
     func start() {
         guard !started else { return }
         started = true
+        let scanner = birthScanner
+        Task { [weak self] in
+            await scanner.run { [weak self] lineage in
+                guard let self else { return }
+                Task { @MainActor in
+                    self.birthLineage = lineage
+                }
+            }
+        }
         let sampler = self.sampler
         samplingTask = Task { [weak self] in
             await sampler.run { [weak self] update in
@@ -64,6 +80,7 @@ final class SystemMonitor {
     }
 
     /// 弹窗可见性变化:采样节奏在 5s/1s 间切换(合盖省电,spec)。
+    /// 出生扫描不受弹窗影响:登记的完整性不依赖观看。
     func setPopoverVisible(_ visible: Bool) {
         let sampler = self.sampler
         Task { await sampler.setPopoverVisible(visible) }
@@ -98,9 +115,11 @@ final class SystemMonitor {
     }
 
     /// 一轮采样落地:菜单栏负载 + 出生登记、归组、截 Top-5(纯逻辑在 GroupingPipeline),
-    /// 同时构账下钻输入(快照 + 累计登记表 + 进程差分,同轮一致)。
+    /// 同时构建下钻输入(快照 + 累计登记表 + 进程差分,同轮一致)。
+    /// 出生扫描的登记表先并入——扫描间隙出生的短命父进程由此参与本轮归组。
     private func apply(_ update: SamplingUpdate) {
-        systemCPULoad = update.diff.systemCPULoad
+        systemCPULoad = update.systemCPULoad
+        pipeline.mergeBirths(birthLineage)
         topGroups = pipeline.update(
             snapshot: update.snapshot,
             processCPU: update.diff.processCPU

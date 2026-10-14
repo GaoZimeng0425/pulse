@@ -19,7 +19,7 @@ final class ProjectRootsStore {
 
     /// 注入读写闭包的构造(测试 / 预览):load 决定启动初值,persist 决定落盘副作用。
     init(load: () -> [String], persist: @escaping ([String]) -> Void) {
-        self.projectRoots = load().map(Self.normalized)
+        self.projectRoots = load().map(PathNormalization.normalize)
         self.persist = persist
     }
 
@@ -33,7 +33,7 @@ final class ProjectRootsStore {
 
     /// 新增项目根(文件夹选择器选中的目录)。归一后与现有根相同则幂等忽略。
     func add(_ root: String) {
-        let normalized = Self.normalized(root)
+        let normalized = PathNormalization.normalize(root)
         guard !normalized.isEmpty, !projectRoots.contains(normalized) else { return }
         projectRoots.append(normalized)
         persist(projectRoots)
@@ -41,20 +41,11 @@ final class ProjectRootsStore {
 
     /// 移除项目根。列表中没有该根时安静无操作。
     func remove(_ root: String) {
-        let normalized = Self.normalized(root)
+        let normalized = PathNormalization.normalize(root)
         let before = projectRoots
         projectRoots.removeAll { $0 == normalized }
         if projectRoots != before {
             persist(projectRoots)
         }
-    }
-
-    /// 轻量归一:去尾部 "/"(与归组引擎的路径前缀匹配同口径),不做文件系统访问。
-    private static func normalized(_ path: String) -> String {
-        var result = path
-        while result.count > 1 && result.hasSuffix("/") {
-            result.removeLast()
-        }
-        return result
     }
 }

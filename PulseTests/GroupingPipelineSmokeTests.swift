@@ -19,21 +19,13 @@ final class GroupingPipelineSmokeTests: XCTestCase {
         let first = source.snapshot()
         _ = pipeline.update(
             snapshot: first,
-            processCPU: CPUDiffer.diff(
-                previous: nil,
-                current: first,
-                logicalCoreCount: ProcessInfo.processInfo.activeProcessorCount
-            ).processCPU
+            processCPU: CPUDiffer.diff(previous: nil, current: first).processCPU
         )
         Thread.sleep(forTimeInterval: 1.1)
         let second = source.snapshot()
         let allGroups = pipeline.update(
             snapshot: second,
-            processCPU: CPUDiffer.diff(
-                previous: first,
-                current: second,
-                logicalCoreCount: ProcessInfo.processInfo.activeProcessorCount
-            ).processCPU
+            processCPU: CPUDiffer.diff(previous: first, current: second).processCPU
         )
         let topGroups = Array(allGroups.prefix(GroupingPipeline.defaultDisplayLimit))
 
