@@ -63,42 +63,86 @@ struct PulseApp: App {
 /// `.renderingMode(.original)` 交给系统——这是 SwiftUI 栈下唯一可靠的方式。
 struct MenuBarLoadLabel: View {
     let monitor: SystemMonitor
-    /// 菜单栏深浅外观:正常态文字用白/黑随外观,红色态固定系统红。
+    /// 菜单栏深浅外观:正常态文字用白/黑随外观,警示态固定系统色。
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let loadText = PulseFormat.cpuPercent(monitor.systemCPULoad)
+        // 用户拍板(2026-10-15):菜单栏双读数——CPU / RAM,小标签在数字上方。
+        // CPU 口径 = 系统 CPU 负载(0–100%);RAM = 已用占总内存百分比,
+        // 颜色联动内存压力(偏高橙/紧张红,数据来自 host_statistics64)。
+        HStack(spacing: 5) {
+            menuBadge(
+                caption: "CPU",
+                value: PulseFormat.cpuPercent(monitor.systemCPULoad),
+                color: monitor.systemCPULoad > SystemMonitor.redThreshold ? .red : nil
+            )
+            menuBadge(
+                caption: "RAM",
+                value: ramPercentText,
+                color: ramColor
+            )
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("系统状态")
+        .accessibilityValue("CPU \(PulseFormat.cpuPercent(monitor.systemCPULoad)),内存 \(ramPercentText)")
+    }
+
+    private var ramPercentText: String {
+        guard let memory = monitor.memory, memory.totalBytes > 0 else { return "–" }
+        return PulseFormat.cpuPercent(Double(memory.usedBytes) / Double(memory.totalBytes) * 100)
+    }
+
+    /// RAM 徽标色:内存压力偏高 → 橙,紧张 → 红;正常 → 随外观墨色。
+    private var ramColor: Color? {
+        switch monitor.memory?.pressure {
+        case .critical: .red
+        case .warning: .orange
+        default: nil
+        }
+    }
+
+    private func menuBadge(caption: String, value: String, color: Color?) -> some View {
         Image(
-            nsImage: MenuBarBadgeRenderer.image(
-                loadText: loadText,
-                isRed: monitor.systemCPULoad > SystemMonitor.redThreshold,
+            nsImage: MenuBarBadgeRenderer.stackedImage(
+                caption: caption,
+                valueText: value,
+                valueColor: color,
                 colorScheme: colorScheme
             )
         )
         .renderingMode(.original)
-        .accessibilityLabel("系统 CPU 负载")
-        .accessibilityValue(loadText)
     }
 }
 
 /// 菜单栏徽标位图渲染器:SwiftUI 视图 → ImageRenderer → NSImage,按
-/// (数字, 是否红, 外观) 缓存——每轮采样最多一次位图化,且值不变时零开销。
-/// 徽标只含数字本身(spec 单一数字口径)。
+/// (标签, 数字, 颜色, 外观) 缓存——每轮采样最多一次位图化,值不变时零开销。
+/// 双读数形态(用户拍板):小标签在数字上方(CPU / RAM),整体高约 22pt 贴菜单栏。
 @MainActor
 enum MenuBarBadgeRenderer {
     private static var cache: [String: NSImage] = [:]
 
-    static func image(loadText: String, isRed: Bool, colorScheme: ColorScheme) -> NSImage {
-        let key = "\(loadText)|\(isRed)|\(colorScheme)"
+    static func stackedImage(
+        caption: String,
+        valueText: String,
+        valueColor: Color?,
+        colorScheme: ColorScheme
+    ) -> NSImage {
+        let ink = colorScheme == .dark ? Color.white : Color.black
+        let value = valueColor ?? ink
+        let key = "\(caption)|\(valueText)|\(valueDescription(valueColor))|\(colorScheme)"
         if let cached = cache[key] { return cached }
 
-        let color: Color = isRed ? .red : (colorScheme == .dark ? .white : .black)
         let renderer = ImageRenderer(
-            content: Text(loadText).monospacedDigit()
-                // 与系统菜单栏字号对齐(约 13pt 小号)。
-                .font(.system(size: NSFont.systemFontSize(for: .small)))
-                .foregroundStyle(color)
-                .padding(1)
+            content: VStack(alignment: .leading, spacing: 0) {
+                Text(caption)
+                    .font(.system(size: 7, weight: .semibold))
+                    .foregroundStyle(ink.opacity(0.55))
+                Text(valueText)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(value)
+            }
+            .padding(.horizontal, 1)
         )
         renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
 
@@ -106,14 +150,14 @@ enum MenuBarBadgeRenderer {
         if let nsImage = renderer.nsImage {
             rendered = nsImage
         } else {
-            // ImageRenderer 失效兜底:退回纯文本 label(不变色,但数字可见)。
-            let fallback = NSImage(size: NSSize(width: 56, height: 18))
+            // ImageRenderer 失效兜底:退回单行纯文本(不变色,但数字可见)。
+            let fallback = NSImage(size: NSSize(width: 48, height: 18))
             fallback.lockFocus()
-            (loadText as NSString).draw(
+            (valueText as NSString).draw(
                 at: NSPoint(x: 1, y: 2),
                 withAttributes: [
                     .font: NSFont.menuBarFont(ofSize: 0),
-                    .foregroundColor: isRed ? NSColor.systemRed : NSColor.labelColor,
+                    .foregroundColor: NSColor.labelColor,
                 ]
             )
             fallback.unlockFocus()
@@ -122,5 +166,13 @@ enum MenuBarBadgeRenderer {
         rendered.isTemplate = false // 绝不让系统把颜色又模板化掉
         cache[key] = rendered
         return rendered
+    }
+
+    /// 缓存键里的颜色标识(nil = 墨色随外观)。
+    private static func valueDescription(_ color: Color?) -> String {
+        guard let color else { return "ink" }
+        if color == .red { return "red" }
+        if color == .orange { return "orange" }
+        return "custom"
     }
 }
