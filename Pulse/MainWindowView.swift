@@ -18,6 +18,10 @@ enum MainWindowSceneID {
 struct MainWindowView: View {
     let monitor: SystemMonitor
 
+    /// 设备环境信息(工单 04):主窗口副标题 "Apple M4 · 10 核 · 32 GB" 的数据源,
+    /// 启动期读一次(硬件不会热变)。
+    private let environment = SystemEnvironmentInfo.live()
+
     /// 当前 tab(工单 03):药丸点击或 ←/→ 切换。
     @State private var tabSelection = MetricTabSelection()
     /// 展开中的组(按稳定组 id),跨采样轮保持;组消失时残留 id 无害(少渲染一张卡)。
@@ -140,15 +144,30 @@ struct MainWindowView: View {
         }
     }
 
-    /// 头部与弹窗同款式(Pulse + 系统 CPU 负载),另给全部组计数——
-    /// 窗口的卖点正是"Top-5 之外还有多少组"。
+    /// 头部(工单 04 收尾):标题 + 状态徽章(与弹窗同语言)+ 设备环境副标题
+    /// (参考文档 §2.1 "Apple M1 Max · 10 cores · 64 GB" 形态)+ 负载读数
+    /// (另给全部组计数——窗口的卖点正是"Top-5 之外还有多少组")。
     private var header: some View {
         HStack(spacing: 8) {
             Image(systemName: "waveform.path.ecg")
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Pulse")
-                    .font(.headline)
+                HStack(spacing: 6) {
+                    Text("Pulse")
+                        .font(.headline)
+                    if let badge = StatusBadgeRules.systemBadge(load: monitor.systemCPULoad) {
+                        StatusBadgeChip(badge: badge)
+                    }
+                }
+                Text(
+                    EnvironmentInfoFormat.subtitle(
+                        chipName: environment.chipName,
+                        coreCount: environment.coreCount,
+                        memoryBytes: environment.physicalMemoryBytes
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
                 loadLine
                     .font(.caption)
                     .monospacedDigit()

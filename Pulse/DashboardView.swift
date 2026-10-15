@@ -193,14 +193,23 @@ struct DashboardView: View {
         killFailureReport = KillRequestFlow.endGroup(group, monitor: monitor)
     }
 
-    /// 标题排:app 身份 + 设置入口(齿轮),常驻所有 tab 之上。
+    /// 标题排:app 身份 + 状态徽章(工单 04:空载 ✓正常 / 高负载)+ 弹窗 uptime
+    /// (参考文档 §2.1 顶栏 "⏱ Up 6d 4h" 形态)+ 设置入口,常驻所有 tab 之上。
+    /// uptime 随每轮采样重算(弹窗打开 = 1s 一轮),无需独立计时器。
     private var titleRow: some View {
         HStack(spacing: 8) {
             Image(systemName: "waveform.path.ecg")
                 .foregroundStyle(.secondary)
             Text("Pulse")
                 .font(.headline)
+            if let badge = StatusBadgeRules.systemBadge(load: monitor.systemCPULoad) {
+                StatusBadgeChip(badge: badge)
+            }
             Spacer()
+            Text(EnvironmentInfoFormat.systemUptime(ProcessInfo.processInfo.systemUptime))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .help("系统已运行时长")
             Button {
                 openSettings()
             } label: {
@@ -278,10 +287,17 @@ struct GroupCardView: View {
                 HStack(spacing: 10) {
                     icon
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(group.name)
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
+                        HStack(spacing: 6) {
+                            Text(group.name)
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            // 高负载警示 chip(工单 04):组 CPU% > 100% 才挂
+                            // (恰好 100% 不算);名称截断让位、chip 不缩不折。
+                            if let badge = StatusBadgeRules.groupBadge(cpuPercent: group.cpuPercent) {
+                                StatusBadgeChip(badge: badge)
+                            }
+                        }
                         Text("\(group.processes.count) 进程")
                             .font(.caption)
                             .foregroundStyle(.secondary)
