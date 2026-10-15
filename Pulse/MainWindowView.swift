@@ -24,6 +24,8 @@ struct MainWindowView: View {
     @State private var model: DashboardModel
     /// 当前 tab(工单 03):药丸点击或 ←/→ 切换;初始 tab 可注入(走查预留)。
     @State private var tabSelection: MetricTabSelection
+    /// 工具栏搜索框:窗口本地会话态,与 tab 选中同层;过滤纯视图层,不动数据。
+    @State private var searchQuery: String = ""
 
     init(monitor: SystemMonitor, initialTab: MetricTab = .overview) {
         self.monitor = monitor
@@ -50,6 +52,9 @@ struct MainWindowView: View {
                 MetricPillTabBar(selection: $tabSelection)
             }
             ToolbarItem(placement: .primaryAction) {
+                MainSearchField(query: $searchQuery)
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button {
                     openSettings()
                 } label: {
@@ -64,6 +69,18 @@ struct MainWindowView: View {
     /// 当前 tab 的展示内容(纯逻辑折叠,与弹窗同一出处):榜单序、组行口径、内存分段。
     private var content: MetricTabContent {
         model.content(tab: tabSelection.current)
+    }
+
+    /// 搜索过滤器(视图直接持有的归一口径;空查询时全部旁路)。
+    private var searchFilter: ProcessSearchFilter {
+        ProcessSearchFilter(query: searchQuery)
+    }
+
+    /// 搜索生效时的可见组(口径在 ProcessSearchFilter.filteredGroups)。
+    private var displayGroups: [ProcessGroup] {
+        ProcessSearchFilter.filteredGroups(content.ranking, filter: searchFilter) { group in
+            monitor.drilldown.map { $0.rows(for: group) }
+        }
     }
 
     /// 内容头(SHOT1:`Overview` 大标题 + `Apple M1 Max · 10 cores · 64 GB`)。
@@ -112,33 +129,62 @@ struct MainWindowView: View {
         }
     }
 
-    /// 排行卡:全部组;点行展开主窗口版进程表(表头可排序);
-    /// 前 3 名带 26×14 微图(工单 03 兑现)。
+    /// 排行卡:全部组;搜索生效时换成过滤后的组(无命中 → 专用空态);
+    /// 点行展开主窗口版进程表(表头可排序);前 3 名带 26×14 微图(工单 03 兑现)。
+    /// meter 归一榜首仍取全榜单(content 口径),过滤不改变条的相对读数。
     @ViewBuilder
     private var rankingCard: some View {
-        if monitor.allGroups.isEmpty {
+        let filter = searchFilter
+        if filter.isActive {
+            if displayGroups.isEmpty {
+                searchMissState
+            } else {
+                rankingCardList(displayGroups)
+            }
+        } else if monitor.allGroups.isEmpty {
             emptyState
         } else {
-            RankingCardView(
-                groups: content.ranking,
-                metric: content.metric,
-                cpuLeader: content.cpuLeader,
-                memoryLeaderBytes: content.memoryLeaderBytes,
-                expandedGroupIDs: model.expandedGroupIDs,
-                microGraphValues: model.microGraphValues(for: content),
-                onToggle: model.toggleExpansion(of:),
-                onEndGroup: model.requestEndGroup
-            ) { group in
-                if let drilldown = monitor.drilldown {
-                    SortableProcessTableView(
-                        group: group,
-                        drilldown: drilldown,
-                        selectedProcessID: $model.selectedProcessID,
-                        onEndProcess: model.requestEndProcess
-                    )
-                }
+            rankingCardList(content.ranking)
+        }
+    }
+
+    /// 排行卡本体(有无搜索共用一份构造,只差组列表)。
+    private func rankingCardList(_ groups: [ProcessGroup]) -> some View {
+        RankingCardView(
+            groups: groups,
+            metric: content.metric,
+            cpuLeader: content.cpuLeader,
+            memoryLeaderBytes: content.memoryLeaderBytes,
+            expandedGroupIDs: model.expandedGroupIDs,
+            microGraphValues: model.microGraphValues(for: content),
+            onToggle: model.toggleExpansion(of:),
+            onEndGroup: model.requestEndGroup
+        ) { group in
+            if let drilldown = monitor.drilldown {
+                SortableProcessTableView(
+                    group: group,
+                    drilldown: drilldown,
+                    searchFilter: searchFilter,
+                    selectedProcessID: $model.selectedProcessID,
+                    onEndProcess: model.requestEndProcess
+                )
             }
         }
+    }
+
+    /// 搜索无命中:与"暂无活动组"区分开——首轮空载和搜不到是两回事。
+    private var searchMissState: some View {
+        VStack(spacing: 8) {
+            Text("没有匹配“\(searchFilter.normalized)”的结果")
+                .font(.title3)
+                .foregroundStyle(.tertiary)
+            Text("试试应用名的片段,或输入纯数字按 PID 前缀搜")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+        .background(Surface.card, in: .rect(cornerRadius: 18))
     }
 
     /// 首轮采样前 / 极端空闲:与弹窗同一句安静文案。
@@ -157,6 +203,53 @@ struct MainWindowView: View {
     }
 }
 
+// MARK: - 工具栏搜索框
+
+/// 主窗口工具栏搜索框:放大镜 + 无边框输入 + 一键清空。⌘F 聚焦;
+/// Esc 先清空、再按一次失焦。药丸 tab 占了 principal,搜索框与齿轮同为
+/// primaryAction(声明序在前 → 摆齿轮左侧);宽度定长,药丸 tab 在 720
+/// 最小窗宽下不挤。⌘F / Esc 行为属手动验收。
+private struct MainSearchField: View {
+    @Binding var query: String
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            TextField("搜索应用或 PID", text: $query)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12))
+                .focused($isFocused)
+                .keyboardShortcut("f", modifiers: .command)
+                .onExitCommand {
+                    if query.isEmpty {
+                        isFocused = false
+                    } else {
+                        query = ""
+                    }
+                }
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                    isFocused = true
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("清空搜索")
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.primary.opacity(0.06), in: .capsule)
+        .frame(width: 168)
+    }
+}
+
 // MARK: - 主窗口进程表(表头可排序)
 
 /// 主窗口进程表:组卡展开后的表区。表头 CPU%/内存两列可点排序
@@ -166,6 +259,8 @@ struct MainWindowView: View {
 struct SortableProcessTableView: View {
     let group: ProcessGroup
     let drilldown: DrilldownState
+    /// 工具栏搜索:组名命中 → 全部行,否则只留命中行(口径在 ProcessSearchFilter)。
+    let searchFilter: ProcessSearchFilter
     /// 当前展开详情的进程(nil = 全部收起),跨组唯一由主窗口持有。
     @Binding var selectedProcessID: pid_t?
     @State private var order = ProcessTableOrder()
@@ -173,9 +268,10 @@ struct SortableProcessTableView: View {
     let onEndProcess: (KillTarget) -> Void
 
     var body: some View {
-        // rows(for:) 保持引擎既定序(进程 CPU% 降序)——排序叠加其上:
-        // 同值次键 pid 升序,排序跨采样轮稳定,进窗口默认观感与弹窗一致。
-        let rows = order.sorted(drilldown.rows(for: group))
+        // rows(for:) 保持引擎既定序(进程 CPU% 降序)——搜索过滤保序叠加其上,
+        // 排序再叠加过滤结果:同值次键 pid 升序,排序跨采样轮稳定,进窗口默认
+        // 观感与弹窗一致。
+        let rows = order.sorted(searchFilter.filterRows(for: group, in: drilldown.rows(for: group)))
         // 进程行 meter 榜首(工单 P0.6-02):当前表内 CPU% 最大者——
         // 无论按哪列排序,meter 恒以 CPU 占比取值(CPU 指标驱动 meter),
         // 换列排序只换行序,不换条的口径。
