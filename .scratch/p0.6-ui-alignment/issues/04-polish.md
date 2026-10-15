@@ -4,7 +4,7 @@
 
 **Blocked by:** 03。
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] 状态徽章:✓正常(空载)/ 高负载 chip,阈值纯逻辑可测
 - [x] 主窗口副标题:设备型号 · 核数 · 物理内存;弹窗头部 uptime

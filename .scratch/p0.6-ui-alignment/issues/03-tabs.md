@@ -4,7 +4,7 @@
 
 **Blocked by:** 01(走势图进组卡)、02(强调色令牌)。
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] 组卡瘦身:无全尺寸 strip、无均值/峰值对;大数字 + meter;(可选)前几名 26×14 微图
 - [x] 全尺寸走势图只在:弹窗头部系统负载 + 指标 tab 主卡(CPU tab 面积图形态)

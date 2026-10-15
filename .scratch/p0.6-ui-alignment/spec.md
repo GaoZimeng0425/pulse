@@ -1,6 +1,6 @@
 # P0.6:UI 对齐 Vitals(视觉跃迁)
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 

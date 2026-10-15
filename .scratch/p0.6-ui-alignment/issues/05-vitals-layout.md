@@ -10,7 +10,7 @@
 
 **Blocked by:** 03。
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] CPU 用户/系统拆分、内存构成与压力等级:纯逻辑单测
 - [x] 主机信息与运行时长格式化:纯逻辑单测
