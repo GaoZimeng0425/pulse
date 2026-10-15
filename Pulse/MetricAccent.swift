@@ -39,10 +39,35 @@ extension Metric {
     /// 动态 NSColor provider 让同一 `Color` 随系统外观切换;浅深切换的观感
     /// 属预览 + 手动验收(spec 测试决策:UI 不写单元测试)。
     var accentColor: Color {
-        let token = accent
-        return Color(nsColor: NSColor(name: nil) { appearance in
+        Color.dynamic(light: accent.light, dark: accent.dark)
+    }
+}
+
+// MARK: - 表面令牌(工单 P0.6-05,参考文档 §1.1 中性色)
+
+/// 窗底 / 卡底 / 卡内抬升底 + 环形图用到的辅助色。Vitals 的层级只有
+/// "窗 > 卡 > 卡内元素"三级:卡与窗底只差一档,不描边不投影(§1.4)。
+enum Surface {
+    /// 窗口 / 弹窗本体底(`--raised`)。
+    static let window = Color.dynamic(light: 0xffffff, dark: 0x1a1a1d)
+    /// 卡片底(`--card`)。
+    static let card = Color.dynamic(light: 0xf5f5f7, dark: 0x1f1f22)
+    /// 卡内强调底、环形"其他/空闲"段(`--card-hi`)。
+    static let cardHigh = Color.dynamic(light: 0xe8e8ed, dark: 0x27272b)
+    /// 三级墨色(`--ink-3`):环形"缓存"段。
+    static let inkTertiary = Color.dynamic(light: 0xa1a1a6, dark: 0x6e6e73)
+    /// Projects 指标色:内存构成环的"联动"段(§2.2 by Type 配色)。
+    static let projectsAccent = Color.dynamic(light: 0xeb6834, dark: 0xd95926)
+    /// 正常态绿(Battery 指标色):内存压力 "正常" chip。
+    static let positive = Color.dynamic(light: 0x008300, dark: 0x2fa83a)
+}
+
+extension Color {
+    /// 浅深自适应色:动态 NSColor provider 让同一 `Color` 随系统外观切换。
+    static func dynamic(light: UInt32, dark: UInt32) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
             let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            return NSColor(srgbHex: isDark ? token.dark : token.light)
+            return NSColor(srgbHex: isDark ? dark : light)
         })
     }
 }

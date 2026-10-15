@@ -47,7 +47,11 @@ struct SamplingUpdate: Sendable {
     let snapshot: ProcessSnapshot
     let diff: CPUDiffResult
     /// 系统 CPU 负载,0–100%,每核 tick 口径(CoreTickDiffer)。
-    let systemCPULoad: Double
+    var systemCPULoad: Double { cpu.total }
+    /// 负载及用户/系统拆分(工单 P0.6-05 总览 CPU 卡)。
+    let cpu: CPULoadBreakdown
+    /// 系统内存构成(工单 P0.6-05 总览内存卡);读失败为 nil。
+    let memory: MemoryBreakdown?
 }
 
 /// 采样 actor:以自适应节奏驱动 ProcessSource(进程明细)与 CoreTickSource
@@ -63,6 +67,7 @@ actor Sampler {
 
     private let source: any ProcessSource
     private let coreTicks: any CoreTickSource
+    private let memoryStats: any MemoryStatsSource
     private let clock: Clock
     private let sleep: Sleeping
     private let maxSleepSlice: TimeInterval
@@ -74,12 +79,14 @@ actor Sampler {
     init(
         source: any ProcessSource,
         coreTicks: any CoreTickSource = LiveCoreTickSource(),
+        memoryStats: any MemoryStatsSource = LiveMemoryStatsSource(),
         clock: @escaping Clock = { Date() },
         sleep: @escaping Sleeping = { try await Task.sleep(nanoseconds: UInt64($0 * 1_000_000_000)) },
         maxSleepSlice: TimeInterval = 0.5
     ) {
         self.source = source
         self.coreTicks = coreTicks
+        self.memoryStats = memoryStats
         self.clock = clock
         self.sleep = sleep
         self.maxSleepSlice = maxSleepSlice
@@ -99,10 +106,8 @@ actor Sampler {
                 let snapshot = source.snapshot()
                 let ticks = coreTicks.sample()
                 let diff = CPUDiffer.diff(previous: previousSnapshot, current: snapshot)
-                let systemLoad = CoreTickDiffer.systemCPULoad(
-                    previous: previousCoreTicks,
-                    current: ticks
-                )
+                let cpu = CoreTickDiffer.breakdown(previous: previousCoreTicks, current: ticks)
+                let memory = memoryStats.sample()
                 previousSnapshot = snapshot
                 previousCoreTicks = ticks
                 scheduler.recordSample(at: clock())
@@ -110,7 +115,8 @@ actor Sampler {
                     SamplingUpdate(
                         snapshot: snapshot,
                         diff: diff,
-                        systemCPULoad: systemLoad
+                        cpu: cpu,
+                        memory: memory
                     )
                 )
             } else {

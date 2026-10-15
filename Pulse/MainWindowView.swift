@@ -1,9 +1,9 @@
 import SwiftUI
 
 // MARK: - 主窗口(工单 P0.5-01):全部组列表 + 三层下钻
-// P0.6-03 tab 化:药丸文字 tab(总览 / CPU / 内存,与弹窗同三 tab 同内容模型),
-// 总览 = 系统负载卡 + 瘦身组卡;CPU = 面积图主卡 + 组排行;内存 = Memory by App
-// 环形卡 + 内存组排行。
+// P0.6-05 对齐 SHOT1:药丸 tab 进标题栏工具栏、齿轮在右;内容头 = 页名大标题 +
+// "芯片 · 核数 · 内存";总览 = 指标卡网格 + "此刻"环形卡 + "当前最忙"排行卡;
+// CPU / 内存 tab = 指标主卡 + 排行卡(内存再加按应用环形)。
 
 /// 主窗口场景 id:弹窗头部"在窗口中打开"按钮与第二菜单栏项都以
 /// `openWindow(id:)` 打开同一窗口——两个入口,一个目的地。
@@ -11,16 +11,18 @@ enum MainWindowSceneID {
     static let value = "main"
 }
 
-/// 主窗口:展示**全部组**(读 `monitor.allGroups`,非弹窗的 Top-5 截取),
-/// 组卡 → 进程表(CPU%/内存可点表头排序)→ 进程详情,三层结构与弹窗同源;
-/// 数据同源实时刷新(@Observable),窗口开/关不触碰弹窗可见性——
-/// 采样节奏与窗口无关(spec:窗口不属于"弹窗打开"状态)。
+/// 主窗口:展示**全部组**(排行卡读 `monitor.allGroups`),排行行 → 进程表
+/// (CPU%/内存可点表头排序)→ 进程详情,三层结构与弹窗同源;数据同源实时刷新
+/// (@Observable),窗口开/关不触碰弹窗可见性——采样节奏与窗口无关
+/// (spec:窗口不属于"弹窗打开"状态)。
 struct MainWindowView: View {
     let monitor: SystemMonitor
+    /// 工具栏齿轮:设置窗(项目根目录)。
+    @Environment(\.openSettings) private var openSettings
 
     /// 当前 tab(工单 03):药丸点击或 ←/→ 切换。
     @State private var tabSelection = MetricTabSelection()
-    /// 展开中的组(按稳定组 id),跨采样轮保持;组消失时残留 id 无害(少渲染一张卡)。
+    /// 展开中的组(按稳定组 id),跨采样轮保持;组消失时残留 id 无害。
     @State private var expandedGroupIDs: Set<String> = []
     /// 展开详情的进程(跨组唯一):下钻期间进程退出时详情安静收起。
     @State private var selectedProcessID: pid_t?
@@ -28,109 +30,125 @@ struct MainWindowView: View {
     @State private var killFailureReport: KillReport?
 
     var body: some View {
-        VStack(spacing: 12) {
-            header
-            MetricPillTabBar(selection: $tabSelection)
-            if monitor.allGroups.isEmpty {
-                emptyState
-            } else {
-                pinnedTabCard
-                ScrollView {
-                    // 普通 VStack:组卡即时构卡参与布局;组内数十行的惰性渲染
-                    // 由 SortableProcessTableView 的 LazyVStack 承担。
-                    VStack(spacing: 12) {
-                        ForEach(content.ranking) { group in
-                            groupSection(for: group)
-                        }
-                    }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                pageHeader
+                tabBody
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 12)
+            .padding(.bottom, 24)
+        }
+        // spec 最小尺寸 ~720×560;弹窗的宽度约束是 MenuBarExtra 专用,此处不适用。
+        .frame(minWidth: 720, minHeight: 560)
+        .containerBackground(Surface.window, for: .window)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                MetricPillTabBar(selection: $tabSelection)
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    openSettings()
+                } label: {
+                    Image(systemName: "gearshape")
                 }
+                .help("设置项目根目录")
             }
         }
-        .padding(16)
-        // spec 最小尺寸 ~720×560:内容最小尺寸约束窗口最小尺寸;
-        // 弹窗的 480pt 高度上限与 340pt 宽度是 MenuBarExtra 专用,此处不适用。
-        .frame(minWidth: 720, minHeight: 560)
         .modifier(KillFailureAlert(report: $killFailureReport))
     }
 
-    /// 当前 tab 的展示内容(纯逻辑折叠,与弹窗同一出处):榜单序、微图资格、
-    /// 组卡口径、内存分段——两个窗口的同一 tab 观感一致。
+    /// 当前 tab 的展示内容(纯逻辑折叠,与弹窗同一出处):榜单序、组行口径、内存分段。
     private var content: MetricTabContent {
         MetricTabContent.build(groups: monitor.allGroups, tab: tabSelection.current)
     }
 
-    /// 各 tab 固定在滚动区之上的主卡(工单 03):总览 = 系统负载卡(带 strip);
-    /// CPU = 面积图主卡;内存 = Memory by App 环形卡。
+    private var cpuModel: MetricCardModel {
+        .cpu(
+            breakdown: monitor.cpuBreakdown,
+            statistics: monitor.history.systemCPULoad.statistics,
+            trend: monitor.history.systemCPULoad.values
+        )
+    }
+
+    private var memoryModel: MetricCardModel {
+        .memory(monitor.memory, trend: monitor.history.memoryUsed.values, host: .current)
+    }
+
+    /// 内容头(SHOT1:`Overview` 大标题 + `Apple M1 Max · 10 cores · 64 GB`)。
+    private var pageHeader: some View {
+        let host = HostInfo.current
+        return VStack(alignment: .leading, spacing: 3) {
+            Text(tabSelection.current.title)
+                .font(.system(size: 26, weight: .bold))
+            Text(PulseFormat.hostSummary(
+                chipName: host.chipName,
+                coreCount: host.coreCount,
+                physicalMemoryBytes: host.physicalMemoryBytes
+            ))
+            .font(.system(size: 12))
+            .foregroundStyle(.secondary)
+        }
+    }
+
     @ViewBuilder
-    private var pinnedTabCard: some View {
+    private var tabBody: some View {
         switch tabSelection.current {
         case .overview:
-            loadBlock
+            HStack(alignment: .top, spacing: 16) {
+                MetricCardView(model: cpuModel) { tabSelection.current = .cpu }
+                MetricCardView(model: memoryModel) { tabSelection.current = .memory }
+            }
+            SectionTitle(title: "此刻")
+                .padding(.top, 6)
+            HStack(alignment: .top, spacing: 16) {
+                RingCardView.memoryByType(monitor.memory)
+                RingCardView.memoryByApp(segments: content.memorySegments, totalBytes: content.memoryTotalBytes)
+            }
+            SectionTitle(title: "当前最忙")
+                .padding(.top, 6)
+            rankingCard
         case .cpu:
-            CPULoadMainCardView(
-                currentLoad: monitor.systemCPULoad,
-                statistics: monitor.history.systemCPULoad.statistics,
-                trendValues: monitor.history.systemCPULoad.values
-            )
+            MetricMainCardView(model: cpuModel)
+            rankingCard
         case .memory:
-            MemoryRingCardView(
-                segments: content.memorySegments,
-                totalBytes: content.memoryTotalBytes
-            )
+            MetricMainCardView(model: memoryModel)
+            HStack(alignment: .top, spacing: 16) {
+                RingCardView.memoryByType(monitor.memory)
+                RingCardView.memoryByApp(segments: content.memorySegments, totalBytes: content.memoryTotalBytes)
+            }
+            rankingCard
         }
     }
 
-    /// 单个组卡 + 展开后的进程表。组卡 / 结束入口复用弹窗组件(同一确认对话框把关),
-    /// 进程表换成主窗口版(表头可排序)。
-    private func groupSection(for group: ProcessGroup) -> some View {
-        VStack(spacing: 6) {
-            GroupCardView(
-                group: group,
+    /// 排行卡:全部组;点行展开主窗口版进程表(表头可排序)。
+    @ViewBuilder
+    private var rankingCard: some View {
+        if monitor.allGroups.isEmpty {
+            emptyState
+        } else {
+            RankingCardView(
+                groups: content.ranking,
                 metric: content.metric,
-                isExpanded: expandedGroupIDs.contains(group.id),
-                meterFraction: meterFraction(for: group),
-                microGraphValues: microGraphValues(for: group),
-                onToggle: { toggleExpansion(of: group.id) },
-                onEndGroup: {
+                cpuLeader: content.cpuLeader,
+                memoryLeaderBytes: content.memoryLeaderBytes,
+                expandedGroupIDs: expandedGroupIDs,
+                onToggle: toggleExpansion(of:),
+                onEndGroup: { group in
                     killFailureReport = KillRequestFlow.endGroup(group, monitor: monitor)
                 }
-            )
-            if expandedGroupIDs.contains(group.id), let drilldown = monitor.drilldown {
-                SortableProcessTableView(
-                    group: group,
-                    drilldown: drilldown,
-                    selectedProcessID: $selectedProcessID,
-                    onEndProcess: { target in
-                        killFailureReport = KillRequestFlow.endProcess(target, monitor: monitor)
-                    }
-                )
+            ) { group in
+                if let drilldown = monitor.drilldown {
+                    SortableProcessTableView(
+                        group: group,
+                        drilldown: drilldown,
+                        selectedProcessID: $selectedProcessID,
+                        onEndProcess: { target in
+                            killFailureReport = KillRequestFlow.endProcess(target, monitor: monitor)
+                        }
+                    )
+                }
             }
-        }
-    }
-
-    /// 组卡 meter 归一(工单 02 口径,随 tab 换指标,与弹窗同源)。
-    private func meterFraction(for group: ProcessGroup) -> Double {
-        switch content.metric {
-        case .cpu:
-            return MeterNormalization.fraction(group.cpuPercent, leader: content.cpuLeader)
-        case .memory:
-            return MeterNormalization.fraction(
-                Double(group.memoryBytes),
-                leader: Double(content.memoryLeaderBytes)
-            )
-        }
-    }
-
-    /// 26×14 微图数据(工单 03):榜单前 3 名才有,序列随口径取 CPU% 或内存。
-    private func microGraphValues(for group: ProcessGroup) -> [Double]? {
-        guard content.microGraphGroupIDs.contains(group.id),
-              let series = monitor.history.series(forGroup: group.id)
-        else { return nil }
-        switch content.metric {
-        case .cpu:
-            return series.cpuPercent.values
-        case .memory:
-            return series.memoryBytes.values.map(Double.init)
         }
     }
 
@@ -140,50 +158,7 @@ struct MainWindowView: View {
         }
     }
 
-    /// 头部与弹窗同款式(Pulse + 系统 CPU 负载),另给全部组计数——
-    /// 窗口的卖点正是"Top-5 之外还有多少组"。
-    private var header: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "waveform.path.ecg")
-                .foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Pulse")
-                    .font(.headline)
-                loadLine
-                    .font(.caption)
-                    .monospacedDigit()
-            }
-            Spacer()
-        }
-    }
-
-    /// 系统 CPU 负载读数(工单 P0.6-02):文案不变,数值用 CPU 指标强调色
-    /// (与弹窗头部同一处理)。
-    private var loadLine: Text {
-        Text("系统 CPU 负载 ")
-            .foregroundStyle(.secondary)
-            + Text(PulseFormat.cpuPercent(monitor.systemCPULoad))
-                .foregroundStyle(Metric.cpu.accentColor)
-            + Text(" · 共 \(monitor.allGroups.count) 组")
-                .foregroundStyle(.secondary)
-    }
-
-    /// 系统负载卡(总览 tab 固定卡,与弹窗同款式):负载读数 + 小趋势条。
-    private var loadBlock: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            loadLine
-                .font(.caption.monospacedDigit())
-            StripChartView(
-                values: monitor.history.systemCPULoad.values,
-                tint: Metric.cpu.accentColor,
-                domainMax: 100
-            )
-            .frame(height: 14)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// 极端空载 / 首轮采样前:与弹窗同一句安静文案,大画布上居中。
+    /// 首轮采样前 / 极端空闲:与弹窗同一句安静文案。
     private var emptyState: some View {
         VStack(spacing: 8) {
             Text("暂无活动组")
@@ -193,7 +168,9 @@ struct MainWindowView: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+        .background(Surface.card, in: .rect(cornerRadius: 18))
     }
 }
 

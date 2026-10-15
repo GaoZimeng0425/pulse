@@ -36,6 +36,46 @@ enum PulseFormat {
         return (String(text[..<separator]), String(text[text.index(after: separator)...]))
     }
 
+    /// 系统内存(工单 P0.6-05 总览/内存卡):**二进制** GB 两位小数("51.06 GB"),
+    /// <1 GiB 显示整 MB——与物理总量同一口径,"已用 / 共" 不打架
+    /// (组内存仍走 memory() 的十进制口径,两者语境不同)。
+    static func systemMemory(_ bytes: UInt64) -> String {
+        let figure = systemMemoryFigure(bytes)
+        return "\(figure.value) \(figure.unit)"
+    }
+
+    /// systemMemory 的数字/单位分层版(大数字排版用)。
+    static func systemMemoryFigure(_ bytes: UInt64) -> (value: String, unit: String) {
+        let gib = Double(bytes) / 1_073_741_824
+        guard gib >= 1 else { return ("\(bytes / 1_048_576)", "MB") }
+        let hundredths = Int((gib * 100).rounded())
+        let fraction = hundredths % 100
+        return ("\(hundredths / 100).\(fraction < 10 ? "0" : "")\(fraction)", "GB")
+    }
+
+    /// 物理内存总量:二进制 GB 取整("64 GB")。
+    static func physicalMemoryTotal(_ bytes: UInt64) -> String {
+        "\(Int((Double(bytes) / 1_073_741_824).rounded())) GB"
+    }
+
+    /// 主窗口副标题(工单 P0.6-05):"Apple M4 Pro · 12 核 · 48 GB";芯片名未知则省略。
+    static func hostSummary(chipName: String?, coreCount: Int, physicalMemoryBytes: UInt64) -> String {
+        let parts = [chipName, "\(coreCount) 核", physicalMemoryTotal(physicalMemoryBytes)]
+        return parts.compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// 系统运行时长(弹窗头部,Vitals 的 "Up 6d 4h"):取最大两级单位,
+    /// 不足 1 分钟按 1 分钟。
+    static func systemUptime(seconds: TimeInterval) -> String {
+        let total = max(0, Int(seconds))
+        let days = total / 86_400
+        let hours = total % 86_400 / 3600
+        let minutes = total % 3600 / 60
+        if days > 0 { return "已运行 \(days) 天 \(hours) 小时" }
+        if hours > 0 { return "已运行 \(hours) 小时 \(minutes) 分" }
+        return "已运行 \(max(minutes, 1)) 分钟"
+    }
+
     /// 启动时长(工单 06):("已 25 分钟")。
     /// 秒 → 分 → 时 → 天逐级取整(<60 秒 "已 40 秒";<60 分 "已 25 分钟";
     /// <24 小时 "已 3 小时";≥24 小时 "已 3 天"——用户故事 13 的"常驻 3 天")。

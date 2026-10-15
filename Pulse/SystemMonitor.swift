@@ -16,6 +16,10 @@ final class SystemMonitor {
 
     /// 系统 CPU 负载,0–100%,随采样跳动。
     private(set) var systemCPULoad: Double = 0
+    /// 负载的用户/系统拆分(工单 P0.6-05 总览 CPU 卡)。
+    private(set) var cpuBreakdown: CPULoadBreakdown = .zero
+    /// 系统内存构成(工单 P0.6-05);首轮采样前或读失败为 nil。
+    private(set) var memory: MemoryBreakdown?
     /// 全部组(GLOSSARY 组),组 CPU% 降序,每轮整体刷新;首轮采样前为空。
     /// 弹窗与主窗口都读这里(用户拍板:弹窗不再截 Top-5,滚动展示全部)。
     private(set) var allGroups: [ProcessGroup] = []
@@ -40,11 +44,12 @@ final class SystemMonitor {
     init(
         source: any ProcessSource = LiveProcessSource(),
         coreTicks: any CoreTickSource = LiveCoreTickSource(),
+        memoryStats: any MemoryStatsSource = LiveMemoryStatsSource(),
         projectRoots: [String] = [],
         killService: any KillService = LiveKillService(),
         birthScanSource: any BirthScanSource = LiveBirthScanSource()
     ) {
-        self.sampler = Sampler(source: source, coreTicks: coreTicks)
+        self.sampler = Sampler(source: source, coreTicks: coreTicks, memoryStats: memoryStats)
         self.birthScanner = BirthScanner(source: birthScanSource)
         self.pipeline = GroupingPipeline(
             configuration: GroupingConfiguration(
@@ -122,6 +127,8 @@ final class SystemMonitor {
     /// 出生扫描的登记表先并入——扫描间隙出生的短命父进程由此参与本轮归组。
     private func apply(_ update: SamplingUpdate) {
         systemCPULoad = update.systemCPULoad
+        cpuBreakdown = update.cpu
+        memory = update.memory
         pipeline.mergeBirths(birthLineage)
         pipeline.update(
             snapshot: update.snapshot,
@@ -131,6 +138,7 @@ final class SystemMonitor {
         // 采样历史(工单 P0.6-01)随同一轮推进:在场组追加,消失组逐出。
         history.advance(
             systemCPULoad: update.systemCPULoad,
+            memoryUsedBytes: update.memory?.usedBytes,
             groups: allGroups.map { group in
                 GroupSample(id: group.id, cpuPercent: group.cpuPercent, memoryBytes: group.memoryBytes)
             }

@@ -15,6 +15,21 @@ struct CoreTickSample: Equatable, Sendable {
     let totalTicks: [UInt64]
     /// 采样时刻(诊断用;差分本身自归一——总 tick 已含 idle,无需墙钟)。
     let takenAt: Date
+    /// 每核的用户态 tick(user + nice,工单 P0.6-05 总览 CPU 卡"用户"列);
+    /// 空 = 该样本不带拆分(旧口径 / 合成源),拆分退化为 0。
+    var userTicks: [UInt64] = []
+    /// 每核的内核态 tick(system,总览 CPU 卡"系统"列)。
+    var systemTicks: [UInt64] = []
+}
+
+/// 系统 CPU 负载及其用户/系统拆分(工单 P0.6-05),均为 0–100%、
+/// 占全部 tick 的比例——user + system ≈ total(nice 计入用户)。
+struct CPULoadBreakdown: Equatable, Sendable {
+    let total: Double
+    let user: Double
+    let system: Double
+
+    static let zero = CPULoadBreakdown(total: 0, user: 0, system: 0)
 }
 
 /// 每核 tick 差分器(纯逻辑,评审 S6):相邻两样本 → 系统 CPU 负载 0–100%。
@@ -46,6 +61,33 @@ enum CoreTickDiffer {
         }
         guard totalDelta > 0 else { return 0 }
         return min(100, Double(busyDelta) / Double(totalDelta) * 100)
+    }
+
+    /// 负载 + 用户/系统拆分(工单 P0.6-05):合计与 `systemCPULoad` 同一口径;
+    /// 拆分 = 用户/系统 tick 差 ÷ 同一总 tick 差。任一侧样本不带拆分 → 拆分为 0。
+    static func breakdown(previous: CoreTickSample?, current: CoreTickSample) -> CPULoadBreakdown {
+        guard let previous else { return .zero }
+        let total = systemCPULoad(previous: previous, current: current)
+        let coreCount = min(previous.totalTicks.count, current.totalTicks.count)
+        let hasSplit = [previous.userTicks, previous.systemTicks, current.userTicks, current.systemTicks]
+            .allSatisfy { $0.count >= coreCount }
+        guard hasSplit, coreCount > 0 else {
+            return CPULoadBreakdown(total: total, user: 0, system: 0)
+        }
+        var totalDelta: UInt64 = 0
+        var userDelta: UInt64 = 0
+        var systemDelta: UInt64 = 0
+        for core in 0..<coreCount {
+            totalDelta += clampedDelta(previous: previous.totalTicks[core], current: current.totalTicks[core])
+            userDelta += clampedDelta(previous: previous.userTicks[core], current: current.userTicks[core])
+            systemDelta += clampedDelta(previous: previous.systemTicks[core], current: current.systemTicks[core])
+        }
+        guard totalDelta > 0 else { return CPULoadBreakdown(total: total, user: 0, system: 0) }
+        return CPULoadBreakdown(
+            total: total,
+            user: min(100, Double(userDelta) / Double(totalDelta) * 100),
+            system: min(100, Double(systemDelta) / Double(totalDelta) * 100)
+        )
     }
 
     /// 计数器回退(如 host 重启计数)按 0 差值处理(UInt 下溢会崩溃)。
@@ -95,8 +137,12 @@ struct LiveCoreTickSource: CoreTickSource {
         let statesPerCore = Int(CPU_STATE_MAX)
         var busy: [UInt64] = []
         var total: [UInt64] = []
+        var userTicks: [UInt64] = []
+        var systemTicks: [UInt64] = []
         busy.reserveCapacity(Int(coreCount))
         total.reserveCapacity(Int(coreCount))
+        userTicks.reserveCapacity(Int(coreCount))
+        systemTicks.reserveCapacity(Int(coreCount))
         for core in 0..<Int(coreCount) {
             let base = core * statesPerCore
             let user = UInt64(info[base + Int(CPU_STATE_USER)])
@@ -105,8 +151,16 @@ struct LiveCoreTickSource: CoreTickSource {
             let nice = UInt64(info[base + Int(CPU_STATE_NICE)])
             busy.append(user + system + nice)
             total.append(user + system + idle + nice)
+            userTicks.append(user + nice)
+            systemTicks.append(system)
         }
-        return CoreTickSample(busyTicks: busy, totalTicks: total, takenAt: Date())
+        return CoreTickSample(
+            busyTicks: busy,
+            totalTicks: total,
+            takenAt: Date(),
+            userTicks: userTicks,
+            systemTicks: systemTicks
+        )
     }
 }
 

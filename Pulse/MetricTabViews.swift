@@ -1,5 +1,4 @@
 import SwiftUI
-import Charts
 
 // MARK: - 指标 tab 视图族(工单 P0.6-03)
 // 内容模型(tab 展示什么)在 MetricTabModel(纯逻辑,单测覆盖);本文件只做
@@ -22,17 +21,21 @@ struct AreaTrendChartView: View {
     let values: [Double]
     /// 线与面积色。
     var tint: Color
-    /// 归一化上限(系统负载固定 0–100 语义域)。
+    /// 归一化上限(系统负载固定 0–100 语义域;内存 = 物理总量)。
     var domainMax: Double
+    /// 网格线:主卡画,弹窗小卡的细走势线不画(OG 左图)。
+    var showsGrid: Bool
 
     init(
         values: [Double],
         tint: Color = Metric.cpu.accentColor,
-        domainMax: Double = 100
+        domainMax: Double = 100,
+        showsGrid: Bool = true
     ) {
         self.values = values
         self.tint = tint
-        self.domainMax = domainMax
+        self.domainMax = max(domainMax, 1)
+        self.showsGrid = showsGrid
     }
 
     var body: some View {
@@ -43,14 +46,16 @@ struct AreaTrendChartView: View {
     }
 
     private func draw(in context: inout GraphicsContext, size: CGSize) {
-        var grid = Path()
-        for fraction in Self.gridLineFractions {
-            let y = size.height * fraction
-            grid.move(to: CGPoint(x: 0, y: y))
-            grid.addLine(to: CGPoint(x: size.width, y: y))
+        if showsGrid {
+            var grid = Path()
+            for fraction in Self.gridLineFractions {
+                let y = size.height * fraction
+                grid.move(to: CGPoint(x: 0, y: y))
+                grid.addLine(to: CGPoint(x: size.width, y: y))
+            }
+            // 网格线:--line 口径(浅色黑 8% / 深色白 10%),Color.primary.opacity 自适应。
+            context.stroke(grid, with: .color(Color.primary.opacity(0.08)), lineWidth: 1)
         }
-        // 网格线:--line 口径(浅色黑 8% / 深色白 10%),Color.primary.opacity 自适应。
-        context.stroke(grid, with: .color(Color.primary.opacity(0.08)), lineWidth: 1)
 
         let count = Self.pointCount
         let window = Array(values.suffix(count))
@@ -194,175 +199,98 @@ struct MetricPillTabBar: View {
     }
 }
 
-// MARK: - CPU tab 主卡(全尺寸走势图的归位处,工单 03 纠偏)
+// MARK: - 指标 tab 主卡(工单 P0.6-05,参考文档 §2.3 / §2.4)
 
-/// CPU tab 主卡(参考文档 §2.3 布局):左列"当前"标签 + 大数字 + 窗口均值/峰值
-/// 统计对(01 从组卡收回的口径归位至此);右列 56 点面积图(系统 CPU 负载序列)。
-/// <2 轮时面积图只剩网格与垫底线、统计对不显示——不出坏图。
-struct CPULoadMainCardView: View {
-    /// 当轮系统 CPU 负载(0–100)。
-    let currentLoad: Double
-    /// 窗口统计(nil = 首轮采样前);≥2 轮才显示均值/峰值对。
-    let statistics: SeriesStatistics?
-    /// 面积图数据(时间序,旧 → 新)。
-    let trendValues: [Double]
+/// 指标 tab 主卡:左列 "当前" 标签 + 大数字(+ 状态 chip)+ 2×2 小统计;
+/// 右列 56 点面积图。弹窗(compact)改竖排:数字行 / 面积图 / 四列统计。
+/// 内容复用总览卡的 MetricCardModel——同一指标两处读数同源。
+struct MetricMainCardView: View {
+    let model: MetricCardModel
+    var isCompact = false
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 14) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("当前")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                loadFigure
-                if let stats = statistics, stats.count >= 2 {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("均值 \(PulseFormat.cpuPercent(stats.average))")
-                        Text("峰值 \(PulseFormat.cpuPercent(stats.peak))")
-                    }
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 2)
-                }
+        Group {
+            if isCompact {
+                compactBody
+            } else {
+                regularBody
             }
-            Spacer(minLength: 12)
-            AreaTrendChartView(values: trendValues, tint: Metric.cpu.accentColor, domainMax: 100)
-                .frame(height: 84)
         }
-        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary, in: .rect(cornerRadius: 12))
+        .background(Surface.card, in: .rect(cornerRadius: isCompact ? 12 : 18))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("当前系统 CPU 负载 \(PulseFormat.cpuPercent(currentLoad))")
     }
 
-    /// 大数字(§1.2 figure 规格):圆体加粗 + tabular + 负字距,单位小字基线对齐。
-    private var loadFigure: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 2) {
-            Text(PulseFormat.cpuPercentNumber(currentLoad))
-                .font(.system(size: 34, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .kerning(-0.7)
-            Text("%")
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(.secondary)
-        }
-    }
-}
-
-// MARK: - Memory by App 环形卡(内存 tab,工单 03)
-
-/// Memory by App 环形卡(参考文档 §2.2):单色梯度环形(内存强调色 100/83/66/49/32%,
-/// "其他"段用中性抬升底)+ 环心全部组内存合计大数字 + 图例(应用图标 + 名称 + 数值 + 占比)。
-/// 分段数据由 MetricTabContent 折叠(纯逻辑,单测覆盖);空组/全零内存走安静空态。
-struct MemoryRingCardView: View {
-    let segments: [MemoryRingSegment]
-    /// 全部组内存合计(环心大数字)。
-    let totalBytes: UInt64
-
-    /// 单色梯度档位(§2.2 Memory by App:tint 与 card 按 100/83/66/49% 混,
-    /// 本表扩到第五档覆盖 top-5;"其他"段单独配色)。
-    private static let segmentOpacities: [Double] = [1.0, 0.83, 0.66, 0.49, 0.32]
-
-    private var tint: Color { Metric.memory.accentColor }
-
-    var body: some View {
-        if segments.isEmpty {
-            Text("暂无内存数据")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 28)
-                .background(.quaternary, in: .rect(cornerRadius: 12))
-        } else {
-            HStack(spacing: 14) {
-                ring
-                legend
-            }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.quaternary, in: .rect(cornerRadius: 12))
-        }
-    }
-
-    /// 环形主体 + 环心大数字(§2.2:环心 = 总量 + 两字说明)。
-    private var ring: some View {
-        Chart(segments) { segment in
-            SectorMark(
-                angle: .value("内存", segment.bytes),
-                innerRadius: .ratio(0.72),
-                angularInset: 1.2
-            )
-            .cornerRadius(2.5)
-            .foregroundStyle(fill(for: segment))
-        }
-        .frame(width: 116, height: 116)
-        .overlay {
-            VStack(spacing: 2) {
-                HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    let figure = PulseFormat.memoryFigure(totalBytes)
-                    Text(figure.value)
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .kerning(-0.3)
-                    Text(figure.unit)
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.secondary)
-                }
-                Text("全部组")
-                    .font(.caption2)
+    private var regularBody: some View {
+        HStack(alignment: .top, spacing: 24) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(model.caption)
+                    .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)
-            }
-        }
-        .accessibilityHidden(true) // 数值与名称由图例文字承载
-    }
-
-    /// 图例:图标 + 名称 + 内存值 + 占比(§2.2 每段图例带应用小图标)。
-    private var legend: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
-                HStack(spacing: 6) {
-                    segmentIcon(segment)
-                        .frame(width: 16, height: 16)
-                    Text(segment.name)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Spacer(minLength: 4)
-                    Text(PulseFormat.memory(segment.bytes))
-                        .monospacedDigit()
-                    Text("\(Int((segment.fraction * 100).rounded()))%")
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .layoutPriority(-1)
+                FigureText(value: model.figureValue, unit: model.figureUnit, size: 44)
+                if let chip = model.chip {
+                    MetricChipView(chip: chip)
                 }
-                .font(.caption)
+                Spacer(minLength: 12)
+                Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 8) {
+                    ForEach(Array(stride(from: 0, to: model.stats.count, by: 2)), id: \.self) { index in
+                        GridRow {
+                            statCell(model.stats[index])
+                            if index + 1 < model.stats.count {
+                                statCell(model.stats[index + 1])
+                            }
+                        }
+                    }
+                }
+            }
+            .frame(width: 200, alignment: .leading)
+            AreaTrendChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
+                .frame(maxWidth: .infinity)
+        }
+        .frame(height: 176)
+        .padding(20)
+    }
+
+    private var compactBody: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(model.caption)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    FigureText(value: model.figureValue, unit: model.figureUnit, size: 30)
+                }
+                Spacer()
+                if let chip = model.chip {
+                    MetricChipView(chip: chip)
+                }
+            }
+            AreaTrendChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
+                .frame(height: 64)
+            HStack(alignment: .top, spacing: 6) {
+                ForEach(model.stats) { stat in
+                    statCell(stat)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         }
+        .padding(12)
     }
 
-    /// 段填充色:top-5 单色梯度;"其他"= 中性抬升底(card-hi 的本地近似)。
-    private func fill(for segment: MemoryRingSegment) -> Color {
-        guard !segment.isOther,
-              let index = segments.firstIndex(where: { $0.id == segment.id }),
-              index < Self.segmentOpacities.count
-        else { return Color.primary.opacity(0.12) }
-        return tint.opacity(Self.segmentOpacities[index])
-    }
-
-    /// 图例小图标:App 组用真实应用图标;其余类别用 SF Symbol;"其他"用省略号。
-    @ViewBuilder
-    private func segmentIcon(_ segment: MemoryRingSegment) -> some View {
-        if let bundlePath = segment.bundlePath {
-            Image(nsImage: NSWorkspace.shared.icon(forFile: bundlePath))
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-        } else if segment.isOther {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.secondary)
-        } else {
-            Image(systemName: segment.category?.cardStyle.symbolName ?? "shippingbox")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+    private func statCell(_ stat: MetricCardStat) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 4) {
+                if let dot = stat.dot {
+                    Circle().fill(dot).frame(width: 6, height: 6)
+                }
+                Text(stat.label)
+            }
+            .font(.system(size: 10.5))
+            .foregroundStyle(.secondary)
+            Text(stat.value)
+                .font(.system(size: isCompact ? 12 : 15, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .lineLimit(1)
         }
     }
 }
@@ -387,37 +315,31 @@ struct MemoryRingCardView: View {
     .frame(width: 340)
 }
 
-#Preview("CPU 主卡 + 内存环形卡") {
-    let groups = [
-        ProcessGroup(
-            id: "bundle:code", name: "Code", category: .app,
-            bundlePath: "/Applications/Xcode.app", processes: [], cpuPercent: 88, memoryBytes: 5_200_000_000
-        ),
-        ProcessGroup(
-            id: "bundle:browser", name: "浏览器", category: .app,
-            bundlePath: "/Applications/Safari.app", processes: [], cpuPercent: 40, memoryBytes: 3_100_000_000
-        ),
-        ProcessGroup(id: "p", name: "proj @ wt", category: .project, bundlePath: nil, processes: [], cpuPercent: 445, memoryBytes: 2_400_000_000),
-        ProcessGroup(id: "o", name: "孤儿进程", category: .orphan, bundlePath: nil, processes: [], cpuPercent: 7, memoryBytes: 30_000_000),
-    ]
-    let memoryContent = MetricTabContent.build(groups: groups, tab: .memory)
-    let loadTrend: [Double] = (0..<56).map { i in
-        let ramp = Double(i) / 55 * 50
-        let wave = Double((i * 5) % 17) * 2
+#Preview("tab 主卡") {
+    let host = HostInfo(chipName: "Apple M4 Pro", coreCount: 12, physicalMemoryBytes: 51_539_607_552)
+    let loadTrend: [Double] = (0..<56).map { (i: Int) -> Double in
+        let ramp: Double = Double(i) / 55 * 50
+        let wave: Double = Double((i * 5) % 17) * 2
         return min(ramp + wave, 100)
     }
-
+    let memory = MemoryBreakdown(
+        totalBytes: 51_539_607_552, appBytes: 21_000_000_000, wiredBytes: 6_000_000_000,
+        compressedBytes: 9_000_000_000, cachedBytes: 8_000_000_000, pressure: .warning
+    )
+    let cpu = MetricCardModel.cpu(
+        breakdown: CPULoadBreakdown(total: 27, user: 19, system: 8),
+        statistics: SeriesStatistics(count: 12, average: 36, peak: 71, minimum: 4),
+        trend: loadTrend
+    )
     return VStack(spacing: 12) {
-        CPULoadMainCardView(
-            currentLoad: 27,
-            statistics: SeriesStatistics(count: 12, average: 36, peak: 71, minimum: 4),
-            trendValues: loadTrend
-        )
-        MemoryRingCardView(segments: memoryContent.memorySegments, totalBytes: memoryContent.memoryTotalBytes)
-        MemoryRingCardView(segments: [], totalBytes: 0) // 空态
+        MetricMainCardView(model: cpu)
+        MetricMainCardView(model: .memory(memory, trend: [], host: host))
+        MetricMainCardView(model: cpu, isCompact: true)
+            .frame(width: 332)
     }
     .padding(16)
-    .frame(width: 340)
+    .frame(width: 760)
+    .background(Surface.window)
 }
 
 #Preview("tab 条") {

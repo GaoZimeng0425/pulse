@@ -125,12 +125,15 @@ struct SampleHistoryStore: Equatable, Sendable {
 
     let capacity: Int
     private(set) var systemCPULoad: RingSeries<Double>
+    /// 系统内存已用(工单 P0.6-05 总览内存卡 strip / 内存 tab 面积图)。
+    private(set) var memoryUsed: RingSeries<UInt64>
     private(set) var groups: [String: GroupSeries] = [:]
 
     init(capacity: Int = SampleHistoryStore.defaultCapacity) {
         precondition(capacity > 0, "历史窗口容量必须为正")
         self.capacity = capacity
         self.systemCPULoad = RingSeries<Double>(capacity: capacity)
+        self.memoryUsed = RingSeries<UInt64>(capacity: capacity)
     }
 
     /// 读取某组的历史序列;组已被逐出(或从未出现)返回 nil。
@@ -140,9 +143,16 @@ struct SampleHistoryStore: Equatable, Sendable {
 
     /// 一轮采样的推进:系统负载追加一点,在场的组各追加 CPU%/内存一点,
     /// 缺席的组逐出。同轮重复 id 以最后一条为准(归组引擎保证组 id 唯一,
-    /// 此处只是防御性口径)。
-    mutating func advance(systemCPULoad load: Double, groups present: [GroupSample]) {
+    /// 此处只是防御性口径)。内存已用缺读数(nil)的轮次不追加,不伪造 0。
+    mutating func advance(
+        systemCPULoad load: Double,
+        memoryUsedBytes: UInt64? = nil,
+        groups present: [GroupSample]
+    ) {
         self.systemCPULoad.append(load)
+        if let memoryUsedBytes {
+            memoryUsed.append(memoryUsedBytes)
+        }
 
         var presentByID = [String: GroupSample]()
         for sample in present {
