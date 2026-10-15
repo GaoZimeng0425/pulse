@@ -18,6 +18,55 @@ struct MetricCardChip {
     let tint: Color
 }
 
+// MARK: - 状态徽章语言(工单 P0.6-04 语义,评审 F1 并入 05 chip 实现)
+
+/// 状态徽章:两态语言——✓正常(空载)与 高负载(警示)。外观不复刻 04 的
+/// 独立组件,统一映射到 05 的 `MetricCardChip`(经 `MetricChipView` 渲染)——
+/// 徽章 = 值得注意的偏差,出现在指标卡大数字旁与排行行名内。
+enum StatusBadge: Equatable, Sendable {
+    /// ✓ 正常:系统空载(参考文档 §2.2 "✓ Normal" 绿 chip 同款)。
+    case normal
+    /// 高负载:系统负载越红线,或组 CPU% 超 100%。
+    case high
+
+    /// 映射到 05 的 chip:正常 = 空载绿;高负载 = 危险红(不是孤儿橙——孤儿橙
+    /// 专属"来历不明"语义,高负载是另一码事)。
+    var chip: MetricCardChip {
+        switch self {
+        case .normal:
+            MetricCardChip(title: "正常", systemImage: "checkmark", tint: Surface.positive)
+        case .high:
+            MetricCardChip(title: "高负载", systemImage: "exclamationmark.triangle.fill", tint: Surface.negative)
+        }
+    }
+}
+
+/// 徽章阈值规则(纯逻辑,单测见 StatusBadgeTests)。
+/// 系统 = 三档语言(空载 ✓正常 / 高负载 / 中间静默);组卡只挂高负载警示——
+/// 组级 ✓正常 会满屏绿 chip,与"徽章 = 值得注意的偏差"的语义冲突。
+enum StatusBadgeRules {
+    /// 组 CPU% 高负载线:**> 100%** 才算(恰好 100% = 单核满载,是正常可达值,不算;
+    /// 工单钉死的边界)。GLOSSARY:组 CPU% 单核为 100%,445% ≈ 4.5 个核满载。
+    static let groupHighLoadCPUThreshold: Double = 100
+    /// 系统空载线:负载 < 30% 挂 ✓正常(恰 30% 落入静默档)。
+    static let systemIdleLoadThreshold: Double = 30
+    /// 系统高负载线:> 70%,与菜单栏变红同一口径(SystemMonitor.redThreshold,
+    /// 字面量直写避免 MainActor 隔离引用;两处相等由单测 @MainActor 断言钉死)。
+    static let systemHighLoadThreshold: Double = 70
+
+    /// 系统负载徽章:> 70% → .high;< 30% → .normal;中间静默(nil,不挂 chip)。
+    static func systemBadge(load: Double) -> StatusBadge? {
+        if load > systemHighLoadThreshold { return .high }
+        if load < systemIdleLoadThreshold { return .normal }
+        return nil
+    }
+
+    /// 组卡徽章:组 CPU% > 100% → .high,否则不挂。
+    static func groupBadge(cpuPercent: Double) -> StatusBadge? {
+        cpuPercent > groupHighLoadCPUThreshold ? .high : nil
+    }
+}
+
 /// 一张指标卡的全部展示内容。builder 只做取数与格式化,视图只管排版。
 struct MetricCardModel {
     let metric: Metric
@@ -40,9 +89,11 @@ struct MetricCardModel {
 }
 
 extension MetricCardModel {
-    /// CPU 卡:当前负载 + 用户 / 系统 / 窗口均值。
+    /// CPU 卡:当前负载 + 用户 / 系统 / 窗口均值;系统负载三档徽章
+    /// (<30% ✓正常 / >70% 高负载 / 中间静默)挂大数字旁(工单 04 语义)。
     static func cpu(
         breakdown: CPULoadBreakdown,
+        load: Double,
         statistics: SeriesStatistics?,
         trend: [Double]
     ) -> MetricCardModel {
@@ -54,6 +105,7 @@ extension MetricCardModel {
             caption: "当前",
             figureValue: PulseFormat.cpuPercentNumber(breakdown.total),
             figureUnit: "%",
+            chip: StatusBadgeRules.systemBadge(load: load)?.chip,
             note: "均值 \(average)",
             stats: [
                 MetricCardStat(label: "用户", value: PulseFormat.cpuPercent(breakdown.user)),
@@ -68,12 +120,12 @@ extension MetricCardModel {
 
     /// 内存卡:已用 / 物理总量 + 压力 chip + App / 联动 / 压缩构成。
     /// 读数缺失(首轮前 / 读失败)显示占位,不伪造。
+    /// 构成分段走 MemoryCompositionKey 单表(评审 F5):名称与色点唯一出处,
+    /// 与 by-Type 环形卡同表;总览/主卡的统计列不展示"缓存"(05 形态拍板)。
     static func memory(_ memory: MemoryBreakdown?, trend: [UInt64], host: HostInfo) -> MetricCardModel {
         let total = PulseFormat.physicalMemoryTotal(memory?.totalBytes ?? host.physicalMemoryBytes)
         let figure = memory.map { PulseFormat.systemMemoryFigure($0.usedBytes) } ?? (value: "—", unit: "")
-        let format: (KeyPath<MemoryBreakdown, UInt64>) -> String = { keyPath in
-            memory.map { PulseFormat.systemMemory($0[keyPath: keyPath]) } ?? "—"
-        }
+        let statKeys: [MemoryCompositionKey] = [.app, .wired, .compressed, .free]
         return MetricCardModel(
             metric: .memory,
             title: "内存",
@@ -83,12 +135,13 @@ extension MetricCardModel {
             figureUnit: figure.unit,
             chip: memory.map { pressureChip($0.pressure) },
             note: "共 \(total)",
-            stats: [
-                MetricCardStat(label: "App", value: format(\.appBytes), dot: Metric.cpu.accentColor),
-                MetricCardStat(label: "联动", value: format(\.wiredBytes), dot: Surface.projectsAccent),
-                MetricCardStat(label: "压缩", value: format(\.compressedBytes), dot: Metric.network.accentColor),
-                MetricCardStat(label: "空闲", value: format(\.freeBytes)),
-            ],
+            stats: statKeys.map { key in
+                MetricCardStat(
+                    label: key.title,
+                    value: memory.map { PulseFormat.systemMemory($0.bytes(for: key)) } ?? "—",
+                    dot: key == .free ? nil : key.color
+                )
+            },
             trend: trend.map { Double($0) },
             domainMax: Double(memory?.totalBytes ?? host.physicalMemoryBytes)
         )
@@ -101,13 +154,14 @@ extension MetricCardModel {
         case .warning:
             MetricCardChip(title: pressure.title, systemImage: "exclamationmark.circle.fill", tint: Metric.disk.accentColor)
         case .critical:
-            MetricCardChip(title: pressure.title, systemImage: "exclamationmark.triangle.fill", tint: .red)
+            MetricCardChip(title: pressure.title, systemImage: "exclamationmark.triangle.fill", tint: Surface.negative)
         }
     }
 }
 
 /// 指标卡:full = 主窗口总览网格(徽章 + 名称 + chevron / 34pt 大数字 / 三列小统计 /
-/// 36pt 高 44 柱 strip);compact = 弹窗双列小卡(名称 / 大数字 + 一句补充 / 细走势线)。
+/// 36pt 高 44 柱 strip);compact = 弹窗双列小卡(名称 / 大数字 + 一句补充 /
+/// 36pt 44 柱 strip——工单 05 "指标卡底部 = strip",评审 F7 由 22pt 面积线对齐)。
 /// 整卡可点,跳到对应指标 tab(Vitals `data-goto`)。
 struct MetricCardView: View {
     enum Style {
@@ -205,8 +259,10 @@ struct MetricCardView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            AreaTrendChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax, showsGrid: false)
-                .frame(height: 22)
+            // 底部走势与 full 形态同款(工单 05 票面:36pt 高 44 柱 strip);
+            // 面积线形态专属指标 tab 主卡(CPU tab 面积图),不在此用。
+            StripChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
+                .frame(height: 36)
         }
         .padding(10)
     }
@@ -292,6 +348,7 @@ struct SectionTitle: View {
     )
     let cpu = MetricCardModel.cpu(
         breakdown: CPULoadBreakdown(total: 27, user: 19, system: 8),
+        load: 27,
         statistics: SeriesStatistics(count: 10, average: 36, peak: 71, minimum: 4),
         trend: trend
     )

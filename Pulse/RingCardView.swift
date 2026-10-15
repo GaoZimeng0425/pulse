@@ -47,19 +47,17 @@ extension RingSlice {
         }
     }
 
-    /// Memory by Type(§2.2):构成分类直接用各指标色——
-    /// App = CPU 蓝 / 联动 = Projects 橙 / 压缩 = Network 绿 / 缓存 = ink-3 / 空闲 = card-hi。
+    /// Memory by Type(§2.2):分段直接走 MemoryCompositionKey 单表(评审 F5)——
+    /// 名称与色和总览内存卡统计点同出处,App = CPU 蓝 / 联动 = Projects 橙 /
+    /// 压缩 = Network 绿 / 缓存 = ink-3 / 空闲 = card-hi。
     static func memoryByType(_ memory: MemoryBreakdown) -> [RingSlice] {
         let total = max(Double(memory.totalBytes), 1)
-        let parts: [(String, String, UInt64, Color)] = [
-            ("app", "App", memory.appBytes, Metric.cpu.accentColor),
-            ("wired", "联动", memory.wiredBytes, Surface.projectsAccent),
-            ("compressed", "压缩", memory.compressedBytes, Metric.network.accentColor),
-            ("cached", "缓存", memory.cachedBytes, Surface.inkTertiary),
-            ("free", "空闲", memory.freeBytes, Surface.cardHigh),
-        ]
-        return parts.map { id, name, bytes, color in
-            RingSlice(id: id, name: name, bytes: bytes, fraction: Double(bytes) / total, color: color, icon: .dot)
+        return MemoryCompositionKey.allCases.map { key in
+            let bytes = memory.bytes(for: key)
+            return RingSlice(
+                id: key.rawValue, name: key.title, bytes: bytes,
+                fraction: Double(bytes) / total, color: key.color, icon: .dot
+            )
         }
     }
 }

@@ -6,6 +6,7 @@ import XCTest
 /// 期望值全部是手工推演的字面量,不经过实现同源计算。
 final class SystemStatsTests: XCTestCase {
     private let base = Date(timeIntervalSinceReferenceDate: 1_000)
+    private let gib: Double = 1_073_741_824
 
     // MARK: CPU 用户/系统拆分(CoreTickDiffer.breakdown)
 
@@ -141,11 +142,43 @@ final class SystemStatsTests: XCTestCase {
         )
     }
 
+    /// 物理内存取整边界(自 EnvironmentInfoTests 迁入,评审 F1):非 2 的幂
+    /// 装机值按最近整 GB——.4 舍 / .6 入,不出现 "12.4 GB" 式小数。
+    func testPhysicalMemoryTotalRoundsToNearestGigabyte() {
+        XCTAssertEqual(PulseFormat.physicalMemoryTotal(UInt64(12.4 * Double(gib))), "12 GB")
+        XCTAssertEqual(PulseFormat.physicalMemoryTotal(UInt64(12.6 * Double(gib))), "13 GB")
+    }
+
+    // MARK: 内存构成单表(评审 F5)
+
+    /// 单表键 → 构成字段的映射:键集与中文名固定,字节取值与 MemoryBreakdown
+    /// 字段一一对应(统计点与 by-Type 环共用此映射,漂移由本断言拦截)。
+    func testMemoryCompositionTableMapsKeysToFields() {
+        let breakdown = MemoryBreakdown(
+            totalBytes: 40_000_000, appBytes: 1_100, wiredBytes: 2_200,
+            compressedBytes: 3_300, cachedBytes: 4_400, pressure: .normal
+        )
+        XCTAssertEqual(MemoryCompositionKey.allCases.count, 5)
+        XCTAssertEqual(MemoryCompositionKey.allCases.map(\.title), ["App", "联动", "压缩", "缓存", "空闲"])
+        XCTAssertEqual(breakdown.bytes(for: .app), breakdown.appBytes)
+        XCTAssertEqual(breakdown.bytes(for: .wired), breakdown.wiredBytes)
+        XCTAssertEqual(breakdown.bytes(for: .compressed), breakdown.compressedBytes)
+        XCTAssertEqual(breakdown.bytes(for: .cached), breakdown.cachedBytes)
+        XCTAssertEqual(breakdown.bytes(for: .free), breakdown.freeBytes)
+    }
+
+    // MARK: 系统 uptime(05 口径:两级单位,不足 1 分钟按 1 分钟)
+
     func testSystemUptimeUsesTwoLargestUnits() {
         XCTAssertEqual(PulseFormat.systemUptime(seconds: 45), "已运行 1 分钟")
         XCTAssertEqual(PulseFormat.systemUptime(seconds: 25 * 60), "已运行 25 分钟")
         XCTAssertEqual(PulseFormat.systemUptime(seconds: 3 * 3600 + 12 * 60), "已运行 3 小时 12 分")
         XCTAssertEqual(PulseFormat.systemUptime(seconds: 6 * 86_400 + 4 * 3600 + 59), "已运行 6 天 4 小时")
+    }
+
+    /// 负时长(时钟回拨)防御:按 0 夹紧,最少显示 1 分钟(迁自 EnvironmentInfoTests)。
+    func testSystemUptimeClampsNegative() {
+        XCTAssertEqual(PulseFormat.systemUptime(seconds: -5), "已运行 1 分钟")
     }
 
     func testSystemMemoryFigureUsesBinaryGigabytesWithTwoDecimals() {

@@ -20,17 +20,20 @@ struct MainWindowView: View {
     /// 工具栏齿轮:设置窗(项目根目录)。
     @Environment(\.openSettings) private var openSettings
 
-    /// 当前 tab(工单 03):药丸点击或 ←/→ 切换。
-    @State private var tabSelection = MetricTabSelection()
-    /// 展开中的组(按稳定组 id),跨采样轮保持;组消失时残留 id 无害。
-    @State private var expandedGroupIDs: Set<String> = []
-    /// 展开详情的进程(跨组唯一):下钻期间进程退出时详情安静收起。
-    @State private var selectedProcessID: pid_t?
-    /// 处置失败汇总(工单 08,与弹窗共用弹窗与流程):**有失败才弹**。
-    @State private var killFailureReport: KillReport?
+    /// 两窗共用呈现模型(评审 F4):卡模型 / 会话状态 / 处置请求同出处。
+    @State private var model: DashboardModel
+    /// 当前 tab(工单 03):药丸点击或 ←/→ 切换;初始 tab 可注入(走查预留)。
+    @State private var tabSelection: MetricTabSelection
+
+    init(monitor: SystemMonitor, initialTab: MetricTab = .overview) {
+        self.monitor = monitor
+        _model = State(initialValue: DashboardModel(monitor: monitor))
+        _tabSelection = State(initialValue: MetricTabSelection(current: initialTab))
+    }
 
     var body: some View {
-        ScrollView {
+        @Bindable var model = model
+        return ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 pageHeader
                 tabBody
@@ -55,24 +58,12 @@ struct MainWindowView: View {
                 .help("设置项目根目录")
             }
         }
-        .modifier(KillFailureAlert(report: $killFailureReport))
+        .modifier(KillFailureAlert(report: $model.killFailureReport))
     }
 
     /// 当前 tab 的展示内容(纯逻辑折叠,与弹窗同一出处):榜单序、组行口径、内存分段。
     private var content: MetricTabContent {
-        MetricTabContent.build(groups: monitor.allGroups, tab: tabSelection.current)
-    }
-
-    private var cpuModel: MetricCardModel {
-        .cpu(
-            breakdown: monitor.cpuBreakdown,
-            statistics: monitor.history.systemCPULoad.statistics,
-            trend: monitor.history.systemCPULoad.values
-        )
-    }
-
-    private var memoryModel: MetricCardModel {
-        .memory(monitor.memory, trend: monitor.history.memoryUsed.values, host: .current)
+        model.content(tab: tabSelection.current)
     }
 
     /// 内容头(SHOT1:`Overview` 大标题 + `Apple M1 Max · 10 cores · 64 GB`)。
@@ -96,8 +87,8 @@ struct MainWindowView: View {
         switch tabSelection.current {
         case .overview:
             HStack(alignment: .top, spacing: 16) {
-                MetricCardView(model: cpuModel) { tabSelection.current = .cpu }
-                MetricCardView(model: memoryModel) { tabSelection.current = .memory }
+                MetricCardView(model: model.cpuModel) { tabSelection.current = .cpu }
+                MetricCardView(model: model.memoryModel) { tabSelection.current = .memory }
             }
             SectionTitle(title: "此刻")
                 .padding(.top, 6)
@@ -109,10 +100,10 @@ struct MainWindowView: View {
                 .padding(.top, 6)
             rankingCard
         case .cpu:
-            MetricMainCardView(model: cpuModel)
+            MetricMainCardView(model: model.cpuModel)
             rankingCard
         case .memory:
-            MetricMainCardView(model: memoryModel)
+            MetricMainCardView(model: model.memoryModel)
             HStack(alignment: .top, spacing: 16) {
                 RingCardView.memoryByType(monitor.memory)
                 RingCardView.memoryByApp(segments: content.memorySegments, totalBytes: content.memoryTotalBytes)
@@ -121,7 +112,8 @@ struct MainWindowView: View {
         }
     }
 
-    /// 排行卡:全部组;点行展开主窗口版进程表(表头可排序)。
+    /// 排行卡:全部组;点行展开主窗口版进程表(表头可排序);
+    /// 前 3 名带 26×14 微图(工单 03 兑现)。
     @ViewBuilder
     private var rankingCard: some View {
         if monitor.allGroups.isEmpty {
@@ -132,29 +124,20 @@ struct MainWindowView: View {
                 metric: content.metric,
                 cpuLeader: content.cpuLeader,
                 memoryLeaderBytes: content.memoryLeaderBytes,
-                expandedGroupIDs: expandedGroupIDs,
-                onToggle: toggleExpansion(of:),
-                onEndGroup: { group in
-                    killFailureReport = KillRequestFlow.endGroup(group, monitor: monitor)
-                }
+                expandedGroupIDs: model.expandedGroupIDs,
+                microGraphValues: model.microGraphValues(for: content),
+                onToggle: model.toggleExpansion(of:),
+                onEndGroup: model.requestEndGroup
             ) { group in
                 if let drilldown = monitor.drilldown {
                     SortableProcessTableView(
                         group: group,
                         drilldown: drilldown,
-                        selectedProcessID: $selectedProcessID,
-                        onEndProcess: { target in
-                            killFailureReport = KillRequestFlow.endProcess(target, monitor: monitor)
-                        }
+                        selectedProcessID: $model.selectedProcessID,
+                        onEndProcess: model.requestEndProcess
                     )
                 }
             }
-        }
-    }
-
-    private func toggleExpansion(of groupID: String) {
-        if !expandedGroupIDs.insert(groupID).inserted {
-            expandedGroupIDs.remove(groupID)
         }
     }
 

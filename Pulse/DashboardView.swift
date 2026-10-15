@@ -3,13 +3,14 @@ import AppKit
 
 /// 弹窗主页(工单 P0.6-05 对齐 OG 左图):图标 tab → "页名 / 已运行时长" 头 →
 /// 各 tab 内容(总览 = 双列小指标卡;CPU / 内存 = 指标主卡)+ "当前最忙"排行卡 →
-/// 底部操作排(打开主窗口 + 设置 + 退出)。tab 内容模型在 MetricTabContent
-/// (纯逻辑,单测覆盖);组下钻(工单 06)与处置编排(工单 08)不变。
+/// 底部操作排(打开主窗口 + 设置 + 退出)。tab 内容模型与会话状态在
+/// DashboardModel(与主窗口共用,评审 F4);组下钻(工单 06)与处置编排
+/// (工单 08)不变。
 struct DashboardView: View {
     let monitor: SystemMonitor
     /// 设置窗入口(工单 07):底部齿轮按钮。
     @Environment(\.openSettings) private var openSettings
-    /// 主窗口入口:底部"打开主窗口"按钮。
+    /// 主窗口入口:底部开窗按钮。
     @Environment(\.openWindow) private var openWindow
 
     /// 弹窗宽度(OG 紧凑弹窗形态)。
@@ -19,17 +20,21 @@ struct DashboardView: View {
     /// 必须给定值而非 maxHeight。
     private static let contentHeight: CGFloat = 520
 
-    /// 当前 tab(工单 03):图标 tab 点击或 ←/→ 切换,内容模型由此折叠。
-    @State private var tabSelection = MetricTabSelection()
-    /// 展开中的组(按稳定组 id):跨采样轮次保持,组消失时残留 id 无害。
-    @State private var expandedGroupIDs: Set<String> = []
-    /// 展开详情的进程(跨组唯一):下钻期间进程退出时详情安静收起。
-    @State private var selectedProcessID: pid_t?
-    /// 处置结果汇总(工单 08):**有失败才弹**;全成功保持安静。
-    @State private var killFailureReport: KillReport?
+    /// 两窗共用呈现模型(评审 F4):卡模型 / 会话状态 / 处置请求同出处。
+    @State private var model: DashboardModel
+    /// 当前 tab(工单 03):图标 tab 点击或 ←/→ 切换,内容模型由此折叠;
+    /// 初始 tab 可注入(走查 / 深链预留),默认总览。
+    @State private var tabSelection: MetricTabSelection
+
+    init(monitor: SystemMonitor, initialTab: MetricTab = .overview) {
+        self.monitor = monitor
+        _model = State(initialValue: DashboardModel(monitor: monitor))
+        _tabSelection = State(initialValue: MetricTabSelection(current: initialTab))
+    }
 
     var body: some View {
-        VStack(spacing: 10) {
+        @Bindable var model = model
+        return VStack(spacing: 10) {
             MetricIconTabBar(selection: $tabSelection)
             pageHeader
             ScrollView {
@@ -49,24 +54,12 @@ struct DashboardView: View {
         .padding(14)
         .frame(width: Self.width)
         .background(Surface.window)
-        .modifier(KillFailureAlert(report: $killFailureReport))
+        .modifier(KillFailureAlert(report: $model.killFailureReport))
     }
 
     /// 当前 tab 的展示内容(纯逻辑折叠):榜单序、组行口径、内存分段。
     private var content: MetricTabContent {
-        MetricTabContent.build(groups: monitor.allGroups, tab: tabSelection.current)
-    }
-
-    private var cpuModel: MetricCardModel {
-        .cpu(
-            breakdown: monitor.cpuBreakdown,
-            statistics: monitor.history.systemCPULoad.statistics,
-            trend: monitor.history.systemCPULoad.values
-        )
-    }
-
-    private var memoryModel: MetricCardModel {
-        .memory(monitor.memory, trend: monitor.history.memoryUsed.values, host: .current)
+        model.content(tab: tabSelection.current)
     }
 
     /// 页头(OG:"Overview" + 右侧 "⏱ Up 6d 4h"):运行时长每分钟刷新。
@@ -92,13 +85,13 @@ struct DashboardView: View {
         switch tabSelection.current {
         case .overview:
             HStack(spacing: 8) {
-                MetricCardView(model: cpuModel, style: .compact) { tabSelection.current = .cpu }
-                MetricCardView(model: memoryModel, style: .compact) { tabSelection.current = .memory }
+                MetricCardView(model: model.cpuModel, style: .compact) { tabSelection.current = .cpu }
+                MetricCardView(model: model.memoryModel, style: .compact) { tabSelection.current = .memory }
             }
         case .cpu:
-            MetricMainCardView(model: cpuModel, isCompact: true)
+            MetricMainCardView(model: model.cpuModel, isCompact: true)
         case .memory:
-            MetricMainCardView(model: memoryModel, isCompact: true)
+            MetricMainCardView(model: model.memoryModel, isCompact: true)
             RingCardView.memoryByApp(
                 segments: content.memorySegments,
                 totalBytes: content.memoryTotalBytes,
@@ -107,7 +100,8 @@ struct DashboardView: View {
         }
     }
 
-    /// "当前最忙"排行卡:全部组,榜单序随 tab;点行展开组内进程(只读最近一轮采样)。
+    /// "当前最忙"排行卡:全部组,榜单序随 tab;点行展开组内进程(只读最近一轮采样);
+    /// 前 3 名带 26×14 微图(工单 03 兑现,数据按口径从采样历史折叠)。
     private var rankingCard: some View {
         RankingCardView(
             title: "当前最忙",
@@ -115,24 +109,25 @@ struct DashboardView: View {
             metric: content.metric,
             cpuLeader: content.cpuLeader,
             memoryLeaderBytes: content.memoryLeaderBytes,
-            expandedGroupIDs: expandedGroupIDs,
+            expandedGroupIDs: model.expandedGroupIDs,
+            microGraphValues: model.microGraphValues(for: content),
             density: .compact,
-            onToggle: toggleExpansion(of:),
-            onEndGroup: requestEndGroup
+            onToggle: model.toggleExpansion(of:),
+            onEndGroup: model.requestEndGroup
         ) { group in
             if let drilldown = monitor.drilldown {
                 ProcessDrilldownView(
                     group: group,
                     drilldown: drilldown,
-                    selectedProcessID: $selectedProcessID,
-                    onEndProcess: requestEndProcess
+                    selectedProcessID: $model.selectedProcessID,
+                    onEndProcess: model.requestEndProcess
                 )
             }
         }
     }
 
-    /// 底部操作排(OG:`Open Vitals` 宽按钮 + 齿轮 + `Quit`):
-    /// openWindow 对已开窗口 = 聚焦;NSApplication.terminate 是 LSUIElement 应用体面的退出路径。
+    /// 底部操作排(OG 底排):开窗 + 齿轮 + `Quit` 电源图标。开窗按钮纯图标
+    /// (用户拍板,票面记录于工单 05 Comments),悬停提示承载语义。
     private var footer: some View {
         HStack(spacing: 6) {
             Button {
@@ -141,9 +136,10 @@ struct DashboardView: View {
                 NSApplication.shared.activate(ignoringOtherApps: true)
                 openWindow(id: MainWindowSceneID.value)
             } label: {
-                Label("打开主窗口", systemImage: "macwindow")
-                    .frame(maxWidth: .infinity)
+                Image(systemName: "macwindow")
             }
+            .help("打开主窗口")
+            .accessibilityLabel("打开主窗口")
             Button {
                 NSApplication.shared.activate(ignoringOtherApps: true)
                 openSettings()
@@ -160,25 +156,6 @@ struct DashboardView: View {
             .help("退出 Pulse")
         }
         .buttonStyle(FooterButtonStyle())
-    }
-
-    private func toggleExpansion(of groupID: String) {
-        if !expandedGroupIDs.insert(groupID).inserted {
-            expandedGroupIDs.remove(groupID)
-        }
-    }
-
-    // MARK: 处置(工单 08)——不主动杀、确认后才杀
-    // 确认 + 执行 + 失败汇总的编排在 KillRequestFlow(主窗口同流程共用)。
-
-    /// 进程详情"结束进程":确认(点名 name+pid)→ SIGTERM;有失败才弹汇总。
-    private func requestEndProcess(_ target: KillTarget) {
-        killFailureReport = KillRequestFlow.endProcess(target, monitor: monitor)
-    }
-
-    /// 排行行"结束整组":确认(列进程数)→ 对最新一轮采样的组员逐个 SIGTERM。
-    private func requestEndGroup(_ group: ProcessGroup) {
-        killFailureReport = KillRequestFlow.endGroup(group, monitor: monitor)
     }
 
     /// 极端空载 / 首轮采样前:无组可显示,给一行安静文案而不是坏 UI(所有 tab 同)。

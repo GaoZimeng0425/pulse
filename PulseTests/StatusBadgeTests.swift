@@ -1,8 +1,9 @@
 import XCTest
 @testable import Pulse
 
-/// 状态徽章阈值规则(工单 P0.6-04,纯逻辑):✓正常 / 高负载 的判定边界。
-/// chip 外观(7px 圆角、14% 派生底)属预览 + 手动验收,不在此接缝。
+/// 状态徽章阈值规则(工单 P0.6-04 语义,评审 F1 并入 05 的 chip 实现):
+/// ✓正常 / 高负载 的判定边界。规则纯逻辑在此钉死;chip 外观(全圆 pill、
+/// tint 14% 底)走 05 的 MetricCardView 家族,属预览 + 手动验收接缝。
 final class StatusBadgeTests: XCTestCase {
     // MARK: 组卡高负载线(组 CPU% > 100%)
 
@@ -45,15 +46,15 @@ final class StatusBadgeTests: XCTestCase {
         XCTAssertEqual(StatusBadgeRules.systemHighLoadThreshold, SystemMonitor.redThreshold)
     }
 
-    // MARK: 文案
+    // MARK: chip 映射(外观 = 05 的 MetricCardChip,唯一实现)
 
-    func testBadgeTitlesAreChinese() {
-        XCTAssertEqual(StatusBadge.normal.title, "正常")
-        XCTAssertEqual(StatusBadge.high.title, "高负载")
+    func testBadgeChipsUseChineseTitles() {
+        XCTAssertEqual(StatusBadge.normal.chip.title, "正常")
+        XCTAssertEqual(StatusBadge.high.chip.title, "高负载")
     }
 
-    func testBadgeSymbolsAreDistinct() {
+    func testBadgeChipSymbolsAreDistinct() {
         // ✓ 与警示三角互异,chip 才可辨。
-        XCTAssertNotEqual(StatusBadge.normal.symbolName, StatusBadge.high.symbolName)
+        XCTAssertNotEqual(StatusBadge.normal.chip.systemImage, StatusBadge.high.chip.systemImage)
     }
 }

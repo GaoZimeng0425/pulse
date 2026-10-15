@@ -23,19 +23,15 @@ struct AreaTrendChartView: View {
     var tint: Color
     /// 归一化上限(系统负载固定 0–100 语义域;内存 = 物理总量)。
     var domainMax: Double
-    /// 网格线:主卡画,弹窗小卡的细走势线不画(OG 左图)。
-    var showsGrid: Bool
 
     init(
         values: [Double],
         tint: Color = Metric.cpu.accentColor,
-        domainMax: Double = 100,
-        showsGrid: Bool = true
+        domainMax: Double = 100
     ) {
         self.values = values
         self.tint = tint
         self.domainMax = max(domainMax, 1)
-        self.showsGrid = showsGrid
     }
 
     var body: some View {
@@ -46,16 +42,14 @@ struct AreaTrendChartView: View {
     }
 
     private func draw(in context: inout GraphicsContext, size: CGSize) {
-        if showsGrid {
-            var grid = Path()
-            for fraction in Self.gridLineFractions {
-                let y = size.height * fraction
-                grid.move(to: CGPoint(x: 0, y: y))
-                grid.addLine(to: CGPoint(x: size.width, y: y))
-            }
-            // 网格线:--line 口径(浅色黑 8% / 深色白 10%),Color.primary.opacity 自适应。
-            context.stroke(grid, with: .color(Color.primary.opacity(0.08)), lineWidth: 1)
+        var grid = Path()
+        for fraction in Self.gridLineFractions {
+            let y = size.height * fraction
+            grid.move(to: CGPoint(x: 0, y: y))
+            grid.addLine(to: CGPoint(x: size.width, y: y))
         }
+        // 网格线:--line 口径(浅色黑 8% / 深色白 10%),Color.primary.opacity 自适应。
+        context.stroke(grid, with: .color(Color.primary.opacity(0.08)), lineWidth: 1)
 
         let count = Self.pointCount
         let window = Array(values.suffix(count))
@@ -328,6 +322,7 @@ struct MetricMainCardView: View {
     )
     let cpu = MetricCardModel.cpu(
         breakdown: CPULoadBreakdown(total: 27, user: 19, system: 8),
+        load: 27,
         statistics: SeriesStatistics(count: 12, average: 36, peak: 71, minimum: 4),
         trend: loadTrend
     )

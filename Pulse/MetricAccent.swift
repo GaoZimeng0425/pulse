@@ -60,6 +60,61 @@ enum Surface {
     static let projectsAccent = Color.dynamic(light: 0xeb6834, dark: 0xd95926)
     /// 正常态绿(Battery 指标色):内存压力 "正常" chip。
     static let positive = Color.dynamic(light: 0x008300, dark: 0x2fa83a)
+    /// 危险色(参考文档 §1.1 `--red`):内存压力 "紧张"、高负载警示 chip、
+    /// 结束整组图标等"值得注意的负面偏差"的唯一出处(深色补系统红暗色变体,
+    /// 参考文档未给暗色值)。
+    static let negative = Color.dynamic(light: 0xe0352b, dark: 0xff453a)
+}
+
+// MARK: - 内存构成单表(工单 P0.6-05,评审 F5 去重)
+
+/// 内存 by-Type 分段的展示键(名称 + 色):总览内存卡统计点与 by-Type 环形卡
+/// 分段的唯一出处——模式同 `GroupCategory.cardStyle` 单表,改配色只动这里。
+/// 段色 = §2.2 by Type 配色:App = CPU 蓝 / 联动 = Projects 橙 / 压缩 = Network 绿 /
+/// 缓存 = ink-3 / 空闲 = card-hi。
+enum MemoryCompositionKey: String, CaseIterable, Identifiable, Sendable {
+    case app
+    case wired
+    case compressed
+    case cached
+    case free
+
+    var id: String { rawValue }
+
+    /// 中文段名:内存卡统计点标签与环形图例共用。
+    var title: String {
+        switch self {
+        case .app: "App"
+        case .wired: "联动"
+        case .compressed: "压缩"
+        case .cached: "缓存"
+        case .free: "空闲"
+        }
+    }
+
+    /// 段色(单表;by-Type 环与统计点色点都从这里取)。
+    var color: Color {
+        switch self {
+        case .app: Metric.cpu.accentColor
+        case .wired: Surface.projectsAccent
+        case .compressed: Metric.network.accentColor
+        case .cached: Surface.inkTertiary
+        case .free: Surface.cardHigh
+        }
+    }
+}
+
+extension MemoryBreakdown {
+    /// 单表键 → 构成字节(映射纯逻辑,单测见 SystemStatsTests)。
+    func bytes(for key: MemoryCompositionKey) -> UInt64 {
+        switch key {
+        case .app: appBytes
+        case .wired: wiredBytes
+        case .compressed: compressedBytes
+        case .cached: cachedBytes
+        case .free: freeBytes
+        }
+    }
 }
 
 extension Color {

@@ -1,0 +1,90 @@
+import Foundation
+import Observation
+
+// MARK: - 弹窗与主窗口共用呈现模型(工单 P0.6-05,评审 F4 去重)
+
+/// 两窗共用的呈现模型:弹窗(DashboardView)与主窗口(MainWindowView)对同一份
+/// SystemMonitor 数据做完全相同的折叠——指标卡模型、tab 内容、26×14 微图数据、
+/// 展开/下钻会话状态与处置请求。原先散在两个视图里的重复实现收敛到这里,
+/// 视图只保留各自的外形(弹窗紧凑 / 窗口常规)与 tab 选中态(两窗独立)。
+@Observable
+@MainActor
+final class DashboardModel {
+    let monitor: SystemMonitor
+
+    /// 展开中的组(按稳定组 id):跨采样轮次保持,组消失时残留 id 无害。
+    var expandedGroupIDs: Set<String> = []
+    /// 展开详情的进程(跨组唯一):下钻期间进程退出时详情安静收起。
+    var selectedProcessID: pid_t?
+    /// 处置结果汇总(工单 08):**有失败才弹**;全成功保持安静。
+    var killFailureReport: KillReport?
+
+    init(monitor: SystemMonitor) {
+        self.monitor = monitor
+    }
+
+    // MARK: tab 内容折叠(纯逻辑在 MetricTabContent)
+
+    /// 当前 tab 的展示内容:榜单序、组行口径、内存分段与两个 meter 榜首。
+    func content(tab: MetricTab) -> MetricTabContent {
+        MetricTabContent.build(groups: monitor.allGroups, tab: tab)
+    }
+
+    // MARK: 指标卡模型(总览小卡与 tab 主卡同源)
+
+    var cpuModel: MetricCardModel {
+        .cpu(
+            breakdown: monitor.cpuBreakdown,
+            load: monitor.systemCPULoad,
+            statistics: monitor.history.systemCPULoad.statistics,
+            trend: monitor.history.systemCPULoad.values
+        )
+    }
+
+    var memoryModel: MetricCardModel {
+        .memory(monitor.memory, trend: monitor.history.memoryUsed.values, host: .current)
+    }
+
+    // MARK: 26×14 微图数据(工单 03 兑现,评审 F3)
+
+    /// 排行卡微图数据:榜单前 3 名(content.microGraphGroupIDs 资格)按当前口径
+    /// 取组历史序列——CPU 口径 = 组 CPU%,内存口径 = 组内存字节;
+    /// 无历史的组(榜单资格先于首个采样点)不入表,行内不画。
+    func microGraphValues(for content: MetricTabContent) -> [String: [Double]] {
+        guard !content.microGraphGroupIDs.isEmpty else { return [:] }
+        var values: [String: [Double]] = [:]
+        for group in content.ranking where content.microGraphGroupIDs.contains(group.id) {
+            guard let series = monitor.history.series(forGroup: group.id) else { continue }
+            switch content.metric {
+            case .cpu:
+                if !series.cpuPercent.values.isEmpty {
+                    values[group.id] = series.cpuPercent.values
+                }
+            case .memory:
+                if !series.memoryBytes.values.isEmpty {
+                    values[group.id] = series.memoryBytes.values.map(Double.init)
+                }
+            }
+        }
+        return values
+    }
+
+    // MARK: 会话状态与处置请求(工单 08;确认 + 执行在 KillRequestFlow)
+
+    /// 点行展开 / 收起组内进程。
+    func toggleExpansion(of groupID: String) {
+        if !expandedGroupIDs.insert(groupID).inserted {
+            expandedGroupIDs.remove(groupID)
+        }
+    }
+
+    /// 进程详情"结束进程":确认(点名 name+pid)→ SIGTERM;有失败才弹汇总。
+    func requestEndProcess(_ target: KillTarget) {
+        killFailureReport = KillRequestFlow.endProcess(target, monitor: monitor)
+    }
+
+    /// 排行行"结束整组":确认(列进程数)→ 对最新一轮采样的组员逐个 SIGTERM。
+    func requestEndGroup(_ group: ProcessGroup) {
+        killFailureReport = KillRequestFlow.endGroup(group, monitor: monitor)
+    }
+}
