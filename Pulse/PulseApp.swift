@@ -52,15 +52,15 @@ struct PulseApp: App {
     }
 }
 
-/// 菜单栏标签:系统 CPU 负载真实数字,超过 70% 变红。
-/// 独立成 View,保证 @Observable 的读取落在视图 body 内——负载变化即时刷新菜单栏。
+/// 菜单栏标签:双读数 CPU / RAM,小标签在数字上方;CPU 超 70% 变红,RAM 联动
+/// 内存压力变色。独立成 View,保证 @Observable 的读取落在视图 body 内——
+/// 负载变化即时刷新菜单栏。
 ///
-/// 变红的实现路径(工单 09 实机走查修正):MenuBarExtra 的 label 会被系统重绘成
-/// NSStatusItem 标题,SwiftUI 的 foregroundStyle / AttributedString 颜色一律被
-/// 剥掉(实测 macOS 26 上数字永远是默认色,只有 Shape 能保住颜色)。因此把
-/// 「单一数字」(spec:菜单栏只放一个数字,评审 S2 去掉波形符号——图标与
-/// 名称仍保留在弹窗头部)用 ImageRenderer 预绘成**带颜色的位图**,以
-/// `.renderingMode(.original)` 交给系统——这是 SwiftUI 栈下唯一可靠的方式。
+/// 位图路径的由来(工单 09 实机走查修正):MenuBarExtra 的 label 会被系统重绘成
+/// NSStatusItem 内容,SwiftUI 的 foregroundStyle / AttributedString 颜色一律被
+/// 剥掉(实测 macOS 26 上数字永远是默认色,只有 Shape 能保住颜色)。因此徽标
+/// 用 ImageRenderer 预绘成**带颜色的位图**,以 `.renderingMode(.original)` 交给
+/// 系统——这是 SwiftUI 栈下唯一可靠的方式。
 struct MenuBarLoadLabel: View {
     let monitor: SystemMonitor
     /// 菜单栏深浅外观:正常态文字用白/黑随外观,警示态固定系统色。
@@ -70,21 +70,21 @@ struct MenuBarLoadLabel: View {
         // 用户拍板(2026-10-15):菜单栏双读数——CPU / RAM,小标签在数字上方。
         // CPU 口径 = 系统 CPU 负载(0–100%);RAM = 已用占总内存百分比,
         // 颜色联动内存压力(偏高橙/紧张红,数据来自 host_statistics64)。
-        HStack(spacing: 5) {
-            menuBadge(
-                caption: "CPU",
-                value: PulseFormat.cpuPercent(monitor.systemCPULoad),
-                color: monitor.systemCPULoad > SystemMonitor.redThreshold ? .red : nil
+        // 实测(macOS 26):label 里 HStack 放两个位图 Image 只有第一个会被渲染
+        // 进 NSStatusItem——双徽标必须先合成一张位图,label 里只放一个 Image。
+        let cpuText = PulseFormat.cpuPercent(monitor.systemCPULoad)
+        Image(
+            nsImage: MenuBarBadgeRenderer.dualImage(
+                cpuText: cpuText,
+                cpuColor: monitor.systemCPULoad > SystemMonitor.redThreshold ? .red : nil,
+                ramText: ramPercentText,
+                ramColor: ramColor,
+                colorScheme: colorScheme
             )
-            menuBadge(
-                caption: "RAM",
-                value: ramPercentText,
-                color: ramColor
-            )
-        }
-        .accessibilityElement(children: .combine)
+        )
+        .renderingMode(.original)
         .accessibilityLabel("系统状态")
-        .accessibilityValue("CPU \(PulseFormat.cpuPercent(monitor.systemCPULoad)),内存 \(ramPercentText)")
+        .accessibilityValue("CPU \(cpuText),内存 \(ramPercentText)")
     }
 
     private var ramPercentText: String {
@@ -101,48 +101,32 @@ struct MenuBarLoadLabel: View {
         }
     }
 
-    private func menuBadge(caption: String, value: String, color: Color?) -> some View {
-        Image(
-            nsImage: MenuBarBadgeRenderer.stackedImage(
-                caption: caption,
-                valueText: value,
-                valueColor: color,
-                colorScheme: colorScheme
-            )
-        )
-        .renderingMode(.original)
-    }
 }
 
 /// 菜单栏徽标位图渲染器:SwiftUI 视图 → ImageRenderer → NSImage,按
-/// (标签, 数字, 颜色, 外观) 缓存——每轮采样最多一次位图化,值不变时零开销。
-/// 双读数形态(用户拍板):小标签在数字上方(CPU / RAM),整体高约 22pt 贴菜单栏。
+/// (CPU 数字/色, RAM 数字/色, 外观) 缓存——每轮采样最多一次位图化,值不变时零开销。
+/// 双读数形态(用户拍板):CPU / RAM 两枚小标签各自在数字上方,一次合成单张位图
+/// (多张 Image 在 label 里会被丢,见 MenuBarLoadLabel 注释)。
 @MainActor
 enum MenuBarBadgeRenderer {
     private static var cache: [String: NSImage] = [:]
 
-    static func stackedImage(
-        caption: String,
-        valueText: String,
-        valueColor: Color?,
+    static func dualImage(
+        cpuText: String,
+        cpuColor: Color?,
+        ramText: String,
+        ramColor: Color?,
         colorScheme: ColorScheme
     ) -> NSImage {
         let ink = colorScheme == .dark ? Color.white : Color.black
-        let value = valueColor ?? ink
-        let key = "\(caption)|\(valueText)|\(valueDescription(valueColor))|\(colorScheme)"
+        let key = "\(cpuText)|\(valueDescription(cpuColor))|\(ramText)|\(valueDescription(ramColor))|\(colorScheme)"
         if let cached = cache[key] { return cached }
 
         let renderer = ImageRenderer(
-            content: VStack(alignment: .leading, spacing: 0) {
-                Text(caption)
-                    .font(.system(size: 7, weight: .semibold))
-                    .foregroundStyle(ink.opacity(0.55))
-                Text(valueText)
-                    .font(.system(size: 11.5, weight: .medium))
-                    .monospacedDigit()
-                    .foregroundStyle(value)
+            content: HStack(alignment: .center, spacing: 5) {
+                badge(caption: "CPU", valueText: cpuText, valueColor: cpuColor ?? ink, ink: ink)
+                badge(caption: "RAM", valueText: ramText, valueColor: ramColor ?? ink, ink: ink)
             }
-            .padding(.horizontal, 1)
         )
         renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
 
@@ -150,11 +134,11 @@ enum MenuBarBadgeRenderer {
         if let nsImage = renderer.nsImage {
             rendered = nsImage
         } else {
-            // ImageRenderer 失效兜底:退回单行纯文本(不变色,但数字可见)。
-            let fallback = NSImage(size: NSSize(width: 48, height: 18))
+            // ImageRenderer 失效兜底:退回单行纯文本(不变色,但两个数字可见)。
+            let fallback = NSImage(size: NSSize(width: 96, height: 18))
             fallback.lockFocus()
-            (valueText as NSString).draw(
-                at: NSPoint(x: 1, y: 2),
+            ("\(cpuText)  \(ramText)" as NSString).draw(
+                at: NSPoint(x: 2, y: 2),
                 withAttributes: [
                     .font: NSFont.menuBarFont(ofSize: 0),
                     .foregroundColor: NSColor.labelColor,
@@ -166,6 +150,20 @@ enum MenuBarBadgeRenderer {
         rendered.isTemplate = false // 绝不让系统把颜色又模板化掉
         cache[key] = rendered
         return rendered
+    }
+
+    /// 单枚徽标:小标签在数字上方。
+    private static func badge(caption: String, valueText: String, valueColor: Color, ink: Color) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(caption)
+                .font(.system(size: 7, weight: .semibold))
+                .foregroundStyle(ink.opacity(0.55))
+            Text(valueText)
+                .font(.system(size: 11.5, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(valueColor)
+        }
+        .padding(.horizontal, 1)
     }
 
     /// 缓存键里的颜色标识(nil = 墨色随外观)。
