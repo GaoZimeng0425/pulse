@@ -126,8 +126,8 @@ struct DashboardView: View {
         }
     }
 
-    /// 底部操作排(OG 底排):开窗 + 齿轮 + `Quit` 电源图标。开窗按钮纯图标
-    /// (用户拍板,票面记录于工单 05 Comments),悬停提示承载语义。
+    /// 底部操作排(用户拍板):开窗靠左;齿轮 + 电源(退出)靠右。全纯图标,
+    /// 悬停提示与无障碍标签承载语义(开窗纯图标决定记录于工单 05 Comments)。
     private var footer: some View {
         HStack(spacing: 6) {
             Button {
@@ -140,6 +140,7 @@ struct DashboardView: View {
             }
             .help("打开主窗口")
             .accessibilityLabel("打开主窗口")
+            Spacer()
             Button {
                 NSApplication.shared.activate(ignoringOtherApps: true)
                 openSettings()
@@ -151,9 +152,10 @@ struct DashboardView: View {
             Button {
                 NSApplication.shared.terminate(nil)
             } label: {
-                Label("退出", systemImage: "power")
+                Image(systemName: "power")
             }
             .help("退出 Pulse")
+            .accessibilityLabel("退出 Pulse")
         }
         .buttonStyle(FooterButtonStyle())
     }
