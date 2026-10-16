@@ -27,4 +27,4 @@
 ## 构建与检查
 
 - Xcode 工程由 `project.yml` 生成:加/移文件后先 `xcodegen generate`,绝不手改 `project.pbxproj`。
-- 提交闸门 `.githooks/pre-commit`(staged 含 .swift 即增量构建,失败拦截;改钩子后重跑 `sh .githooks/install.sh`)。全量检查 `sh scripts/check.sh`;只跑测试 `sh scripts/test.sh [--only 套件]`。
+- 提交闸门 `.githooks/pre-commit`(staged 含 .swift 即增量构建,失败拦截;改钩子后重跑 `sh .githooks/install.sh`)。全量检查 `sh scripts/check.sh`;只跑测试 `sh scripts/test.sh [--only 套件]`;Release 安装到 /Applications 并换新拉起 `sh scripts/build.sh`。
