@@ -57,6 +57,7 @@ struct SettingsView: View {
     private var detailView: some View {
         switch SettingsPage(rawValue: selectedPageRaw) ?? .general {
         case .general: GeneralSettingsView(monitor: monitor)
+        case .alerts: AlertSettingsView(center: monitor.alerts)
         case .projectRoots: ProjectRootsSettingsView(store: rootsStore)
         case .menuBar: MenuBarBadgeSettingsView()
         }
@@ -67,6 +68,7 @@ struct SettingsView: View {
 /// 与系统设置的侧栏图标行为一致)。P1 加页时在此登记。
 enum SettingsPage: String, CaseIterable, Identifiable {
     case general
+    case alerts
     case projectRoots
     case menuBar
 
@@ -75,6 +77,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .general: "通用"
+        case .alerts: "告警"
         case .projectRoots: "项目根目录"
         case .menuBar: "菜单栏"
         }
@@ -83,6 +86,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .general: "gearshape"
+        case .alerts: "bell.badge"
         case .projectRoots: "folder.badge.gearshape"
         case .menuBar: "menubar.rectangle"
         }
@@ -91,6 +95,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     var tintA: Color {
         switch self {
         case .general: Color(red: 0.62, green: 0.62, blue: 0.66)
+        case .alerts: Color(red: 0.95, green: 0.62, blue: 0.20)
         case .projectRoots: Color(red: 0.30, green: 0.55, blue: 0.95)
         case .menuBar: Color(red: 0.58, green: 0.40, blue: 0.92)
         }
@@ -99,6 +104,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     var tintB: Color {
         switch self {
         case .general: Color(red: 0.42, green: 0.42, blue: 0.47)
+        case .alerts: Color(red: 0.85, green: 0.35, blue: 0.10)
         case .projectRoots: Color(red: 0.15, green: 0.35, blue: 0.75)
         case .menuBar: Color(red: 0.42, green: 0.22, blue: 0.78)
         }

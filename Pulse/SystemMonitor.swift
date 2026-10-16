@@ -48,6 +48,9 @@ final class SystemMonitor {
     /// 在落地处转换即可(徽标只消费上/下行字节速率两个字段)。填充前恒 nil,
     /// 菜单栏网络槽位显示占位"—",不伪造。
     private(set) var networkRate: NetworkRateReading?
+    /// 告警编排(工单 P1-07):每轮采样与磁盘容量读数喂进来,触发/恢复的
+    /// 系统通知与应用内提示都由它出。设置页也读它(alerts.store)。
+    let alerts: AlertCenter
 
     private let sampler: Sampler
     /// 历史引擎(工单 03):5s 采样经它卷积落库 + 出生登记持久化 + 唤醒清基线。
@@ -84,7 +87,8 @@ final class SystemMonitor {
         historyEngine: HistoryEngine? = HistoryEngine.openDefault(),
         batterySource: any BatterySource = LiveBatterySource(),
         diskCapacitySource: any DiskCapacitySource = LiveDiskCapacitySource(),
-        diskThroughputSource: any DiskThroughputSource = LiveDiskThroughputSource.adoptingBestPath()
+        diskThroughputSource: any DiskThroughputSource = LiveDiskThroughputSource.adoptingBestPath(),
+        alertCenter: AlertCenter = AlertCenter()
     ) {
         self.sampler = Sampler(source: source, coreTicks: coreTicks, memoryStats: memoryStats)
         self.historyEngine = historyEngine
@@ -92,6 +96,7 @@ final class SystemMonitor {
         self.batteryProvider = BatterySensorProvider(source: batterySource)
         self.diskCapacityProvider = DiskCapacityProvider(source: diskCapacitySource)
         self.diskThroughputProvider = DiskThroughputProvider(source: diskThroughputSource)
+        self.alerts = alertCenter
         self.pipeline = GroupingPipeline(
             configuration: GroupingConfiguration(
                 projectRoots: projectRoots,
@@ -153,6 +158,11 @@ final class SystemMonitor {
         let throughputProvider = diskThroughputProvider
         let provider = batteryProvider
         let scheduler = SensorScheduler()
+        // 通知授权现状只查不弹(工单 07:弹窗仅在用户首开规则时由设置动作触发)。
+        let alerts = alerts
+        Task { [weak self] in
+            await self?.alerts.refreshAuthorization()
+        }
         sensorTask = Task { [weak self] in
             await scheduler.run([
                 provider.driver { [weak self] reading in
@@ -274,6 +284,18 @@ final class SystemMonitor {
                 )
             }
         }
+        // 告警喂食(工单 P1-07):系统负载 + 全部组(引擎只读聚合口径,不持快照)。
+        alerts.ingestSampling(
+            systemCPULoad: update.systemCPULoad,
+            groups: allGroups.map { group in
+                AlertGroupSnapshot(
+                    id: group.id,
+                    name: group.name,
+                    cpuPercent: group.cpuPercent,
+                    memoryBytes: group.memoryBytes
+                )
+            }
+        )
     }
 
     /// 电池读数落地(工单 02):nil = 从未有过读数(无内建电池)→ 页面保持
@@ -290,6 +312,10 @@ final class SystemMonitor {
     private func applyDiskCapacity(_ reading: DiskCapacityReading?) {
         guard let reading else { return }
         diskCapacity = reading
+        // 磁盘剩余规则喂食(工单 07):Finder「可用」口径;读不到不喂(不伪造)。
+        if let available = reading.availableForImportantUsageBytes {
+            alerts.ingestDisk(availableBytes: available)
+        }
     }
 
     /// 磁盘吞吐读数落地(工单 05):nil 首轮前保持占位,此后 lastGood 口径同上。

@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UserNotifications
 
 @main
 struct PulseApp: App {
@@ -8,12 +9,20 @@ struct PulseApp: App {
     /// 采样管线持有者:app 生命周期内常驻(@State 在 App 中只创建一次)。
     /// 拉起即喂入已持久化的项目根——重启后项目归因即刻可用。
     @State private var monitor: SystemMonitor
+    /// 告警通知路由(工单 07):UNUserNotificationCenter delegate,点通知直达。
+    @State private var alertRouter: AlertNotificationRouter
+    /// 开窗环境(点通知广播的响应点在标签视图修饰链上)。
+    @Environment(\.openWindow) private var openWindow
 
     init() {
         _ = LogService.shared // 拉起即建文件日志通道(~/.Pulse/logs,含退出留痕观察者)
         let store = ProjectRootsStore()
         _rootsStore = State(initialValue: store)
         _monitor = State(initialValue: SystemMonitor(projectRoots: store.projectRoots))
+        // delegate 必须在通知到达前挂上(app 拉起即挂;点开横幅 → 路由到主窗口)。
+        let router = AlertNotificationRouter()
+        UNUserNotificationCenter.current().delegate = router
+        _alertRouter = State(initialValue: router)
         LogService.info("Pulse 启动(项目根 \(store.projectRoots.count) 个)", category: "App")
     }
 
@@ -33,6 +42,13 @@ struct PulseApp: App {
                 .onChange(of: rootsStore.projectRoots) { _, roots in
                     monitor.setProjectRoots(roots)
                 }
+                // 告警通知点开(工单 07):常驻的标签视图响应开窗广播——
+                // 激活已由路由完成,这里只负责 openWindow(环境值只存在于视图)。
+                .onReceive(NotificationCenter.default.publisher(
+                    for: AlertNotificationRouter.openMainWindowNotification
+                )) { _ in
+                    openWindow(id: MainWindowSceneID.value)
+                }
         }
         .menuBarExtraStyle(.window)
 
@@ -40,7 +56,7 @@ struct PulseApp: App {
         // 入口在弹窗底部"打开主窗口"按钮(用户拍板:合并为单一菜单栏项);
         // 窗口内容不触碰 setPopoverVisible:关窗只藏窗,采样节奏不受影响(spec)。
         Window("Pulse", id: MainWindowSceneID.value) {
-            MainWindowView(monitor: monitor)
+            MainWindowView(monitor: monitor, alertRouter: alertRouter)
                 // 菜单栏标签拉起即启动采样(start 幂等);此处再提一次,
                 // 让预览 / 理论上的窗口先行场景同样有数据。
                 .task { monitor.start() }
@@ -48,7 +64,7 @@ struct PulseApp: App {
         .defaultSize(width: 880, height: 620)
 
         // 设置窗(工单 07 → 2026-10-16 扩为系统设置式双栏,见 SettingsView):
-        // 通用(登录自启/日志/诊断报告/版本)+ 项目根目录;入口在弹窗头部齿轮按钮。
+        // 通用 + 告警(工单 P1-07)+ 项目根目录;入口在弹窗头部齿轮按钮。
         Settings {
             SettingsView(rootsStore: rootsStore, monitor: monitor)
         }
