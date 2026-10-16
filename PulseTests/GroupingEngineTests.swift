@@ -558,6 +558,98 @@ final class GroupingEngineTests: XCTestCase {
         XCTAssertFalse(GroupingEngine.isLaunchdDomainExecutablePath(""))
     }
 
+    /// launchd 域 2026-10-16 扩充:/usr/{sbin,libexec} 的 Apple 系统守护与
+    /// /Library/{SystemExtensions,PrivilegedHelperTools,Developer} 都算域内;
+    /// /usr/bin 刻意不算(用户一次性命令 ssh/python3 不该读成后台服务),
+    /// /usr/local、/opt/homebrew 维持域外(S3 本意)。
+    func testLaunchdDomainExtendedPrefixes() {
+        XCTAssertTrue(GroupingEngine.isLaunchdDomainExecutablePath("/usr/libexec/logd"))
+        XCTAssertTrue(GroupingEngine.isLaunchdDomainExecutablePath("/usr/sbin/securityd"))
+        XCTAssertTrue(GroupingEngine.isLaunchdDomainExecutablePath(
+            "/Library/SystemExtensions/ABC/com.example.ext.systemextension/Contents/MacOS/ext"))
+        XCTAssertTrue(GroupingEngine.isLaunchdDomainExecutablePath(
+            "/Library/PrivilegedHelperTools/com.macpaw.CleanMyMac5.Agent"))
+        XCTAssertTrue(GroupingEngine.isLaunchdDomainExecutablePath(
+            "/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/Resources/bin/simdiskimaged"))
+        XCTAssertFalse(GroupingEngine.isLaunchdDomainExecutablePath("/usr/bin/ssh"))
+        XCTAssertFalse(GroupingEngine.isLaunchdDomainExecutablePath("/usr/local/corplink/corplink-service"))
+    }
+
+    /// .app 容器谓词 2026-10-16 放宽:/Applications、/Users 下 .app 容器内的
+    /// 助手(Frameworks、XPCServices、PlugIns/*.appex)算 bundle 内进程;
+    /// 系统域(/System、/Library)与 /usr/local 不放宽,留给 launchd 域判定。
+    func testAppContainerPredicateWidening() {
+        // 严格口径回归:嵌套 Helper.app 仍算容器内(归属取最外层宿主)。
+        XCTAssertTrue(GroupingEngine.isBundleExecutablePath(
+            "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Helper.app/Contents/MacOS/Helper"))
+        // 放宽:断链助手的三种典型驻地。
+        XCTAssertTrue(GroupingEngine.isBundleExecutablePath(
+            "/Applications/WeChat.app/Contents/Frameworks/crashpad_handler"))
+        XCTAssertTrue(GroupingEngine.isBundleExecutablePath(
+            "/Applications/Input Source Pro.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate"))
+        XCTAssertTrue(GroupingEngine.isBundleExecutablePath(
+            "/Applications/Stats.app/Contents/PlugIns/WidgetsExtension.appex/Contents/MacOS/WidgetsExtension"))
+        XCTAssertTrue(GroupingEngine.isBundleExecutablePath(
+            "/Applications/Raycast.app/Contents/XPCServices/Raycast Accessibility.xpc/Contents/MacOS/agent"))
+        XCTAssertTrue(GroupingEngine.isBundleExecutablePath(
+            "/Users/aa00930/Demo.app/Contents/Resources/helper"))
+        // 不放宽:系统域与厂商域的容器进程不做 App 归属。
+        XCTAssertFalse(GroupingEngine.isBundleExecutablePath(
+            "/System/Library/CoreServices/Foo.xpc/Contents/MacOS/foo"))
+        XCTAssertFalse(GroupingEngine.isBundleExecutablePath(
+            "/Library/Developer/PrivateFrameworks/CoreDevice.framework/Versions/A/Helper"))
+        XCTAssertFalse(GroupingEngine.isBundleExecutablePath(
+            "/usr/local/Foo.app/Contents/Resources/helper"))
+        XCTAssertFalse(GroupingEngine.isBundleExecutablePath("/opt/homebrew/bin/tool"))
+        XCTAssertFalse(GroupingEngine.isBundleExecutablePath(nil))
+    }
+
+    /// 断链的宿主 App 助手(crashpad 断链成 launchd 子进程)→ 归宿主 App 组,
+    /// 不再落孤儿(放宽前它落孤儿进程)。
+    func testOrphanedHostAppHelperAttributesToHostBundle() {
+        let snapshot = ProcessSnapshot(processes: [
+            RawProcess(
+                pid: 47_639,
+                parentPID: 1,
+                executablePath: "/Applications/WeChat.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+                argv: ["chrome_crashpad_handler"],
+                physicalFootprintBytes: 9_000_000
+            ),
+        ])
+        let groups = GroupingEngine.groups(from: snapshot, cpuPercentByPID: [47_639: 1])
+
+        XCTAssertEqual(groups.count, 1)
+        XCTAssertEqual(groups[0].name, "WeChat")
+        XCTAssertEqual(groups[0].category, .app)
+        XCTAssertEqual(groups[0].bundlePath, "/Applications/WeChat.app")
+    }
+
+    /// /usr/libexec 的 Apple 系统守护(logd 等,launchd 之下):落"后台服务",
+    /// 不再落孤儿(域扩充前 ~200 个系统守护全被误成孤儿,孤儿桶虚胖)。
+    func testAppleSystemDaemonUnderLaunchdFallsToBackgroundService() {
+        let snapshot = ProcessSnapshot(processes: [
+            RawProcess(
+                pid: 1,
+                parentPID: 0,
+                executablePath: "/sbin/launchd",
+                physicalFootprintBytes: 20_000_000
+            ),
+            RawProcess(
+                pid: 336,
+                parentPID: 1,
+                executablePath: "/usr/libexec/logd",
+                argv: ["logd"],
+                physicalFootprintBytes: 30_000_000
+            ),
+        ])
+        let groups = GroupingEngine.groups(from: snapshot, cpuPercentByPID: [1: 0.2, 336: 3])
+
+        XCTAssertEqual(groups.count, 2)
+        let daemon = groups.first { $0.processes.contains { $0.pid == 336 } }
+        XCTAssertEqual(daemon?.name, "后台服务")
+        XCTAssertEqual(daemon?.category, .backgroundService)
+    }
+
     // MARK: - 项目归因(评审 S4:不看可执行名,名单闸解除)
 
     /// 名单外工具(zig)的 cwd 命中项目根 → 照样归"项目名 @ worktree"。

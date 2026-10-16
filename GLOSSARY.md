@@ -41,7 +41,7 @@ _Avoid_: 项目归属、仓库匹配
 _Avoid_: 工作区、workspace
 
 **后台服务 (Background service)**:
-挂在 launchd 之下、可执行位于 launchd 域(/Library/LaunchAgents|LaunchDaemons、/System/Library、~/Library/LaunchAgents 等)的兜底归属。
+挂在 launchd 之下、可执行位于 launchd 域的兜底归属。域 = /Library/LaunchAgents|LaunchDaemons、/System/Library、/Library/SystemExtensions、/Library/PrivilegedHelperTools、/Library/Developer、/usr/sbin、/usr/libexec、~/Library/LaunchAgents(2026-10-16 扩充:/usr/{sbin,libexec} 的 ~200 个 Apple 系统守护此前被误成孤儿);/usr/bin、/usr/local、/opt/homebrew 刻意不在域内。
 
 **孤儿进程 (Orphan)**:
 父链断到 launchd 且无 App 归属、无项目归因的进程;可执行不在 launchd 域者(即便父是 launchd)也归此类。UI 中橙色高亮——它往往正是问题所在。

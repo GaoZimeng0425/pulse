@@ -71,8 +71,10 @@ struct GroupingConfiguration: Sendable {
 /// 输出 = 按组 CPU% 降序(次键 id 升序)的组列表。同输入同输出,不持 OS 状态。
 ///
 /// 每个进程的判定顺序:
-/// 1. App 归属——自身可执行路径含 `.app/Contents/MacOS/`(取最外层 .app,
-///    Chrome Helper 的嵌套 Helper.app 因此跟随宿主 Google Chrome.app);
+/// 1. App 归属——自身可执行在 `.app` 容器内(容器口径见 `appContainerPrefix`:
+///    含 `.app/Contents/MacOS/` 全盘生效;/Applications、/Users 下的容器助手
+///    ——Frameworks、XPCServices、.appex——也归最外层宿主 .app,断链的
+///    crashpad_handler、Sparkle Autoupdate 因此不再落孤儿);
 /// 2. 项目归因——按 cwd 优先、argv 中路径次之与项目根前缀匹配,
 ///    命中 `.worktrees/<名>` 显示"项目名 @ 名"。不看可执行名(评审 S4:
 ///    名单闸已解除——cwd/argv 命中即归项目,zig 与 rustc 同权)。
@@ -135,23 +137,59 @@ enum GroupingEngine {
         .sorted { $0.cpuPercent == $1.cpuPercent ? $0.id < $1.id : $0.cpuPercent > $1.cpuPercent }
     }
 
-    /// spec App 归属判定的路径谓词:可执行路径含 `.app/Contents/MacOS/` 即 bundle 内进程。
-    /// 父链面包屑(工单 06)复用同一口径,判定只有这一份。
+    /// App 归属判定的路径谓词:`.app` 容器内的进程。父链面包屑(工单 06)复用
+    /// 同一口径,判定只有这一份。容器口径见 `appContainerPrefix`。
     static func isBundleExecutablePath(_ executablePath: String?) -> Bool {
-        executablePath?.contains(".app/Contents/MacOS/") ?? false
+        appContainerPrefix(executablePath) != nil
+    }
+
+    /// `.app` 容器判定与归属提取(`isBundleExecutablePath` 与
+    /// `outermostAppBundleDirectory` 共用的唯一口径):
+    /// - 严格口径:路径含 `.app/Contents/MacOS/`,全盘生效(含 /System 下的
+    ///   系统 App),归属取**最外层** `.app`——嵌套 Helper.app 因此跟随宿主
+    ///   Google Chrome.app;
+    /// - 放宽口径(2026-10-16):/Applications、/Users 下的 `.app` 容器内进程
+    ///   (Contents/Frameworks、XPCServices、PlugIns/*.appex、*.framework,
+    ///   典型:断链成 launchd 子进程的 crashpad_handler、Sparkle Autoupdate、
+    ///   App 扩展)同归宿主 `.app`;系统域(/System、/usr、/Library)不放宽,
+    ///   留给 launchd 域判定(后台服务),避免系统代理散成一堆 bundle 组。
+    static func appContainerPrefix(_ executablePath: String?) -> (prefix: String, strict: Bool)? {
+        guard let path = executablePath, !path.isEmpty else { return nil }
+        let strict = path.contains(".app/Contents/MacOS/")
+        var accumulated = ""
+        for component in path.split(separator: "/") {
+            accumulated += "/" + component
+            if component.hasSuffix(".app") {
+                if strict { return (accumulated, true) }
+                if accumulated.hasPrefix("/Applications/") || accumulated.hasPrefix("/Users/") {
+                    return (accumulated, false)
+                }
+            }
+        }
+        return nil
     }
 
     /// 后台服务的 launchd 域推断谓词(评审 S3,spec"后台服务 = launchd 域推断"):
-    /// 可执行位于系统域(/Library/LaunchAgents|LaunchDaemons、/System/Library)
+    /// 可执行位于系统/厂商守护的标准驻地——/Library/LaunchAgents|LaunchDaemons、
+    /// /System/Library、/Library/SystemExtensions(系统扩展)、
+    /// /Library/PrivilegedHelperTools(特权助手惯例位)、/Library/Developer
+    /// (CoreSimulator/CoreDevice 开发守护)、/usr/sbin、/usr/libexec——
     /// 或用户级 LaunchAgent 域(任意家目录下 ~/Library/LaunchAgents)。
-    /// 挂在 launchd 之下但可执行不在这些域内(典型:homebrew / 自装常驻)不算
-    /// 后台服务,按孤儿进程处理——重启后不再把一切 launchd 子进程误并为后台服务。
+    /// 2026-10-16 前只认前三个前缀:/usr/{sbin,libexec} 的 ~200 个 Apple 系统
+    /// 守护(logd/configd/securityd…)全被误成孤儿进程,孤儿桶因此虚胖。
+    /// 仍不算域:/usr/bin(用户一次性命令 ssh/python3 不该读成后台服务)、
+    /// /usr/local、/opt/homebrew(自装常驻——S3 的本意就是不并它们)。
     /// 判定只有这一份;P1 可升级为真实读取 launchd 任务清单。
     static func isLaunchdDomainExecutablePath(_ executablePath: String?) -> Bool {
         guard let path = executablePath, !path.isEmpty else { return false }
         if path.hasPrefix("/Library/LaunchAgents/")
             || path.hasPrefix("/Library/LaunchDaemons/")
             || path.hasPrefix("/System/Library/")
+            || path.hasPrefix("/Library/SystemExtensions/")
+            || path.hasPrefix("/Library/PrivilegedHelperTools/")
+            || path.hasPrefix("/Library/Developer/")
+            || path.hasPrefix("/usr/sbin/")
+            || path.hasPrefix("/usr/libexec/")
         {
             return true
         }
@@ -388,19 +426,10 @@ private final class Resolver {
         return nil
     }
 
-    /// 最外层 .app bundle 目录:可执行路径含 `.app/Contents/MacOS/` 即为 bundle 内进程
-    /// (spec 判定规则),归属取路径中**最外层** `.app` 目录组件——嵌套 Helper.app
-    /// (宿主后跟 `/Contents/Frameworks/…` 而非 `/Contents/MacOS/`)因此跟随宿主
-    /// bundle(Google Chrome.app)。
+    /// 最外层 .app bundle 目录:容器口径见 `appContainerPrefix`(严格 + 放宽
+    /// 两档,判定只有这一份),归属一律取路径中**最外层** `.app` 目录组件。
     private static func outermostAppBundleDirectory(_ executablePath: String?) -> String? {
-        guard let path = executablePath,
-              path.contains(".app/Contents/MacOS/")
-        else { return nil }
-        let components = path.split(separator: "/", omittingEmptySubsequences: false)
-        for (index, component) in components.enumerated() where component.hasSuffix(".app") {
-            return components[...index].joined(separator: "/")
-        }
-        return nil
+        GroupingEngine.appContainerPrefix(executablePath)?.prefix
     }
 
     /// 项目名 = 项目根最后一级目录名。
