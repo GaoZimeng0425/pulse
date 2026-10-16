@@ -72,7 +72,7 @@ final class MetricTabModelTests: XCTestCase {
 
     // MARK: - MetricTabContent:每 tab 的组排行与组卡口径
 
-    /// 测试用组:id 即名,cpu/mem 显式给定。
+    /// 测试用组:id 即名(app 身份的原始值同名字),cpu/mem 显式给定。
     private func group(
         _ id: String,
         cpu: Double,
@@ -80,15 +80,30 @@ final class MetricTabModelTests: XCTestCase {
         category: GroupCategory = .app,
         bundlePath: String? = nil
     ) -> ProcessGroup {
-        ProcessGroup(
-            id: id,
+        let identity: GroupIdentity = switch category {
+        case .app: .app(bundlePath: bundlePath ?? id)
+        case .project: .project(root: id, worktreeName: nil)
+        case .system: .system
+        case .backgroundService: .backgroundService
+        case .orphan: .orphan
+        }
+        return ProcessGroup(
+            id: identity,
             name: id,
-            category: category,
-            bundlePath: bundlePath,
             processes: [],
             cpuPercent: cpu,
             memoryBytes: mem
         )
+    }
+
+    /// 期望榜单的身份序列(与旧字符串口径同形:app 身份原始值即名字)。
+    private func identities(_ ids: [String]) -> [GroupIdentity] {
+        ids.map { GroupIdentity.app(bundlePath: $0) }
+    }
+
+    /// 期望分段身份序列:组段 + "其他"段收尾(nil = 不是组)。
+    private func segmentIdentities(_ ids: [String]) -> [GroupIdentity?] {
+        identities(ids).map(Optional.init) + [nil]
     }
 
     func testOverviewAndCPUTabsRankByCPUDescending() {
@@ -100,11 +115,11 @@ final class MetricTabModelTests: XCTestCase {
         ]
 
         let overview = MetricTabContent.build(groups: groups, tab: .overview)
-        XCTAssertEqual(overview.ranking.map(\.id), ["a", "c", "b"])
+        XCTAssertEqual(overview.ranking.map(\.id), identities(["a", "c", "b"]))
         XCTAssertEqual(overview.metric, .cpu)
 
         let cpu = MetricTabContent.build(groups: groups, tab: .cpu)
-        XCTAssertEqual(cpu.ranking.map(\.id), ["a", "c", "b"])
+        XCTAssertEqual(cpu.ranking.map(\.id), identities(["a", "c", "b"]))
         XCTAssertEqual(cpu.metric, .cpu)
     }
 
@@ -117,7 +132,7 @@ final class MetricTabModelTests: XCTestCase {
         ]
 
         let content = MetricTabContent.build(groups: groups, tab: .memory)
-        XCTAssertEqual(content.ranking.map(\.id), ["fat", "mid", "hot"])
+        XCTAssertEqual(content.ranking.map(\.id), identities(["fat", "mid", "hot"]))
         XCTAssertEqual(content.metric, .memory)
     }
 
@@ -131,11 +146,11 @@ final class MetricTabModelTests: XCTestCase {
 
         XCTAssertEqual(
             MetricTabContent.build(groups: groups, tab: .cpu).ranking.map(\.id),
-            ["a", "b", "c"]
+            identities(["a", "b", "c"])
         )
         XCTAssertEqual(
             MetricTabContent.build(groups: groups, tab: .memory).ranking.map(\.id),
-            ["a", "b", "c"]
+            identities(["a", "b", "c"])
         )
     }
 
@@ -152,12 +167,12 @@ final class MetricTabModelTests: XCTestCase {
         // CPU 榜(总览/CPU tab)前 3 = CPU 最高的 gA/gB/gC。
         XCTAssertEqual(
             MetricTabContent.build(groups: groups, tab: .overview).microGraphGroupIDs,
-            ["gA", "gB", "gC"]
+            Set(identities(["gA", "gB", "gC"]))
         )
         // 内存榜前 3 = 内存最高的 gB/gC/gD(与 CPU 榜不同集合)。
         XCTAssertEqual(
             MetricTabContent.build(groups: groups, tab: .memory).microGraphGroupIDs,
-            ["gB", "gC", "gD"]
+            Set(identities(["gB", "gC", "gD"]))
         )
     }
 
@@ -168,8 +183,10 @@ final class MetricTabModelTests: XCTestCase {
             group("idle", cpu: 0, mem: 30),
         ]
 
-        let content = MetricTabContent.build(groups: groups, tab: .overview)
-        XCTAssertEqual(content.microGraphGroupIDs, ["only", "idle"])
+        XCTAssertEqual(
+            MetricTabContent.build(groups: groups, tab: .overview).microGraphGroupIDs,
+            Set(identities(["only", "idle"]))
+        )
     }
 
     func testMeterLeadersFollowFullGroupList() {
@@ -201,7 +218,10 @@ final class MetricTabModelTests: XCTestCase {
             tab: .memory
         ).memorySegments
 
-        XCTAssertEqual(segments.map(\.id), ["m6", "m1", "m4", "m2", "m5", "other"])
+        XCTAssertEqual(
+            segments.map(\.id),
+            segmentIdentities(["m6", "m1", "m4", "m2", "m5"])
+        )
         XCTAssertEqual(segments.map(\.bytes), [600, 500, 400, 300, 200, 150])
         XCTAssertTrue(segments.last?.isOther ?? false)
         XCTAssertFalse(segments.first?.isOther ?? true)
@@ -231,7 +251,7 @@ final class MetricTabModelTests: XCTestCase {
             groups: memGroups([10, 30, 20]),
             tab: .memory
         ).memorySegments
-        XCTAssertEqual(three.map(\.id), ["m1", "m2", "m0"])
+        XCTAssertEqual(three.map(\.id), identities(["m1", "m2", "m0"]))
         XCTAssertFalse(three.contains(where: \.isOther))
     }
 
@@ -243,7 +263,10 @@ final class MetricTabModelTests: XCTestCase {
             tab: .memory
         ).memorySegments
 
-        XCTAssertEqual(segments.map(\.id), ["m3", "m6", "m4", "m7", "m1", "other"])
+        XCTAssertEqual(
+            segments.map(\.id),
+            segmentIdentities(["m3", "m6", "m4", "m7", "m1"])
+        )
         XCTAssertEqual(segments.last?.bytes, 50)
     }
 

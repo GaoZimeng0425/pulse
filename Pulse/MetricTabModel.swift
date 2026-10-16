@@ -85,13 +85,19 @@ enum GroupCardMetric: Equatable, Sendable {
 
 /// Memory by App 环形卡(工单 03)的一段:top-5 组各一段,尾部聚合成"其他"段
 /// (`isOther = true`,图例用通用符号)。fraction = 该段字节 / 全部组内存合计。
+/// `id` = 该段的组身份(工单 00 类型化);"其他"段不是组,身份为 nil。
 struct MemoryRingSegment: Identifiable, Equatable, Sendable {
-    let id: String
+    /// 组身份;"其他"聚合段为 nil(不是组,不冒充组身份)。
+    let id: GroupIdentity?
     let name: String
     /// App 组的 .app bundle 目录(图例取应用图标);"其他"段与其余类别为 nil。
-    let bundlePath: String?
+    var bundlePath: String? {
+        id?.bundlePath
+    }
     /// 组类别(图例兜底符号);"其他"段为 nil。
-    let category: GroupCategory?
+    var category: GroupCategory? {
+        id?.category
+    }
     let bytes: UInt64
     /// 0–1,占全部组内存合计的比例。
     let fraction: Double
@@ -108,14 +114,12 @@ struct MetricTabContent: Equatable, Sendable {
     static let microGraphLimit = 3
     /// Memory by App 环形分段:top-5 + 其他(工单 03 拍板口径)。
     static let memorySegmentLimit = 5
-    /// "其他"聚合段的稳定 id。
-    static let otherSegmentID = "other"
 
     let tab: MetricTab
     /// 本 tab 的组卡榜单(降序口径随 tab;同值次键 id 升序,跨采样轮稳定)。
     let ranking: [ProcessGroup]
-    /// 有 26×14 微图资格的组 id 集合(榜单前缀)。
-    let microGraphGroupIDs: Set<String>
+    /// 有 26×14 微图资格的组身份集合(榜单前缀)。
+    let microGraphGroupIDs: Set<GroupIdentity>
     /// 组卡读数口径(大数字/meter/微图随它切换)。
     let metric: GroupCardMetric
     /// Memory by App 环形分段;空组或全零内存 → 空(由空态兜底,不出坏图)。
@@ -178,8 +182,6 @@ struct MetricTabContent: Equatable, Sendable {
             MemoryRingSegment(
                 id: group.id,
                 name: group.name,
-                bundlePath: group.bundlePath,
-                category: group.category,
                 bytes: group.memoryBytes,
                 fraction: Double(group.memoryBytes) / Double(totalBytes),
                 isOther: false
@@ -190,10 +192,8 @@ struct MetricTabContent: Equatable, Sendable {
         if otherBytes > 0 {
             segments.append(
                 MemoryRingSegment(
-                    id: otherSegmentID,
+                    id: nil,
                     name: "其他",
-                    bundlePath: nil,
-                    category: nil,
                     bytes: otherBytes,
                     fraction: Double(otherBytes) / Double(totalBytes),
                     isOther: true

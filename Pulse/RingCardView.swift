@@ -44,7 +44,9 @@ extension RingSlice {
                 ? Surface.cardHigh
                 : tint.opacity(opacities[index])
             return RingSlice(
-                id: segment.id, name: segment.name, bytes: segment.bytes,
+                // 展示层键:环形图切片身份,非组身份——组身份止于 MemoryRingSegment。
+                id: segment.id?.stableKey ?? "ring-slice-other",
+                name: segment.name, bytes: segment.bytes,
                 fraction: segment.fraction, color: color, icon: icon
             )
         }

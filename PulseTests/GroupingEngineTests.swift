@@ -75,6 +75,76 @@ final class GroupingEngineTests: XCTestCase {
         [10: 3, 11: 5, 12: 10, 100: 90, 101: 92, 102: 88, 103: 91]
     }
 
+    // MARK: - 组身份类型(工单 00)
+
+    /// 种类 → 类别 1:1:展示口径(图例/图标)继续吃 GroupCategory,不另设第二份映射。
+    func testGroupIdentityMapsEachCaseToItsCategory() {
+        XCTAssertEqual(GroupIdentity.app(bundlePath: "/Applications/X.app").category, .app)
+        XCTAssertEqual(GroupIdentity.project(root: "/r", worktreeName: nil).category, .project)
+        XCTAssertEqual(GroupIdentity.system.category, .system)
+        XCTAssertEqual(GroupIdentity.backgroundService.category, .backgroundService)
+        XCTAssertEqual(GroupIdentity.orphan.category, .orphan)
+    }
+
+    /// 规范字符串与 P0 前缀约定的组 id 逐字节一致:升级前后同组的稳定键不变,
+    /// 排序与(未来的)持久化键因此零漂移。期望值为独立字面量。
+    func testStableKeyReproducesLegacyPrefixedIDs() {
+        XCTAssertEqual(
+            GroupIdentity.app(bundlePath: "/Applications/Zcode.app").stableKey,
+            "bundle:/Applications/Zcode.app"
+        )
+        XCTAssertEqual(
+            GroupIdentity.project(root: "/Users/x/work/octok-client", worktreeName: "wt").stableKey,
+            "project:/Users/x/work/octok-client@wt"
+        )
+        XCTAssertEqual(
+            GroupIdentity.project(root: "/Users/x/work/octok-client", worktreeName: nil).stableKey,
+            "project:/Users/x/work/octok-client"
+        )
+        XCTAssertEqual(GroupIdentity.system.stableKey, "system")
+        XCTAssertEqual(GroupIdentity.backgroundService.stableKey, "background-service")
+        XCTAssertEqual(GroupIdentity.orphan.stableKey, "orphan")
+    }
+
+    /// Comparable = stableKey 字典序:与升级前纯字符串 id 的次键排序逐位一致
+    /// (background-service < bundle: < orphan < project: < system),同值并列时
+    /// 榜单次序零行为变化。
+    func testComparableFollowsLegacyStringOrder() {
+        let ordered: [GroupIdentity] = [
+            .backgroundService,
+            .app(bundlePath: "/Applications/A.app"),
+            .orphan,
+            .project(root: "/r", worktreeName: nil),
+            .system,
+        ]
+        XCTAssertEqual(ordered.sorted(), ordered)
+
+        // 同种类内部按原始值排序(旧的 bundle:/project: 字典序)。
+        let sameKind: [GroupIdentity] = [
+            .app(bundlePath: "/Applications/B.app"),
+            .app(bundlePath: "/Applications/A.app"),
+        ]
+        XCTAssertEqual(sameKind.sorted(), [.app(bundlePath: "/Applications/A.app"), .app(bundlePath: "/Applications/B.app")])
+    }
+
+    /// 相等性按种类 + 原始值判定:平行 worktree 是不同身份(旧约定里
+    /// "project:<root>@alpha" ≠ "project:<root>@beta" 的口径,由类型承载)。
+    func testEqualityDistinguishesWorktreesAndPayloads() {
+        XCTAssertEqual(
+            GroupIdentity.project(root: "/r", worktreeName: "alpha"),
+            GroupIdentity.project(root: "/r", worktreeName: "alpha")
+        )
+        XCTAssertNotEqual(
+            GroupIdentity.project(root: "/r", worktreeName: "alpha"),
+            GroupIdentity.project(root: "/r", worktreeName: "beta")
+        )
+        XCTAssertNotEqual(
+            GroupIdentity.project(root: "/r", worktreeName: nil),
+            GroupIdentity.project(root: "/r", worktreeName: "alpha")
+        )
+        XCTAssertNotEqual(GroupIdentity.system, GroupIdentity.orphan)
+    }
+
     // MARK: - 三层归属
 
     /// 验收锚点:整棵门禁链归"项目 @ worktree",组 CPU% 为各进程之和(超过 100% 合法)。
@@ -90,7 +160,10 @@ final class GroupingEngineTests: XCTestCase {
         let project = groups[0]
         XCTAssertEqual(project.name, "octok-client @ skill-manage-read-and-index")
         XCTAssertEqual(project.category, .project)
-        XCTAssertEqual(project.id, "project:/Users/x/work/octok-client@skill-manage-read-and-index")
+        XCTAssertEqual(
+            project.id,
+            GroupIdentity.project(root: octokRoot, worktreeName: "skill-manage-read-and-index")
+        )
         XCTAssertEqual(project.processes.count, 6)
         // 组 CPU% = 5 + 10 + 90 + 92 + 88 + 91:单核 100% 累加,超过 100% 合法
         XCTAssertEqual(project.cpuPercent, 376, accuracy: 0.0001)

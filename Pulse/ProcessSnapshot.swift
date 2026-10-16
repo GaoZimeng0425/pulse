@@ -1,5 +1,23 @@
 import Foundation
 
+/// 归属判定三元组(P0 评审 D1 收拢,工单 00):可执行路径 / 工作目录 / argv
+/// ——归组引擎与出生登记判定归属时总是结伴消费的三个字段,存储与传递只有这一份
+/// (此前在 `RawProcess` 与 `LineageRegistry.Entry` 各平铺一份)。
+struct ProcessIdentity: Equatable, Sendable {
+    /// 可执行路径(proc_pidpath);受限 / 查不到 → nil。
+    let executablePath: String?
+    /// 工作目录(PROC_PIDVNODEPATHINFO);受限 → nil。
+    let cwd: String?
+    /// 完整 argv(KERN_PROCARGS2,已跳过 execpath);受限 → 空数组。
+    let argv: [String]
+
+    init(executablePath: String? = nil, cwd: String? = nil, argv: [String] = []) {
+        self.executablePath = executablePath
+        self.cwd = cwd
+        self.argv = argv
+    }
+}
+
 /// 原始进程:采集层对单个进程采到的全部字段,快照的组成单元。
 /// 纯 Swift 值类型;受限查询的字段静默降级为 nil / 空数组,绝不因此丢弃字段以外的信息。
 struct RawProcess: Identifiable, Equatable, Sendable {
@@ -7,12 +25,8 @@ struct RawProcess: Identifiable, Equatable, Sendable {
     let pid: pid_t
     /// 父进程 ID;launchd(pid 1)的父为 0。父链上溯归组的依据。
     let parentPID: pid_t
-    /// 可执行路径(proc_pidpath);受限 / 查不到 → nil。
-    let executablePath: String?
-    /// 完整 argv(KERN_PROCARGS2,已跳过 execpath);受限 → 空数组。
-    let argv: [String]
-    /// 工作目录(PROC_PIDVNODEPATHINFO);受限 → nil。
-    let cwd: String?
+    /// 归属判定三元组(D1):路径 / cwd / argv 存储只有这一份。
+    let identity: ProcessIdentity
     /// 累计 CPU 时间(user + system,纳秒)。CPU% 由相邻快照差分得出(后续工单)。
     let cpuTimeNanoseconds: UInt64
     /// 常驻内存(pti_resident_size),字节。
@@ -28,6 +42,14 @@ struct RawProcess: Identifiable, Equatable, Sendable {
 
     var id: pid_t { pid }
 
+    /// 可执行路径(身份三元组的直读视图,采集与展示层的既有通道)。
+    var executablePath: String? { identity.executablePath }
+    /// 完整 argv(身份三元组的直读视图)。
+    var argv: [String] { identity.argv }
+    /// 工作目录(身份三元组的直读视图)。
+    var cwd: String? { identity.cwd }
+
+    /// 采集层构造口径不变:字段平铺入参,内部归拢进 ProcessIdentity。
     init(
         pid: pid_t,
         parentPID: pid_t,
@@ -43,9 +65,11 @@ struct RawProcess: Identifiable, Equatable, Sendable {
     ) {
         self.pid = pid
         self.parentPID = parentPID
-        self.executablePath = executablePath
-        self.argv = argv
-        self.cwd = cwd
+        self.identity = ProcessIdentity(
+            executablePath: executablePath,
+            cwd: cwd,
+            argv: argv
+        )
         self.cpuTimeNanoseconds = cpuTimeNanoseconds
         self.residentMemoryBytes = residentMemoryBytes
         self.physicalFootprintBytes = physicalFootprintBytes

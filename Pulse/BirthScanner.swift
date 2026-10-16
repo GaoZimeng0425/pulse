@@ -31,9 +31,11 @@ struct LiveBirthScanSource: BirthScanSource {
         var argsBuffer = [CChar](repeating: 0, count: LiveProcessSource.procArgsBufferSize)
         return LineageRegistry.Entry(
             parentPID: kinfo.kp_eproc.e_ppid,
-            executablePath: LiveProcessSource.executablePath(pid: pid, buffer: &pathBuffer),
-            cwd: LiveProcessSource.currentWorkingDirectory(pid: pid),
-            argv: ProcArgsParser.argv(of: pid, into: &argsBuffer)
+            identity: ProcessIdentity(
+                executablePath: LiveProcessSource.executablePath(pid: pid, buffer: &pathBuffer),
+                cwd: LiveProcessSource.currentWorkingDirectory(pid: pid),
+                argv: ProcArgsParser.argv(of: pid, into: &argsBuffer)
+            )
         )
     }
 }

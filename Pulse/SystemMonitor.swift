@@ -115,7 +115,7 @@ final class SystemMonitor {
     /// (确认对话框打开期间可能又采了一轮,以最新存活名单为准);
     /// 组已消失 → 空报告(无需处置,也无失败可报)。
     /// 工单 P0.5-01:查全组列表(主窗口与弹窗可见的组都要能处置)。
-    func terminateGroup(id groupID: String) -> KillReport {
+    func terminateGroup(id groupID: GroupIdentity) -> KillReport {
         guard let group = allGroups.first(where: { $0.id == groupID }) else {
             return KillReport(outcomes: [])
         }

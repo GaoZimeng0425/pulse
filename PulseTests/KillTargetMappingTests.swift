@@ -32,7 +32,7 @@ final class KillTargetMappingTests: XCTestCase {
             RawProcess(pid: 101, parentPID: 100, executablePath: "/usr/bin/sleep", argv: ["sleep", "300"]),
         ]
         let group = ProcessGroup(
-            id: "g", name: "octok", category: .project, bundlePath: nil,
+            id: .project(root: "octok", worktreeName: nil), name: "octok",
             processes: members, cpuPercent: 50, memoryBytes: 0
         )
 

@@ -20,12 +20,12 @@ struct RankingCardView<Expanded: View>: View {
     let metric: GroupCardMetric
     let cpuLeader: Double
     let memoryLeaderBytes: UInt64
-    let expandedGroupIDs: Set<String>
-    /// 26×14 微图数据(工单 03 兑现,评审 F3):组 id → 按当前口径的近期序列,
+    let expandedGroupIDs: Set<GroupIdentity>
+    /// 26×14 微图数据(工单 03 兑现,评审 F3):组身份 → 按当前口径的近期序列,
     /// 由调用方(DashboardModel)从采样历史折叠;不在表内的行不带微图。
-    var microGraphValues: [String: [Double]] = [:]
+    var microGraphValues: [GroupIdentity: [Double]] = [:]
     var density: Density = .regular
-    let onToggle: (String) -> Void
+    let onToggle: (GroupIdentity) -> Void
     let onEndGroup: (ProcessGroup) -> Void
     @ViewBuilder let expandedContent: (ProcessGroup) -> Expanded
 
@@ -222,15 +222,16 @@ struct RankingRowView: View {
 #Preview("排行卡") {
     let groups = [
         ProcessGroup(
-            id: "bundle:code", name: "Xcode", category: .app, bundlePath: "/Applications/Xcode.app",
+            id: .app(bundlePath: "/Applications/Xcode.app"), name: "Xcode",
             processes: [], cpuPercent: 51.4, memoryBytes: 5_200_000_000
         ),
         ProcessGroup(
-            id: "p", name: "octok-client @ main", category: .project, bundlePath: nil,
+            id: .project(root: "/Users/x/work/octok-client", worktreeName: "main"),
+            name: "octok-client @ main",
             processes: [], cpuPercent: 18.6, memoryBytes: 2_400_000_000
         ),
         ProcessGroup(
-            id: "o", name: "孤儿进程", category: .orphan, bundlePath: nil,
+            id: .orphan, name: "孤儿进程",
             processes: [], cpuPercent: 7, memoryBytes: 30_000_000
         ),
     ]

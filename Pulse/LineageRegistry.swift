@@ -11,11 +11,22 @@ import Foundation
 /// 自己的记录串联而成。重启即失(P0 决定,SQLite 随 P1);pid 复用不做区分(已知限制)。
 struct LineageRegistry: Equatable, Sendable {
     /// 单条出生记录:进程出生时刻的可归属字段。
+    /// 路径 / cwd / argv 收拢进 `ProcessIdentity`(D1)——与 RawProcess 同一份三元组。
     struct Entry: Equatable, Sendable {
         let parentPID: pid_t
-        let executablePath: String?
-        let cwd: String?
-        let argv: [String]
+        let identity: ProcessIdentity
+
+        /// 可执行路径(身份三元组的直读视图,查询层的既有通道)。
+        var executablePath: String? { identity.executablePath }
+        /// 工作目录(身份三元组的直读视图)。
+        var cwd: String? { identity.cwd }
+        /// 完整 argv(身份三元组的直读视图)。
+        var argv: [String] { identity.argv }
+
+        init(parentPID: pid_t, identity: ProcessIdentity) {
+            self.parentPID = parentPID
+            self.identity = identity
+        }
     }
 
     /// pid → 出生记录。
@@ -27,9 +38,7 @@ struct LineageRegistry: Equatable, Sendable {
         for process in snapshot.processes where updated.entries[process.pid] == nil {
             updated.entries[process.pid] = Entry(
                 parentPID: process.parentPID,
-                executablePath: process.executablePath,
-                cwd: process.cwd,
-                argv: process.argv
+                identity: process.identity
             )
         }
         return updated

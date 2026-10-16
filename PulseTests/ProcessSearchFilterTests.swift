@@ -13,7 +13,7 @@ final class ProcessSearchFilterTests: XCTestCase {
 
     private func group(name: String) -> ProcessGroup {
         ProcessGroup(
-            id: "g-\(name)", name: name, category: .app, bundlePath: nil,
+            id: .app(bundlePath: "g-\(name)"), name: name,
             processes: [], cpuPercent: 10, memoryBytes: 100
         )
     }

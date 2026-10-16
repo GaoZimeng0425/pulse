@@ -239,10 +239,8 @@ struct ProcessDetailView: View {
         ]
     )
     let group = ProcessGroup(
-        id: "project:octok",
+        id: .project(root: "/Users/x/work/octok-client", worktreeName: "skill-manage-read-and-index"),
         name: "octok-client @ skill-manage-read-and-index",
-        category: .project,
-        bundlePath: nil,
         processes: [processes[2], processes[1]],
         cpuPercent: 95,
         memoryBytes: 280_000_000
