@@ -43,25 +43,15 @@ struct MainWindowView: View {
 
     var body: some View {
         @Bindable var model = model
-        return VStack(spacing: 0) {
-            // tab 条住内容区不住工具栏:P1 加到 6+ 个后工具栏 .principal 放不下,
-            // macOS 对放不下的尾项是裁切不是换行(用户实测电池 tab 被剪)。
-            // 钉在滚动区外——内容滚动时导航常驻。
-            MetricPillTabBar(selection: $tabSelection)
-                .padding(.horizontal, 24)
-                .padding(.top, 10)
-                .padding(.bottom, 8)
-            Divider()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    pageHeader
-                    AlertBannerView(center: monitor.alerts)
-                    tabBody
-                }
-                .padding(.horizontal, 24)
-                .padding(.top, 10)
-                .padding(.bottom, 24)
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                pageHeader
+                AlertBannerView(center: monitor.alerts)
+                tabBody
             }
+            .padding(.horizontal, 24)
+            .padding(.top, 12)
+            .padding(.bottom, 24)
         }
         // 首次电池读数落地 → 电池页入轴(工单 02);被隐藏的当前 tab 回落总览。
         .onChange(of: monitor.hasBattery) { _, hasBattery in
@@ -86,6 +76,11 @@ struct MainWindowView: View {
         .frame(minWidth: 720, minHeight: 560)
         .containerBackground(Surface.window, for: .window)
         .toolbar {
+            // 老样式:药丸 tab 居中挂工具栏 .principal。P1 加到 6-7 个后靠收紧
+            // 药丸内距(12→9)保 720 最小窗宽装得下,样式不变。
+            ToolbarItem(placement: .principal) {
+                MetricPillTabBar(selection: $tabSelection)
+            }
             ToolbarItem(placement: .primaryAction) {
                 MainSearchField(query: $searchQuery)
             }
