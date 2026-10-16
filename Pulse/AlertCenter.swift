@@ -62,6 +62,16 @@ final class AlertCenter {
         handle(events)
     }
 
+    /// dev server 闲置喂食(工单 08):每轮盘点交付,引擎按闲置秒数评估。
+    func ingestDevServers(_ servers: [AlertDevServerSnapshot]) {
+        let events = engine.record(
+            .devServers(servers),
+            now: clock(),
+            settings: store.evaluationSettings
+        )
+        handle(events)
+    }
+
     // MARK: - 设置动作(设置页调用)
 
     /// 开关规则:写存储(即时生效并持久);首次从全关变为有开启时请求授权。

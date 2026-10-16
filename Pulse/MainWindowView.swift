@@ -76,6 +76,8 @@ struct MainWindowView: View {
         .frame(minWidth: 720, minHeight: 560)
         .containerBackground(Surface.window, for: .window)
         .toolbar {
+            // 老样式:药丸 tab 居中挂工具栏 .principal。P1 加到 6-7 个后靠收紧
+            // 药丸内距(12→9)保 720 最小窗宽装得下,样式不变。
             ToolbarItem(placement: .principal) {
                 MetricPillTabBar(selection: $tabSelection)
             }
@@ -144,6 +146,13 @@ struct MainWindowView: View {
             SectionTitle(title: "当前最忙")
                 .padding(.top, 6)
             rankingCard
+            SectionTitle(title: "开发服务")
+                .padding(.top, 6)
+            // dev server 卡(工单 08):主窗口总览页专属(popover 不放,工单拍板);
+            // 全部停止只上抛请求,确认对话框(KillRequestFlow 关口)把关后才发信号。
+            DevServerCardView(servers: monitor.devServers) {
+                model.requestStopAllDevServers(monitor.devServers)
+            }
         case .cpu:
             MetricMainCardView(model: model.cpuModel)
             rankingCard
@@ -168,6 +177,10 @@ struct MainWindowView: View {
             // 网络页(工单 06):主卡 + 流量累计明细(弹窗同构,紧凑)。
             MetricMainCardView(model: model.networkModel)
             NetworkTotalsCardView(totals: monitor.networkTotals)
+        case .history:
+            // 历史页(工单 04):指标 × 时间范围 Canvas 走势;查询走引擎 actor,
+            // 主窗口是它唯一的入口(弹窗轴滤掉了历史页)。
+            HistoryTabView(monitor: monitor)
         }
     }
 

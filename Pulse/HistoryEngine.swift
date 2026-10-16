@@ -47,7 +47,9 @@ struct LineageRow: Decodable, FetchableRecord, TableRecord {
 ///   历史是旁路,绝不拖垮实时页;
 /// - 5s 原始值只活在 MinuteRollupBuffer(内存),永不落盘。
 actor HistoryEngine {
-    private let database: DatabaseQueue?
+    /// 库队列(nil = 库打开失败,历史整体缺席)。internal:写路径在本文件,
+    /// 读入口(历史页查询,工单 04)在同模块 HistoryQueries.swift 的 extension。
+    let database: DatabaseQueue?
     private let calendar: Calendar
 
     private var buffer = MinuteRollupBuffer()

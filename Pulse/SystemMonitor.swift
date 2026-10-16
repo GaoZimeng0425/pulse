@@ -55,6 +55,9 @@ final class SystemMonitor {
     /// 网络 Today/7 天累计(工单 06):历史库 SQL 聚合,随每轮采样在落库后
     /// 读回;库缺席/查询失败为 nil → 累计列占位。
     private(set) var networkTotals: NetworkTotalsReading?
+    /// dev server 盘点(工单 08):每轮采样对 argv 命中的候选进程合成状态
+    /// (闲置时长/内存/监听端口);无候选为空数组。主窗口总览页卡片读这里。
+    private(set) var devServers: [DevServerStatus] = []
     /// 告警编排(工单 P1-07):每轮采样与磁盘容量读数喂进来,触发/恢复的
     /// 系统通知与应用内提示都由它出。设置页也读它(alerts.store)。
     let alerts: AlertCenter
@@ -79,6 +82,8 @@ final class SystemMonitor {
     /// 出生扫描最近交付的登记表:每轮采样落地时并入管线(只补缺)。
     private var birthLineage = LineageRegistry()
     private var pipeline: GroupingPipeline
+    /// dev server 盘点器(工单 08):闲置环状态随采样轮推进,端口扫描走缝。
+    private var devServerFinder: DevServerFinder
     private let killService: any KillService
     private var samplingTask: Task<Void, Never>?
     private var sensorTask: Task<Void, Never>?
@@ -95,6 +100,7 @@ final class SystemMonitor {
         batterySource: any BatterySource = LiveBatterySource(),
         diskCapacitySource: any DiskCapacitySource = LiveDiskCapacitySource(),
         diskThroughputSource: any DiskThroughputSource = LiveDiskThroughputSource.adoptingBestPath(),
+        devServerPortScanner: any DevServerPortScanning = LiveDevServerPortScanner(),
         alertCenter: AlertCenter = AlertCenter()
     ) {
         self.sampler = Sampler(source: source, coreTicks: coreTicks, memoryStats: memoryStats)
@@ -111,6 +117,7 @@ final class SystemMonitor {
             )
         )
         self.killService = killService
+        self.devServerFinder = DevServerFinder(portScanner: devServerPortScanner)
     }
 
     /// 启动采样循环(默认弹窗关闭节奏 5s)、独立出生扫描(~2s 节奏)与电池
@@ -213,6 +220,18 @@ final class SystemMonitor {
     func samplingStats() async -> SamplingStats {
         let sampler = self.sampler
         return await sampler.samplingStats()
+    }
+
+    /// 历史页查询(工单 04):引擎保持私有,UI 只拿曲线——SQL 全在引擎 actor
+    /// 上执行(后台队列不掉帧,spec User Story 10)。引擎缺席(库打开失败,
+    /// 03 的降级路径)→ nil,页面按"暂无数据"占位处理,不打断页面。
+    func historySeries(
+        metric: HistoryMetricKey,
+        range: HistoryRange,
+        now: Date = Date()
+    ) async -> HistorySeries? {
+        guard let historyEngine else { return nil }
+        return await historyEngine.series(metric: metric, range: range, now: now)
     }
 
     /// 结束进程(工单 08):UI 确认后调用——SIGTERM 逐目标投递,
@@ -319,6 +338,20 @@ final class SystemMonitor {
                 )
             }
         )
+        // dev server 盘点(工单 08):argv 分类 → 候选进程闲置环 + 端口扫描;
+        // 盘点时刻与快照同一时间轴(不另取钟),未闲置(nil)的 server 不喂告警。
+        let cpuByPID = update.diff.processCPU.cpuPercentByPID
+        let now = update.snapshot.takenAt
+        devServers = devServerFinder.update(
+            snapshot: update.snapshot,
+            processCPU: cpuByPID,
+            now: now
+        )
+        alerts.ingestDevServers(devServers.compactMap { server in
+            server.idleSeconds.map {
+                AlertDevServerSnapshot(pid: server.pid, name: server.displayName, idleSeconds: $0)
+            }
+        })
     }
 
     /// 电池读数落地(工单 02):nil = 从未有过读数(无内建电池)→ 页面保持

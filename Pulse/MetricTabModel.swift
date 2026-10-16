@@ -3,8 +3,8 @@ import Foundation
 // MARK: - 指标 tab 内容模型(工单 P0.6-03):弹窗图标 tab / 主窗口药丸 tab 的共享逻辑
 
 /// 指标 tab(工单 03):弹窗与主窗口共用同一组 tab——总览 / CPU / 内存 / 磁盘
-/// (工单 05)/ 网络(工单 06)/ 电池(工单 02)。展示序(`allCases`)同时是
-/// 键盘 ←/→ 的移动轴:总览最左、电池最右。
+/// (工单 05)/ 网络(工单 06)/ 电池(工单 02)/ 历史(工单 04)。展示序
+/// (`allCases`)同时是键盘 ←/→ 的移动轴:总览最左、历史最右。
 enum MetricTab: String, CaseIterable, Identifiable, Sendable {
     case overview
     case cpu
@@ -12,6 +12,7 @@ enum MetricTab: String, CaseIterable, Identifiable, Sendable {
     case disk
     case network
     case battery
+    case history
 
     var id: String { rawValue }
 
@@ -24,6 +25,7 @@ enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .disk: "磁盘"
         case .network: "网络"
         case .battery: "电池"
+        case .history: "历史"
         }
     }
 
@@ -36,11 +38,14 @@ enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .disk: "internaldrive"
         case .network: "network"
         case .battery: "battery.100percent"
+        case .history: "clock.arrow.circlepath"
         }
     }
 
     /// 选中态强调色色源(工单 02 令牌表):总览以系统 CPU 负载为主视角取 cpu,
-    /// CPU/内存/磁盘/网络/电池各取自家令牌——选中胶囊、meter、图表全由它派生。
+    /// CPU/内存/磁盘/网络/电池各取自家令牌;历史页默认主视角是系统负载(工单 04
+    /// 展示以系统负载为主、CPU 双口径注明),卡内曲线色另随所选指标取。
+    /// 选中胶囊、meter、图表全由令牌派生。
     var accent: Metric {
         switch self {
         case .overview: .cpu
@@ -49,13 +54,20 @@ enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .disk: .disk
         case .network: .network
         case .battery: .battery
+        case .history: .cpu
         }
     }
 
-    /// 展示轴(工单 02):无内建电池的机器隐藏电池页——轴同时是 tab 条渲染序
-    /// 与键盘 ←/→ 的移动范围(两端夹紧的端点随之收缩)。
+    /// 展示轴(工单 02):无内建电池的机器隐藏电池页——主窗口轴同时是药丸
+    /// tab 渲染序与键盘 ←/→ 的移动范围(两端夹紧的端点随之收缩)。
     static func displayAxis(hasBattery: Bool) -> [MetricTab] {
         hasBattery ? allCases : allCases.filter { $0 != .battery }
+    }
+
+    /// 弹窗轴(工单 04 拍板:popover 不加历史):displayAxis 滤掉历史页,
+    /// 其余语义(电池可用性)不变。
+    static func popoverAxis(hasBattery: Bool) -> [MetricTab] {
+        displayAxis(hasBattery: hasBattery).filter { $0 != .history }
     }
 }
 
@@ -164,11 +176,12 @@ struct MetricTabContent: Equatable, Sendable {
     /// 折叠入口:总览/CPU/磁盘/电池 tab 按组 CPU% 降序(与引擎既定序一致;电池/
     /// 磁盘页不排组,榜单沿用 CPU 序供弹窗"当前最忙"卡),内存 tab 按内存降序;
     /// 分段基于全部组(与榜单口径无关,内存 tab 之外的 tab 也可渲染)。
+    /// 历史 tab(工单 04)不渲染排行,走 CPU 序穷举兜底(轴外的弹窗根本切不到)。
     static func build(groups: [ProcessGroup], tab: MetricTab) -> MetricTabContent {
         let ranked: [ProcessGroup]
         let metric: GroupCardMetric
         switch tab {
-        case .overview, .cpu, .disk, .network, .battery:
+        case .overview, .cpu, .disk, .network, .battery, .history:
             ranked = groups.sorted { lhs, rhs in
                 if lhs.cpuPercent != rhs.cpuPercent { return lhs.cpuPercent > rhs.cpuPercent }
                 return lhs.id < rhs.id

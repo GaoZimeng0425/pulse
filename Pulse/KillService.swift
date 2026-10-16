@@ -164,6 +164,14 @@ enum KillCopy {
             ? "将结束该组的 1 个进程,并发送结束信号(SIGTERM)。"
             : "将结束该组的 \(processCount) 个进程,每个都会收到结束信号(SIGTERM)。"
     }
+
+    // MARK: dev server「全部停止」(工单 08)
+
+    /// 全部停止按钮文字。
+    static let stopAllActionTitle = "全部停止"
+
+    /// 全部停止确认标题(内容复用多目标 confirmationMessage,逐个点名 name+pid)。
+    static let stopAllConfirmationTitle = "停止全部 dev server?"
 }
 
 /// 一次处置的汇总:UI 结果弹窗的原料。有失败才浮出(全成功安静——
