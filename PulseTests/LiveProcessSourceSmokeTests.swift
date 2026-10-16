@@ -60,6 +60,22 @@ final class LiveProcessSourceSmokeTests: XCTestCase {
         XCTAssertGreaterThan(me.physicalFootprintBytes, 0, "物理足迹应 > 0")
     }
 
+    func testConsecutiveSweepsKeepIdentityStableThroughCache() {
+        // 工单 10:第二轮 sweep 走身份缓存(p_comm 一致 ∧ 未过校正期),
+        // 归因消费的快照三元组必须与首轮实读完全一致——归因行为零变化的红线。
+        let first = source.snapshot().processes.first { $0.pid == getpid() }
+        let second = source.snapshot().processes.first { $0.pid == getpid() }
+        guard let first, let second else {
+            return XCTFail("自身进程应在连续两轮快照里")
+        }
+        XCTAssertEqual(first.identity, second.identity, "缓存轮的身份三元组不得偏离实读")
+        XCTAssertEqual(first.executablePath, second.executablePath)
+        XCTAssertEqual(first.cwd, second.cwd)
+        XCTAssertEqual(first.argv, second.argv)
+        // 非身份字段照常逐轮实读:CPU 累计时间允许前进,不被缓存粘住。
+        XCTAssertGreaterThanOrEqual(second.cpuTimeNanoseconds, first.cpuTimeNanoseconds)
+    }
+
     func testChildShellExePathArgvAndCwdAreReadable() {
         // 跨进程读:子 zsh 带标记 argv、cwd 指向 /tmp(内核按 vnode 解析,可能是 /private/tmp)。
         // 脚本末尾放内建命令:若末尾是外部命令,zsh 会 exec 替换自身,pid 就不再是 zsh 了。

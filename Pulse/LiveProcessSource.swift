@@ -16,9 +16,17 @@ import Darwin
 /// 降级策略:字段级查询失败 → nil / 空数组,绝不中断整轮采集;
 /// 仅当 KERN_PROC 查不到该 pid(采样间隙进程退出)时静默跳过整个进程。
 ///
-/// 性能:每进程 6 个 syscall,无任何子进程调用(不 /bin/ps、不 lsof);
-/// 大缓冲整轮复用,~800 pid 一轮保持在毫秒级。
-struct LiveProcessSource: ProcessSource {
+/// 性能(工单 10):常驻每进程 3 次调用(KERN_PROC + PROC_PIDTASKINFO +
+/// rusage)——身份三元组(路径 / cwd / argv)经 `ProcessIdentityCache`
+/// 首见读一次、60s 低频校正;首轮与校正轮 +3,平均约 3.25 次/进程/轮
+/// (改动前恒为 6 次)。argv 读空(KERN_PROCARGS2 失败)不落缓存,下轮
+/// 照常重读——退化不粘滞,与逐轮重读时代一致。无任何子进程调用
+/// (不 /bin/ps、不 lsof);大缓冲整轮复用,~800 pid 一轮保持在毫秒级。
+final class LiveProcessSource: ProcessSource, @unchecked Sendable {
+    /// 缓存决策与真实读取之间的互斥:协议要求 Sendable,采样 actor 串行
+    /// 调用之下锁近乎无争,仅为类型正确性兜底(与 SyntheticProcessSource 同款)。
+    private let lock = NSLock()
+    private var identityCache = ProcessIdentityCache()
     /// proc_pidpath 缓冲上限(libproc 的 PROC_PIDPATHINFO_MAXSIZE,宏不导入 Swift)。
     /// internal:出生扫描器(LiveBirthScanSource)复用同一批调用与缓冲上限。
     static let pathBufferSize = 4096
@@ -52,6 +60,9 @@ struct LiveProcessSource: ProcessSource {
         var pathBuffer = [CChar](repeating: 0, count: Self.pathBufferSize)
         var procArgsBuffer = [CChar](repeating: 0, count: Self.procArgsBufferSize)
 
+        lock.lock()
+        defer { lock.unlock() }
+
         for pid in pids {
             // ppid 与启动时刻一次 sysctl 全取;查不到 = 进程已退出,静默跳过。
             guard let kinfo = Self.kernelProcessInfo(pid: pid) else { continue }
@@ -59,13 +70,33 @@ struct LiveProcessSource: ProcessSource {
             let usage = Self.resourceUsage(pid: pid)
             let cpuTicks = task.map { $0.pti_total_user + $0.pti_total_system } ?? 0
 
+            // 身份三元组:缓存命中(p_comm 一致 ∧ 未过校正期)零身份调用;
+            // 未命中 = 新面孔 / exec / pid 复用 / 校正到期,重读整组并回填。
+            let commandName = Self.commandName(from: kinfo)
+            let identity: ProcessIdentity
+            if let cached = identityCache.identity(pid: pid, commandName: commandName, now: takenAt) {
+                identity = cached
+            } else {
+                let fresh = ProcessIdentity(
+                    executablePath: Self.executablePath(pid: pid, buffer: &pathBuffer),
+                    cwd: Self.currentWorkingDirectory(pid: pid),
+                    argv: ProcArgsParser.argv(of: pid, into: &procArgsBuffer)
+                )
+                if !fresh.argv.isEmpty {
+                    identityCache.record(
+                        pid: pid, identity: fresh, commandName: commandName, at: takenAt
+                    )
+                }
+                identity = fresh
+            }
+
             processes.append(
                 RawProcess(
                     pid: pid,
                     parentPID: kinfo.kp_eproc.e_ppid,
-                    executablePath: Self.executablePath(pid: pid, buffer: &pathBuffer),
-                    argv: ProcArgsParser.argv(of: pid, into: &procArgsBuffer),
-                    cwd: Self.currentWorkingDirectory(pid: pid),
+                    executablePath: identity.executablePath,
+                    argv: identity.argv,
+                    cwd: identity.cwd,
                     cpuTimeNanoseconds: Self.nanoseconds(fromTicks: cpuTicks),
                     residentMemoryBytes: task?.pti_resident_size ?? 0,
                     physicalFootprintBytes: usage?.ri_phys_footprint ?? 0,
@@ -75,6 +106,9 @@ struct LiveProcessSource: ProcessSource {
                 )
             )
         }
+
+        // 每轮对存活集裁剪:已消失的 pid 逐出缓存,pid 复用不背旧身份。
+        identityCache.prune(keeping: Set(processes.map(\.pid)))
 
         return ProcessSnapshot(takenAt: takenAt, processes: processes.sorted { $0.pid < $1.pid })
     }
@@ -106,6 +140,18 @@ struct LiveProcessSource: ProcessSource {
         return Date(
             timeIntervalSince1970: Double(timeval.tv_sec) + Double(timeval.tv_usec) / 1_000_000
         )
+    }
+
+    /// exec 指纹(工单 10):KERN_PROC 的 p_comm,exec 即换名(截断到
+    /// MAXCOMLEN-1 字符 + NUL,pid 复用也几乎必换)。零成本失配信号——
+    /// 乘的是本来就要读的 KERN_PROC,不添调用。定长 C 数组按首地址读,
+    /// 遇 NUL 截断(防御式:无 NUL 时取满长度),UTF-8 有损解码。
+    static func commandName(from info: kinfo_proc) -> String {
+        withUnsafeBytes(of: info.kp_proc.p_comm) { raw in
+            let bytes = raw.bindMemory(to: CChar.self)
+            let length = bytes.firstIndex(of: 0) ?? bytes.count
+            return String(decoding: raw.prefix(length), as: UTF8.self)
+        }
     }
 
     static func executablePath(pid: pid_t, buffer: inout [CChar]) -> String? {
