@@ -164,6 +164,10 @@ struct MainWindowView: View {
                 DiskVolumeBreakdownView(capacity: monitor.diskCapacity)
                 DiskSnapshotsCardView(listing: monitor.diskCapacity?.snapshots)
             }
+        case .history:
+            // 历史页(工单 04):指标 × 时间范围 Canvas 走势;查询走引擎 actor,
+            // 主窗口是它唯一的入口(弹窗轴滤掉了历史页)。
+            HistoryTabView(monitor: monitor)
         }
     }
 

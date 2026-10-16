@@ -11,18 +11,18 @@ final class MetricTabModelTests: XCTestCase {
     // MARK: - MetricTab:顺序与文案
 
     func testTabsAreOrderedOverviewCPUMemoryDiskBattery() {
-        // 展示序即键盘 ←/→ 的移动轴:总览在最左,电池(工单 02)在最右;
+        // 展示序即键盘 ←/→ 的移动轴:总览在最左,历史(工单 04)在最右;
         // 磁盘(工单 05)按令牌表插在内存与电池之间。
         XCTAssertEqual(
             MetricTab.allCases.map(\.rawValue),
-            ["overview", "cpu", "memory", "disk", "battery"]
+            ["overview", "cpu", "memory", "disk", "battery", "history"]
         )
     }
 
     func testTabTitlesAreChinese() {
         // 药丸 tab 文字与无障碍标签共用中文文案。
         let titles = MetricTab.allCases.map(\.title)
-        XCTAssertEqual(titles, ["总览", "CPU", "内存", "磁盘", "电池"])
+        XCTAssertEqual(titles, ["总览", "CPU", "内存", "磁盘", "电池", "历史"])
     }
 
     func testTabSymbolsAreDistinct() {
@@ -33,12 +33,14 @@ final class MetricTabModelTests: XCTestCase {
 
     func testTabAccentMapsToMetricTokens() {
         // 选中态强调色(tint 派生)的色源:总览以系统负载(CPU)为主视角,
-        // CPU/内存/磁盘/电池 tab → 各自令牌。
+        // CPU/内存/磁盘/电池 tab → 各自令牌;历史页默认主视角同为系统负载
+        // (工单 04,页内曲线色另随所选指标取)。
         XCTAssertEqual(MetricTab.overview.accent, .cpu)
         XCTAssertEqual(MetricTab.cpu.accent, .cpu)
         XCTAssertEqual(MetricTab.memory.accent, .memory)
         XCTAssertEqual(MetricTab.disk.accent, .disk)
         XCTAssertEqual(MetricTab.battery.accent, .battery)
+        XCTAssertEqual(MetricTab.history.accent, .cpu)
     }
 
     // MARK: - MetricTabSelection:键盘 ←/→ 切换
@@ -48,7 +50,7 @@ final class MetricTabModelTests: XCTestCase {
     }
 
     func testMoveRightAdvancesInDisplayOrder() {
-        // → 键沿展示序右移:总览 → CPU → 内存 → 磁盘 → 电池。
+        // → 键沿展示序右移:总览 → CPU → 内存 → 磁盘 → 电池 → 历史。
         var selection = MetricTabSelection()
         selection.moveRight()
         XCTAssertEqual(selection.current, .cpu)
@@ -58,11 +60,15 @@ final class MetricTabModelTests: XCTestCase {
         XCTAssertEqual(selection.current, .disk)
         selection.moveRight()
         XCTAssertEqual(selection.current, .battery)
+        selection.moveRight()
+        XCTAssertEqual(selection.current, .history)
     }
 
     func testMoveLeftRetreatsInDisplayOrder() {
-        // ← 键左移:电池 → 磁盘 → 内存 → CPU → 总览。
-        var selection = MetricTabSelection(current: .battery)
+        // ← 键左移:历史 → 电池 → 磁盘 → 内存 → CPU → 总览。
+        var selection = MetricTabSelection(current: .history)
+        selection.moveLeft()
+        XCTAssertEqual(selection.current, .battery)
         selection.moveLeft()
         XCTAssertEqual(selection.current, .disk)
         selection.moveLeft()
@@ -79,34 +85,50 @@ final class MetricTabModelTests: XCTestCase {
         leftmost.moveLeft()
         XCTAssertEqual(leftmost.current, .overview)
 
-        var rightmost = MetricTabSelection(current: .battery)
+        var rightmost = MetricTabSelection(current: .history)
         rightmost.moveRight()
-        XCTAssertEqual(rightmost.current, .battery)
+        XCTAssertEqual(rightmost.current, .history)
     }
 
-    // MARK: - 展示轴:无电池机器隐藏电池页(工单 02)
+    // MARK: - 展示轴:无电池机器隐藏电池页(工单 02);历史页只在主窗口(工单 04)
 
     func testDisplayAxisKeepsAllTabsWithBattery() {
         XCTAssertEqual(MetricTab.displayAxis(hasBattery: true), MetricTab.allCases)
     }
 
     func testDisplayAxisHidesBatteryWithoutBattery() {
-        // 磁盘页(工单 05)常驻轴(每台 Mac 都有盘),无电池只隐藏电池页。
+        // 磁盘页(工单 05)常驻轴(每台 Mac 都有盘),无电池只隐藏电池页;
+        // 历史页(工单 04)同为主窗口常驻轴。
         XCTAssertEqual(
             MetricTab.displayAxis(hasBattery: false),
+            [.overview, .cpu, .memory, .disk, .history]
+        )
+    }
+
+    func testPopoverAxisAlwaysExcludesHistory() {
+        // 弹窗轴(工单 04 拍板:popover 不加历史):有无电池都不得出现历史页,
+        // 其余 tab 与 displayAxis 一致。
+        XCTAssertEqual(
+            MetricTab.popoverAxis(hasBattery: true),
+            [.overview, .cpu, .memory, .disk, .battery]
+        )
+        XCTAssertEqual(
+            MetricTab.popoverAxis(hasBattery: false),
             [.overview, .cpu, .memory, .disk]
         )
     }
 
     func testKeyboardMovesFollowAxisWithoutBattery() {
-        // 无电池机器:轴不含电池页,→ 在磁盘夹紧停下(可预期,不跳空)。
+        // 无电池机器:轴不含电池页,→ 依次走到历史右端夹紧停下(不跳空)。
         var selection = MetricTabSelection(axis: MetricTab.displayAxis(hasBattery: false))
         selection.moveRight()
         selection.moveRight()
         selection.moveRight()
         XCTAssertEqual(selection.current, .disk)
         selection.moveRight()
-        XCTAssertEqual(selection.current, .disk, "轴右端 = 磁盘,再 → 不动")
+        XCTAssertEqual(selection.current, .history, "轴右端 = 历史(工单 04)")
+        selection.moveRight()
+        XCTAssertEqual(selection.current, .history, "再 → 不动")
     }
 
     func testSetAxisHidesCurrentTabFallsBackToOverview() {

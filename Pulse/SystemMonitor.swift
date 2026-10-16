@@ -208,6 +208,18 @@ final class SystemMonitor {
         return await sampler.samplingStats()
     }
 
+    /// 历史页查询(工单 04):引擎保持私有,UI 只拿曲线——SQL 全在引擎 actor
+    /// 上执行(后台队列不掉帧,spec User Story 10)。引擎缺席(库打开失败,
+    /// 03 的降级路径)→ nil,页面按"暂无数据"占位处理,不打断页面。
+    func historySeries(
+        metric: HistoryMetricKey,
+        range: HistoryRange,
+        now: Date = Date()
+    ) async -> HistorySeries? {
+        guard let historyEngine else { return nil }
+        return await historyEngine.series(metric: metric, range: range, now: now)
+    }
+
     /// 结束进程(工单 08):UI 确认后调用——SIGTERM 逐目标投递,
     /// 永不包含自身 pid(getpid),失败逐目标浮出(KillReport)。
     /// 下轮采样自然反映消失;此处仅 MainActor 粘合(编排单测见 KillActionTests)。

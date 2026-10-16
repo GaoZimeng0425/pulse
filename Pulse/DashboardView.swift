@@ -29,10 +29,11 @@ struct DashboardView: View {
     init(monitor: SystemMonitor, initialTab: MetricTab = .overview) {
         self.monitor = monitor
         _model = State(initialValue: DashboardModel(monitor: monitor))
-        // 展示轴随电池可用性(工单 02):无内建电池的机器不含电池页。
+        // 展示轴随电池可用性(工单 02):无内建电池的机器不含电池页;
+        // 历史页(工单 04)只在主窗口,弹窗轴恒滤掉。
         _tabSelection = State(initialValue: MetricTabSelection(
             current: initialTab,
-            axis: MetricTab.displayAxis(hasBattery: monitor.hasBattery)
+            axis: MetricTab.popoverAxis(hasBattery: monitor.hasBattery)
         ))
     }
 
@@ -65,7 +66,7 @@ struct DashboardView: View {
         .background(Surface.window)
         // 首次电池读数落地 → 电池页入轴(工单 02);被隐藏的当前 tab 回落总览。
         .onChange(of: monitor.hasBattery) { _, hasBattery in
-            tabSelection.setAxis(MetricTab.displayAxis(hasBattery: hasBattery))
+            tabSelection.setAxis(MetricTab.popoverAxis(hasBattery: hasBattery))
         }
         .modifier(KillFailureAlert(report: $model.killFailureReport))
     }
@@ -97,7 +98,9 @@ struct DashboardView: View {
     @ViewBuilder
     private var tabCards: some View {
         switch tabSelection.current {
-        case .overview:
+        case .overview, .history:
+            // 历史 tab 不在弹窗轴上(工单 04 拍板:popover 不加历史),与总览
+            // 合并分支只为 switch 穷举(深链误注入时按总览回落,不留坏页)。
             HStack(spacing: 8) {
                 MetricCardView(model: model.cpuModel, style: .compact) { tabSelection.current = .cpu }
                 MetricCardView(model: model.memoryModel, style: .compact) { tabSelection.current = .memory }
