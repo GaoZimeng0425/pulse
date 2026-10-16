@@ -200,12 +200,15 @@ stats 的蓝牙电量是**五源合并**,单一 IOBluetooth 路径覆盖不了�
 1. **IOReport "Energy Model" 通道在 macOS 26 的可用性与单位标签**:stats 正常运行说明通道活着,但通道名/单位(mJ–pJ)无兼容承诺。验证:swift 单文件调 `IOReportCopyChannelsInGroup("Energy Model")` 打印通道名+unit label(参照 `stats-ref Modules/GPU/reader.swift:315`、`:348-359`)。
 2. **`PerformanceStatistics` 键名在当前芯片(M 系列)的实际值**:M5/M6 上是否仍是 "Device Utilization %";`"GPU Activity(%)"` 回退是否需要。验证:IORegistryExplorer 或 `ioreg -l` dump kIOAcceleratorClassName 条目(`stats-ref Modules/GPU/reader.swift:139`)。
 3. **purgeable 两口径差异**:`CSDiskSpaceGetRecoveryEstimate`(stats)与 CFURL 两 key 差值(petal)在 macOS 26 数值是否一致、哪个与 Finder"可用"一致。验证:两者同刻输出对比(`stats-ref Modules/Disk/readers.swift:134`、`petal-ref src/disk.rs:158-161`)。
+   ✅ **结论(2026-10-16 探针①,`docs/probes/01-purgeable-two-sources.swift` + `.output.txt`)**:两口径在 macOS 26 **数值完全一致**(同刻 6.61 GB,Δ=0.00 GB);与 Finder「可用」一致的是 **CFURL `volumeAvailableCapacityForImportantUsageKey`**——osascript 同刻问 Finder 返回 209.55 GB,与 importantUsage 分毫不差(裸 statfs f_bavail=202.9 GB 是另一档)。05 磁盘卡照 §4 既定走 petal 两 key 差值,stats 的 CSDiskSpace 路径不需要了。
 4. **`fs_snapshot_list` 在 macOS 26 仍免 root 可列**:petal 依赖它,签名无变化的话应当可用。验证:照 `petal-ref src/disk.rs:75-107` 翻译 20 行探针跑一次。
+   ✅ **结论(2026-10-16 探针②,`docs/probes/02-fs-snapshot-list.swift` + `.output.txt`)**:**免 root 可列成立**(uid=501,Data 卷 rc=0 空列表——tmutil 交叉确认本机当时确无 TM 快照;根卷额外列到 1 个 `com.apple.os.update-*` 密封系统卷快照)。负对照成立:attrlist 缺 `ATTR_CMN_RETURNED_ATTRS` 时 rc=-1 EINVAL,petal 的 attrlist 三件套要求原样照搬。注意:成功空列表时 errno 是残留值不可信,判成败要看返回值。
 5. **AppleSMC user client 在 macOS 26 无弹窗/无权限门槛**:stats 依赖它读温度。验证:调 `SMC getValue("FNum")`/`"TB1T"`(`stats-ref SMC/smc.swift:172-186`、`stats-ref Modules/Sensors/readers.swift:73`)。
 6. **ANE 最大功耗表对 M5/M6 的数值**(stats 已有 16W 行但来源未注明,`stats-ref Modules/GPU/reader.swift:36-38`):归一化上限错只会影响进度条比例,不崩;可先用 stats 值,发现饱和/常年低估再调。
 7. **OrbStack 的 docker.sock 路径**:容器 tab 无参考实现(§2.9)。验证:`ls /var/run/docker.sock` + OrbStack 设置页;若只有 `~/.orbstack/run/docker.sock`,HTTP 客户端要支持可配置 socket。
 8. **macOS 14+ 进程音频 API 的公开面**(每 App 音量/输入电平):三库无实现(§2.7)。验证:查 CoreAudio 头文件 `AudioHardware.h` 的 process tap 相关常量在 macOS 26 SDK 的可见性,再做最小 demo;麦克风权限弹窗时机要单列。
 9. **`nettop -P -L` JSON 流的输出稳定性**(P3 每 App 网络才需要):stats 已在防列变化(`stats-ref Modules/Net/readers.swift:436-441` 显式 `-k` 裁剪列)。暂不验证,排到 P3。
+10. **IORegistry 块驱动统计对 NVMe 的覆盖**(工单 01 追加,§2.1/§4 吞吐源备选的实证):✅ **结论(2026-10-16 探针③,`docs/probes/03-ioreg-block-driver.swift` + `.output.txt`)**:**覆盖成立**。本机(Apple Silicon NVMe)枚举到 4 个 `IOBlockStorageDriver` 实例;NVMe 驱动(disk0,父节点 NS_01)的 `Statistics` 里 `Bytes (Read)`=3747 GB、`Bytes (Write)`=1888 GB,**2 秒差分有增量**(计数器在走)——系统级内核账,含内核 IO,免 root,不受 rusage 只算用户进程的口径限制。键名照 SDK 是 `"Bytes (Write)"` 不是 "Written"。stats 同款"卷 IOMedia 向上找驱动"遍历(带环检测)从启动卷 `disk3s1s1` 命中同一驱动,映射链可用。回退条件:目标卷向上遍历失败(非典型栈,如某些 RAID/外置盒)或 `Statistics` 缺两键 → 该卷回退 rusage 求和 + 30s 低频档。
 
 ## 6. 证据清单(本次读过)
 
