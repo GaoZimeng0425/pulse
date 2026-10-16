@@ -31,6 +31,18 @@ final class SystemMonitor {
     /// 最近一轮采样留下的下钻输入(工单 06):组卡展开 / 进程详情从这里只读取数,
     /// 下钻不触发额外采集;首轮采样前为 nil。
     private(set) var drilldown: DrilldownState?
+    /// 电池读数(工单 02):最近一次交付,LastGood 语义——读失败交付上次好值,
+    /// 不回退为 nil、不白屏。弹窗与主窗口的电池 tab 读这里。
+    private(set) var battery: BatteryReading?
+    /// 本机有内建电池(工单 02):首次成功读数置真,电池 tab 随之入轴;
+    /// 台式机永无交付 → 恒假,电池页整页隐藏。只翻真不翻假。
+    private(set) var hasBattery = false
+    /// 磁盘容量读数(工单 05):容器对账 + 可清除 + 各卷 + 快照,低频档(30s)
+    /// 交付;首轮前 nil → 卡片全占位(磁盘页常驻轴,无电池页的隐藏问题)。
+    private(set) var diskCapacity: DiskCapacityReading?
+    /// 磁盘吞吐读数(工单 05):系统级读写速率 + 走势,短档(5s)或回退档
+    /// (30s,随源路径)交付;首轮前 nil → 速率列占位。
+    private(set) var diskThroughput: DiskThroughputReading?
 
     private let sampler: Sampler
     /// 历史引擎(工单 03):5s 采样经它卷积落库 + 出生登记持久化 + 唤醒清基线。
@@ -42,11 +54,19 @@ final class SystemMonitor {
     private var wakeObserver: NSObjectProtocol?
     /// 独立出生扫描(评审 S1):~2s 节奏登记新 pid,与采样节奏解耦。
     private let birthScanner: BirthScanner
+    /// 电池传感器(工单 02,ADR-0004 第一个真 provider):事件驱动,IOPS 通知。
+    private let batteryProvider: BatterySensorProvider
+    /// 磁盘容量传感器(工单 05,ADR-0004):低频档 30s,不进 1s 心跳。
+    private let diskCapacityProvider: DiskCapacityProvider
+    /// 磁盘吞吐传感器(工单 05,ADR-0004):短档 5s(IORegistry 主路径)或
+    /// 低频档 30s(rusage 回退),节奏随源路径在构造期钉死。
+    private let diskThroughputProvider: DiskThroughputProvider
     /// 出生扫描最近交付的登记表:每轮采样落地时并入管线(只补缺)。
     private var birthLineage = LineageRegistry()
     private var pipeline: GroupingPipeline
     private let killService: any KillService
     private var samplingTask: Task<Void, Never>?
+    private var sensorTask: Task<Void, Never>?
     private var started = false
 
     init(
@@ -56,11 +76,17 @@ final class SystemMonitor {
         projectRoots: [String] = [],
         killService: any KillService = LiveKillService(),
         birthScanSource: any BirthScanSource = LiveBirthScanSource(),
-        historyEngine: HistoryEngine? = HistoryEngine.openDefault()
+        historyEngine: HistoryEngine? = HistoryEngine.openDefault(),
+        batterySource: any BatterySource = LiveBatterySource(),
+        diskCapacitySource: any DiskCapacitySource = LiveDiskCapacitySource(),
+        diskThroughputSource: any DiskThroughputSource = LiveDiskThroughputSource.adoptingBestPath()
     ) {
         self.sampler = Sampler(source: source, coreTicks: coreTicks, memoryStats: memoryStats)
         self.historyEngine = historyEngine
         self.birthScanner = BirthScanner(source: birthScanSource)
+        self.batteryProvider = BatterySensorProvider(source: batterySource)
+        self.diskCapacityProvider = DiskCapacityProvider(source: diskCapacitySource)
+        self.diskThroughputProvider = DiskThroughputProvider(source: diskThroughputSource)
         self.pipeline = GroupingPipeline(
             configuration: GroupingConfiguration(
                 projectRoots: projectRoots,
@@ -70,9 +96,10 @@ final class SystemMonitor {
         self.killService = killService
     }
 
-    /// 启动采样循环(默认弹窗关闭节奏 5s)与独立出生扫描(~2s 节奏):
-    /// 菜单栏数字与组卡从拉起就是真的,采样间隙出生的短命父进程也留得下快照。
-    /// 幂等;由 UI 的 `.task` 触发。weak self:循环与 app 同寿命,不构成保留环。
+    /// 启动采样循环(默认弹窗关闭节奏 5s)、独立出生扫描(~2s 节奏)与电池
+    /// 传感器调度器(事件驱动):菜单栏数字与组卡从拉起就是真的,采样间隙
+    /// 出生的短命父进程也留得下快照。幂等;由 UI 的 `.task` 触发。
+    /// weak self:循环与 app 同寿命,不构成保留环。
     func start() {
         guard !started else { return }
         started = true
@@ -113,6 +140,35 @@ final class SystemMonitor {
                     self.apply(update)
                 }
             }
+        }
+        // 非心跳型传感器(ADR-0004):单一调度器 actor 按 cadence 驱动——电池
+        // 事件档、磁盘容量 30s 低频档、磁盘吞吐 5s/30s 分档(工单 05"调度器
+        // 体现分档"),心跳型仍住 Sampler 不登记。
+        let capacityProvider = diskCapacityProvider
+        let throughputProvider = diskThroughputProvider
+        let provider = batteryProvider
+        let scheduler = SensorScheduler()
+        sensorTask = Task { [weak self] in
+            await scheduler.run([
+                provider.driver { [weak self] reading in
+                    guard let self else { return }
+                    Task { @MainActor in
+                        self.applyBattery(reading)
+                    }
+                },
+                capacityProvider.driver { [weak self] reading in
+                    guard let self else { return }
+                    Task { @MainActor in
+                        self.applyDiskCapacity(reading)
+                    }
+                },
+                throughputProvider.driver { [weak self] reading in
+                    guard let self else { return }
+                    Task { @MainActor in
+                        self.applyDiskThroughput(reading)
+                    }
+                },
+            ])
         }
     }
 
@@ -213,5 +269,27 @@ final class SystemMonitor {
                 )
             }
         }
+    }
+
+    /// 电池读数落地(工单 02):nil = 从未有过读数(无内建电池)→ 页面保持
+    /// 隐藏;有读数即 hasBattery 置真(此后读失败交付 lastGood 同值重画,
+    /// 不白屏不崩溃——driver 的 `snapshot() ?? lastGood` 交付口径)。
+    private func applyBattery(_ reading: BatteryReading?) {
+        guard let reading else { return }
+        hasBattery = true
+        battery = reading
+    }
+
+    /// 磁盘容量读数落地(工单 05):nil = 从未有过读数(非 APFS 系统/首轮前)
+    /// → 保持占位;读失败交付 lastGood 同值重画(driver 口径),不回退为 nil。
+    private func applyDiskCapacity(_ reading: DiskCapacityReading?) {
+        guard let reading else { return }
+        diskCapacity = reading
+    }
+
+    /// 磁盘吞吐读数落地(工单 05):nil 首轮前保持占位,此后 lastGood 口径同上。
+    private func applyDiskThroughput(_ reading: DiskThroughputReading?) {
+        guard let reading else { return }
+        diskThroughput = reading
     }
 }

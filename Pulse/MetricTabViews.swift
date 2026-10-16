@@ -126,12 +126,13 @@ extension View {
 
 /// 弹窗顶部图标 tab(工单 03,参考文档 §2.1:无文字、title 提示):
 /// 选中态 = 该指标强调色 15% 胶囊 + 强调色图标(§1.1 选中 tab 配方)。
+/// 渲染序 = 选中态的展示轴(工单 02:无电池机器不含电池页)。
 struct MetricIconTabBar: View {
     @Binding var selection: MetricTabSelection
 
     var body: some View {
         HStack(spacing: 4) {
-            ForEach(MetricTab.allCases) { tab in
+            ForEach(selection.axis) { tab in
                 let isSelected = selection.current == tab
                 Button {
                     selection.current = tab
@@ -158,13 +159,13 @@ struct MetricIconTabBar: View {
 }
 
 /// 主窗口药丸文字 tab(工单 03,参考文档 §2.1 主窗口:图标+文字全圆药丸):
-/// 选中态与图标 tab 同配方(强调色 15% 底 + 强调色前景)。
+/// 选中态与图标 tab 同配方(强调色 15% 底 + 强调色前景);渲染序同展示轴。
 struct MetricPillTabBar: View {
     @Binding var selection: MetricTabSelection
 
     var body: some View {
         HStack(spacing: 4) {
-            ForEach(MetricTab.allCases) { tab in
+            ForEach(selection.axis) { tab in
                 let isSelected = selection.current == tab
                 Button {
                     selection.current = tab

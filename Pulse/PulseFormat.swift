@@ -58,6 +58,36 @@ enum PulseFormat {
         "\(Int((Double(bytes) / 1_073_741_824).rounded())) GB"
     }
 
+    /// 磁盘容量(工单 05):字节 → **十进制** GB 两位小数("398.12 GB")——
+    /// Finder「可用/已用」按十进制 GB 报数(探针①同刻 209.55 GB 分毫不差),
+    /// 磁盘卡与 Finder 对照必须同口径;百分位手算拼串,不受系统区域影响。
+    static func diskCapacity(_ bytes: UInt64) -> String {
+        let figure = diskCapacityFigure(bytes)
+        return "\(figure.value) \(figure.unit)"
+    }
+
+    /// diskCapacity 的数字/单位分层版(大数字排版用),同源同格式。
+    static func diskCapacityFigure(_ bytes: UInt64) -> (value: String, unit: String) {
+        let gb = Double(bytes) / 1_000_000_000
+        let hundredths = Int((gb * 100).rounded())
+        let fraction = hundredths % 100
+        return ("\(hundredths / 100).\(fraction < 10 ? "0" : "")\(fraction)", "GB")
+    }
+
+    /// 磁盘速率(工单 05):字节/秒 → "12.4 MB/s"(十进制 KB/MB/GB 三级,
+    /// 一位小数;十分位手算拼串,不随系统区域漂移;负值按 0 夹紧)。
+    static func diskRate(_ bytesPerSecond: Double) -> String {
+        let bps = max(0, bytesPerSecond)
+        let (value, unit): (Double, String) =
+            bps >= 1_000_000_000
+            ? (bps / 1_000_000_000, "GB/s")
+            : bps >= 1_000_000
+            ? (bps / 1_000_000, "MB/s")
+            : (bps / 1_000, "KB/s")
+        let tenths = Int((value * 10).rounded())
+        return "\(tenths / 10).\(tenths % 10) \(unit)"
+    }
+
     /// 主窗口副标题(工单 P0.6-05):"Apple M4 Pro · 12 核 · 48 GB";芯片名未知则省略。
     static func hostSummary(chipName: String?, coreCount: Int, physicalMemoryBytes: UInt64) -> String {
         let parts = [chipName, "\(coreCount) 核", physicalMemoryTotal(physicalMemoryBytes)]
@@ -108,6 +138,25 @@ enum PulseFormat {
             return name
         }
         return "pid \(pid)"
+    }
+
+    /// 电池时间估计(工单 02):分钟 → "3 小时 12 分"/"48 分钟"/"3 小时";
+    /// nil / ≤0(IOPS 未给估计)= "—",不伪造。
+    static func batteryTime(minutes: Int?) -> String {
+        guard let minutes, minutes > 0 else { return "—" }
+        if minutes >= 60 {
+            let hours = minutes / 60
+            let rest = minutes % 60
+            return rest == 0 ? "\(hours) 小时" : "\(hours) 小时 \(rest) 分"
+        }
+        return "\(minutes) 分钟"
+    }
+
+    /// 功率(工单 02 电池卡):瓦 → "18.2 W"(一位小数;tenth 整数运算拼串,
+    /// 不受系统区域小数点写法影响)。负值按 0 夹紧(方向语义由充电状态行表达)。
+    static func watts(_ value: Double) -> String {
+        let tenths = Int((max(0, value) * 10).rounded())
+        return "\(tenths / 10).\(tenths % 10) W"
     }
 
     /// 时长(工单 11 诊断报告"运行时长"):最大两级单位,负数(时钟回拨)按 0 夹紧。

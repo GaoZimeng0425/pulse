@@ -4,15 +4,16 @@ import AppKit
 // MARK: - 指标强调色令牌(工单 P0.6-02):Pulse 从"全灰"到"每指标一色"的色源
 
 /// 指标维度(P0.6-02):"每指标一色"的键,tab 化(工单 03)与 meter/图表从这里取色。
-/// 收录参考文档 §1.1 全表中 Pulse 现阶段用得到的四项:CPU/内存有实时数据,
-/// 磁盘/网络为 tab 化"更多按需"预留;GPU/Neural/电池属 P2、声音/蓝牙有意砍掉、
-/// Projects 属 P1,需要时按同一张表补行(Neural 与 Memory 同色,参考文档已注明,
-/// 故入表即破坏"指标间互异"前提——届时再议)。
+/// 收录参考文档 §1.1 全表中 Pulse 现阶段用得到的项:CPU/内存有实时数据,
+/// 磁盘/网络为 tab 化"更多按需"预留,电池随 P1 工单 02 传感器卡入表;
+/// GPU/Neural 属 P2、声音/蓝牙有意砍掉,需要时按同一张表补行(Neural 与
+/// Memory 同色,参考文档已注明,故入表即破坏"指标间互异"前提——届时再议)。
 enum Metric: String, CaseIterable, Sendable {
     case cpu
     case memory
     case disk
     case network
+    case battery
 }
 
 /// 单指标强调色令牌:浅/深双套,0xRRGGBB。色值唯一出处是
@@ -32,6 +33,7 @@ extension Metric {
         case .memory: MetricAccentToken(light: 0x4a3aa7, dark: 0x9085e9)
         case .disk: MetricAccentToken(light: 0xeda100, dark: 0xc98500)
         case .network: MetricAccentToken(light: 0x1baf7a, dark: 0x199e70)
+        case .battery: MetricAccentToken(light: 0x008300, dark: 0x2fa83a)
         }
     }
 
@@ -58,8 +60,9 @@ enum Surface {
     static let inkTertiary = Color.dynamic(light: 0xa1a1a6, dark: 0x6e6e73)
     /// Projects 指标色:内存构成环的"联动"段(§2.2 by Type 配色)。
     static let projectsAccent = Color.dynamic(light: 0xeb6834, dark: 0xd95926)
-    /// 正常态绿(Battery 指标色):内存压力 "正常" chip。
-    static let positive = Color.dynamic(light: 0x008300, dark: 0x2fa83a)
+    /// 正常态绿 = Battery 指标色(§1.1):内存压力 "正常" chip 与电池卡状态
+    /// chip 同源(工单 02 起 Metric.battery 入表,此处改为别名,不再抄第二份 hex)。
+    static let positive = Metric.battery.accentColor
     /// 危险色(参考文档 §1.1 `--red`):内存压力 "紧张"、高负载警示 chip、
     /// 结束整组图标等"值得注意的负面偏差"的唯一出处(深色补系统红暗色变体,
     /// 参考文档未给暗色值)。

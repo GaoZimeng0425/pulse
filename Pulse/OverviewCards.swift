@@ -157,6 +157,128 @@ extension MetricCardModel {
             MetricCardChip(title: pressure.title, systemImage: "exclamationmark.triangle.fill", tint: Surface.negative)
         }
     }
+
+    /// 电池卡(工单 02):大数字 = 电量,chip = 充电状态,四列小统计 =
+    /// 剩余时间(充电时"充满还需")/ 健康度 / 循环次数 / 功率。
+    /// 读数缺失(未首读 / 部分字段读不到)显示占位,不伪造;电池卡无走势
+    /// (事件驱动,数值罕变),图表区只剩网格线。
+    static func battery(_ reading: BatteryReading?) -> MetricCardModel {
+        guard let reading else {
+            return MetricCardModel(
+                metric: .battery,
+                title: "电池",
+                symbolName: "battery.100percent",
+                caption: "当前电量",
+                figureValue: "—",
+                figureUnit: "%",
+                chip: nil,
+                note: "",
+                stats: [],
+                trend: [],
+                domainMax: 100
+            )
+        }
+        let isCharging = reading.status == .charging
+        return MetricCardModel(
+            metric: .battery,
+            title: "电池",
+            symbolName: "battery.100percent",
+            caption: isCharging ? "充电中 · 当前电量" : "当前电量",
+            figureValue: PulseFormat.cpuPercentNumber(Double(reading.capacityPercent)),
+            figureUnit: "%",
+            chip: reading.status.chip,
+            note: reading.status.title,
+            stats: [
+                MetricCardStat(
+                    label: isCharging ? "充满还需" : "剩余时间",
+                    value: PulseFormat.batteryTime(
+                        minutes: isCharging ? reading.timeToFullMinutes : reading.timeToEmptyMinutes
+                    )
+                ),
+                MetricCardStat(label: "健康度", value: reading.healthPercent.map { "\($0)%" } ?? "—"),
+                MetricCardStat(label: "循环次数", value: reading.cycleCount.map(String.init) ?? "—"),
+                MetricCardStat(label: "功率", value: reading.powerWatts.map(PulseFormat.watts) ?? "—"),
+            ],
+            trend: [],
+            domainMax: 100
+        )
+    }
+    /// 磁盘卡(工单 05):大数字 = 容器已用(十进制 GB,Finder 口径),四列小统计 =
+    /// 实际可用(Finder「可用」importantUsage 口径)/ 可清除(两 key 差值,与
+    /// 「实际可用」分开文案)/ 读取速率 / 写入速率;走势 = 读写合计流量。
+    /// 读数缺失(首轮前 / 容量对账失败)显示占位,不伪造。
+    static func disk(
+        capacity: DiskCapacityReading?,
+        throughput: DiskThroughputReading?
+    ) -> MetricCardModel {
+        guard let capacity else {
+            return MetricCardModel(
+                metric: .disk,
+                title: "磁盘",
+                symbolName: "internaldrive",
+                caption: "已用",
+                figureValue: "—",
+                figureUnit: "GB",
+                chip: nil,
+                note: "",
+                stats: [],
+                trend: [],
+                domainMax: 1
+            )
+        }
+        let total = PulseFormat.diskCapacity(capacity.containerTotalBytes)
+        let trend = throughput?.trend ?? []
+        let trendValues = trend.map { $0.read + $0.write }
+        return MetricCardModel(
+            metric: .disk,
+            title: "磁盘",
+            symbolName: "internaldrive",
+            caption: "已用 · 共 \(total)",
+            figureValue: PulseFormat.diskCapacityFigure(capacity.containerUsedBytes).value,
+            figureUnit: "GB",
+            chip: nil,
+            note: "",
+            stats: [
+                MetricCardStat(
+                    label: "实际可用",
+                    value: capacity.availableForImportantUsageBytes.map {
+                        PulseFormat.diskCapacity(UInt64(max(0, $0)))
+                    } ?? "—"
+                ),
+                MetricCardStat(
+                    label: "可清除",
+                    value: capacity.purgeableBytes.map { PulseFormat.diskCapacity(UInt64($0)) } ?? "—"
+                ),
+                MetricCardStat(
+                    label: "读取",
+                    value: throughput.map { PulseFormat.diskRate($0.current.readBytesPerSecond) } ?? "—"
+                ),
+                MetricCardStat(
+                    label: "写入",
+                    value: throughput.map { PulseFormat.diskRate($0.current.writeBytesPerSecond) } ?? "—"
+                ),
+            ],
+            trend: trendValues,
+            domainMax: max(1, trendValues.max() ?? 1)
+        )
+    }
+}
+
+extension BatteryChargeStatus {
+    /// 状态 chip(工单 02):充电/充满 = Battery 绿;优化充电已介入 = disk 琥珀
+    /// (系统接管中,非故障——调研 §2.3 的语义映射);放电 = 三级墨(常态,安静)。
+    var chip: MetricCardChip {
+        switch self {
+        case .charging:
+            MetricCardChip(title: title, systemImage: "bolt.fill", tint: Surface.positive)
+        case .charged:
+            MetricCardChip(title: title, systemImage: "checkmark", tint: Surface.positive)
+        case .optimizedCharging:
+            MetricCardChip(title: title, systemImage: "clock.badge.checkmark", tint: Metric.disk.accentColor)
+        case .discharging:
+            MetricCardChip(title: title, systemImage: "battery.50percent", tint: Surface.inkTertiary)
+        }
+    }
 }
 
 /// 指标卡:full = 主窗口总览网格(徽章 + 名称 + chevron / 34pt 大数字 / 三列小统计 /

@@ -29,7 +29,11 @@ struct DashboardView: View {
     init(monitor: SystemMonitor, initialTab: MetricTab = .overview) {
         self.monitor = monitor
         _model = State(initialValue: DashboardModel(monitor: monitor))
-        _tabSelection = State(initialValue: MetricTabSelection(current: initialTab))
+        // 展示轴随电池可用性(工单 02):无内建电池的机器不含电池页。
+        _tabSelection = State(initialValue: MetricTabSelection(
+            current: initialTab,
+            axis: MetricTab.displayAxis(hasBattery: monitor.hasBattery)
+        ))
     }
 
     var body: some View {
@@ -54,6 +58,10 @@ struct DashboardView: View {
         .padding(14)
         .frame(width: Self.width)
         .background(Surface.window)
+        // 首次电池读数落地 → 电池页入轴(工单 02);被隐藏的当前 tab 回落总览。
+        .onChange(of: monitor.hasBattery) { _, hasBattery in
+            tabSelection.setAxis(MetricTab.displayAxis(hasBattery: hasBattery))
+        }
         .modifier(KillFailureAlert(report: $model.killFailureReport))
     }
 
@@ -79,7 +87,8 @@ struct DashboardView: View {
         .padding(.horizontal, 4)
     }
 
-    /// 各 tab 的指标卡:总览 = 双列小卡(点卡跳 tab);CPU / 内存 = 主卡(内存再加按应用环形)。
+    /// 各 tab 的指标卡:总览 = 双列小卡(点卡跳 tab);CPU / 内存 / 电池 = 主卡
+    /// (内存再加按应用环形;电池六项读数读 monitor.battery,工单 02)。
     @ViewBuilder
     private var tabCards: some View {
         switch tabSelection.current {
@@ -97,6 +106,14 @@ struct DashboardView: View {
                 totalBytes: content.memoryTotalBytes,
                 isCompact: true
             )
+        case .disk:
+            // 磁盘页(工单 05):主卡(已用大数字 + 可用/可清除/速率)+ 各卷
+            // 明细 + 快照列表;组排行与磁盘无关,不放(battery 同口径)。
+            MetricMainCardView(model: model.diskModel, isCompact: true)
+            DiskVolumeBreakdownView(capacity: monitor.diskCapacity, isCompact: true)
+            DiskSnapshotsCardView(listing: monitor.diskCapacity?.snapshots, isCompact: true)
+        case .battery:
+            MetricMainCardView(model: model.batteryModel, isCompact: true)
         }
     }
 
