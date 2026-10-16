@@ -96,12 +96,22 @@ struct RingSeries<Value: HistoryValue>: Equatable, Sendable {
     }
 }
 
-/// 一轮采样中单个组的采样值(类型化组身份 + 组 CPU% + 组内存)。
+/// 一轮采样中单个组的采样值(类型化组身份 + 组 CPU% + 组内存 + 进程数)。
 /// 输入即 ProcessGroup 的聚合口径,历史层不做二次归组。
+/// 内存环形缓冲(工单 P0.6-01)与历史落库(工单 03 分钟表 procs 列)同一份形状。
 struct GroupSample: Equatable, Sendable {
     let id: GroupIdentity
     let cpuPercent: Double
     let memoryBytes: UInt64
+    /// 组内存活进程数(分钟卷积取窗口峰值)。缺省 1:采到即至少一进程。
+    let processCount: Int
+
+    init(id: GroupIdentity, cpuPercent: Double, memoryBytes: UInt64, processCount: Int = 1) {
+        self.id = id
+        self.cpuPercent = cpuPercent
+        self.memoryBytes = memoryBytes
+        self.processCount = processCount
+    }
 }
 
 /// 单个组的两条历史序列(CPU% 与内存)。

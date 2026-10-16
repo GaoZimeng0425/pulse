@@ -127,6 +127,15 @@ actor Sampler {
         scheduler.setPopoverVisible(visible)
     }
 
+    /// 作废差分基线(工单 03,spec 唤醒处理):系统睡眠唤醒后调用——
+    /// 唤醒后的第一轮无前值,进程 CPU 差分与每核 tick 系统负载双双退化为 0
+    /// (CPUDiffer/CoreTickDiffer 的首采口径),不产生一根横跨睡眠的巨大尖刺。
+    /// 挂唤醒通知的接线在 SystemMonitor.start(UI 粘合层)。
+    func invalidateDeltas() {
+        previousSnapshot = nil
+        previousCoreTicks = nil
+    }
+
     /// 采样累计统计(工单 11:诊断报告在复制时按需取一次)。
     func samplingStats() -> SamplingStats {
         stats
