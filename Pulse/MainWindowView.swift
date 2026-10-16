@@ -351,7 +351,7 @@ private struct MainSearchField: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(Color.primary.opacity(0.06), in: .capsule)
-        .frame(width: 168)
+        .frame(width: 132)
     }
 }
 
