@@ -262,6 +262,50 @@ extension MetricCardModel {
             domainMax: max(1, trendValues.max() ?? 1)
         )
     }
+    /// 网络卡(工单 06):大数字 = 下行速率(十进制 MB/s 口径),四列小统计 =
+    /// 上行速率 / Today 合计 / 7 天合计 / 锁定接口(VPN 自动降级后的物理口);
+    /// 走势 = 上 + 下合计流量。读数缺失(首轮前)与累计缺失(库缺席)显示
+    /// 占位,不伪造。
+    static func network(
+        reading: NetworkRatesReading?,
+        trend: [Double],
+        totals: NetworkTotalsReading?
+    ) -> MetricCardModel {
+        let figure = reading.map { PulseFormat.networkRateFigure($0.rates.downBytesPerSecond) }
+        return MetricCardModel(
+            metric: .network,
+            title: "网络",
+            symbolName: "network",
+            caption: reading.map {
+                "下行速率 · \($0.interfaceName ?? "未知接口")"
+            } ?? "下行速率",
+            figureValue: figure?.value ?? "—",
+            figureUnit: figure?.unit ?? "MB/s",
+            chip: nil,
+            note: "",
+            stats: [
+                MetricCardStat(
+                    label: "上行",
+                    value: reading.map { PulseFormat.networkRateBadge($0.rates.upBytesPerSecond) } ?? "—"
+                ),
+                MetricCardStat(
+                    label: "Today",
+                    value: totals.map {
+                        PulseFormat.networkTotal($0.todayDownBytes + $0.todayUpBytes)
+                    } ?? "—"
+                ),
+                MetricCardStat(
+                    label: "7 天",
+                    value: totals.map {
+                        PulseFormat.networkTotal($0.weekDownBytes + $0.weekUpBytes)
+                    } ?? "—"
+                ),
+                MetricCardStat(label: "接口", value: reading?.interfaceName ?? "—"),
+            ],
+            trend: trend,
+            domainMax: max(1, trend.max() ?? 1)
+        )
+    }
 }
 
 extension BatteryChargeStatus {

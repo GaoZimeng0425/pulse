@@ -58,6 +58,17 @@ final class DashboardModel {
         .disk(capacity: monitor.diskCapacity, throughput: monitor.diskThroughput)
     }
 
+    /// 网络卡(工单 06):实时速率读心跳差分(monitor.network,LastGood),
+    /// Today/7 天累计读历史库聚合(monitor.networkTotals),走势 = 速率环;
+    /// 未首读时全占位(MetricCardModel.network 兜底)。
+    var networkModel: MetricCardModel {
+        .network(
+            reading: monitor.network,
+            trend: monitor.networkTrend.totalBytesPerSecond,
+            totals: monitor.networkTotals
+        )
+    }
+
     // MARK: 26×14 微图数据(工单 03 兑现,评审 F3)
 
     /// 排行卡微图数据:榜单前 3 名(content.microGraphGroupIDs 资格)按当前口径

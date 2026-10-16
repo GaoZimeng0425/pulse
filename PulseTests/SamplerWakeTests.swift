@@ -128,4 +128,120 @@ final class SamplerWakeTests: XCTestCase {
             XCTAssertNil(entry.cpuPercent)
         }
     }
+
+    /// 网络心跳轮(工单 06)与唤醒作废同轨:首轮(无基线)丢弃为 0 → 正常
+    /// 差分出速率 → invalidateDeltas 后首轮再次丢弃——睡眠期累计量不出尖刺。
+    func testNetworkHeartbeatDropsFirstRoundAfterWake() async {
+        let timeline = GatedTimeline(start: base)
+        let sampler = Sampler(
+            source: SyntheticProcessSource(snapshots: [
+                ProcessSnapshot(takenAt: base, processes: []),
+            ]),
+            coreTicks: SyntheticCoreTickSource(samples: [
+                CoreTickSample(busyTicks: [0], totalTicks: [100], takenAt: base),
+            ]),
+            networkCounters: ScriptedNetworkCountersSource(samples: [
+                counters(up: 1_000, down: 2_000, at: 0),                    // 首读:立基线
+                counters(up: 6_000, down: 7_000, at: 5_000_000_000),        // 5s 差分
+                counters(up: 9_000, down: 12_000, at: 10_000_000_000),      // 唤醒后首轮
+            ]),
+            clock: timeline.clock,
+            sleep: timeline.sleeper,
+            maxSleepSlice: .infinity
+        )
+        let box = SamplerTests.DeliveryBox()
+        let task = Task { await sampler.run { box.append($0) } }
+        defer {
+            timeline.close()
+            task.cancel()
+        }
+
+        // 第 1 轮:网络首读 → 丢弃(速率 0,不出开机累计)。
+        let firstReady = await waitFor(box, count: 1)
+        XCTAssertTrue(firstReady)
+        XCTAssertEqual(box.delivered[0].network?.rates, .zero)
+
+        // 第 2 轮:正常差分(1 Gbps 链路内)→ 1000 B/s 双向。
+        timeline.pass(seconds: 5)
+        let secondReady = await waitFor(box, count: 2)
+        XCTAssertTrue(secondReady)
+        XCTAssertEqual(box.delivered[1].network?.rates.upBytesPerSecond ?? -1, 1_000, accuracy: 0.0001)
+        XCTAssertEqual(box.delivered[1].network?.rates.downBytesPerSecond ?? -1, 1_000, accuracy: 0.0001)
+
+        // 模拟唤醒:基线作废 → 第 3 轮丢弃,睡眠期累计不出速率。
+        await sampler.invalidateDeltas()
+        timeline.pass(seconds: 5)
+        let thirdReady = await waitFor(box, count: 3)
+        XCTAssertTrue(thirdReady)
+        XCTAssertEqual(box.delivered[2].network?.rates, .zero)
+    }
+
+    /// 读缺失(nil 计数)轮交付 nil 网络结果,且旧基线保留——下一轮恢复读数
+    /// 时差分跨过缺失轮照常成立,不把缺口算成尖峰。
+    func testMissingNetworkReadingKeepsBaselineAndDeliversNil() async {
+        let timeline = GatedTimeline(start: base)
+        let sampler = Sampler(
+            source: SyntheticProcessSource(snapshots: [
+                ProcessSnapshot(takenAt: base, processes: []),
+            ]),
+            coreTicks: SyntheticCoreTickSource(samples: [
+                CoreTickSample(busyTicks: [0], totalTicks: [100], takenAt: base),
+            ]),
+            networkCounters: ScriptedNetworkCountersSource(samples: [
+                unknownLink(up: 1_000, down: 1_000, at: 0),                 // 首读
+                nil,                                                        // 读缺失
+                unknownLink(up: 6_000, down: 6_000, at: 10_000_000_000),    // 恢复
+            ]),
+            clock: timeline.clock,
+            sleep: timeline.sleeper,
+            maxSleepSlice: .infinity
+        )
+        let box = SamplerTests.DeliveryBox()
+        let task = Task { await sampler.run { box.append($0) } }
+        defer {
+            timeline.close()
+            task.cancel()
+        }
+
+        let firstReady = await waitFor(box, count: 1)
+        XCTAssertTrue(firstReady)
+        XCTAssertNotNil(box.delivered[0].network)
+
+        timeline.pass(seconds: 5)
+        let secondReady = await waitFor(box, count: 2)
+        XCTAssertTrue(secondReady)
+        XCTAssertNil(box.delivered[1].network, "读缺失轮交付 nil,UI 占位")
+
+        timeline.pass(seconds: 5)
+        let thirdReady = await waitFor(box, count: 3)
+        XCTAssertTrue(thirdReady)
+        // 缺失轮没动基线:第 3 轮对首读基线差分(10s 窗)→ 500 B/s,非尖峰。
+        XCTAssertEqual(box.delivered[2].network?.rates.upBytesPerSecond ?? -1, 500, accuracy: 0.0001)
+    }
+}
+
+/// 网络心跳夹具(两用例共享,链路已知 1 Gbps)。
+private func counters(up: UInt64, down: UInt64, at: UInt64) -> NetworkCounters {
+    NetworkCounters(
+        interface: "en0",
+        upBytes: up,
+        downBytes: down,
+        upPackets: 1_000,
+        downPackets: 1_000,
+        linkBaudrateBitsPerSecond: 1_000_000_000,
+        atUptimeNanos: at
+    )
+}
+
+/// 同上,线速未知口径(隧道/死表链路的兜底上限路径)。
+private func unknownLink(up: UInt64, down: UInt64, at: UInt64) -> NetworkCounters {
+    NetworkCounters(
+        interface: "en0",
+        upBytes: up,
+        downBytes: down,
+        upPackets: 1_000,
+        downPackets: 1_000,
+        linkBaudrateBitsPerSecond: nil,
+        atUptimeNanos: at
+    )
 }

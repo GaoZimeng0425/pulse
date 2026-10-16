@@ -43,11 +43,18 @@ final class SystemMonitor {
     /// 磁盘吞吐读数(工单 05):系统级读写速率 + 走势,短档(5s)或回退档
     /// (30s,随源路径)交付;首轮前 nil → 速率列占位。
     private(set) var diskThroughput: DiskThroughputReading?
-    /// 网络速率读数(**工单 09 预留的徽标壳契约,字段由工单 06 填充**):
-    /// 网络卡传感器落地时把读数写到此处——类型若与 NetworkRateReading 不同,
-    /// 在落地处转换即可(徽标只消费上/下行字节速率两个字段)。填充前恒 nil,
-    /// 菜单栏网络槽位显示占位"—",不伪造。
+    /// 网络速率读数(徽标壳契约,工单 09 预留/工单 06 填充):由心跳轮差分
+    /// 结果在落地处转换——徽标只消费上/下行字节速率;读缺失轮保留上次好值
+    /// (LastGood,同电池/磁盘口径),丢弃轮如实为 0。填充前恒 nil → 占位"—"。
     private(set) var networkRate: NetworkRateReading?
+    /// 网络页读数(工单 06):当前速率 + 锁定的物理口名;读缺失轮保留上次
+    /// 好值。首轮前 nil → 全占位。
+    private(set) var network: NetworkRatesReading?
+    /// 网络速率走势(工单 06):心跳轮逐轮推进的纯逻辑环,面积图数据源。
+    private(set) var networkTrend = NetworkTrendBuffer()
+    /// 网络 Today/7 天累计(工单 06):历史库 SQL 聚合,随每轮采样在落库后
+    /// 读回;库缺席/查询失败为 nil → 累计列占位。
+    private(set) var networkTotals: NetworkTotalsReading?
     /// 告警编排(工单 P1-07):每轮采样与磁盘容量读数喂进来,触发/恢复的
     /// 系统通知与应用内提示都由它出。设置页也读它(alerts.store)。
     let alerts: AlertCenter
@@ -263,6 +270,11 @@ final class SystemMonitor {
             lineage: pipeline.lineage,
             processCPU: update.diff.processCPU
         )
+        // 网络心跳轮(工单 06):速率/徽标/走势在 UI 粘合层落地,增量随后
+        // 随落库 Task 进历史引擎(见下方 historyEngine 分支)。
+        if let network = update.network {
+            applyNetwork(network)
+        }
         // 历史管线(工单 03):5s 原始值只进引擎的内存缓冲,分钟卷积 / 小时卷积 /
         // 留存清理 / 出生登记与组元数据落库都在引擎侧一个事务完成;旁路失败只记日志。
         // 采样时刻在 MainActor 上现取(Task 外),顺序即 apply 顺序。
@@ -274,14 +286,25 @@ final class SystemMonitor {
                 uniquingKeysWith: { _, rhs in rhs }
             )
             let lineage = pipeline.lineage
+            // 网络记账增量(工单 06):丢弃轮为 0,读缺失轮 0——不伪造。
+            let netRx = update.network?.downBytesDelta ?? 0
+            let netTx = update.network?.upBytesDelta ?? 0
             Task {
                 await engine.ingest(
                     at: now,
                     systemLoad: update.systemCPULoad,
                     groups: groupSamples,
                     displayNames: displayNames,
-                    lineage: lineage
+                    lineage: lineage,
+                    netRxBytes: netRx,
+                    netTxBytes: netTx
                 )
+                // 累计在落库后读回(同一 actor,顺序即本轮写入先见);
+                // 引擎侧的 nil 只发生在库缺席,UI 保持占位。
+                let totals = await engine.networkTotals(now: now)
+                Task { @MainActor in
+                    self.networkTotals = totals
+                }
             }
         }
         // 告警喂食(工单 P1-07):系统负载 + 全部组(引擎只读聚合口径,不持快照)。
@@ -322,5 +345,17 @@ final class SystemMonitor {
     private func applyDiskThroughput(_ reading: DiskThroughputReading?) {
         guard let reading else { return }
         diskThroughput = reading
+    }
+
+    /// 网络心跳轮落地(工单 06):速率读数 + 徽标契约转换 + 走势环推进。
+    /// 读缺失(nil)整轮跳过,保留上次好值(不回退为 nil、不白屏);
+    /// 丢弃轮(首读/重连跳变/换口)速率如实为 0——菜单栏与图表都见谷底。
+    private func applyNetwork(_ result: NetworkRoundResult) {
+        network = NetworkRatesReading(rates: result.rates, interfaceName: result.interface)
+        networkRate = NetworkRateReading(
+            downloadBytesPerSecond: result.rates.downBytesPerSecond,
+            uploadBytesPerSecond: result.rates.upBytesPerSecond
+        )
+        networkTrend.append(result.rates)
     }
 }

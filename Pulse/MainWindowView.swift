@@ -164,6 +164,10 @@ struct MainWindowView: View {
                 DiskVolumeBreakdownView(capacity: monitor.diskCapacity)
                 DiskSnapshotsCardView(listing: monitor.diskCapacity?.snapshots)
             }
+        case .network:
+            // 网络页(工单 06):主卡 + 流量累计明细(弹窗同构,紧凑)。
+            MetricMainCardView(model: model.networkModel)
+            NetworkTotalsCardView(totals: monitor.networkTotals)
         }
     }
 

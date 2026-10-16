@@ -77,15 +77,8 @@ enum PulseFormat {
     /// 磁盘速率(工单 05):字节/秒 → "12.4 MB/s"(十进制 KB/MB/GB 三级,
     /// 一位小数;十分位手算拼串,不随系统区域漂移;负值按 0 夹紧)。
     static func diskRate(_ bytesPerSecond: Double) -> String {
-        let bps = max(0, bytesPerSecond)
-        let (value, unit): (Double, String) =
-            bps >= 1_000_000_000
-            ? (bps / 1_000_000_000, "GB/s")
-            : bps >= 1_000_000
-            ? (bps / 1_000_000, "MB/s")
-            : (bps / 1_000, "KB/s")
-        let tenths = Int((value * 10).rounded())
-        return "\(tenths / 10).\(tenths % 10) \(unit)"
+        let (value, unit) = decimalByteScale(max(0, bytesPerSecond))
+        return "\(oneDecimal(value)) \(unit)/s"
     }
 
     /// 磁盘剩余徽标(工单 09 菜单栏槽位):字节 → 十进制 GB 整数("182 GB"),
@@ -102,6 +95,41 @@ enum PulseFormat {
     /// 展示格式落地时不与本徽标耦合。
     static func networkRateBadge(_ bytesPerSecond: Double) -> String {
         diskRate(bytesPerSecond)
+    }
+
+    /// 网络速率的数字/单位分层版(工单 06 网络卡大数字排版),口径与
+    /// networkRateBadge 同源同格式(磁盘速率同一套十进制三级一位小数)。
+    static func networkRateFigure(_ bytesPerSecond: Double) -> (value: String, unit: String) {
+        let text = networkRateBadge(bytesPerSecond) // "12.4 MB/s"
+        let parts = text.split(separator: " ")
+        return (String(parts[0]), parts.count > 1 ? String(parts[1]) : "")
+    }
+
+    /// 网络累计(工单 06):字节 → "12.4 MB" / "2.5 GB" / "1.2 TB"(十进制
+    /// KB/MB/GB/TB 四级;百级以上取整求窄,0 恒为 "0.0 KB");与速率同一套
+    /// 十进制口径,Today/7 天累计列共用。
+    static func networkTotal(_ bytes: UInt64) -> String {
+        let (value, unit) = decimalByteScale(Double(bytes))
+        if value >= 100 { return "\(Int(value.rounded())) \(unit)" }
+        return "\(oneDecimal(value)) \(unit)"
+    }
+
+    // MARK: 字节量级私有阶梯(diskRate 与 networkTotal 同源)
+
+    /// 十进制 KB/MB/GB/TB 阶梯:字节量 → (数值, 单位)。磁盘速率(工单 05)
+    /// 与网络累计(工单 06)共用同一套口径;速率层级里 TB 段物理不可达,入表
+    /// 只为与累计同源(阶梯唯一出处)。
+    private static func decimalByteScale(_ bytes: Double) -> (value: Double, unit: String) {
+        if bytes >= 1_000_000_000_000 { return (bytes / 1_000_000_000_000, "TB") }
+        if bytes >= 1_000_000_000 { return (bytes / 1_000_000_000, "GB") }
+        if bytes >= 1_000_000 { return (bytes / 1_000_000, "MB") }
+        return (bytes / 1_000, "KB")
+    }
+
+    /// 十进制一位小数拼串(十分位手算,不受系统区域影响)。
+    private static func oneDecimal(_ value: Double) -> String {
+        let tenths = Int((value * 10).rounded())
+        return "\(tenths / 10).\(tenths % 10)"
     }
 
     /// 主窗口副标题(工单 P0.6-05):"Apple M4 Pro · 12 核 · 48 GB";芯片名未知则省略。

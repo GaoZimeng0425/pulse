@@ -3,13 +3,14 @@ import Foundation
 // MARK: - 指标 tab 内容模型(工单 P0.6-03):弹窗图标 tab / 主窗口药丸 tab 的共享逻辑
 
 /// 指标 tab(工单 03):弹窗与主窗口共用同一组 tab——总览 / CPU / 内存 / 磁盘
-/// (工单 05)/ 电池(工单 02),后续指标(网络,P1+)按 `Metric` 令牌表加 case 即可。
-/// 展示序(`allCases`)同时是键盘 ←/→ 的移动轴:总览最左、电池最右。
+/// (工单 05)/ 网络(工单 06)/ 电池(工单 02)。展示序(`allCases`)同时是
+/// 键盘 ←/→ 的移动轴:总览最左、电池最右。
 enum MetricTab: String, CaseIterable, Identifiable, Sendable {
     case overview
     case cpu
     case memory
     case disk
+    case network
     case battery
 
     var id: String { rawValue }
@@ -21,6 +22,7 @@ enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .cpu: "CPU"
         case .memory: "内存"
         case .disk: "磁盘"
+        case .network: "网络"
         case .battery: "电池"
         }
     }
@@ -32,18 +34,20 @@ enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .cpu: "cpu"
         case .memory: "memorychip"
         case .disk: "internaldrive"
+        case .network: "network"
         case .battery: "battery.100percent"
         }
     }
 
     /// 选中态强调色色源(工单 02 令牌表):总览以系统 CPU 负载为主视角取 cpu,
-    /// CPU/内存/磁盘/电池各取自家令牌——选中胶囊、meter、图表全由它派生。
+    /// CPU/内存/磁盘/网络/电池各取自家令牌——选中胶囊、meter、图表全由它派生。
     var accent: Metric {
         switch self {
         case .overview: .cpu
         case .cpu: .cpu
         case .memory: .memory
         case .disk: .disk
+        case .network: .network
         case .battery: .battery
         }
     }
@@ -164,7 +168,7 @@ struct MetricTabContent: Equatable, Sendable {
         let ranked: [ProcessGroup]
         let metric: GroupCardMetric
         switch tab {
-        case .overview, .cpu, .disk, .battery:
+        case .overview, .cpu, .disk, .network, .battery:
             ranked = groups.sorted { lhs, rhs in
                 if lhs.cpuPercent != rhs.cpuPercent { return lhs.cpuPercent > rhs.cpuPercent }
                 return lhs.id < rhs.id
