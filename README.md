@@ -11,12 +11,13 @@ macOS 菜单栏系统监视器。以 [Vitals](https://vitalsmac.com) 为界面�
 - **弹窗**:全部进程组滚动列表(不只 Top-5),组卡带走势微图、平均/峰值、状态徽章
 - **主窗口**:总览指标卡(CPU user/system 拆分、内存构成)、当前最忙排行卡、可排序进程表、工具栏搜索(按应用名或进程 PID)
 - **动作**:结束整组 / kill 进程树(确认后执行);项目根在设置里配置
-- **资源预算**:全程用户态 API,无 root、零第三方依赖;合盖 5s / 开窗 1s 自适应采样
+- **资源预算**:全程用户态 API,无 root;合盖 5s / 开窗 1s 自适应采样
 
 ## 技术栈
 
 - SwiftUI + `MenuBarExtra`,部署目标 macOS 26+
 - 数据采集直调 Darwin API:`proc_listallpids` / `proc_pidinfo` / `host_processor_info` / `host_statistics64`
+- 日志:CocoaLumberjack(文件双通道)——目前唯一的第三方依赖
 - 纯逻辑层与 OS 边界以 `ProcessSource` 协议分隔,229 个单元测试跑在合成进程树上
 
 ## 构建
