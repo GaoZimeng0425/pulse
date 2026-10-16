@@ -240,12 +240,38 @@ fn group(snap, cache, roots):
 
 ### 8.1 项目可回收产物扫描(P1 候选)
 
-同族功能,点子来自 mole 的 "Purge"(§12):在已配置的项目根下找
-`node_modules`/`target`/`build`/`dist` 等可重建目录,按项目汇总——
-项目卡片给一行"可回收 3.2 GB(node_modules × 5)",告警引擎可出
-"这个项目半个月没动,产物占 X GB"。只读盘点,删不删永远由人确认,
-与 dev server finder 同一原则。实现用 `getattrlistbulk` 目录遍历,
-扫描限项目根、限深度、后台低优先级,不进采样轮。
+在已配置的项目根下找 `node_modules`/`target`/`build`/`dist` 等可重建目录,
+按项目汇总——项目卡片给一行"可回收 3.2 GB(node_modules × 5)",告警引擎可出
+"这个项目半个月没动,产物占 X GB"。只读盘点,删不删永远由人确认,与 dev server
+finder 同一原则。实现用 `getattrlistbulk` 目录遍历,扫描限项目根、限深度、
+后台低优先级,不进采样轮;游走时跳过 iCloud dataless 条目(绝不触发回源下载)。
+
+实现蓝本 = purge-app(MIT,§12,Swift 可直接移植),三个值得照抄的骨架:
+
+- **规则表即真相源**(`ProjectArtifactCatalog.swift`):每个生态一行——
+  rootMarkers 认项目(package.json/Cargo.toml…)、lockfiles 保可重建、
+  refuseWhenPresent 一票否决(`.terraform` 里有 tfstate 就整个拒绝)、
+  reinstall 给出重建命令或人话步骤、level 两档(safe 可进一键/定时;
+  "Check First" 给重建要花真时间的,如 Unity 重导入,永不自动勾选)。
+  加生态 = 加一行,不加 switch。
+- **活跃度判定不看产物 mtime**(`ProjectActivityPolicy.swift`):node_modules
+  的修改时间只说明上次 npm install。"在用" = 有进程 cwd 落在项目内
+  (**Pulse 采样器每轮已有全量 cwd,免费得到**)+ git 锁文件(index.lock);
+  "近期用过" = 项目内最新使用信号(产物 mtime → git 的 index/HEAD/
+  FETCH_HEAD → 根目录 mtime),最后是有 2 万条目上限的目录游走,超限 =
+  "查不动",降级为 Check First 而不是猜。git 目录可向上找(monorepo),
+  但止步于 home——否则 ~ 下的 dotfiles 仓库让所有项目显得忙碌。
+- **发现与删除分离,默认拒绝**(`DeletionSafetyPolicy.swift`):规则只提名,
+  删除前独立过闸门——白名单不在册 = 拒并显示原因;通用名(build/vendor)
+  仅当上层紧邻有项目标记才放行,且永远排在"永不删除"守卫(Pictures/Mail/
+  Keychains…)之后;tfstate、运行中浏览器旧框架这类"答案会随磁盘状态翻转"
+  的检查**永不 memo**,只 memo 稳定答案;identity/账号类缓存与 MDM/终端
+  安全厂商目录整类不提供(前者清了引发登录钥匙串弹窗风暴,后者可能触发
+  篡改告警被企业当成攻击);删除走 Trash 不走 rm。这些闸门只在 Pulse 将来
+  提供"移到废纸篓"按钮时才需要,盘点阶段照抄的是它的名单和分类学。
+- **加分项**:它连 agent 残留都有现成策略——`<项目>/.claude/worktrees/<name>`
+  与 Cursor/Codex 等工具 home 目录下的孤儿 worktree 识别
+  (`AgentWorktreeScanPolicy`),正合我们的 agent 归因定位,纳入 §8.1 范围。
 
 ## 9. MCP server(P3,但这是对你最有价值的一块)
 
@@ -300,6 +326,7 @@ CPU/内存双徽章 + popover 分组卡 + 主窗口 tab + kill 组 + 项目根�
 | [petal](https://github.com/henrydennis/petal) | Rust+GPUI 磁盘空间探索器(旭日图),全盘 ~600 万文件 25s | **代码级参考**:`src/disk.rs` 的 `startup_layout()` APFS 容器级容量算法、purgeable 两 key 差值、`fs_snapshot_list` 快照枚举,照此翻译成 Swift 做 P1 磁盘卡。注意它同时回答了"为什么 naive statfs 不准" | **MIT**,可翻译代码,文件头注明来源 |
 | [stats](https://github.com/exelban/stats) | Swift 菜单栏监视器,42.6k star,模块与本方案 P1/P2 传感器一一对应 | **代码级参考(P2 主参考)**:GPU 利用率 = IORegistry `kIOAcceleratorClassName` → `PerformanceStatistics`("Device Utilization %" 等),免 root 不用 IOReport;神经网络引擎 = IOReport "Energy Model" 用户态 ANE 能量差分 + 每芯片最大功耗表(`Modules/GPU/reader.swift`);SMC 温度风扇 = `SMC/smc.swift` 可直接移植;网络 `NET_RT_IFLIST2`、电池 IOPowerSources 均与 §4 互相印证 | **MIT**,可移植代码,注明来源 |
 | [mole](https://github.com/tw93/Mole) | Go 终端版 CleanMyMac(清理/卸载/磁盘分析/状态仪表盘) | **只拿点子**:项目可回收产物扫描(§8.1)、SMART 可选字段、APFS free 分层修正(独立印证 petal 结论)。**实现一律不学**——数据层全是起子进程 + 正则(pmset/system_profiler/diskutil/powermetrics),常驻监视器场景是反模式,GPU 那条还要 root | **GPL-3.0**,不抄代码、不翻译(翻译也算衍生);点子/算法思路不受版权限制 |
+| [purge-app](https://github.com/jithin-sabu/purge-app) | Swift 原生清理 App(1.25k star):缓存/项目产物/大文件,默认进废纸篓 | **代码级参考(§8.1 主参考)**:`Models/ProjectArtifactCatalog.swift` 40+ 生态规则表(rootMarkers/lockfiles/refuseWhenPresent/reinstall/safe|medium 两档);`Services/ProjectActivityPolicy.swift` 活跃度判定(进程 cwd 在项目内 = 在用——与 Pulse 采样器同款 libproc 技巧;git 活跃文件 + 2 万条上限有界游走);`Services/DeletionSafetyPolicy.swift` 默认拒绝闸门(白名单/永不删除/动态拒绝永不 memo;identity 与 MDM 厂商整类不提供);agent worktree 残留策略 | **MIT**,可移植代码,注明来源 |
 | Vitals 本体 | 闭源商用监视器 | UI 形态、每指标强调色、数字口径的**行为对齐基准** | 闭源,只对齐行为,不看其代码 |
 
 逐传感器的实现细节、防御点清单与 9 条待本机探针验证的开放问题
