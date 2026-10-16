@@ -342,6 +342,20 @@ enum KillRequestFlow {
         let report = monitor.terminateGroup(id: group.id)
         return report.hasFailures ? report : nil
     }
+
+    /// dev server 卡"全部停止"(工单 08):一次确认列出全部目标,确认后逐个
+    /// SIGTERM;确认流与单进程/整组同一 NSAlert 关口,绝不自动杀。
+    static func stopAll(_ targets: [KillTarget], monitor: SystemMonitor) -> KillReport? {
+        guard !targets.isEmpty else { return nil }
+        let confirmed = KillConfirmationDialog.confirm(
+            title: KillCopy.stopAllConfirmationTitle,
+            informativeText: KillCopy.confirmationMessage(for: targets),
+            actionTitle: KillCopy.stopAllActionTitle
+        )
+        guard confirmed else { return nil }
+        let report = monitor.terminate(targets)
+        return report.hasFailures ? report : nil
+    }
 }
 
 /// 处置失败汇总弹窗:**有失败才弹**(标题 / 正文 / "知道了"按钮与工单 08 一致)。

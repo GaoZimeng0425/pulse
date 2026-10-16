@@ -144,6 +144,13 @@ struct MainWindowView: View {
             SectionTitle(title: "当前最忙")
                 .padding(.top, 6)
             rankingCard
+            SectionTitle(title: "开发服务")
+                .padding(.top, 6)
+            // dev server 卡(工单 08):主窗口总览页专属(popover 不放,工单拍板);
+            // 全部停止只上抛请求,确认对话框(KillRequestFlow 关口)把关后才发信号。
+            DevServerCardView(servers: monitor.devServers) {
+                model.requestStopAllDevServers(monitor.devServers)
+            }
         case .cpu:
             MetricMainCardView(model: model.cpuModel)
             rankingCard

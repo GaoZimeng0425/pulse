@@ -119,7 +119,7 @@ struct AlertSettingsView: View {
         case .groupCPU: "任一组 CPU 持续高于阈值 10 分钟时提醒(逐组判定)"
         case .newGroupMemory: "新出现的组出生即占用超过阈值内存且稳住三轮时提醒"
         case .diskAvailable: "磁盘可用空间低于阈值时提醒(Finder「可用」口径)"
-        case .devServerIdle: "dev server 闲置超过阈值时提醒(数据源随 dev server 卡接入)"
+        case .devServerIdle: "dev server 闲置超过阈值时提醒(argv 识别;最近 10 分钟 CPU≈0 记闲置)"
         }
     }
 }

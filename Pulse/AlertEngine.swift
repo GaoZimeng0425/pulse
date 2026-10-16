@@ -10,8 +10,7 @@ import Foundation
 // 要求的规则还要跨越该时长),退出需连续 `exitConsecutive` 次低于阈值∓20%——
 // 阈值附近抖动的读数落进迟滞带,两侧计数都清零,不会连环轰炸。
 
-/// 告警规则种类(五条预设,spec):dev server 闲置的数据源随工单 08 接入,
-/// 本单仅留规则位(枚举/预设/存储都在,引擎永不收到它的喂食,自然静默)。
+/// 告警规则种类(五条预设,spec)。
 enum AlertKind: String, CaseIterable, Codable, Identifiable, Sendable {
     /// 系统 CPU 负载 >70% 持续 5 分钟(每核 tick 口径,同菜单栏数字)。
     case systemLoad
@@ -21,7 +20,7 @@ enum AlertKind: String, CaseIterable, Codable, Identifiable, Sendable {
     case newGroupMemory
     /// 磁盘可用(Finder「可用」口径)<20GB。
     case diskAvailable
-    /// dev server 闲置 >24h(工单 08 接入;规则位占坑)。
+    /// dev server 闲置 >24h(工单 08:数据源 = dev server finder 闲置环)。
     case devServerIdle
 
     var id: String { rawValue }
@@ -38,7 +37,7 @@ enum AlertKind: String, CaseIterable, Codable, Identifiable, Sendable {
         case .diskAvailable:
             AlertKindPreset(threshold: 20 * 1_073_741_824, direction: .below, sustain: nil, cooldown: 600)
         case .devServerIdle:
-            // 阈值 = 闲置秒数(24h);工单 08 接入数据源时按需细化。
+            // 阈值 = 闲置秒数(默认 24h);设置页以小时编辑(AlertSettingsView)。
             AlertKindPreset(threshold: 24 * 3600, direction: .above, sustain: nil, cooldown: 600)
         }
     }
@@ -54,8 +53,9 @@ enum AlertKind: String, CaseIterable, Codable, Identifiable, Sendable {
         }
     }
 
-    /// 数据源是否已接线(本单只接四条;dev server 随工单 08)——设置页只展示已接线的。
-    var isDataSourceWired: Bool { self != .devServerIdle }
+    /// 数据源是否已接线(设置页只展示已接线的)。五条已全部接线:dev server
+    /// 闲置的喂食随工单 08 落地(dev server finder 每轮盘点)。
+    var isDataSourceWired: Bool { true }
 
     /// 点通知直达的视图(spec:系统负载→总览、组 CPU→CPU 页、磁盘→磁盘页;
     /// 新组内存同构延伸落内存页)。
@@ -153,10 +153,20 @@ struct AlertGroupSnapshot: Sendable {
     let memoryBytes: UInt64
 }
 
-/// 引擎喂食:采样轮(系统负载 + 全部组)或磁盘容量读数,各自按其到达节奏推进。
+/// dev server 喂食行(dev server finder 工单 08 每轮产出;闲置秒数已由
+/// 闲置环判定,nil 的未闲置 server 不喂——不伪造读数)。
+struct AlertDevServerSnapshot: Sendable {
+    let pid: pid_t
+    let name: String
+    let idleSeconds: TimeInterval
+}
+
+/// 引擎喂食:采样轮(系统负载 + 全部组)、磁盘容量读数或 dev server 盘点,
+/// 各自按其到达节奏推进。
 enum AlertFeed: Sendable {
     case sampling(systemCPULoad: Double, groups: [AlertGroupSnapshot])
     case disk(availableBytes: Int64)
+    case devServers([AlertDevServerSnapshot])
 }
 
 /// 一次实际发出的告警(fired 事件的载荷):通知与设置页"触发中"都消费它。
@@ -287,6 +297,44 @@ struct AlertEngine: Sendable {
                     ageWindow: nil
                 )
             }
+        case .devServers(let servers):
+            events += ingestDevServers(servers, now: now, settings: settings)
+        }
+        return events
+    }
+
+    // MARK: dev server 喂食(工单 08):消失解除 / 闲置超阈评估
+
+    /// dev server 主体的规范键(pid 唯一;进程退出即解除,pid 复用天然新主体)。
+    static func devServerSubjectKey(pid: pid_t) -> String {
+        "devserver|\(pid)"
+    }
+
+    private mutating func ingestDevServers(
+        _ servers: [AlertDevServerSnapshot], now: Date, settings: AlertEvaluationSettings
+    ) -> [AlertEvent] {
+        var events: [AlertEvent] = []
+        let presentKeys = Set(servers.map { Self.devServerSubjectKey(pid: $0.pid) })
+        // dev server 消失:firing 立即解除,状态清空(候选态安静丢弃)。
+        let vanished = subjects.filter { ref, _ in
+            ref.kind == .devServerIdle && !presentKeys.contains(ref.subjectKey)
+        }
+        for (ref, state) in vanished {
+            if state.phase == .firing {
+                events.append(.resolved(kind: ref.kind, subjectKey: ref.subjectKey))
+            }
+            subjects.removeValue(forKey: ref)
+        }
+        guard let policy = settings[.devServerIdle], policy.isEnabled else { return events }
+        for server in servers {
+            events += evaluate(
+                kind: .devServerIdle,
+                subjectKey: Self.devServerSubjectKey(pid: server.pid),
+                subjectName: server.name,
+                value: server.idleSeconds,
+                policy: policy, now: now,
+                ageWindow: nil
+            )
         }
         return events
     }

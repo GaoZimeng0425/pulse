@@ -48,6 +48,9 @@ final class SystemMonitor {
     /// 在落地处转换即可(徽标只消费上/下行字节速率两个字段)。填充前恒 nil,
     /// 菜单栏网络槽位显示占位"—",不伪造。
     private(set) var networkRate: NetworkRateReading?
+    /// dev server 盘点(工单 08):每轮采样对 argv 命中的候选进程合成状态
+    /// (闲置时长/内存/监听端口);无候选为空数组。主窗口总览页卡片读这里。
+    private(set) var devServers: [DevServerStatus] = []
     /// 告警编排(工单 P1-07):每轮采样与磁盘容量读数喂进来,触发/恢复的
     /// 系统通知与应用内提示都由它出。设置页也读它(alerts.store)。
     let alerts: AlertCenter
@@ -72,6 +75,8 @@ final class SystemMonitor {
     /// 出生扫描最近交付的登记表:每轮采样落地时并入管线(只补缺)。
     private var birthLineage = LineageRegistry()
     private var pipeline: GroupingPipeline
+    /// dev server 盘点器(工单 08):闲置环状态随采样轮推进,端口扫描走缝。
+    private var devServerFinder: DevServerFinder
     private let killService: any KillService
     private var samplingTask: Task<Void, Never>?
     private var sensorTask: Task<Void, Never>?
@@ -88,6 +93,7 @@ final class SystemMonitor {
         batterySource: any BatterySource = LiveBatterySource(),
         diskCapacitySource: any DiskCapacitySource = LiveDiskCapacitySource(),
         diskThroughputSource: any DiskThroughputSource = LiveDiskThroughputSource.adoptingBestPath(),
+        devServerPortScanner: any DevServerPortScanning = LiveDevServerPortScanner(),
         alertCenter: AlertCenter = AlertCenter()
     ) {
         self.sampler = Sampler(source: source, coreTicks: coreTicks, memoryStats: memoryStats)
@@ -104,6 +110,7 @@ final class SystemMonitor {
             )
         )
         self.killService = killService
+        self.devServerFinder = DevServerFinder(portScanner: devServerPortScanner)
     }
 
     /// 启动采样循环(默认弹窗关闭节奏 5s)、独立出生扫描(~2s 节奏)与电池
@@ -308,6 +315,20 @@ final class SystemMonitor {
                 )
             }
         )
+        // dev server 盘点(工单 08):argv 分类 → 候选进程闲置环 + 端口扫描;
+        // 盘点时刻与快照同一时间轴(不另取钟),未闲置(nil)的 server 不喂告警。
+        let cpuByPID = update.diff.processCPU.cpuPercentByPID
+        let now = update.snapshot.takenAt
+        devServers = devServerFinder.update(
+            snapshot: update.snapshot,
+            processCPU: cpuByPID,
+            now: now
+        )
+        alerts.ingestDevServers(devServers.compactMap { server in
+            server.idleSeconds.map {
+                AlertDevServerSnapshot(pid: server.pid, name: server.displayName, idleSeconds: $0)
+            }
+        })
     }
 
     /// 电池读数落地(工单 02):nil = 从未有过读数(无内建电池)→ 页面保持

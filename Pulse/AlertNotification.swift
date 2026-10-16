@@ -95,7 +95,7 @@ enum AlertNotificationContent {
         case .diskAvailable:
             "可用 \(PulseFormat.diskCapacity(UInt64(max(0, occurrence.value)))),剩余空间紧张。"
         case .devServerIdle:
-            "已闲置超过 24 小时,确认一下是否还需要。"
+            "「\(occurrence.subjectName ?? "dev server")」已闲置 \(PulseFormat.duration(seconds: occurrence.value)),确认一下是否还需要。"
         }
     }
 

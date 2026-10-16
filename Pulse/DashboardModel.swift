@@ -100,4 +100,12 @@ final class DashboardModel {
     func requestEndGroup(_ group: ProcessGroup) {
         killFailureReport = KillRequestFlow.endGroup(group, monitor: monitor)
     }
+
+    /// dev server 卡"全部停止"(工单 08):一次确认列全部目标 → 逐个 SIGTERM。
+    /// 取点击瞬间的盘点名单;确认对话框打开期间采样照跑,消失的进程 SIGTERM
+    /// 报"进程已退出"进失败汇总,不会误伤。
+    func requestStopAllDevServers(_ servers: [DevServerStatus]) {
+        let targets = servers.map { KillTarget(pid: $0.pid, name: $0.displayName) }
+        killFailureReport = KillRequestFlow.stopAll(targets, monitor: monitor)
+    }
 }
