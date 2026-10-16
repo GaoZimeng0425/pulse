@@ -1,0 +1,23 @@
+uid=501(非 root)  探针③:IORegistry 块存储驱动统计覆盖(根卷 BSD=disk3s1s1)
+共 4 个 IOBlockStorageDriver 实例
+  [0] IOBlockStorageDriver  父=NS_01  media=disk0
+       Bytes(Read)=3747.44 GB  Bytes(Write)=1888.77 GB
+  [1] IOBlockStorageDriver  父=AppleSDXCBlockStorageDevice  media=(无 IOMedia 子节点)
+       Bytes(Read)=0.00 GB  Bytes(Write)=0.00 GB
+  [2] IOBlockStorageDriver  父=IODiskImageBlockStorageDeviceOutKernel  media=disk4
+       Bytes(Read)=0.01 GB  Bytes(Write)=0.00 GB
+  [3] IOCDBlockStorageDriver  父=IOCompactDiscServices  media=(无 IOMedia 子节点)
+       Bytes(Read)=0.00 GB  Bytes(Write)=0.00 GB
+
+2 秒后差分(计数器是否在走;负值 = 回绕/重置,按 stats 规则钳 0):
+  [0] IOBlockStorageDriver: Δread=3874816B  Δwrite=995328B
+  [1] IOBlockStorageDriver: Δread=0B  Δwrite=0B
+  [2] IOBlockStorageDriver: Δread=0B  Δwrite=0B
+  [3] IOCDBlockStorageDriver: Δread=0B  Δwrite=0B
+
+计数器在走:IORegistry 路径可作系统级吞吐源(含内核 IO)。
+
+stats 同款遍历:启动卷 disk3s1s1 → 向上找块驱动
+  命中 driver=IOBlockStorageDriver  父=NS_01
+  Bytes(Read)=3747.44 GB  Bytes(Write)=1888.77 GB
+  → 卷级到驱动的映射链可用,吞吐差分可按此遍历实装。

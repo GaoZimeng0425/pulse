@@ -1,0 +1,27 @@
+uid=501(非 root)  探针①:purgeable 两口径同刻对照
+
+== 卷 / (fs=apfs) ==
+  statfs       total=494.38 GB  used(f_blocks-f_bfree)=291.45 GB  avail(f_bavail)=202.93 GB
+  CSDiskSpaceGetRecoveryEstimate          = 6.61 GB   (stats 路径,仅估计值)
+  CFURL AvailableCapacity(free)           = 202.93 GB   (petal 的 free 口径)
+  CFURL AvailableCapacityForImportantUsage= 209.54 GB   (petal 注释:即 Finder「可用」)
+  ⇒ petal 两 key 差值 purgeable            = 6.61 GB
+  ⇒ stats 口径 free = f_bavail + estimate = 209.54 GB  (与上行 important 对照)
+  ⇒ 两口径 estimate vs 两 key 差值          = 6.61 GB vs 6.61 GB  Δ=0.00 GB
+
+== 卷 /System/Volumes/Data (fs=apfs) ==
+  statfs       total=494.38 GB  used(f_blocks-f_bfree)=291.45 GB  avail(f_bavail)=202.93 GB
+  CSDiskSpaceGetRecoveryEstimate          = 6.61 GB   (stats 路径,仅估计值)
+  CFURL AvailableCapacity(free)           = 202.93 GB   (petal 的 free 口径)
+  CFURL AvailableCapacityForImportantUsage= 209.54 GB   (petal 注释:即 Finder「可用」)
+  ⇒ petal 两 key 差值 purgeable            = 6.61 GB
+  ⇒ stats 口径 free = f_bavail + estimate = 209.54 GB  (与上行 important 对照)
+  ⇒ 两口径 estimate vs 两 key 差值          = 6.61 GB vs 6.61 GB  Δ=0.00 GB
+
+Finder 对照提示:访达对启动盘显示的「可用空间」按十进制 GB 报数;
+与上行 importantUsage 一致则 petal 口径即 Finder 口径,与 f_bavail 一致则裸 statfs 口径即 Finder 口径。
+── 留档补充(同刻交叉证据,运行时间同上一次探针间隔数秒)──
+osascript -e 'tell application "Finder" to get free space of startup disk' → 2.0955...E+11 ≈ 209.55 GB
+  = kCFURLVolumeAvailableCapacityForImportantUsageKey 分毫不差 → Finder「可用」即 importantUsage 口径(petal)
+df -k / → avail 189.00 GiB = 202.9 GB ≈ f_bavail / AvailableCapacity(free),交叉一致
+结论:两口径在 macOS 26 数值一致(Δ=0.00 GB);Finder 一致者是 petal 两 key 差值口径。

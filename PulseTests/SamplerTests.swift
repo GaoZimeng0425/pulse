@@ -193,4 +193,22 @@ final class SamplerTests: XCTestCase {
         XCTAssertEqual(loads[1], 25, accuracy: 0.0001)
         XCTAssertEqual(clock.sleepRequests, [2, 2, 1])
     }
+
+    // MARK: 采样统计(工单 11:诊断报告取数)
+
+    func testSamplingStatsAccumulateAcrossRounds() async {
+        // 三轮交付后统计:轮数 = 交付数;峰值取最大快照进程数(2);
+        // 运行起点 = 首轮采样时刻。假时钟同一轮内不走秒,轮耗时累计 0
+        // (均值口径在 SamplingStats 纯值测试里另测)。
+        let timeline = FakeTimeline(start: base, sleepBudget: 2)
+        let sampler = makeSampler(timeline: timeline)
+        _ = await drain(sampler, timeline: timeline)
+
+        let stats = await sampler.samplingStats()
+
+        XCTAssertEqual(stats.sampleCount, 3)
+        XCTAssertEqual(stats.peakProcessCount, 2)
+        XCTAssertEqual(stats.startedAt, base)
+        XCTAssertEqual(stats.averageRoundDuration ?? -1, 0, accuracy: 0.0001)
+    }
 }

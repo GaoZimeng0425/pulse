@@ -10,12 +10,19 @@ import SwiftUI
 /// UserDefaults 双份账本):开关动作即时注册/注销,窗口出现时从系统读回;
 /// 开关状态与系统真实状态解耦(程序性回滚不重触发动作,见 syncing 注释)。
 struct GeneralSettingsView: View {
+    /// 采样管线(工单 11):诊断报告的统计数据源(运行起点/轮数/均值/峰值)。
+    let monitor: SystemMonitor
+
     /// 系统登录项状态的镜像;程序性赋值(读回/失败回滚)前置 suppress 标记,
     /// 防止镜像变化再次触发 onChange 造成重入。
     @State private var launchAtLogin = false
     @State private var requiresApproval = false
     @State private var notInstalledNotice: String?
     @State private var suppressNextChange = false
+    /// 复制反馈(工单 11):标签翻转"已复制",~2s 后复位;新点击先取消旧定时,
+    /// 连点不会提前收走反馈。
+    @State private var reportCopied = false
+    @State private var copyFeedbackTask: Task<Void, Never>?
 
     var body: some View {
         Form {
@@ -42,6 +49,12 @@ struct GeneralSettingsView: View {
                     Button("打开日志文件夹") { openLogsFolder() }
                 }
                 Text("位于 ~/.Pulse/logs,最多保留 14 个文件自动轮转。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                LabeledContent("诊断报告") {
+                    Button(reportCopied ? "已复制" : "复制诊断报告") { copyDiagnosticReport() }
+                }
+                Text("版本 / 系统 / 机型 / 采样统计 / 最近日志尾部拼成纯文本,报 bug 时直接粘贴。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -116,10 +129,41 @@ struct GeneralSettingsView: View {
         NSWorkspace.shared.open(URL(fileURLWithPath: LogService.logDirectory))
     }
 
+    /// 一键复制诊断报告(工单 11):拼装是纯函数(时钟/统计/日志尾全部注入,
+    /// 单测见 DiagnosticReportTests),这里只做取数与剪贴板写入;成功反馈 =
+    /// 按钮标签翻转"已复制"约 2 秒。
+    private func copyDiagnosticReport() {
+        let monitor = monitor
+        Task {
+            let report = DiagnosticReport.assemble(
+                version: bundleValue("CFBundleShortVersionString"),
+                build: bundleValue("CFBundleVersion"),
+                macOSVersion: ProcessInfo.processInfo.operatingSystemVersionString,
+                chipName: HostInfo.current.chipName,
+                stats: await monitor.samplingStats(),
+                logTail: DiagnosticReport.logTail(directory: LogService.logDirectory),
+                now: Date()
+            )
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(report, forType: .string)
+            LogService.info("诊断报告已复制(\(report.count) 字符)", category: "Settings")
+
+            copyFeedbackTask?.cancel()
+            reportCopied = true
+            copyFeedbackTask = Task {
+                try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled else { return }
+                reportCopied = false
+            }
+        }
+    }
+
+    /// Info.plist 字符串读取,缺失以 "?" 兜底(与 versionText 同口径)。
+    private func bundleValue(_ key: String) -> String {
+        Bundle.main.infoDictionary?[key] as? String ?? "?"
+    }
+
     private var versionText: String {
-        let info = Bundle.main.infoDictionary ?? [:]
-        let version = info["CFBundleShortVersionString"] as? String ?? "?"
-        let build = info["CFBundleVersion"] as? String ?? "?"
-        return "\(version) (\(build))"
+        "\(bundleValue("CFBundleShortVersionString")) (\(bundleValue("CFBundleVersion")))"
     }
 }
