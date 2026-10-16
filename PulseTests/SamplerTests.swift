@@ -53,7 +53,8 @@ final class SamplerTests: XCTestCase {
     }
 
     /// 线程安全的交付记录(deliver 从 actor 上下文同步调用)。
-    private final class DeliveryBox: @unchecked Sendable {
+    /// internal:SamplerWakeTests(工单 03 唤醒)共用同一份。
+    final class DeliveryBox: @unchecked Sendable {
         private let lock = NSLock()
         private var updates: [SamplingUpdate] = []
 
