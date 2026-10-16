@@ -48,9 +48,9 @@ struct PulseApp: App {
         .defaultSize(width: 880, height: 620)
 
         // 设置窗(工单 07 → 2026-10-16 扩为系统设置式双栏,见 SettingsView):
-        // 通用(登录自启/日志/版本)+ 项目根目录;入口在弹窗头部齿轮按钮。
+        // 通用(登录自启/日志/诊断报告/版本)+ 项目根目录;入口在弹窗头部齿轮按钮。
         Settings {
-            SettingsView(rootsStore: rootsStore)
+            SettingsView(rootsStore: rootsStore, monitor: monitor)
         }
     }
 }

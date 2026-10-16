@@ -12,8 +12,8 @@ import Observation
 final class DashboardModel {
     let monitor: SystemMonitor
 
-    /// 展开中的组(按稳定组 id):跨采样轮次保持,组消失时残留 id 无害。
-    var expandedGroupIDs: Set<String> = []
+    /// 展开中的组(按类型化组身份):跨采样轮次保持,组消失时残留身份无害。
+    var expandedGroupIDs: Set<GroupIdentity> = []
     /// 展开详情的进程(跨组唯一):下钻期间进程退出时详情安静收起。
     var selectedProcessID: pid_t?
     /// 处置结果汇总(工单 08):**有失败才弹**;全成功保持安静。
@@ -56,9 +56,9 @@ final class DashboardModel {
     /// 排行卡微图数据:榜单前 3 名(content.microGraphGroupIDs 资格)按当前口径
     /// 取组历史序列——CPU 口径 = 组 CPU%,内存口径 = 组内存字节;
     /// 无历史的组(榜单资格先于首个采样点)不入表,行内不画。
-    func microGraphValues(for content: MetricTabContent) -> [String: [Double]] {
+    func microGraphValues(for content: MetricTabContent) -> [GroupIdentity: [Double]] {
         guard !content.microGraphGroupIDs.isEmpty else { return [:] }
-        var values: [String: [Double]] = [:]
+        var values: [GroupIdentity: [Double]] = [:]
         for group in content.ranking where content.microGraphGroupIDs.contains(group.id) {
             guard let series = monitor.history.series(forGroup: group.id) else { continue }
             switch content.metric {
@@ -78,7 +78,7 @@ final class DashboardModel {
     // MARK: 会话状态与处置请求(工单 08;确认 + 执行在 KillRequestFlow)
 
     /// 点行展开 / 收起组内进程。
-    func toggleExpansion(of groupID: String) {
+    func toggleExpansion(of groupID: GroupIdentity) {
         if !expandedGroupIDs.insert(groupID).inserted {
             expandedGroupIDs.remove(groupID)
         }

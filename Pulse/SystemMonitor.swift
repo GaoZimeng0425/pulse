@@ -123,6 +123,13 @@ final class SystemMonitor {
         pipeline.setProjectRoots(roots)
     }
 
+    /// 诊断报告取数(工单 11):按需向采样器要一份累计统计快照
+    /// (运行起点/轮数/均值/峰值),不做常驻观察。
+    func samplingStats() async -> SamplingStats {
+        let sampler = self.sampler
+        return await sampler.samplingStats()
+    }
+
     /// 结束进程(工单 08):UI 确认后调用——SIGTERM 逐目标投递,
     /// 永不包含自身 pid(getpid),失败逐目标浮出(KillReport)。
     /// 下轮采样自然反映消失;此处仅 MainActor 粘合(编排单测见 KillActionTests)。
@@ -138,7 +145,7 @@ final class SystemMonitor {
     /// (确认对话框打开期间可能又采了一轮,以最新存活名单为准);
     /// 组已消失 → 空报告(无需处置,也无失败可报)。
     /// 工单 P0.5-01:查全组列表(主窗口与弹窗可见的组都要能处置)。
-    func terminateGroup(id groupID: String) -> KillReport {
+    func terminateGroup(id groupID: GroupIdentity) -> KillReport {
         guard let group = allGroups.first(where: { $0.id == groupID }) else {
             return KillReport(outcomes: [])
         }

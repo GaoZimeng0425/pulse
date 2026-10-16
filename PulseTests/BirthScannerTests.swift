@@ -139,12 +139,13 @@ final class BirthScannerTests: XCTestCase {
             pidLists: [[1], [1, 42]],
             entryFor: { pid in
                 pid == 1
-                    ? LineageRegistry.Entry(parentPID: 0, executablePath: "/sbin/launchd", cwd: nil, argv: ["launchd"])
+                    ? LineageRegistry.Entry(
+                        parentPID: 0,
+                        identity: ProcessIdentity(executablePath: "/sbin/launchd", cwd: nil, argv: ["launchd"])
+                    )
                     : LineageRegistry.Entry(
                         parentPID: 7,
-                        executablePath: "/bin/foo",
-                        cwd: "/tmp/x",
-                        argv: ["foo", "-x"]
+                        identity: ProcessIdentity(executablePath: "/bin/foo", cwd: "/tmp/x", argv: ["foo", "-x"])
                     )
             }
         )
@@ -157,7 +158,10 @@ final class BirthScannerTests: XCTestCase {
         let registry = delivered.last!
         XCTAssertEqual(
             registry.entries[42],
-            LineageRegistry.Entry(parentPID: 7, executablePath: "/bin/foo", cwd: "/tmp/x", argv: ["foo", "-x"]),
+            LineageRegistry.Entry(
+                parentPID: 7,
+                identity: ProcessIdentity(executablePath: "/bin/foo", cwd: "/tmp/x", argv: ["foo", "-x"])
+            ),
             "新 pid 的出生信息应完整登记(父 pid / 路径 / cwd / argv)"
         )
         XCTAssertEqual(registry.entries[1]?.parentPID, 0)
@@ -183,9 +187,7 @@ final class BirthScannerTests: XCTestCase {
                 let round = counter.next()
                 return LineageRegistry.Entry(
                     parentPID: pid_t(round),
-                    executablePath: "/bin/foo",
-                    cwd: nil,
-                    argv: []
+                    identity: ProcessIdentity(executablePath: "/bin/foo")
                 )
             }
         )
@@ -232,10 +234,10 @@ final class BirthScannerTests: XCTestCase {
 
     func testRegistryMergingKeepsOwnRecordsAndFillsGaps() {
         var own = LineageRegistry()
-        own.register(pid: 10, entry: LineageRegistry.Entry(parentPID: 1, executablePath: "/a", cwd: nil, argv: []))
+        own.register(pid: 10, entry: LineageRegistry.Entry(parentPID: 1, identity: ProcessIdentity(executablePath: "/a")))
         var other = LineageRegistry()
-        other.register(pid: 10, entry: LineageRegistry.Entry(parentPID: 2, executablePath: "/b", cwd: nil, argv: []))
-        other.register(pid: 11, entry: LineageRegistry.Entry(parentPID: 3, executablePath: "/c", cwd: nil, argv: []))
+        other.register(pid: 10, entry: LineageRegistry.Entry(parentPID: 2, identity: ProcessIdentity(executablePath: "/b")))
+        other.register(pid: 11, entry: LineageRegistry.Entry(parentPID: 3, identity: ProcessIdentity(executablePath: "/c")))
 
         let merged = own.merging(other)
 

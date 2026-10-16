@@ -13,10 +13,8 @@ final class DrilldownStateTests: XCTestCase {
     /// CPU 从最近差分取,内存取物理足迹(活动监视器"内存"列口径)。
     func testRowsCarryNamePIDCPUMemoryInGroupOrder() {
         let group = ProcessGroup(
-            id: "project:octok",
+            id: .project(root: "octok", worktreeName: nil),
             name: "octok-client @ wt",
-            category: .project,
-            bundlePath: nil,
             processes: [
                 RawProcess(
                     pid: 100,
@@ -63,7 +61,7 @@ final class DrilldownStateTests: XCTestCase {
             RawProcess(pid: 101, parentPID: 1, executablePath: "/usr/local/bin/node"),
         ]
         let group = ProcessGroup(
-            id: "g", name: "g", category: .orphan, bundlePath: nil,
+            id: .orphan, name: "g",
             processes: processes, cpuPercent: 0, memoryBytes: 0
         )
         let newborn = DrilldownState(
@@ -82,7 +80,7 @@ final class DrilldownStateTests: XCTestCase {
             RawProcess(pid: 31, parentPID: 1),
         ]
         let group = ProcessGroup(
-            id: "g", name: "g", category: .orphan, bundlePath: nil,
+            id: .orphan, name: "g",
             processes: processes, cpuPercent: 0, memoryBytes: 0
         )
         let state = DrilldownState(
@@ -145,7 +143,7 @@ final class DrilldownStateTests: XCTestCase {
     /// 空组(极端空载):行列表为空,不坏 UI。
     func testRowsForEmptyGroupAreEmpty() {
         let group = ProcessGroup(
-            id: "g", name: "g", category: .system, bundlePath: nil,
+            id: .system, name: "g",
             processes: [], cpuPercent: 0, memoryBytes: 0
         )
         let state = DrilldownState(

@@ -23,6 +23,7 @@
 		3598E8EB4005ED5ED236302F /* CoreTickDifferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 157B382FB4BC0949D81F02BD /* CoreTickDifferTests.swift */; };
 		364710EC5C95B423C886E4D3 /* SettingsWindowChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEBC94632BC0F748A5375D1C /* SettingsWindowChrome.swift */; };
 		3891285DCA8188E59A9EC34E /* GroupCategoryDisplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B7ADC75304AC8AC8EF1CED3 /* GroupCategoryDisplayTests.swift */; };
+		3A4696425FA64D6D47C5ED02 /* DiagnosticReportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 276EA0F7DAC2C0AC558E9614 /* DiagnosticReportTests.swift */; };
 		3B0AEF0F7AC596C838890C69 /* ProjectRootsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1E06F0A25EE07740DA1C192 /* ProjectRootsSettingsView.swift */; };
 		3FA77C4232F6EE6783FBBA03 /* MetricAccent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15A129D11862CB2382425940 /* MetricAccent.swift */; };
 		4608D143CBE0C0EFE846429A /* GeneralSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25DC4F22A90CFBA1BA79B750 /* GeneralSettingsView.swift */; };
@@ -70,6 +71,7 @@
 		D9434C4C35D7823C01826B81 /* GroupingPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5770D8A3B1DB2980B7B412C /* GroupingPipeline.swift */; };
 		DE7D6CED82B14BE22E71050D /* HostInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9545FA1A4A41049807AFF603 /* HostInfo.swift */; };
 		E4A99F8C1ACA71DF7876AF70 /* AcceptanceAnchorEndToEndTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C71FCD146BC0C56EF25AEE9 /* AcceptanceAnchorEndToEndTests.swift */; };
+		E4F96C3034A732D97973EDBA /* DiagnosticReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A72E4A9FD692096E36A0C948 /* DiagnosticReport.swift */; };
 		E559247BAA70D0A1868BD156 /* LiveProcessSourceSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A992F5F503CAD7CB90DD838 /* LiveProcessSourceSmokeTests.swift */; };
 		E9FB46EA364DC9CBF4A6BA36 /* MeterBarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E785F53B70C02534AC3EBF8 /* MeterBarTests.swift */; };
 		EB0CDD553EA6D376380B5006 /* StripChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F3216AB5859694E2E2665D7 /* StripChartView.swift */; };
@@ -115,6 +117,7 @@
 		1F99A0A803B159AF36A4BD82 /* MainWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowView.swift; sourceTree = "<group>"; };
 		215416C474EC313A5A138037 /* SystemStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemStatsTests.swift; sourceTree = "<group>"; };
 		25DC4F22A90CFBA1BA79B750 /* GeneralSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsView.swift; sourceTree = "<group>"; };
+		276EA0F7DAC2C0AC558E9614 /* DiagnosticReportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticReportTests.swift; sourceTree = "<group>"; };
 		2A05454E2790B918CCFBFDA4 /* PulseFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PulseFormat.swift; sourceTree = "<group>"; };
 		2B498B8CE0F9931DB5FED231 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		30D9403FA7D11E59957A5230 /* SampleHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleHistory.swift; sourceTree = "<group>"; };
@@ -150,6 +153,7 @@
 		9D5309CAF2CC1BC7C626E937 /* PulseApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PulseApp.swift; sourceTree = "<group>"; };
 		A41FA45715128B122D691CA0 /* OverviewCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewCards.swift; sourceTree = "<group>"; };
 		A5770D8A3B1DB2980B7B412C /* GroupingPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupingPipeline.swift; sourceTree = "<group>"; };
+		A72E4A9FD692096E36A0C948 /* DiagnosticReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticReport.swift; sourceTree = "<group>"; };
 		AA4729652A528B0AD0592677 /* MetricTabViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricTabViews.swift; sourceTree = "<group>"; };
 		AE61AAB8A3AD499BFDAD5BEF /* MetricTabModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricTabModel.swift; sourceTree = "<group>"; };
 		AFC9AB4EF78C90578BF978B2 /* BundleDisplayNameReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundleDisplayNameReader.swift; sourceTree = "<group>"; };
@@ -203,6 +207,7 @@
 				3876B006CE48D758E7238556 /* CPUDiffer.swift */,
 				32BE8BAC25214CEDFBA5AF6C /* DashboardModel.swift */,
 				C03A9EBCB9547AAD3B2FF3F9 /* DashboardView.swift */,
+				A72E4A9FD692096E36A0C948 /* DiagnosticReport.swift */,
 				25DC4F22A90CFBA1BA79B750 /* GeneralSettingsView.swift */,
 				6E978B9526EA1C54372E33CC /* GroupingEngine.swift */,
 				A5770D8A3B1DB2980B7B412C /* GroupingPipeline.swift */,
@@ -271,6 +276,7 @@
 				0B5633EC929F85A22B2BB45E /* BundleDisplayNameReaderTests.swift */,
 				157B382FB4BC0949D81F02BD /* CoreTickDifferTests.swift */,
 				52CBC2FEBBED6BCB5A8AE107 /* CPUDifferTests.swift */,
+				276EA0F7DAC2C0AC558E9614 /* DiagnosticReportTests.swift */,
 				135674B4363F7A3923D5D6C1 /* DrilldownStateTests.swift */,
 				1B7ADC75304AC8AC8EF1CED3 /* GroupCategoryDisplayTests.swift */,
 				F3D0353305807063B3A9F254 /* GroupingEngineTests.swift */,
@@ -392,6 +398,7 @@
 				1A6FBBAA8FFC5AB748E47788 /* BundleDisplayNameReaderTests.swift in Sources */,
 				699E7D697AF017DD08E2E9E0 /* CPUDifferTests.swift in Sources */,
 				3598E8EB4005ED5ED236302F /* CoreTickDifferTests.swift in Sources */,
+				3A4696425FA64D6D47C5ED02 /* DiagnosticReportTests.swift in Sources */,
 				154454A04341DB4CA585E4B9 /* DrilldownStateTests.swift in Sources */,
 				3891285DCA8188E59A9EC34E /* GroupCategoryDisplayTests.swift in Sources */,
 				05709BE15A090DCA772345D5 /* GroupingEngineTests.swift in Sources */,
@@ -434,6 +441,7 @@
 				D01C022CE4904C8972600CED /* CoreTickDiffer.swift in Sources */,
 				5A0E5B74BDCCD77BA4B7DA54 /* DashboardModel.swift in Sources */,
 				68820A72998494281B77A725 /* DashboardView.swift in Sources */,
+				E4F96C3034A732D97973EDBA /* DiagnosticReport.swift in Sources */,
 				4608D143CBE0C0EFE846429A /* GeneralSettingsView.swift in Sources */,
 				75364487780EFF56E510D046 /* GroupingEngine.swift in Sources */,
 				D9434C4C35D7823C01826B81 /* GroupingPipeline.swift in Sources */,

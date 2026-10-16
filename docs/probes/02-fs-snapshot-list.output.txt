@@ -1,0 +1,13 @@
+uid=501(非 root)  探针②:fs_snapshot_list 可列性 + attrlist 负对照
+
+== /System/Volumes/Data:0 个快照 (最后一次调用 rc=0,errno=1) ==
+  负对照(缺 RETURNED_ATTRS):rc=-1,errno=22 → EINVAL,petal 注释成立
+
+== /:1 个快照 (最后一次调用 rc=0,errno=22) ==
+  2026-10-01T00:46:41+08:00  [macOS update]  com.apple.os.update-9A91EDBD140271063B786C536C3AC26E58AD0E7C7F07601D5628E11CD66CC339
+  负对照(缺 RETURNED_ATTRS):rc=-1,errno=22 → EINVAL,petal 注释成立
+── 留档补充(tmutil 交叉验证,与探针同日)──
+tmutil listlocalsnapshots /                → "Snapshots for disk /:"(空)
+tmutil listlocalsnapshots /System/Volumes/Data → "Snapshots for disk /System/Volumes/Data:"(空)
+判读:Data 卷 rc=0 + 空列表 = 调用成功且本机当前确无 TM 快照(errno=1 为成功后的残留值,不可信);
+根卷列出的 com.apple.os.update-* 是密封系统卷的 OS 更新快照,tmutil 不列它。免 root 可列成立。

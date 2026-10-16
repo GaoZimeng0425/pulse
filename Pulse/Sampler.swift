@@ -15,6 +15,34 @@ struct SamplingCadence: Equatable, Sendable {
     }
 }
 
+/// 采样累计统计(工单 11:诊断报告取数):Sampler 每轮推进一次的纯值账本。
+/// 未采一轮时保持"空"(nil / 0)——报告侧据此如实标"暂无",不伪造数字。
+struct SamplingStats: Equatable, Sendable {
+    /// 首轮采样的时刻(运行时长的起点);未采样为 nil。
+    private(set) var startedAt: Date?
+    /// 累计采样轮数。
+    private(set) var sampleCount = 0
+    /// 全部轮次的采样工作耗时总和(不含等待),均值由此折算。
+    private(set) var totalRoundDuration: TimeInterval = 0
+    /// 见过的最大单轮进程数;未采样为 nil(与 0 区分)。
+    private(set) var peakProcessCount: Int?
+
+    /// 平均一轮采样的耗时(秒);未采样为 nil。
+    var averageRoundDuration: TimeInterval? {
+        sampleCount > 0 ? totalRoundDuration / Double(sampleCount) : nil
+    }
+
+    /// 登记一轮采样:运行起点只认首轮,峰值取历史最大。
+    mutating func record(startedAt: Date, roundDuration: TimeInterval, processCount: Int) {
+        if self.startedAt == nil {
+            self.startedAt = startedAt
+        }
+        sampleCount += 1
+        totalRoundDuration += max(0, roundDuration)
+        peakProcessCount = max(peakProcessCount ?? 0, processCount)
+    }
+}
+
 /// 采样调度决策(纯逻辑):记录上次采样时刻,按当前节奏回答"距下次采样还要等多久"。
 /// 时间全部由调用方注入,单测用合成时间轴;Sampler actor 只负责计时与执行。
 struct SamplingScheduler: Sendable {
@@ -75,6 +103,8 @@ actor Sampler {
     private var scheduler = SamplingScheduler()
     private var previousSnapshot: ProcessSnapshot?
     private var previousCoreTicks: CoreTickSample?
+    /// 采样累计统计(工单 11:诊断报告取数)。
+    private var stats = SamplingStats()
 
     init(
         source: any ProcessSource,
@@ -97,12 +127,18 @@ actor Sampler {
         scheduler.setPopoverVisible(visible)
     }
 
+    /// 采样累计统计(工单 11:诊断报告在复制时按需取一次)。
+    func samplingStats() -> SamplingStats {
+        stats
+    }
+
     /// 采样主循环:采样节奏上每到点即采一张快照、差分、连同快照一起交付,
     /// 直至任务取消或 sleep 抛错。deliver 从 actor 上下文同步调用。
     func run(deliver: @escaping @Sendable (SamplingUpdate) -> Void) async {
         while !Task.isCancelled {
             let wait = scheduler.delay(until: clock())
             if wait <= 0 {
+                let roundStart = clock()
                 let snapshot = source.snapshot()
                 let ticks = coreTicks.sample()
                 let diff = CPUDiffer.diff(previous: previousSnapshot, current: snapshot)
@@ -111,6 +147,12 @@ actor Sampler {
                 previousSnapshot = snapshot
                 previousCoreTicks = ticks
                 scheduler.recordSample(at: clock())
+                // 轮耗时只计采样工作本身(不含节奏等待),时钟可注入(测试内不走秒)。
+                stats.record(
+                    startedAt: roundStart,
+                    roundDuration: clock().timeIntervalSince(roundStart),
+                    processCount: snapshot.processes.count
+                )
                 deliver(
                     SamplingUpdate(
                         snapshot: snapshot,

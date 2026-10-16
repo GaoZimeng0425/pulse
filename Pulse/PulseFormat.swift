@@ -129,6 +129,30 @@ enum PulseFormat {
         return "\(tenths / 10).\(tenths % 10) W"
     }
 
+    /// 时长(工单 11 诊断报告"运行时长"):最大两级单位,负数(时钟回拨)按 0 夹紧。
+    /// 与 systemUptime 同取级策略,但不带"已运行"前缀——报告里它只是字段值。
+    static func duration(seconds: TimeInterval) -> String {
+        let total = max(0, Int(seconds))
+        let days = total / 86_400
+        let hours = total % 86_400 / 3_600
+        let minutes = total % 3_600 / 60
+        let secs = total % 60
+        if days > 0 { return "\(days) 天 \(hours) 小时" }
+        if hours > 0 { return "\(hours) 小时 \(minutes) 分" }
+        if minutes > 0 { return "\(minutes) 分 \(secs) 秒" }
+        return "\(secs) 秒"
+    }
+
+    /// 毫秒(工单 11 诊断报告"平均轮耗时"):一位小数;过小但非零如实标下限,
+    /// 不圆整成 0。十分位手算拼串,写法不随系统区域漂移(与 memory 同因)。
+    static func milliseconds(_ seconds: TimeInterval) -> String {
+        let value = seconds * 1_000
+        if value == 0 { return "0 ms" }
+        guard value >= 0.1 else { return "<0.1 ms" }
+        let tenths = Int((value * 10).rounded())
+        return "\(tenths / 10).\(tenths % 10) ms"
+    }
+
     private static func basename(ofPath path: String?) -> String? {
         path.map { String($0.split(separator: "/").last ?? Substring($0)) }
     }

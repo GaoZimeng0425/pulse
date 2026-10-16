@@ -11,17 +11,73 @@ enum GroupCategory: String, Equatable, Sendable, CaseIterable {
     case orphan
 }
 
+/// 组的类型化稳定身份(工单 00):种类即 case,稳定原始值即关联值——
+/// "拿任意字符串当组 ID"自此成为编译错误。与 `GroupCategory` 1:1 映射
+/// (`category`,展示口径继续吃类别),`stableKey` 逐字节复现 P0 前缀约定的
+/// 规范字符串("bundle:<path>" / "project:<root>[@<worktree>]" / "system" /
+/// "background-service" / "orphan"),Comparable 即 stableKey 字典序——
+/// 与升级前纯字符串 id 的次键排序逐位一致,升级零行为变化。
+/// 历史管线(工单 03)的分钟/小时表与出生登记都将以它做键。
+enum GroupIdentity: Hashable, Sendable, Comparable {
+    /// App 组:稳定原始值 = 最外层 `.app` bundle 目录(容器口径见 appContainerPrefix)。
+    case app(bundlePath: String)
+    /// 项目组:项目根 + worktree 名(命中非 worktree 路径时为 nil)。
+    case project(root: String, worktreeName: String?)
+    /// 系统组(知名系统进程固定聚合,无原始值)。
+    case system
+    /// 后台服务组(launchd 域聚合,无原始值)。
+    case backgroundService
+    /// 孤儿进程组(断链无归属聚合,无原始值)。
+    case orphan
+
+    /// 组类别(种类 1:1 派生):图例 / 图标样式等展示口径的既有通道。
+    var category: GroupCategory {
+        switch self {
+        case .app: .app
+        case .project: .project
+        case .system: .system
+        case .backgroundService: .backgroundService
+        case .orphan: .orphan
+        }
+    }
+
+    /// App 组的 .app bundle 目录;其余种类为 nil。
+    var bundlePath: String? {
+        if case .app(let bundlePath) = self { return bundlePath }
+        return nil
+    }
+
+    /// 规范字符串:与 P0 前缀约定的组 id 完全一致。只用于排序的稳定次键与
+    /// 将来的持久化键,不再充当身份本身——字符串造不出组身份。
+    var stableKey: String {
+        switch self {
+        case .app(let bundlePath): "bundle:" + bundlePath
+        case .project(let root, let worktreeName):
+            "project:" + root + (worktreeName.map { "@\($0)" } ?? "")
+        case .system: "system"
+        case .backgroundService: "background-service"
+        case .orphan: "orphan"
+        }
+    }
+
+    static func < (lhs: GroupIdentity, rhs: GroupIdentity) -> Bool {
+        lhs.stableKey < rhs.stableKey
+    }
+}
+
 /// 组(GLOSSARY):若干进程聚合成的一个显示实体——稳定身份、显示名、类别与聚合指标。
 /// `processes` 保留进程明细(cwd / argv / 启动时刻),供下钻(工单 06)直接取用,
 /// 不需回查采集层。
 struct ProcessGroup: Identifiable, Equatable, Sendable {
-    /// 稳定身份,跨快照可比(bundle 路径 / 项目根+worktree / 兜底键)。
-    let id: String
+    /// 类型化稳定身份(工单 00):跨快照可比,类别与 bundle 目录由它派生——
+    /// 身份只有这一份,历史管线(工单 03)以它做键。
+    let id: GroupIdentity
     /// 显示名(bundle 显示名 / "项目名 @ worktree" / 兜底类别名)。
     let name: String
-    let category: GroupCategory
+    /// 组类别:身份种类的 1:1 派生(图例 / 图标样式等展示口径)。
+    var category: GroupCategory { id.category }
     /// App 组的 .app bundle 目录,供 UI 取应用图标(工单 05);其余类别为 nil。
-    let bundlePath: String?
+    var bundlePath: String? { id.bundlePath }
     /// 组内进程,按进程 CPU% 降序(次键 pid 升序)——下钻列表的既定顺序。
     let processes: [RawProcess]
     /// 组 CPU%(GLOSSARY):组内全部进程 CPU% 之和,单核 100% 累加,可超过 100%。
@@ -105,8 +161,8 @@ enum GroupingEngine {
             attributionByPID[process.pid] = resolver.finalAttribution(for: process)
         }
 
-        var membersByID: [String: [RawProcess]] = [:]
-        var attributionByID: [String: Attribution] = [:]
+        var membersByID: [GroupIdentity: [RawProcess]] = [:]
+        var attributionByID: [GroupIdentity: Attribution] = [:]
         var memberPIDs: Set<pid_t> = []
         for process in snapshot.processes {
             guard memberPIDs.insert(process.pid).inserted,
@@ -127,8 +183,6 @@ enum GroupingEngine {
             return ProcessGroup(
                 id: id,
                 name: attribution.name,
-                category: attribution.category,
-                bundlePath: attribution.bundlePath,
                 processes: sortedMembers,
                 cpuPercent: cpu,
                 memoryBytes: memory
@@ -200,20 +254,17 @@ enum GroupingEngine {
 
 // MARK: - 归属判定
 
-/// 单进程的归属判定结果(聚合前)。
+/// 单进程的归属判定结果(聚合前):身份 + 显示名;类别与 bundle 目录由身份派生。
 private struct Attribution: Equatable {
-    let id: String
+    let id: GroupIdentity
     let name: String
-    let category: GroupCategory
-    let bundlePath: String?
 }
 
 extension Attribution {
     /// 兜底三分类的固定组:同名进程聚合进各自类别的单一组。
-    static let systemGroup = Attribution(id: "system", name: "系统", category: .system, bundlePath: nil)
-    static let backgroundServiceGroup =
-        Attribution(id: "background-service", name: "后台服务", category: .backgroundService, bundlePath: nil)
-    static let orphanGroup = Attribution(id: "orphan", name: "孤儿进程", category: .orphan, bundlePath: nil)
+    static let systemGroup = Attribution(id: .system, name: "系统")
+    static let backgroundServiceGroup = Attribution(id: .backgroundService, name: "后台服务")
+    static let orphanGroup = Attribution(id: .orphan, name: "孤儿进程")
 }
 
 /// 一次 `groups` 调用私有的判定器:持有快照 / 登记表 / 配置与逐 pid 记忆化缓存。
@@ -319,33 +370,26 @@ private final class Resolver {
     /// 进程自身可判定的两层归属:App 归属(bundle)→ 项目归因(项目根前缀)。
     /// 这两层可被子进程与登记链继承;系统 / 兜底归属不可继承。
     /// 项目归因不看可执行名(评审 S4):到达此层的非 bundle 进程,
-    /// cwd / argv 路径命中项目根即归项目。
-    private func layerSelf(
-        executablePath: String?,
-        cwd: String?,
-        argv: [String]
-    ) -> Attribution? {
-        if let bundle = Self.outermostAppBundleDirectory(executablePath) {
+    /// cwd / argv 路径命中项目根即归项目。输入即归属三元组(ProcessIdentity,
+    /// D1 收拢)——快照进程与出生登记的祖先同一份形状。
+    private func layerSelf(_ identity: ProcessIdentity) -> Attribution? {
+        if let bundle = Self.outermostAppBundleDirectory(identity.executablePath) {
             return Attribution(
-                id: "bundle:" + bundle,
-                name: bundleDisplayName(forBundleDirectory: bundle),
-                category: .app,
-                bundlePath: bundle
+                id: .app(bundlePath: bundle),
+                name: bundleDisplayName(forBundleDirectory: bundle)
             )
         }
         // 项目归因:cwd 优先,argv 中的路径次之。
-        guard let match = projectMatch(cwd) ?? argvProjectMatch(argv) else { return nil }
+        guard let match = projectMatch(identity.cwd) ?? argvProjectMatch(identity.argv) else { return nil }
         let projectName = Self.rootDisplayName(match.root)
         return Attribution(
-            id: "project:" + match.root + (match.worktreeName.map { "@\($0)" } ?? ""),
-            name: match.worktreeName.map { "\(projectName) @ \($0)" } ?? projectName,
-            category: .project,
-            bundlePath: nil
+            id: .project(root: match.root, worktreeName: match.worktreeName),
+            name: match.worktreeName.map { "\(projectName) @ \($0)" } ?? projectName
         )
     }
 
     private func layerSelf(_ process: RawProcess) -> Attribution? {
-        layerSelf(executablePath: process.executablePath, cwd: process.cwd, argv: process.argv)
+        layerSelf(process.identity)
     }
 
     /// 出生登记回查(GLOSSARY 活链断裂后的归属来源):沿出生父链找有归属的祖先,
@@ -355,11 +399,7 @@ private final class Resolver {
         var currentPID = pid
         while let entry = lineage.entries[currentPID], visited.insert(currentPID).inserted {
             guard let parent = lineage.entries[entry.parentPID] else { return nil }
-            if let attribution = layerSelf(
-                executablePath: parent.executablePath,
-                cwd: parent.cwd,
-                argv: parent.argv
-            ) {
+            if let attribution = layerSelf(parent.identity) {
                 return attribution
             }
             currentPID = entry.parentPID

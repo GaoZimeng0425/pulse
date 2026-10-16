@@ -8,6 +8,8 @@ import SwiftUI
 /// (页少)、整窗玻璃、本地化键(Pulse 全中文硬编码)。
 struct SettingsView: View {
     let rootsStore: ProjectRootsStore
+    /// 采样管线(工单 11):诊断报告的统计数据源,透传给通用页。
+    let monitor: SystemMonitor
 
     /// 上次到访页(@AppStorage 持久)。
     @AppStorage("settings.selectedPage") private var selectedPageRaw = SettingsPage.general.rawValue
@@ -54,7 +56,7 @@ struct SettingsView: View {
     @ViewBuilder
     private var detailView: some View {
         switch SettingsPage(rawValue: selectedPageRaw) ?? .general {
-        case .general: GeneralSettingsView()
+        case .general: GeneralSettingsView(monitor: monitor)
         case .projectRoots: ProjectRootsSettingsView(store: rootsStore)
         }
     }

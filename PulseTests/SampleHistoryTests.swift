@@ -90,41 +90,41 @@ final class SampleHistoryTests: XCTestCase {
         store.advance(
             systemCPULoad: 42,
             groups: [
-                GroupSample(id: "bundle:x", cpuPercent: 320, memoryBytes: 2_400_000_000),
-                GroupSample(id: "orphan:y", cpuPercent: 7, memoryBytes: 30_000_000),
+                GroupSample(id: .app(bundlePath: "x"), cpuPercent: 320, memoryBytes: 2_400_000_000),
+                GroupSample(id: .project(root: "y", worktreeName: nil), cpuPercent: 7, memoryBytes: 30_000_000),
             ]
         )
         store.advance(
             systemCPULoad: 55,
-            groups: [GroupSample(id: "bundle:x", cpuPercent: 445, memoryBytes: 2_500_000_000)]
+            groups: [GroupSample(id: .app(bundlePath: "x"), cpuPercent: 445, memoryBytes: 2_500_000_000)]
         )
 
         XCTAssertEqual(store.systemCPULoad.values, [42, 55])
-        let x = store.series(forGroup: "bundle:x")
+        let x = store.series(forGroup: .app(bundlePath: "x"))
         XCTAssertEqual(x?.cpuPercent.values, [320, 445])
         XCTAssertEqual(x?.memoryBytes.values, [2_400_000_000, 2_500_000_000])
         // 第二轮缺席的组:序列已逐出,不再可读。
-        XCTAssertNil(store.series(forGroup: "orphan:y"))
+        XCTAssertNil(store.series(forGroup: .project(root: "y", worktreeName: nil)))
     }
 
     func testVanishedGroupStopsAppendingAndIsEvicted() {
         // 组消失 = 组内进程全部退场:本轮起停止追加,序列随即逐出(内存不无限增长)。
         var store = SampleHistoryStore(capacity: 10)
-        store.advance(systemCPULoad: 10, groups: [GroupSample(id: "g", cpuPercent: 100, memoryBytes: 1)])
+        store.advance(systemCPULoad: 10, groups: [GroupSample(id: .orphan, cpuPercent: 100, memoryBytes: 1)])
         store.advance(systemCPULoad: 20, groups: [])
 
-        XCTAssertNil(store.series(forGroup: "g"))
+        XCTAssertNil(store.series(forGroup: .orphan))
         XCTAssertTrue(store.groups.isEmpty)
     }
 
     func testReturningGroupRestartsItsSeries() {
         // 同 id 组去而复返:视为新 incarnation,序列从头累计(旧窗口不复活)。
         var store = SampleHistoryStore(capacity: 10)
-        store.advance(systemCPULoad: 10, groups: [GroupSample(id: "g", cpuPercent: 5, memoryBytes: 10)])
+        store.advance(systemCPULoad: 10, groups: [GroupSample(id: .orphan, cpuPercent: 5, memoryBytes: 10)])
         store.advance(systemCPULoad: 20, groups: [])
-        store.advance(systemCPULoad: 30, groups: [GroupSample(id: "g", cpuPercent: 9, memoryBytes: 20)])
+        store.advance(systemCPULoad: 30, groups: [GroupSample(id: .orphan, cpuPercent: 9, memoryBytes: 20)])
 
-        let series = store.series(forGroup: "g")
+        let series = store.series(forGroup: .orphan)
         XCTAssertEqual(series?.cpuPercent.values, [9])
         XCTAssertEqual(series?.memoryBytes.values, [20])
     }
@@ -135,20 +135,20 @@ final class SampleHistoryTests: XCTestCase {
         store.advance(
             systemCPULoad: 10,
             groups: [
-                GroupSample(id: "a", cpuPercent: 12, memoryBytes: 100),
-                GroupSample(id: "b", cpuPercent: 34, memoryBytes: 200),
+                GroupSample(id: .app(bundlePath: "a"), cpuPercent: 12, memoryBytes: 100),
+                GroupSample(id: .app(bundlePath: "b"), cpuPercent: 34, memoryBytes: 200),
             ]
         )
         store.advance(
             systemCPULoad: 20,
             groups: [
-                GroupSample(id: "a", cpuPercent: 56, memoryBytes: 150),
-                GroupSample(id: "b", cpuPercent: 78, memoryBytes: 250),
+                GroupSample(id: .app(bundlePath: "a"), cpuPercent: 56, memoryBytes: 150),
+                GroupSample(id: .app(bundlePath: "b"), cpuPercent: 78, memoryBytes: 250),
             ]
         )
 
-        XCTAssertEqual(store.series(forGroup: "a")?.cpuPercent.values, [12, 56])
-        XCTAssertEqual(store.series(forGroup: "b")?.cpuPercent.values, [34, 78])
+        XCTAssertEqual(store.series(forGroup: .app(bundlePath: "a"))?.cpuPercent.values, [12, 56])
+        XCTAssertEqual(store.series(forGroup: .app(bundlePath: "b"))?.cpuPercent.values, [34, 78])
     }
 
     func testSystemLoadRespectsCapacityAcrossSweeps() {

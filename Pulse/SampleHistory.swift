@@ -96,10 +96,10 @@ struct RingSeries<Value: HistoryValue>: Equatable, Sendable {
     }
 }
 
-/// 一轮采样中单个组的采样值(组 id + 组 CPU% + 组内存)。
+/// 一轮采样中单个组的采样值(类型化组身份 + 组 CPU% + 组内存)。
 /// 输入即 ProcessGroup 的聚合口径,历史层不做二次归组。
 struct GroupSample: Equatable, Sendable {
-    let id: String
+    let id: GroupIdentity
     let cpuPercent: Double
     let memoryBytes: UInt64
 }
@@ -127,7 +127,7 @@ struct SampleHistoryStore: Equatable, Sendable {
     private(set) var systemCPULoad: RingSeries<Double>
     /// 系统内存已用(工单 P0.6-05 总览内存卡 strip / 内存 tab 面积图)。
     private(set) var memoryUsed: RingSeries<UInt64>
-    private(set) var groups: [String: GroupSeries] = [:]
+    private(set) var groups: [GroupIdentity: GroupSeries] = [:]
 
     init(capacity: Int = SampleHistoryStore.defaultCapacity) {
         precondition(capacity > 0, "历史窗口容量必须为正")
@@ -137,7 +137,7 @@ struct SampleHistoryStore: Equatable, Sendable {
     }
 
     /// 读取某组的历史序列;组已被逐出(或从未出现)返回 nil。
-    func series(forGroup id: String) -> GroupSeries? {
+    func series(forGroup id: GroupIdentity) -> GroupSeries? {
         groups[id]
     }
 
@@ -154,7 +154,7 @@ struct SampleHistoryStore: Equatable, Sendable {
             memoryUsed.append(memoryUsedBytes)
         }
 
-        var presentByID = [String: GroupSample]()
+        var presentByID = [GroupIdentity: GroupSample]()
         for sample in present {
             presentByID[sample.id] = sample
         }
