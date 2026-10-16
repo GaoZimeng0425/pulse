@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 // MARK: - 主窗口(工单 P0.5-01):全部组列表 + 三层下钻
 // P0.6-05 对齐 SHOT1:药丸 tab 进标题栏工具栏、齿轮在右;内容头 = 页名大标题 +
@@ -71,6 +72,18 @@ struct MainWindowView: View {
             if let tab = alertRouter?.consumePendingTab() {
                 tabSelection.current = tab
             }
+            MainWindowView.repositionIfOffscreen()
+            // 系统窗口恢复套旧 frame 发生在 onAppear 之后——补一拍延迟守卫。
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                MainWindowView.repositionIfOffscreen()
+            }
+        }
+        // 外接屏断电后系统把窗口还回幻影屏坐标(AX/截屏/人眼都够不着),
+        // 应用重新激活时再守一次——"打开主窗口像没反应"的根因之一。
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSApplication.didBecomeActiveNotification
+        )) { _ in
+            MainWindowView.repositionIfOffscreen()
         }
         // spec 最小尺寸 ~720×560;弹窗的宽度约束是 MenuBarExtra 专用,此处不适用。
         .frame(minWidth: 720, minHeight: 560)
@@ -99,6 +112,43 @@ struct MainWindowView: View {
     /// 当前 tab 的展示内容(纯逻辑折叠,与弹窗同一出处):榜单序、组行口径、内存分段。
     private var content: MetricTabContent {
         model.content(tab: tabSelection.current)
+    }
+
+    /// 窗口落在**用户看不见的屏**(典型:外接屏断电留幻影屏,系统状态恢复把窗口
+    /// 还回旧坐标)时,搬回用户光标所在的在线屏。判据依据 2026-10-16 验收走查的
+    /// 实测排除法:幻影屏在 CG/NSScreen 层仍是"活跃在线",甚至可以是
+    /// NSScreen.main(用户把它设过主屏)——"面板灭没灭"没有任何 API 可问,唯一
+    /// 骗不掉的锚点是用户此刻的光标(点"打开主窗口"时光标必然在他们看得见的
+    /// 屏上);光标定位不到就退回内建屏(笔记本开盖必亮)。
+    static func repositionIfOffscreen() {
+        let window = NSApp.windows.first {
+            $0.identifier?.rawValue == MainWindowSceneID.value || $0.title == "Pulse"
+        }
+        guard let window else {
+            LogService.info("离屏守卫:未找到主窗口(windows=\(NSApp.windows.map { "\($0.title)|\($0.identifier?.rawValue ?? "-")" }.joined(separator: ",")))", category: "MainWindow")
+            return
+        }
+        var onlineCount: UInt32 = 0
+        CGGetOnlineDisplayList(0, nil, &onlineCount)
+        guard onlineCount > 0 else { return }
+        var ids = [CGDirectDisplayID](repeating: 0, count: Int(onlineCount))
+        CGGetOnlineDisplayList(onlineCount, &ids, &onlineCount)
+        let cursor = CGEvent(source: nil)?.location ?? .zero
+        let online = ids.prefix(Int(onlineCount)).map { ($0, CGDisplayBounds($0)) }
+        // 目标屏 = 光标所在屏;光标落点无归属(极端)则内建屏,再退最大在线屏。
+        let target = online.first { $0.1.contains(cursor) }?.1
+            ?? online.first { CGDisplayIsBuiltin($0.0) != 0 }?.1
+            ?? online.map { $0.1 }.max { $0.width < $1.width }
+        guard let target else { return }
+        guard !target.intersects(window.frame) else { return }
+        var origin = CGPoint(
+            x: target.midX - window.frame.width / 2,
+            y: target.midY - window.frame.height / 2
+        )
+        origin.x = max(target.minX + 8, min(origin.x, target.maxX - window.frame.width - 8))
+        origin.y = max(target.minY + 8, min(origin.y, target.maxY - window.frame.height - 8))
+        LogService.info("离屏守卫:窗口在 \(window.frame),按光标搬回 \(origin)", category: "MainWindow")
+        window.setFrameOrigin(origin)
     }
 
     /// 搜索过滤器(视图直接持有的归一口径;空查询时全部旁路)。

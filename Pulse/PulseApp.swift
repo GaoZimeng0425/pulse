@@ -23,6 +23,22 @@ struct PulseApp: App {
         let router = AlertNotificationRouter()
         UNUserNotificationCenter.current().delegate = router
         _alertRouter = State(initialValue: router)
+        // 主窗口可见即守卫一次(2026-10-16 验收走查:外接屏断电时窗口被系统恢复到
+        // 幻影屏坐标,AppKit 层观察比 SwiftUI 视图钩子更早更稳);启动后延迟一拍
+        // 兜底覆盖状态恢复创建的窗口。
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification,
+            object: nil,
+            queue: .main
+        ) { note in
+            guard let window = note.object as? NSWindow,
+                  window.identifier?.rawValue == MainWindowSceneID.value || window.title == "Pulse"
+            else { return }
+            MainWindowView.repositionIfOffscreen()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            MainWindowView.repositionIfOffscreen()
+        }
         LogService.info("Pulse 启动(项目根 \(store.projectRoots.count) 个)", category: "App")
     }
 
