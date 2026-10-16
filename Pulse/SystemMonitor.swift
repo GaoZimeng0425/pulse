@@ -100,6 +100,13 @@ final class SystemMonitor {
         pipeline.setProjectRoots(roots)
     }
 
+    /// 诊断报告取数(工单 11):按需向采样器要一份累计统计快照
+    /// (运行起点/轮数/均值/峰值),不做常驻观察。
+    func samplingStats() async -> SamplingStats {
+        let sampler = self.sampler
+        return await sampler.samplingStats()
+    }
+
     /// 结束进程(工单 08):UI 确认后调用——SIGTERM 逐目标投递,
     /// 永不包含自身 pid(getpid),失败逐目标浮出(KillReport)。
     /// 下轮采样自然反映消失;此处仅 MainActor 粘合(编排单测见 KillActionTests)。

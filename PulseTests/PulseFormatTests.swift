@@ -114,4 +114,26 @@ final class PulseFormatTests: XCTestCase {
     func testProcessNameFallsBackToPIDWhenBothPathAndArgvUnavailable() {
         XCTAssertEqual(PulseFormat.processName(executablePath: nil, argv: [], pid: 999), "pid 999")
     }
+
+    // MARK: duration / milliseconds(工单 11:诊断报告的采样统计文案)
+
+    func testDurationTakesLargestTwoUnits() {
+        // 与 systemUptime 同一取级策略(最大两级),但不带"已运行"前缀(报告字段值)。
+        XCTAssertEqual(PulseFormat.duration(seconds: 40), "40 秒")
+        XCTAssertEqual(PulseFormat.duration(seconds: 90), "1 分 30 秒")
+        XCTAssertEqual(PulseFormat.duration(seconds: 5_400), "1 小时 30 分")
+        XCTAssertEqual(PulseFormat.duration(seconds: 3 * 86_400 + 2 * 3_600), "3 天 2 小时")
+    }
+
+    func testDurationClampsNegativeToZero() {
+        XCTAssertEqual(PulseFormat.duration(seconds: -5), "0 秒")
+    }
+
+    func testMillisecondsShowsOneDecimalAndSubdecimalFloor() {
+        XCTAssertEqual(PulseFormat.milliseconds(2), "2000.0 ms")
+        XCTAssertEqual(PulseFormat.milliseconds(0.0032), "3.2 ms")
+        // 过小但非零:如实标下限,不圆整成 0。
+        XCTAssertEqual(PulseFormat.milliseconds(0.00004), "<0.1 ms")
+        XCTAssertEqual(PulseFormat.milliseconds(0), "0 ms")
+    }
 }
