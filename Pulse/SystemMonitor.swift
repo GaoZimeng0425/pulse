@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import AppKit
 import Darwin
 
 /// 呈现层模型(spec 命名 SystemMonitor):持有采样管线,把每轮采样变成可观察状态。
@@ -32,6 +33,13 @@ final class SystemMonitor {
     private(set) var drilldown: DrilldownState?
 
     private let sampler: Sampler
+    /// 历史引擎(工单 03):5s 采样经它卷积落库 + 出生登记持久化 + 唤醒清基线。
+    /// 库打开失败时为 nil(已记日志),历史降级缺席,实时页不受影响。
+    private let historyEngine: HistoryEngine?
+    /// 唤醒通知观察者(与 app 同寿命,start 建立一次;monitor 是 app 唯一的
+    /// @State 管线持有者,观察者随进程结束——闭包 weak self,无保留环,
+    /// deinit 属非隔离上下文,不做摘除)。
+    private var wakeObserver: NSObjectProtocol?
     /// 独立出生扫描(评审 S1):~2s 节奏登记新 pid,与采样节奏解耦。
     private let birthScanner: BirthScanner
     /// 出生扫描最近交付的登记表:每轮采样落地时并入管线(只补缺)。
@@ -47,9 +55,11 @@ final class SystemMonitor {
         memoryStats: any MemoryStatsSource = LiveMemoryStatsSource(),
         projectRoots: [String] = [],
         killService: any KillService = LiveKillService(),
-        birthScanSource: any BirthScanSource = LiveBirthScanSource()
+        birthScanSource: any BirthScanSource = LiveBirthScanSource(),
+        historyEngine: HistoryEngine? = HistoryEngine.openDefault()
     ) {
         self.sampler = Sampler(source: source, coreTicks: coreTicks, memoryStats: memoryStats)
+        self.historyEngine = historyEngine
         self.birthScanner = BirthScanner(source: birthScanSource)
         self.pipeline = GroupingPipeline(
             configuration: GroupingConfiguration(
@@ -66,6 +76,26 @@ final class SystemMonitor {
     func start() {
         guard !started else { return }
         started = true
+        // 出生登记回灌(工单 03):库中既往登记并入管线——重启后,此前归到
+        // 宿主的断链进程仍归原宿主(验收锚点①先半)。合并只补缺,与扫描
+        // /采样轮的登记互不覆盖;身份字段进程终身不变,先后无差。
+        if let historyEngine {
+            let engine = historyEngine
+            Task { [weak self] in
+                let restored = await engine.importLineage()
+                guard let self else { return }
+                self.pipeline.mergeBirths(restored)
+            }
+        }
+        // 唤醒处理(spec):差分基线清零——唤醒后第一轮作废,无巨大尖刺。
+        // 观察者与 app 同寿命,随 monitor 释放移除。
+        wakeObserver = NotificationCenter.default.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            let sampler = self.sampler
+            Task { await sampler.invalidateDeltas() }
+        }
         let scanner = birthScanner
         Task { [weak self] in
             await scanner.run { [weak self] lineage in
@@ -142,18 +172,46 @@ final class SystemMonitor {
             processCPU: update.diff.processCPU
         )
         allGroups = pipeline.allGroups
-        // 采样历史(工单 P0.6-01)随同一轮推进:在场组追加,消失组逐出。
+        // 组采样快照:内存环形缓冲(工单 P0.6-01)与历史落库(工单 03)同一份形状。
+        let groupSamples = allGroups.map { group in
+            GroupSample(
+                id: group.id,
+                cpuPercent: group.cpuPercent,
+                memoryBytes: group.memoryBytes,
+                processCount: group.processes.count
+            )
+        }
+        // 采样历史随同一轮推进:在场组追加,消失组逐出。
         history.advance(
             systemCPULoad: update.systemCPULoad,
             memoryUsedBytes: update.memory?.usedBytes,
-            groups: allGroups.map { group in
-                GroupSample(id: group.id, cpuPercent: group.cpuPercent, memoryBytes: group.memoryBytes)
-            }
+            groups: groupSamples
         )
         drilldown = DrilldownState(
             snapshot: update.snapshot,
             lineage: pipeline.lineage,
             processCPU: update.diff.processCPU
         )
+        // 历史管线(工单 03):5s 原始值只进引擎的内存缓冲,分钟卷积 / 小时卷积 /
+        // 留存清理 / 出生登记与组元数据落库都在引擎侧一个事务完成;旁路失败只记日志。
+        // 采样时刻在 MainActor 上现取(Task 外),顺序即 apply 顺序。
+        if let historyEngine {
+            let engine = historyEngine
+            let now = Date()
+            let displayNames = Dictionary(
+                allGroups.map { ($0.id, $0.name) },
+                uniquingKeysWith: { _, rhs in rhs }
+            )
+            let lineage = pipeline.lineage
+            Task {
+                await engine.ingest(
+                    at: now,
+                    systemLoad: update.systemCPULoad,
+                    groups: groupSamples,
+                    displayNames: displayNames,
+                    lineage: lineage
+                )
+            }
+        }
     }
 }
