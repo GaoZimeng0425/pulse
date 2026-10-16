@@ -1,0 +1,61 @@
+#!/bin/sh
+# Pulse 提交闸门(源头文件;安装副本由 install.sh 生成,勿直接改安装副本)。
+# 规则:staged 含 *.swift 时——
+#   1. xcodegen generate 重新接线工程文件(新文件漏进 pbxproj 会被静默不编译,
+#      实测写坏的新文件构建照样绿;project.yml 是文件夹源,重新生成即纳新),
+#      有变化则并入暂存区;project.yml 坏了则直接拦截。
+#   2. 增量构建,失败即拦截 —— 防止把编译不过的代码提交进仓库
+#      (2026-10-15 事故:构建失败仍被 `;` 链命令提交并启动旧二进制)。
+# 应急绕过:git commit --no-verify 或 PULSE_SKIP_BUILD=1 git commit ...
+
+if [ "${PULSE_SKIP_BUILD:-0}" = "1" ]; then
+  exit 0
+fi
+
+staged_swift=$(git diff --cached --name-only --diff-filter=ACM -- '*.swift')
+[ -n "$staged_swift" ] || exit 0
+
+root=$(git rev-parse --show-toplevel)
+mkdir -p "$root/build"
+log="$root/build/precommit-build.log"
+
+# ── 1. 新文件接线 ──
+if command -v xcodegen >/dev/null 2>&1; then
+  if (cd "$root" && xcodegen generate > "$root/build/xcodegen.log" 2>&1); then
+    if ! git diff --quiet -- Pulse.xcodeproj/project.pbxproj; then
+      git add -- Pulse.xcodeproj/project.pbxproj
+      echo "🔧 xcodegen 接线新文件,工程文件已并入暂存区"
+    fi
+  else
+    echo "❌ xcodegen generate 失败 — project.yml 有问题,拒绝提交" >&2
+    tail -10 "$root/build/xcodegen.log" >&2
+    exit 1
+  fi
+else
+  echo "⚠️  未安装 xcodegen — 新增 .swift 文件不会被编译到,慎行" >&2
+fi
+
+# ── 2. 构建门禁 ──
+echo "🛠  staged 含 Swift 文件 — 构建门禁(增量;完整日志: $log)"
+# 输出整体重定向到日志而不是接管道:POSIX sh 拿不到管道里 xcodebuild 的
+# 真实退出码,而退出码正是门禁依据(参考 NemoNotch scripts/test.sh 同款)。
+xcodebuild build \
+  -project "$root/Pulse.xcodeproj" \
+  -scheme Pulse \
+  -configuration Debug \
+  -derivedDataPath "$root/build" \
+  -quiet \
+  > "$log" 2>&1
+status=$?
+
+if [ "$status" != 0 ]; then
+  echo ""
+  echo "❌ 构建失败(退出码 $status)— 拒绝提交。日志尾 30 行:"
+  tail -30 "$log"
+  echo ""
+  echo "   完整日志: $log"
+  echo "   应急绕过: git commit --no-verify"
+  exit "$status"
+fi
+echo "✅ 构建通过"
+exit 0

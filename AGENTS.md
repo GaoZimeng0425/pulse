@@ -23,3 +23,8 @@
 - **简单文本查找**(找已知字符串、快速定位)→ grep 即可。
 
 实施子代理的 prompt 应按其任务带上下述默认:涉及重命名/改签名/迁移类型 → ripwire 查影响面;涉及多点同构修改 → ast-grep。
+
+## 构建与检查
+
+- Xcode 工程由 `project.yml` 生成:加/移文件后先 `xcodegen generate`,绝不手改 `project.pbxproj`。
+- 提交闸门 `.githooks/pre-commit`(staged 含 .swift 即增量构建,失败拦截;改钩子后重跑 `sh .githooks/install.sh`)。全量检查 `sh scripts/check.sh`;只跑测试 `sh scripts/test.sh [--only 套件]`。
