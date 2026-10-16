@@ -10,15 +10,19 @@ final class MetricTabModelTests: XCTestCase {
 
     // MARK: - MetricTab:顺序与文案
 
-    func testTabsAreOrderedOverviewCPUMemoryBattery() {
-        // 展示序即键盘 ←/→ 的移动轴:总览在最左,电池(工单 02)在最右。
-        XCTAssertEqual(MetricTab.allCases.map(\.rawValue), ["overview", "cpu", "memory", "battery"])
+    func testTabsAreOrderedOverviewCPUMemoryDiskBattery() {
+        // 展示序即键盘 ←/→ 的移动轴:总览在最左,电池(工单 02)在最右;
+        // 磁盘(工单 05)按令牌表插在内存与电池之间。
+        XCTAssertEqual(
+            MetricTab.allCases.map(\.rawValue),
+            ["overview", "cpu", "memory", "disk", "battery"]
+        )
     }
 
     func testTabTitlesAreChinese() {
         // 药丸 tab 文字与无障碍标签共用中文文案。
         let titles = MetricTab.allCases.map(\.title)
-        XCTAssertEqual(titles, ["总览", "CPU", "内存", "电池"])
+        XCTAssertEqual(titles, ["总览", "CPU", "内存", "磁盘", "电池"])
     }
 
     func testTabSymbolsAreDistinct() {
@@ -29,10 +33,11 @@ final class MetricTabModelTests: XCTestCase {
 
     func testTabAccentMapsToMetricTokens() {
         // 选中态强调色(tint 派生)的色源:总览以系统负载(CPU)为主视角,
-        // CPU tab → cpu 令牌,内存 tab → memory 令牌,电池 tab → battery 令牌。
+        // CPU/内存/磁盘/电池 tab → 各自令牌。
         XCTAssertEqual(MetricTab.overview.accent, .cpu)
         XCTAssertEqual(MetricTab.cpu.accent, .cpu)
         XCTAssertEqual(MetricTab.memory.accent, .memory)
+        XCTAssertEqual(MetricTab.disk.accent, .disk)
         XCTAssertEqual(MetricTab.battery.accent, .battery)
     }
 
@@ -43,19 +48,23 @@ final class MetricTabModelTests: XCTestCase {
     }
 
     func testMoveRightAdvancesInDisplayOrder() {
-        // → 键沿展示序右移:总览 → CPU → 内存 → 电池。
+        // → 键沿展示序右移:总览 → CPU → 内存 → 磁盘 → 电池。
         var selection = MetricTabSelection()
         selection.moveRight()
         XCTAssertEqual(selection.current, .cpu)
         selection.moveRight()
         XCTAssertEqual(selection.current, .memory)
         selection.moveRight()
+        XCTAssertEqual(selection.current, .disk)
+        selection.moveRight()
         XCTAssertEqual(selection.current, .battery)
     }
 
     func testMoveLeftRetreatsInDisplayOrder() {
-        // ← 键左移:电池 → 内存 → CPU → 总览。
+        // ← 键左移:电池 → 磁盘 → 内存 → CPU → 总览。
         var selection = MetricTabSelection(current: .battery)
+        selection.moveLeft()
+        XCTAssertEqual(selection.current, .disk)
         selection.moveLeft()
         XCTAssertEqual(selection.current, .memory)
         selection.moveLeft()
@@ -82,17 +91,22 @@ final class MetricTabModelTests: XCTestCase {
     }
 
     func testDisplayAxisHidesBatteryWithoutBattery() {
-        XCTAssertEqual(MetricTab.displayAxis(hasBattery: false), [.overview, .cpu, .memory])
+        // 磁盘页(工单 05)常驻轴(每台 Mac 都有盘),无电池只隐藏电池页。
+        XCTAssertEqual(
+            MetricTab.displayAxis(hasBattery: false),
+            [.overview, .cpu, .memory, .disk]
+        )
     }
 
     func testKeyboardMovesFollowAxisWithoutBattery() {
-        // 无电池机器:轴不含电池页,→ 在内存夹紧停下(可预期,不跳空)。
+        // 无电池机器:轴不含电池页,→ 在磁盘夹紧停下(可预期,不跳空)。
         var selection = MetricTabSelection(axis: MetricTab.displayAxis(hasBattery: false))
         selection.moveRight()
         selection.moveRight()
-        XCTAssertEqual(selection.current, .memory)
         selection.moveRight()
-        XCTAssertEqual(selection.current, .memory, "轴右端 = 内存,再 → 不动")
+        XCTAssertEqual(selection.current, .disk)
+        selection.moveRight()
+        XCTAssertEqual(selection.current, .disk, "轴右端 = 磁盘,再 → 不动")
     }
 
     func testSetAxisHidesCurrentTabFallsBackToOverview() {
@@ -159,6 +173,18 @@ final class MetricTabModelTests: XCTestCase {
         let cpu = MetricTabContent.build(groups: groups, tab: .cpu)
         XCTAssertEqual(cpu.ranking.map(\.id), identities(["a", "c", "b"]))
         XCTAssertEqual(cpu.metric, .cpu)
+    }
+
+    func testDiskTabRanksByCPULikeOverview() {
+        // 磁盘 tab(工单 05)不排组——榜单沿用 CPU 序供弹窗"当前最忙"卡,
+        // 口径与总览一致(CPU 降序、cpu 卡口径)。
+        let groups = [
+            group("b", cpu: 40, mem: 100),
+            group("a", cpu: 445, mem: 50),
+        ]
+        let disk = MetricTabContent.build(groups: groups, tab: .disk)
+        XCTAssertEqual(disk.ranking.map(\.id), identities(["a", "b"]))
+        XCTAssertEqual(disk.metric, .cpu)
     }
 
     func testMemoryTabRanksByMemoryDescending() {

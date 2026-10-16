@@ -51,6 +51,13 @@ final class DashboardModel {
         .battery(monitor.battery)
     }
 
+    /// 磁盘卡(工单 05):容量对账 + 可清除 + 各卷 + 快照读容量 provider,
+    /// 读写速率与走势读吞吐 provider——两个 provider 两条节奏,卡模型在此合流;
+    /// 容量未首读时全占位(MetricCardModel.disk 兜底)。
+    var diskModel: MetricCardModel {
+        .disk(capacity: monitor.diskCapacity, throughput: monitor.diskThroughput)
+    }
+
     // MARK: 26×14 微图数据(工单 03 兑现,评审 F3)
 
     /// 排行卡微图数据:榜单前 3 名(content.microGraphGroupIDs 资格)按当前口径

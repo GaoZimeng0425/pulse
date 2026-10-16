@@ -137,6 +137,13 @@ struct MainWindowView: View {
         case .battery:
             // 电池页(工单 02):六项读数主卡;组排行与电池无关,不放。
             MetricMainCardView(model: model.batteryModel)
+        case .disk:
+            // 磁盘页(工单 05):主卡 + 各卷对账明细 + 快照列表(弹窗同构,紧凑)。
+            MetricMainCardView(model: model.diskModel)
+            HStack(alignment: .top, spacing: 16) {
+                DiskVolumeBreakdownView(capacity: monitor.diskCapacity)
+                DiskSnapshotsCardView(listing: monitor.diskCapacity?.snapshots)
+            }
         }
     }
 

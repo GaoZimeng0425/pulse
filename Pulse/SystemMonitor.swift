@@ -36,12 +36,23 @@ final class SystemMonitor {
     /// 本机有内建电池(工单 02):首次成功读数置真,电池 tab 随之入轴;
     /// 台式机永无交付 → 恒假,电池页整页隐藏。只翻真不翻假。
     private(set) var hasBattery = false
+    /// 磁盘容量读数(工单 05):容器对账 + 可清除 + 各卷 + 快照,低频档(30s)
+    /// 交付;首轮前 nil → 卡片全占位(磁盘页常驻轴,无电池页的隐藏问题)。
+    private(set) var diskCapacity: DiskCapacityReading?
+    /// 磁盘吞吐读数(工单 05):系统级读写速率 + 走势,短档(5s)或回退档
+    /// (30s,随源路径)交付;首轮前 nil → 速率列占位。
+    private(set) var diskThroughput: DiskThroughputReading?
 
     private let sampler: Sampler
     /// 独立出生扫描(评审 S1):~2s 节奏登记新 pid,与采样节奏解耦。
     private let birthScanner: BirthScanner
     /// 电池传感器(工单 02,ADR-0004 第一个真 provider):事件驱动,IOPS 通知。
     private let batteryProvider: BatterySensorProvider
+    /// 磁盘容量传感器(工单 05,ADR-0004):低频档 30s,不进 1s 心跳。
+    private let diskCapacityProvider: DiskCapacityProvider
+    /// 磁盘吞吐传感器(工单 05,ADR-0004):短档 5s(IORegistry 主路径)或
+    /// 低频档 30s(rusage 回退),节奏随源路径在构造期钉死。
+    private let diskThroughputProvider: DiskThroughputProvider
     /// 出生扫描最近交付的登记表:每轮采样落地时并入管线(只补缺)。
     private var birthLineage = LineageRegistry()
     private var pipeline: GroupingPipeline
@@ -57,11 +68,15 @@ final class SystemMonitor {
         projectRoots: [String] = [],
         killService: any KillService = LiveKillService(),
         birthScanSource: any BirthScanSource = LiveBirthScanSource(),
-        batterySource: any BatterySource = LiveBatterySource()
+        batterySource: any BatterySource = LiveBatterySource(),
+        diskCapacitySource: any DiskCapacitySource = LiveDiskCapacitySource(),
+        diskThroughputSource: any DiskThroughputSource = LiveDiskThroughputSource.adoptingBestPath()
     ) {
         self.sampler = Sampler(source: source, coreTicks: coreTicks, memoryStats: memoryStats)
         self.birthScanner = BirthScanner(source: birthScanSource)
         self.batteryProvider = BatterySensorProvider(source: batterySource)
+        self.diskCapacityProvider = DiskCapacityProvider(source: diskCapacitySource)
+        self.diskThroughputProvider = DiskThroughputProvider(source: diskThroughputSource)
         self.pipeline = GroupingPipeline(
             configuration: GroupingConfiguration(
                 projectRoots: projectRoots,
@@ -96,16 +111,34 @@ final class SystemMonitor {
                 }
             }
         }
-        // 非心跳型传感器(ADR-0004):单一调度器 actor 按 cadence 驱动。
+        // 非心跳型传感器(ADR-0004):单一调度器 actor 按 cadence 驱动——电池
+        // 事件档、磁盘容量 30s 低频档、磁盘吞吐 5s/30s 分档(工单 05"调度器
+        // 体现分档"),心跳型仍住 Sampler 不登记。
+        let capacityProvider = diskCapacityProvider
+        let throughputProvider = diskThroughputProvider
         let provider = batteryProvider
         let scheduler = SensorScheduler()
         sensorTask = Task { [weak self] in
-            await scheduler.run([provider.driver { [weak self] reading in
-                guard let self else { return }
-                Task { @MainActor in
-                    self.applyBattery(reading)
-                }
-            }])
+            await scheduler.run([
+                provider.driver { [weak self] reading in
+                    guard let self else { return }
+                    Task { @MainActor in
+                        self.applyBattery(reading)
+                    }
+                },
+                capacityProvider.driver { [weak self] reading in
+                    guard let self else { return }
+                    Task { @MainActor in
+                        self.applyDiskCapacity(reading)
+                    }
+                },
+                throughputProvider.driver { [weak self] reading in
+                    guard let self else { return }
+                    Task { @MainActor in
+                        self.applyDiskThroughput(reading)
+                    }
+                },
+            ])
         }
     }
 
@@ -187,5 +220,18 @@ final class SystemMonitor {
         guard let reading else { return }
         hasBattery = true
         battery = reading
+    }
+
+    /// 磁盘容量读数落地(工单 05):nil = 从未有过读数(非 APFS 系统/首轮前)
+    /// → 保持占位;读失败交付 lastGood 同值重画(driver 口径),不回退为 nil。
+    private func applyDiskCapacity(_ reading: DiskCapacityReading?) {
+        guard let reading else { return }
+        diskCapacity = reading
+    }
+
+    /// 磁盘吞吐读数落地(工单 05):nil 首轮前保持占位,此后 lastGood 口径同上。
+    private func applyDiskThroughput(_ reading: DiskThroughputReading?) {
+        guard let reading else { return }
+        diskThroughput = reading
     }
 }

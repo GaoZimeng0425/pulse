@@ -106,6 +106,12 @@ struct DashboardView: View {
                 totalBytes: content.memoryTotalBytes,
                 isCompact: true
             )
+        case .disk:
+            // 磁盘页(工单 05):主卡(已用大数字 + 可用/可清除/速率)+ 各卷
+            // 明细 + 快照列表;组排行与磁盘无关,不放(battery 同口径)。
+            MetricMainCardView(model: model.diskModel, isCompact: true)
+            DiskVolumeBreakdownView(capacity: monitor.diskCapacity, isCompact: true)
+            DiskSnapshotsCardView(listing: monitor.diskCapacity?.snapshots, isCompact: true)
         case .battery:
             MetricMainCardView(model: model.batteryModel, isCompact: true)
         }

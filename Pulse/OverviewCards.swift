@@ -203,6 +203,65 @@ extension MetricCardModel {
             domainMax: 100
         )
     }
+    /// 磁盘卡(工单 05):大数字 = 容器已用(十进制 GB,Finder 口径),四列小统计 =
+    /// 实际可用(Finder「可用」importantUsage 口径)/ 可清除(两 key 差值,与
+    /// 「实际可用」分开文案)/ 读取速率 / 写入速率;走势 = 读写合计流量。
+    /// 读数缺失(首轮前 / 容量对账失败)显示占位,不伪造。
+    static func disk(
+        capacity: DiskCapacityReading?,
+        throughput: DiskThroughputReading?
+    ) -> MetricCardModel {
+        guard let capacity else {
+            return MetricCardModel(
+                metric: .disk,
+                title: "磁盘",
+                symbolName: "internaldrive",
+                caption: "已用",
+                figureValue: "—",
+                figureUnit: "GB",
+                chip: nil,
+                note: "",
+                stats: [],
+                trend: [],
+                domainMax: 1
+            )
+        }
+        let total = PulseFormat.diskCapacity(capacity.containerTotalBytes)
+        let trend = throughput?.trend ?? []
+        let trendValues = trend.map { $0.read + $0.write }
+        return MetricCardModel(
+            metric: .disk,
+            title: "磁盘",
+            symbolName: "internaldrive",
+            caption: "已用 · 共 \(total)",
+            figureValue: PulseFormat.diskCapacityFigure(capacity.containerUsedBytes).value,
+            figureUnit: "GB",
+            chip: nil,
+            note: "",
+            stats: [
+                MetricCardStat(
+                    label: "实际可用",
+                    value: capacity.availableForImportantUsageBytes.map {
+                        PulseFormat.diskCapacity(UInt64(max(0, $0)))
+                    } ?? "—"
+                ),
+                MetricCardStat(
+                    label: "可清除",
+                    value: capacity.purgeableBytes.map { PulseFormat.diskCapacity(UInt64($0)) } ?? "—"
+                ),
+                MetricCardStat(
+                    label: "读取",
+                    value: throughput.map { PulseFormat.diskRate($0.current.readBytesPerSecond) } ?? "—"
+                ),
+                MetricCardStat(
+                    label: "写入",
+                    value: throughput.map { PulseFormat.diskRate($0.current.writeBytesPerSecond) } ?? "—"
+                ),
+            ],
+            trend: trendValues,
+            domainMax: max(1, trendValues.max() ?? 1)
+        )
+    }
 }
 
 extension BatteryChargeStatus {

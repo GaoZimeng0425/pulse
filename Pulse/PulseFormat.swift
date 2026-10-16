@@ -58,6 +58,36 @@ enum PulseFormat {
         "\(Int((Double(bytes) / 1_073_741_824).rounded())) GB"
     }
 
+    /// 磁盘容量(工单 05):字节 → **十进制** GB 两位小数("398.12 GB")——
+    /// Finder「可用/已用」按十进制 GB 报数(探针①同刻 209.55 GB 分毫不差),
+    /// 磁盘卡与 Finder 对照必须同口径;百分位手算拼串,不受系统区域影响。
+    static func diskCapacity(_ bytes: UInt64) -> String {
+        let figure = diskCapacityFigure(bytes)
+        return "\(figure.value) \(figure.unit)"
+    }
+
+    /// diskCapacity 的数字/单位分层版(大数字排版用),同源同格式。
+    static func diskCapacityFigure(_ bytes: UInt64) -> (value: String, unit: String) {
+        let gb = Double(bytes) / 1_000_000_000
+        let hundredths = Int((gb * 100).rounded())
+        let fraction = hundredths % 100
+        return ("\(hundredths / 100).\(fraction < 10 ? "0" : "")\(fraction)", "GB")
+    }
+
+    /// 磁盘速率(工单 05):字节/秒 → "12.4 MB/s"(十进制 KB/MB/GB 三级,
+    /// 一位小数;十分位手算拼串,不随系统区域漂移;负值按 0 夹紧)。
+    static func diskRate(_ bytesPerSecond: Double) -> String {
+        let bps = max(0, bytesPerSecond)
+        let (value, unit): (Double, String) =
+            bps >= 1_000_000_000
+            ? (bps / 1_000_000_000, "GB/s")
+            : bps >= 1_000_000
+            ? (bps / 1_000_000, "MB/s")
+            : (bps / 1_000, "KB/s")
+        let tenths = Int((value * 10).rounded())
+        return "\(tenths / 10).\(tenths % 10) \(unit)"
+    }
+
     /// 主窗口副标题(工单 P0.6-05):"Apple M4 Pro · 12 核 · 48 GB";芯片名未知则省略。
     static func hostSummary(chipName: String?, coreCount: Int, physicalMemoryBytes: UInt64) -> String {
         let parts = [chipName, "\(coreCount) 核", physicalMemoryTotal(physicalMemoryBytes)]

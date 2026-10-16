@@ -2,13 +2,14 @@ import Foundation
 
 // MARK: - 指标 tab 内容模型(工单 P0.6-03):弹窗图标 tab / 主窗口药丸 tab 的共享逻辑
 
-/// 指标 tab(工单 03):弹窗与主窗口共用同一组 tab——总览 / CPU / 内存 / 电池
-/// (工单 02),后续指标(磁盘/网络,P1+)按 `Metric` 令牌表加 case 即可。
+/// 指标 tab(工单 03):弹窗与主窗口共用同一组 tab——总览 / CPU / 内存 / 磁盘
+/// (工单 05)/ 电池(工单 02),后续指标(网络,P1+)按 `Metric` 令牌表加 case 即可。
 /// 展示序(`allCases`)同时是键盘 ←/→ 的移动轴:总览最左、电池最右。
 enum MetricTab: String, CaseIterable, Identifiable, Sendable {
     case overview
     case cpu
     case memory
+    case disk
     case battery
 
     var id: String { rawValue }
@@ -19,6 +20,7 @@ enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .overview: "总览"
         case .cpu: "CPU"
         case .memory: "内存"
+        case .disk: "磁盘"
         case .battery: "电池"
         }
     }
@@ -29,17 +31,19 @@ enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .overview: "square.grid.2x2"
         case .cpu: "cpu"
         case .memory: "memorychip"
+        case .disk: "internaldrive"
         case .battery: "battery.100percent"
         }
     }
 
     /// 选中态强调色色源(工单 02 令牌表):总览以系统 CPU 负载为主视角取 cpu,
-    /// CPU/内存/电池各取自家令牌——选中胶囊、meter、图表全由它派生。
+    /// CPU/内存/磁盘/电池各取自家令牌——选中胶囊、meter、图表全由它派生。
     var accent: Metric {
         switch self {
         case .overview: .cpu
         case .cpu: .cpu
         case .memory: .memory
+        case .disk: .disk
         case .battery: .battery
         }
     }
@@ -153,14 +157,14 @@ struct MetricTabContent: Equatable, Sendable {
     /// CPU meter 归一榜首。
     let cpuLeader: Double
 
-    /// 折叠入口:总览/CPU/电池 tab 按组 CPU% 降序(与引擎既定序一致;电池页
-    /// 不排组,榜单沿用 CPU 序供弹窗"当前最忙"卡),内存 tab 按内存降序;
+    /// 折叠入口:总览/CPU/磁盘/电池 tab 按组 CPU% 降序(与引擎既定序一致;电池/
+    /// 磁盘页不排组,榜单沿用 CPU 序供弹窗"当前最忙"卡),内存 tab 按内存降序;
     /// 分段基于全部组(与榜单口径无关,内存 tab 之外的 tab 也可渲染)。
     static func build(groups: [ProcessGroup], tab: MetricTab) -> MetricTabContent {
         let ranked: [ProcessGroup]
         let metric: GroupCardMetric
         switch tab {
-        case .overview, .cpu, .battery:
+        case .overview, .cpu, .disk, .battery:
             ranked = groups.sorted { lhs, rhs in
                 if lhs.cpuPercent != rhs.cpuPercent { return lhs.cpuPercent > rhs.cpuPercent }
                 return lhs.id < rhs.id

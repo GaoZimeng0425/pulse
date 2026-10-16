@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		03760751534AA31D20082DF3 /* GroupingPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04B94E5187DBD137CE08441B /* GroupingPipelineTests.swift */; };
+		04BFB76AC65777ABAFFF1897 /* LiveDiskSourceSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F27F7F4AB085BB21BC93D75 /* LiveDiskSourceSmokeTests.swift */; };
 		05709BE15A090DCA772345D5 /* GroupingEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D0353305807063B3A9F254 /* GroupingEngineTests.swift */; };
 		0768A25F3BC010CBFDB706E9 /* PulseFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C772B1E878BAEDA9C022C6C /* PulseFormatTests.swift */; };
 		0AC65ED3BAE50360BFE8D689 /* ParentChainQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91BEE952FDD7E25ABCCEED94 /* ParentChainQuery.swift */; };
@@ -33,6 +34,7 @@
 		4FD94E45498F42D4F33D37AB /* KillCopyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6905F53CAA07BA2EBD3D8BD /* KillCopyTests.swift */; };
 		51A6E49B73921A3FC725B604 /* BundleDisplayNameReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFC9AB4EF78C90578BF978B2 /* BundleDisplayNameReader.swift */; };
 		53BF4BF8378F0983A51FC4A8 /* SamplingSchedulerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C1A01E0236973380C357F35 /* SamplingSchedulerTests.swift */; };
+		59D37D46AB0A2072BA352F44 /* DiskCardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4BFCB03504BD8D4F7165238 /* DiskCardViews.swift */; };
 		5A0E5B74BDCCD77BA4B7DA54 /* DashboardModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32BE8BAC25214CEDFBA5AF6C /* DashboardModel.swift */; };
 		5E698B91C352218AEC7DF667 /* MetricAccentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD1902314E98C2C8F685D0D9 /* MetricAccentTests.swift */; };
 		616D7878CF54B2A29104277C /* ProcArgsParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 922EBEDDF974C9C5C567A5C8 /* ProcArgsParserTests.swift */; };
@@ -61,6 +63,7 @@
 		B7AF2DC3EECBC71EF6EC6346 /* RingCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 933B0BDAB34D052ED3CE1FDA /* RingCardView.swift */; };
 		BAA389388E0FABC05A298C73 /* RankingCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFA46EAEACE1FFB5C9B9CEF7 /* RankingCard.swift */; };
 		C28472B069243FA1523B97C5 /* LiveBatterySourceSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F686C4FCD1571352152AE894 /* LiveBatterySourceSmokeTests.swift */; };
+		C54E62D5C96A4FFA4851744E /* DiskSensorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0C2BC1088F0581063C1D49A /* DiskSensorTests.swift */; };
 		CADC6FC231286ABD06F04C67 /* KillServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C53D2D1E33AFAC1704FD224A /* KillServiceTests.swift */; };
 		CE6715B1906E190F4170C1F5 /* CPUDiffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3876B006CE48D758E7238556 /* CPUDiffer.swift */; };
 		D01C022CE4904C8972600CED /* CoreTickDiffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2DC9EA24953F94BEA87B826 /* CoreTickDiffer.swift */; };
@@ -75,6 +78,7 @@
 		E559247BAA70D0A1868BD156 /* LiveProcessSourceSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A992F5F503CAD7CB90DD838 /* LiveProcessSourceSmokeTests.swift */; };
 		E9FB46EA364DC9CBF4A6BA36 /* MeterBarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E785F53B70C02534AC3EBF8 /* MeterBarTests.swift */; };
 		EB0CDD553EA6D376380B5006 /* StripChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F3216AB5859694E2E2665D7 /* StripChartView.swift */; };
+		EB57B1EE81630963AC27E01D /* DiskSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1647D66367867289B05266A /* DiskSensor.swift */; };
 		EB6A8D530686F8BEE362E0AD /* ProcessSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF564398ED42F94AAC5F11A4 /* ProcessSource.swift */; };
 		EBE6B448AA908BA66471F4A1 /* MeterBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDD3F4E919A4F4E221C8DA95 /* MeterBar.swift */; };
 		EE3566C6FB14C20C796F9706 /* PulseFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A05454E2790B918CCFBFDA4 /* PulseFormat.swift */; };
@@ -151,6 +155,7 @@
 		983A9EA484804485FCD66013 /* MemoryStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryStats.swift; sourceTree = "<group>"; };
 		9905BF005BD3EB506349DE3E /* SampleHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleHistoryTests.swift; sourceTree = "<group>"; };
 		9D5309CAF2CC1BC7C626E937 /* PulseApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PulseApp.swift; sourceTree = "<group>"; };
+		9F27F7F4AB085BB21BC93D75 /* LiveDiskSourceSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDiskSourceSmokeTests.swift; sourceTree = "<group>"; };
 		A41FA45715128B122D691CA0 /* OverviewCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewCards.swift; sourceTree = "<group>"; };
 		A5770D8A3B1DB2980B7B412C /* GroupingPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupingPipeline.swift; sourceTree = "<group>"; };
 		A72E4A9FD692096E36A0C948 /* DiagnosticReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticReport.swift; sourceTree = "<group>"; };
@@ -165,16 +170,19 @@
 		BC06CE2AAADC2E6B644F4619 /* ProcessDrilldownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessDrilldownView.swift; sourceTree = "<group>"; };
 		BF564398ED42F94AAC5F11A4 /* ProcessSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessSource.swift; sourceTree = "<group>"; };
 		C03A9EBCB9547AAD3B2FF3F9 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		C1647D66367867289B05266A /* DiskSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskSensor.swift; sourceTree = "<group>"; };
 		C1B6EB298AF64E7F67498D19 /* ProcessDrilldown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessDrilldown.swift; sourceTree = "<group>"; };
 		C1EF72EAAF8C6F0A9C75A56D /* SensorProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SensorProvider.swift; sourceTree = "<group>"; };
 		C51EAD0B99672798A7F56077 /* LiveProcessSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveProcessSource.swift; sourceTree = "<group>"; };
 		C53D2D1E33AFAC1704FD224A /* KillServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KillServiceTests.swift; sourceTree = "<group>"; };
 		C63C1ECC09721E8533BE5DAA /* BirthScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BirthScanner.swift; sourceTree = "<group>"; };
 		CDD3F4E919A4F4E221C8DA95 /* MeterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeterBar.swift; sourceTree = "<group>"; };
+		D4BFCB03504BD8D4F7165238 /* DiskCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskCardViews.swift; sourceTree = "<group>"; };
 		DCA4A32138D3658BE3DDD03F /* ProjectRootsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRootsStore.swift; sourceTree = "<group>"; };
 		DF43629A17EF4D982135C6DC /* ProjectRootsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRootsStoreTests.swift; sourceTree = "<group>"; };
 		DFA46EAEACE1FFB5C9B9CEF7 /* RankingCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingCard.swift; sourceTree = "<group>"; };
 		E04EA088E4D30C0FF3A1CB75 /* KillActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KillActionTests.swift; sourceTree = "<group>"; };
+		E0C2BC1088F0581063C1D49A /* DiskSensorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskSensorTests.swift; sourceTree = "<group>"; };
 		E1E06F0A25EE07740DA1C192 /* ProjectRootsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRootsSettingsView.swift; sourceTree = "<group>"; };
 		EEBC94632BC0F748A5375D1C /* SettingsWindowChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowChrome.swift; sourceTree = "<group>"; };
 		EF2E7BDD9FC935868908BF6C /* ProcessSearchFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessSearchFilterTests.swift; sourceTree = "<group>"; };
@@ -208,6 +216,8 @@
 				32BE8BAC25214CEDFBA5AF6C /* DashboardModel.swift */,
 				C03A9EBCB9547AAD3B2FF3F9 /* DashboardView.swift */,
 				A72E4A9FD692096E36A0C948 /* DiagnosticReport.swift */,
+				D4BFCB03504BD8D4F7165238 /* DiskCardViews.swift */,
+				C1647D66367867289B05266A /* DiskSensor.swift */,
 				25DC4F22A90CFBA1BA79B750 /* GeneralSettingsView.swift */,
 				6E978B9526EA1C54372E33CC /* GroupingEngine.swift */,
 				A5770D8A3B1DB2980B7B412C /* GroupingPipeline.swift */,
@@ -277,6 +287,7 @@
 				157B382FB4BC0949D81F02BD /* CoreTickDifferTests.swift */,
 				52CBC2FEBBED6BCB5A8AE107 /* CPUDifferTests.swift */,
 				276EA0F7DAC2C0AC558E9614 /* DiagnosticReportTests.swift */,
+				E0C2BC1088F0581063C1D49A /* DiskSensorTests.swift */,
 				135674B4363F7A3923D5D6C1 /* DrilldownStateTests.swift */,
 				1B7ADC75304AC8AC8EF1CED3 /* GroupCategoryDisplayTests.swift */,
 				F3D0353305807063B3A9F254 /* GroupingEngineTests.swift */,
@@ -288,6 +299,7 @@
 				C53D2D1E33AFAC1704FD224A /* KillServiceTests.swift */,
 				B1CFF8BCDEC12DA39EA8F8D3 /* KillTargetMappingTests.swift */,
 				F686C4FCD1571352152AE894 /* LiveBatterySourceSmokeTests.swift */,
+				9F27F7F4AB085BB21BC93D75 /* LiveDiskSourceSmokeTests.swift */,
 				3A992F5F503CAD7CB90DD838 /* LiveProcessSourceSmokeTests.swift */,
 				F937470B1B173E43976933F8 /* MainWindowModelTests.swift */,
 				1E785F53B70C02534AC3EBF8 /* MeterBarTests.swift */,
@@ -399,6 +411,7 @@
 				699E7D697AF017DD08E2E9E0 /* CPUDifferTests.swift in Sources */,
 				3598E8EB4005ED5ED236302F /* CoreTickDifferTests.swift in Sources */,
 				3A4696425FA64D6D47C5ED02 /* DiagnosticReportTests.swift in Sources */,
+				C54E62D5C96A4FFA4851744E /* DiskSensorTests.swift in Sources */,
 				154454A04341DB4CA585E4B9 /* DrilldownStateTests.swift in Sources */,
 				3891285DCA8188E59A9EC34E /* GroupCategoryDisplayTests.swift in Sources */,
 				05709BE15A090DCA772345D5 /* GroupingEngineTests.swift in Sources */,
@@ -410,6 +423,7 @@
 				CADC6FC231286ABD06F04C67 /* KillServiceTests.swift in Sources */,
 				6CBEE611BA0F9C722030FA75 /* KillTargetMappingTests.swift in Sources */,
 				C28472B069243FA1523B97C5 /* LiveBatterySourceSmokeTests.swift in Sources */,
+				04BFB76AC65777ABAFFF1897 /* LiveDiskSourceSmokeTests.swift in Sources */,
 				E559247BAA70D0A1868BD156 /* LiveProcessSourceSmokeTests.swift in Sources */,
 				80E1D933B7837B2709826B4B /* MainWindowModelTests.swift in Sources */,
 				E9FB46EA364DC9CBF4A6BA36 /* MeterBarTests.swift in Sources */,
@@ -442,6 +456,8 @@
 				5A0E5B74BDCCD77BA4B7DA54 /* DashboardModel.swift in Sources */,
 				68820A72998494281B77A725 /* DashboardView.swift in Sources */,
 				E4F96C3034A732D97973EDBA /* DiagnosticReport.swift in Sources */,
+				59D37D46AB0A2072BA352F44 /* DiskCardViews.swift in Sources */,
+				EB57B1EE81630963AC27E01D /* DiskSensor.swift in Sources */,
 				4608D143CBE0C0EFE846429A /* GeneralSettingsView.swift in Sources */,
 				75364487780EFF56E510D046 /* GroupingEngine.swift in Sources */,
 				D9434C4C35D7823C01826B81 /* GroupingPipeline.swift in Sources */,
