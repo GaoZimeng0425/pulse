@@ -202,7 +202,7 @@ struct RankingRowView: View {
         return group.category.cardStyle.accentColor
     }
 
-    /// bundle 组用真实应用图标;其余类别用样式表的 SF Symbol(孤儿橙)。
+    /// bundle 组用真实应用图标;其余类别用"外壳底色 + 白符号"瓦片(形态对齐 app logo)。
     @ViewBuilder
     private var icon: some View {
         if let bundlePath = group.bundlePath {
@@ -210,9 +210,11 @@ struct RankingRowView: View {
                 .resizable()
                 .aspectRatio(contentMode: .fit)
         } else {
-            Image(systemName: group.category.cardStyle.symbolName)
-                .font(.system(size: isCompact ? 11 : 13))
-                .foregroundStyle(group.category.cardStyle.iconColor)
+            CategoryIconTile(
+                symbolName: group.category.cardStyle.symbolName,
+                color: group.category.cardStyle.tileColor,
+                size: iconSize
+            )
         }
     }
 }

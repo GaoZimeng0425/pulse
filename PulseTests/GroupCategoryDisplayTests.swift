@@ -14,9 +14,18 @@ final class GroupCategoryDisplayTests: XCTestCase {
         XCTAssertEqual(Set(symbols).count, symbols.count, "各类别符号应互不相同(可辨识)")
     }
 
-    /// 孤儿进程的样式表条目:橙色图标(GLOSSARY:橙色高亮,"它往往正是问题所在")。
+    /// 孤儿进程的样式表条目:橙色外壳(GLOSSARY:橙色高亮,"它往往正是问题所在")。
     func testOrphanCardStyleIsOrangeHighlighted() {
-        XCTAssertEqual(GroupCategory.orphan.cardStyle.iconColor, .orange)
+        XCTAssertEqual(GroupCategory.orphan.cardStyle.tileColor, .orange)
+    }
+
+    /// 类别外壳底色互不相同(2026-10-16 外壳瓦片:非 bundle 组以"实心圆角方块 +
+    /// 白符号"对齐 app logo 形态,底色是类别的可辨识标记)。
+    func testEveryCategoryHasDistinctTileColor() {
+        let tiles = GroupCategory.allCases.map(\.cardStyle.tileColor)
+        let resolved = tiles.map { $0.resolve(in: .init()) }
+
+        XCTAssertEqual(Set(resolved.map(\.description)).count, resolved.count, "各类别外壳底色应互不相同")
     }
 
     /// P0.6-02 强调色接入样式表后,孤儿一行的强调色仍是橙——

@@ -9,8 +9,8 @@ struct RingSlice: Identifiable {
     enum Icon {
         /// 应用图标(.app bundle 路径)。
         case app(String)
-        /// SF Symbol(项目 / 兜底类别 / "其他")。
-        case symbol(String)
+        /// SF Symbol + 外壳底色(项目 / 兜底类别 / "其他")。
+        case symbol(String, Color)
         /// 色点(构成类分段)。
         case dot
     }
@@ -33,9 +33,12 @@ extension RingSlice {
             let icon: Icon = if let bundlePath = segment.bundlePath {
                 .app(bundlePath)
             } else if segment.isOther {
-                .symbol("ellipsis")
+                .symbol("ellipsis", .gray)
             } else {
-                .symbol(segment.category?.cardStyle.symbolName ?? "shippingbox")
+                .symbol(
+                    segment.category?.cardStyle.symbolName ?? "shippingbox",
+                    segment.category?.cardStyle.tileColor ?? .gray
+                )
             }
             let color = segment.isOther || index >= opacities.count
                 ? Surface.cardHigh
@@ -153,10 +156,8 @@ struct RingCardView: View {
             Image(nsImage: NSWorkspace.shared.icon(forFile: path))
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-        case .symbol(let name):
-            Image(systemName: name)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.secondary)
+        case .symbol(let name, let color):
+            CategoryIconTile(symbolName: name, color: color, size: 16)
         case .dot:
             Circle()
                 .fill(slice.color)

@@ -190,11 +190,32 @@ struct FooterButtonStyle: ButtonStyle {
 /// 它往往正是问题所在)是表中的一行,而非散落在视图里的 `.orphan` 特判。
 struct GroupCardStyle {
     let symbolName: String
-    let iconColor: Color
+    /// 外壳底色(2026-10-16 用户反馈):非 bundle 组没有真实应用图标,裸 SF Symbol
+    /// 夹在真 App 图标之间显得突兀——改为实心圆角方块 + 白符号,形态对齐 app logo。
+    let tileColor: Color
     let cardBackground: AnyShapeStyle
     /// 指标强调色:CPU 口径下驱动卡内 meter/微图(孤儿橙)。工单 03 tab 化后
     /// 内存口径由 RankingRowView 按当前 tab 的指标另行覆盖(孤儿仍橙,语义不变)。
     let accentColor: Color
+}
+
+/// 类别图标的"外壳":实心圆角方块 + 白色符号,形态对齐真实 app 图标。
+struct CategoryIconTile: View {
+    let symbolName: String
+    let color: Color
+    var size: CGFloat
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
+            .fill(color)
+            .frame(width: size, height: size)
+            .overlay {
+                Image(systemName: symbolName)
+                    .font(.system(size: size * 0.52, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .accessibilityHidden(true)
+    }
 }
 
 extension GroupCategory {
@@ -204,7 +225,8 @@ extension GroupCategory {
         switch self {
         case .app:
             GroupCardStyle(
-                symbolName: "shippingbox", iconColor: .secondary,
+                // app 组渲染走真实应用图标,此瓦片仅样式表完备性的理论兜底。
+                symbolName: "shippingbox", tileColor: .brown,
                 cardBackground: AnyShapeStyle(.quaternary),
                 accentColor: Metric.cpu.accentColor
             )
@@ -212,26 +234,25 @@ extension GroupCategory {
             GroupCardStyle(
                 // 项目组统一图标:folder(目录 = 项目的自然隐喻,与 Vitals 的
                 // Projects 概念一致;旧 hammer 读作"构建工具",用户反馈怪)。
-                symbolName: "folder", iconColor: .secondary,
+                symbolName: "folder", tileColor: Metric.cpu.accentColor,
                 cardBackground: AnyShapeStyle(.quaternary),
                 accentColor: Metric.cpu.accentColor
             )
         case .system:
             GroupCardStyle(
-                symbolName: "cpu", iconColor: .secondary,
+                symbolName: "cpu", tileColor: .gray,
                 cardBackground: AnyShapeStyle(.quaternary),
                 accentColor: Metric.cpu.accentColor
             )
         case .backgroundService:
             GroupCardStyle(
-                symbolName: "gearshape", iconColor: .secondary,
+                symbolName: "gearshape", tileColor: Metric.network.accentColor,
                 cardBackground: AnyShapeStyle(.quaternary),
                 accentColor: Metric.cpu.accentColor
             )
         case .orphan:
             GroupCardStyle(
-                symbolName: "exclamationmark.triangle",
-                iconColor: .orange,
+                symbolName: "exclamationmark.triangle", tileColor: .orange,
                 cardBackground: AnyShapeStyle(Color.orange.opacity(0.15)),
                 accentColor: .orange
             )
