@@ -51,6 +51,10 @@ struct MinuteAggregate: Equatable, Sendable {
     let groups: [GroupMinuteAggregate]
     let systemLoadAverage: Double
     let systemLoadPeak: Double
+    /// 窗口内网络增量合计(工单 06,system_min 的 net_rx/net_tx 列;
+    /// rx = 接收 = 下行,tx = 发送 = 上行)。
+    let netRxBytes: UInt64
+    let netTxBytes: UInt64
 }
 
 /// 分钟窗卷积器(纯逻辑,工单 03"每 60 秒把环形缓冲卷积进分钟表"的聚合半边):
@@ -74,13 +78,19 @@ struct MinuteRollupBuffer: Sendable, Equatable {
     private var currentMinuteStart: Date?
     private var groupAccumulators: [GroupIdentity: GroupAccumulator] = [:]
     private var systemLoads: [Double] = []
+    /// 当前窗的网络增量合计(工单 06):逐轮求和,跨窗清零重计。
+    private var netRxBytes: UInt64 = 0
+    private var netTxBytes: UInt64 = 0
 
     /// 采样进窗。跨入新分钟时返回上一分钟的聚合(该分钟有样本才非 nil);
     /// 时间戳早于当前窗(时钟回拨/乱序迟到)时丢弃该样本,不污染已聚合窗口。
+    @discardableResult
     mutating func ingest(
         at now: Date,
         systemLoad: Double,
-        groups: [GroupSample]
+        groups: [GroupSample],
+        netRxBytes: UInt64 = 0,
+        netTxBytes: UInt64 = 0
     ) -> MinuteAggregate? {
         let minute = HistoryWindows.minuteStart(of: now)
         if let current = currentMinuteStart {
@@ -90,18 +100,33 @@ struct MinuteRollupBuffer: Sendable, Equatable {
                 currentMinuteStart = minute
                 groupAccumulators = [:]
                 systemLoads = []
-                accumulate(systemLoad: systemLoad, groups: groups)
+                self.netRxBytes = 0
+                self.netTxBytes = 0
+                accumulate(
+                    systemLoad: systemLoad,
+                    groups: groups,
+                    netRxBytes: netRxBytes,
+                    netTxBytes: netTxBytes
+                )
                 return flushed
             }
         } else {
             currentMinuteStart = minute
         }
-        accumulate(systemLoad: systemLoad, groups: groups)
+        accumulate(systemLoad: systemLoad, groups: groups, netRxBytes: netRxBytes, netTxBytes: netTxBytes)
         return nil
     }
 
-    private mutating func accumulate(systemLoad: Double, groups: [GroupSample]) {
+    private mutating func accumulate(
+        systemLoad: Double,
+        groups: [GroupSample],
+        netRxBytes: UInt64 = 0,
+        netTxBytes: UInt64 = 0
+    ) {
         systemLoads.append(systemLoad)
+        // 网络增量逐轮求和(加法可能进位,用 &+ 防溢出崩溃:历史记账宁绕回不算)。
+        self.netRxBytes = self.netRxBytes &+ netRxBytes
+        self.netTxBytes = self.netTxBytes &+ netTxBytes
         var presentByID: [GroupIdentity: GroupSample] = [:]
         for sample in groups {
             presentByID[sample.id] = sample // 同轮重复 id 以最后一条为准(与环形缓冲同口径)
@@ -136,7 +161,9 @@ struct MinuteRollupBuffer: Sendable, Equatable {
             minuteStart: currentMinuteStart ?? .distantPast,
             groups: groups,
             systemLoadAverage: systemAverage,
-            systemLoadPeak: systemLoads.max() ?? 0
+            systemLoadPeak: systemLoads.max() ?? 0,
+            netRxBytes: netRxBytes,
+            netTxBytes: netTxBytes
         )
     }
 }

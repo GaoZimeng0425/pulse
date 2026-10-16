@@ -55,7 +55,9 @@ final class HistoryEngineTests: XCTestCase {
         load: Double = 10,
         groups: [GroupSample],
         names: [GroupIdentity: String]? = nil,
-        lineage: LineageRegistry = LineageRegistry()
+        lineage: LineageRegistry = LineageRegistry(),
+        netRx: UInt64 = 0,
+        netTx: UInt64 = 0
     ) async {
         let displayNames = names ?? Dictionary(
             uniqueKeysWithValues: groups.map { ($0.id, Self.title(of: $0.id)) }
@@ -65,7 +67,9 @@ final class HistoryEngineTests: XCTestCase {
             systemLoad: load,
             groups: groups,
             displayNames: displayNames,
-            lineage: lineage
+            lineage: lineage,
+            netRxBytes: netRx,
+            netTxBytes: netTx
         )
     }
 
@@ -310,6 +314,66 @@ final class HistoryEngineTests: XCTestCase {
         XCTAssertEqual(try scalarInt("SELECT count(*) FROM sample_hour"), 0)
         XCTAssertEqual(try scalarInt("SELECT count(*) FROM system_hour"), 0)
         XCTAssertEqual(try scalarInt("SELECT count(*) FROM system_min"), 0)
+    }
+
+    // MARK: 网络增量落库与累计查询(工单 06)
+
+    /// system_min 的 net_rx/net_tx 由分钟窗内增量求和写入(rx = 下行,tx = 上行)。
+    func testMinuteRowsCarryNetworkIncrements() async throws {
+        let engine = try makeMemoryEngine(now: minute0)
+        await ingest(engine, at: minute0, load: 1, groups: [], netRx: 300, netTx: 100)
+        await ingest(engine, at: minute0.addingTimeInterval(5), load: 1, groups: [], netRx: 200, netTx: 400)
+        await ingest(engine, at: minute0.addingTimeInterval(60), load: 1, groups: [])
+
+        XCTAssertEqual(try scalarInt("SELECT net_rx FROM system_min"), 500)
+        XCTAssertEqual(try scalarInt("SELECT net_tx FROM system_min"), 500)
+    }
+
+    /// Today/7 天累计与库内增量吻合,跨当地零点翻日,且已卷积分钟不重复计数:
+    /// 昨日 23:00 的行在 system_min 与 system_hour 各一份(rollup 幂等保留明细),
+    /// 查询必须按"小时边界前走小时表、边界后走分钟表"两段相加——
+    /// 天真地对两表同窗求和会得到 300/30 而不是正确的 150/15。
+    func testNetworkTotalsCrossLocalMidnightWithoutDoubleCounting() async throws {
+        let day0 = calendar.startOfDay(for: minute0)
+        let lateNight = try XCTUnwrap(calendar.date(bySettingHour: 23, minute: 0, second: 0, of: day0))
+        let engine = try makeFileEngine(now: lateNight)
+
+        // 昨日 23:00 一分钟(下行 100 / 上行 10),跨分钟冲刷成行。
+        await ingest(engine, at: lateNight, load: 1, groups: [], netRx: 100, netTx: 10)
+        await ingest(engine, at: lateNight.addingTimeInterval(60), load: 1, groups: [])
+
+        // 跨当地零点 + 跨小时:今日 00:05 一分钟(下行 50 / 上行 5)。
+        let nextDay = try XCTUnwrap(calendar.date(bySettingHour: 0, minute: 5, second: 0, of: day0.addingTimeInterval(86_400)))
+        await ingest(engine, at: nextDay, load: 1, groups: [], netRx: 50, netTx: 5)
+        await ingest(engine, at: nextDay.addingTimeInterval(60), load: 1, groups: [])
+
+        let totals = await engine.networkTotals(now: nextDay.addingTimeInterval(120))
+        let totalsReading = try XCTUnwrap(totals)
+        XCTAssertEqual(totalsReading.todayDownBytes, 50, "Today 只算当地零点之后的窗口")
+        XCTAssertEqual(totalsReading.todayUpBytes, 5)
+        XCTAssertEqual(totalsReading.weekDownBytes, 150, "7 天 = 今天 + 前 6 个当地日,两段相加不重复")
+        XCTAssertEqual(totalsReading.weekUpBytes, 15)
+    }
+
+    /// 无网络增量的分钟写 0(行仍要落,负载列照常);累计对 0 行安然无恙。
+    func testNetworkTotalsWithNoTrafficReadZero() async throws {
+        let engine = try makeMemoryEngine(now: minute0)
+        await ingest(engine, at: minute0, load: 1, groups: [])
+        await ingest(engine, at: minute0.addingTimeInterval(60), load: 1, groups: [])
+
+        let totals = await engine.networkTotals(now: minute0.addingTimeInterval(120))
+        let totalsReading = try XCTUnwrap(totals)
+        XCTAssertEqual(totalsReading.todayDownBytes, 0)
+        XCTAssertEqual(totalsReading.todayUpBytes, 0)
+        XCTAssertEqual(totalsReading.weekDownBytes, 0)
+        XCTAssertEqual(totalsReading.weekUpBytes, 0)
+    }
+
+    /// 库缺席(降级为无历史):累计返回 nil,UI 占位,不伪造。
+    func testNetworkTotalsWithoutDatabaseReturnsNil() async throws {
+        let engine = HistoryEngine(database: nil, now: minute0, calendar: calendar)
+        let totals = await engine.networkTotals(now: minute0)
+        XCTAssertNil(totals)
     }
 
     // MARK: 出生登记持久化(重启保归因)

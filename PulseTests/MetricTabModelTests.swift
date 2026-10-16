@@ -10,19 +10,19 @@ final class MetricTabModelTests: XCTestCase {
 
     // MARK: - MetricTab:顺序与文案
 
-    func testTabsAreOrderedOverviewCPUMemoryDiskBattery() {
+    func testTabsAreOrderedOverviewCPUMemoryDiskNetworkBatteryHistory() {
         // 展示序即键盘 ←/→ 的移动轴:总览在最左,历史(工单 04)在最右;
-        // 磁盘(工单 05)按令牌表插在内存与电池之间。
+        // 磁盘(工单 05)与网络(工单 06)按令牌表插在内存与电池之间。
         XCTAssertEqual(
             MetricTab.allCases.map(\.rawValue),
-            ["overview", "cpu", "memory", "disk", "battery", "history"]
+            ["overview", "cpu", "memory", "disk", "network", "battery", "history"]
         )
     }
 
     func testTabTitlesAreChinese() {
         // 药丸 tab 文字与无障碍标签共用中文文案。
         let titles = MetricTab.allCases.map(\.title)
-        XCTAssertEqual(titles, ["总览", "CPU", "内存", "磁盘", "电池", "历史"])
+        XCTAssertEqual(titles, ["总览", "CPU", "内存", "磁盘", "网络", "电池", "历史"])
     }
 
     func testTabSymbolsAreDistinct() {
@@ -39,6 +39,7 @@ final class MetricTabModelTests: XCTestCase {
         XCTAssertEqual(MetricTab.cpu.accent, .cpu)
         XCTAssertEqual(MetricTab.memory.accent, .memory)
         XCTAssertEqual(MetricTab.disk.accent, .disk)
+        XCTAssertEqual(MetricTab.network.accent, .network)
         XCTAssertEqual(MetricTab.battery.accent, .battery)
         XCTAssertEqual(MetricTab.history.accent, .cpu)
     }
@@ -59,16 +60,20 @@ final class MetricTabModelTests: XCTestCase {
         selection.moveRight()
         XCTAssertEqual(selection.current, .disk)
         selection.moveRight()
+        XCTAssertEqual(selection.current, .network)
+        selection.moveRight()
         XCTAssertEqual(selection.current, .battery)
         selection.moveRight()
         XCTAssertEqual(selection.current, .history)
     }
 
     func testMoveLeftRetreatsInDisplayOrder() {
-        // ← 键左移:历史 → 电池 → 磁盘 → 内存 → CPU → 总览。
+        // ← 键左移:历史 → 电池 → 网络 → 磁盘 → 内存 → CPU → 总览。
         var selection = MetricTabSelection(current: .history)
         selection.moveLeft()
         XCTAssertEqual(selection.current, .battery)
+        selection.moveLeft()
+        XCTAssertEqual(selection.current, .network)
         selection.moveLeft()
         XCTAssertEqual(selection.current, .disk)
         selection.moveLeft()
@@ -97,38 +102,34 @@ final class MetricTabModelTests: XCTestCase {
     }
 
     func testDisplayAxisHidesBatteryWithoutBattery() {
-        // 磁盘页(工单 05)常驻轴(每台 Mac 都有盘),无电池只隐藏电池页;
+        // 磁盘/网络页(工单 05/06)常驻轴(每台 Mac 都有),无电池只隐藏电池页;
         // 历史页(工单 04)同为主窗口常驻轴。
         XCTAssertEqual(
             MetricTab.displayAxis(hasBattery: false),
-            [.overview, .cpu, .memory, .disk, .history]
+            [.overview, .cpu, .memory, .disk, .network, .history]
         )
     }
 
     func testPopoverAxisAlwaysExcludesHistory() {
         // 弹窗轴(工单 04 拍板:popover 不加历史):有无电池都不得出现历史页,
-        // 其余 tab 与 displayAxis 一致。
+        // 其余 tab 与 displayAxis 一致(网络页入弹窗,工单 06)。
         XCTAssertEqual(
             MetricTab.popoverAxis(hasBattery: true),
-            [.overview, .cpu, .memory, .disk, .battery]
+            [.overview, .cpu, .memory, .disk, .network, .battery]
         )
         XCTAssertEqual(
             MetricTab.popoverAxis(hasBattery: false),
-            [.overview, .cpu, .memory, .disk]
+            [.overview, .cpu, .memory, .disk, .network]
         )
     }
 
     func testKeyboardMovesFollowAxisWithoutBattery() {
         // 无电池机器:轴不含电池页,→ 依次走到历史右端夹紧停下(不跳空)。
         var selection = MetricTabSelection(axis: MetricTab.displayAxis(hasBattery: false))
+        for _ in 0..<5 { selection.moveRight() }
+        XCTAssertEqual(selection.current, .history)
         selection.moveRight()
-        selection.moveRight()
-        selection.moveRight()
-        XCTAssertEqual(selection.current, .disk)
-        selection.moveRight()
-        XCTAssertEqual(selection.current, .history, "轴右端 = 历史(工单 04)")
-        selection.moveRight()
-        XCTAssertEqual(selection.current, .history, "再 → 不动")
+        XCTAssertEqual(selection.current, .history, "轴右端 = 历史(工单 04),再 → 不动")
     }
 
     func testSetAxisHidesCurrentTabFallsBackToOverview() {

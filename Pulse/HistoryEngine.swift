@@ -99,17 +99,26 @@ actor HistoryEngine {
     /// 一轮采样进历史(每轮采样调用,`now` = 该轮采样时刻):
     /// 5s 原始值进内存缓冲;跨分钟冲刷上一分钟为行;跨小时卷积完整小时;
     /// 跨当地日顺带留存清理;出生登记与组元数据增量落库——同一事务。
+    /// `netRxBytes`/`netTxBytes` = 本轮网络记账增量(工单 06,差分丢弃轮为 0)。
     func ingest(
         at now: Date,
         systemLoad: Double,
         groups: [GroupSample],
         displayNames: [GroupIdentity: String],
-        lineage: LineageRegistry
+        lineage: LineageRegistry,
+        netRxBytes: UInt64 = 0,
+        netTxBytes: UInt64 = 0
     ) {
         guard let database else { return }
         do {
             try database.write { db in
-                if let aggregate = buffer.ingest(at: now, systemLoad: systemLoad, groups: groups) {
+                if let aggregate = buffer.ingest(
+                    at: now,
+                    systemLoad: systemLoad,
+                    groups: groups,
+                    netRxBytes: netRxBytes,
+                    netTxBytes: netTxBytes
+                ) {
                     try Self.insertMinute(aggregate, in: db)
                 }
 
@@ -132,6 +141,62 @@ actor HistoryEngine {
         } catch {
             // 过渡非轮询:失败记一条,不逐轮刷屏(日志惯例)。
             LogService.error("历史落库失败:\(error)", category: "History")
+        }
+    }
+
+    // MARK: 网络 Today/7 天累计(工单 06)
+
+    /// Today/7 天网络累计(system_min/system_hour SQL 聚合,当地零点为日界):
+    /// 已过小时边界前的分钟行在分钟表与小时表**各有一份**(小时卷积幂等保留
+    /// 明细),查询按"当前小时边界前走小时表、边界后走分钟表"两段相加——
+    /// 天真地对两表同窗求和会重复计数。库缺席/查询失败返回 nil(UI 占位,
+    /// 不伪造);03 时代的旧行 net 列为 NULL,SUM 忽略之。
+    func networkTotals(now: Date) -> NetworkTotalsReading? {
+        guard let database else { return nil }
+        do {
+            return try database.read { db in
+                let dayStart = calendar.startOfDay(for: now)
+                let weekStart = calendar.date(byAdding: .day, value: -6, to: dayStart)
+                let hourStart = HistoryWindows.hourStartSeconds(of: now)
+                let dayStartSeconds = HistoryWindows.epochSeconds(of: dayStart)
+                let weekStartSeconds = weekStart.map { HistoryWindows.epochSeconds(of: $0) }
+                    ?? dayStartSeconds
+
+                /// net 两列的窗口求和(rx = 下行,tx = 上行):`[lower, upper)`。
+                /// upper = nil = 不封顶(当前小时未卷积段,行只可能 ≤ now);
+                /// 表名/边界都是本文件字面量整数,无注入面。
+                func sum(table: String, lower: Int, upper: Int?) throws -> (rx: Int64, tx: Int64) {
+                    let bound = upper.map { "AND ts < \(Int($0))" } ?? ""
+                    let row = try Row.fetchOne(
+                        db,
+                        sql: """
+                            SELECT COALESCE(SUM(net_rx), 0) AS rx, COALESCE(SUM(net_tx), 0) AS tx
+                            FROM \(table) WHERE ts >= \(Int(lower)) \(bound)
+                            """
+                    )
+                    let rx: Int64 = row?["rx"] ?? 0
+                    let tx: Int64 = row?["tx"] ?? 0
+                    return (rx, tx)
+                }
+
+                func total(_ hour: Int64, _ minute: Int64) -> UInt64 {
+                    UInt64(max(0, hour + minute))
+                }
+
+                let (todayHourRx, todayHourTx) = try sum(table: "system_hour", lower: dayStartSeconds, upper: hourStart)
+                let (todayMinuteRx, todayMinuteTx) = try sum(table: "system_min", lower: hourStart, upper: nil)
+                let (weekHourRx, weekHourTx) = try sum(table: "system_hour", lower: weekStartSeconds, upper: hourStart)
+                let (weekMinuteRx, weekMinuteTx) = try sum(table: "system_min", lower: hourStart, upper: nil)
+                return NetworkTotalsReading(
+                    todayDownBytes: total(todayHourRx, todayMinuteRx),
+                    todayUpBytes: total(todayHourTx, todayMinuteTx),
+                    weekDownBytes: total(weekHourRx, weekMinuteRx),
+                    weekUpBytes: total(weekHourTx, weekMinuteTx)
+                )
+            }
+        } catch {
+            LogService.error("网络累计查询失败:\(error)", category: "History")
+            return nil
         }
     }
 
@@ -225,7 +290,7 @@ actor HistoryEngine {
     // MARK: 行写入与卷积
 
     /// 分钟聚合 → sample_min + system_min 各一批行(组级磁盘两列与系统级
-    /// net/disk 四列本阶段恒空,显式不写 NULL 之外的任何值)。
+    /// disk 两列本阶段恒空;系统级 net 两列自工单 06 起随聚合写入增量合计)。
     private static func insertMinute(_ aggregate: MinuteAggregate, in db: Database) throws {
         let ts = HistoryWindows.epochSeconds(of: aggregate.minuteStart)
         for group in aggregate.groups {
@@ -246,8 +311,18 @@ actor HistoryEngine {
             )
         }
         try db.execute(
-            sql: "INSERT OR REPLACE INTO system_min (ts, load_avg, load_max) VALUES (?, ?, ?)",
-            arguments: [ts, aggregate.systemLoadAverage, aggregate.systemLoadPeak]
+            sql: """
+                INSERT OR REPLACE INTO system_min
+                    (ts, load_avg, load_max, net_rx, net_tx)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+            arguments: [
+                ts,
+                aggregate.systemLoadAverage,
+                aggregate.systemLoadPeak,
+                Int64(bitPattern: aggregate.netRxBytes),
+                Int64(bitPattern: aggregate.netTxBytes),
+            ]
         )
     }
 

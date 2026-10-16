@@ -173,6 +173,10 @@ struct MainWindowView: View {
                 DiskVolumeBreakdownView(capacity: monitor.diskCapacity)
                 DiskSnapshotsCardView(listing: monitor.diskCapacity?.snapshots)
             }
+        case .network:
+            // 网络页(工单 06):主卡 + 流量累计明细(弹窗同构,紧凑)。
+            MetricMainCardView(model: model.networkModel)
+            NetworkTotalsCardView(totals: monitor.networkTotals)
         case .history:
             // 历史页(工单 04):指标 × 时间范围 Canvas 走势;查询走引擎 actor,
             // 主窗口是它唯一的入口(弹窗轴滤掉了历史页)。

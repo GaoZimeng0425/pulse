@@ -80,6 +80,10 @@ struct SamplingUpdate: Sendable {
     let cpu: CPULoadBreakdown
     /// 系统内存构成(工单 P0.6-05 总览内存卡);读失败为 nil。
     let memory: MemoryBreakdown?
+    /// 网络心跳轮差分(工单 06):速率 + 记账增量;丢弃轮(首读/重连跳变/
+    /// 换口)速率为 0、增量 0 但结果在场。nil = 本轮读缺失(无可用接口 /
+    /// sysctl 失败),UI 占位、历史增量为 0,不伪造。
+    let network: NetworkRoundResult?
 }
 
 /// 采样 actor:以自适应节奏驱动 ProcessSource(进程明细)与 CoreTickSource
@@ -96,6 +100,8 @@ actor Sampler {
     private let source: any ProcessSource
     private let coreTicks: any CoreTickSource
     private let memoryStats: any MemoryStatsSource
+    /// 网络计数源(工单 06,心跳型):每轮一次 sysctl,住采样循环不另起节奏。
+    private let networkCounters: any NetworkCountersSource
     private let clock: Clock
     private let sleep: Sleeping
     private let maxSleepSlice: TimeInterval
@@ -103,6 +109,9 @@ actor Sampler {
     private var scheduler = SamplingScheduler()
     private var previousSnapshot: ProcessSnapshot?
     private var previousCoreTicks: CoreTickSample?
+    /// 网络差分基线(工单 06):无论本轮成败都以本轮计数重立(读缺失保留旧基线
+    /// 等下一轮);唤醒清基线走 invalidateDeltas,与进程/tick 同口径。
+    private var previousNetworkCounters: NetworkCounters?
     /// 采样累计统计(工单 11:诊断报告取数)。
     private var stats = SamplingStats()
 
@@ -110,6 +119,7 @@ actor Sampler {
         source: any ProcessSource,
         coreTicks: any CoreTickSource = LiveCoreTickSource(),
         memoryStats: any MemoryStatsSource = LiveMemoryStatsSource(),
+        networkCounters: any NetworkCountersSource = LiveNetworkCountersSource(),
         clock: @escaping Clock = { Date() },
         sleep: @escaping Sleeping = { try await Task.sleep(nanoseconds: UInt64($0 * 1_000_000_000)) },
         maxSleepSlice: TimeInterval = 0.5
@@ -117,6 +127,7 @@ actor Sampler {
         self.source = source
         self.coreTicks = coreTicks
         self.memoryStats = memoryStats
+        self.networkCounters = networkCounters
         self.clock = clock
         self.sleep = sleep
         self.maxSleepSlice = maxSleepSlice
@@ -129,11 +140,13 @@ actor Sampler {
 
     /// 作废差分基线(工单 03,spec 唤醒处理):系统睡眠唤醒后调用——
     /// 唤醒后的第一轮无前值,进程 CPU 差分与每核 tick 系统负载双双退化为 0
-    /// (CPUDiffer/CoreTickDiffer 的首采口径),不产生一根横跨睡眠的巨大尖刺。
+    /// (CPUDiffer/CoreTickDiffer 的首采口径),不产生一根横跨睡眠的巨大尖刺;
+    /// 网络差分基线同步作废(工单 06):睡眠期累计量一并跳过,首轮丢弃。
     /// 挂唤醒通知的接线在 SystemMonitor.start(UI 粘合层)。
     func invalidateDeltas() {
         previousSnapshot = nil
         previousCoreTicks = nil
+        previousNetworkCounters = nil
     }
 
     /// 采样累计统计(工单 11:诊断报告在复制时按需取一次)。
@@ -153,6 +166,16 @@ actor Sampler {
                 let diff = CPUDiffer.diff(previous: previousSnapshot, current: snapshot)
                 let cpu = CoreTickDiffer.breakdown(previous: previousCoreTicks, current: ticks)
                 let memory = memoryStats.sample()
+                // 网络心跳轮(工单 06):每轮一次 sysctl 差分。读缺失(nil)保留
+                // 旧基线等下一轮;读到了则以本轮计数重立基线——丢弃轮(首读/
+                // 跳变/换口)速率为 0 但基线照常推进,下一轮即可正常差分。
+                let networkCounters = networkCounters.sample()
+                let network = networkCounters.map {
+                    NetworkRateDiffer.result(previous: previousNetworkCounters, current: $0)
+                }
+                if networkCounters != nil {
+                    previousNetworkCounters = networkCounters
+                }
                 previousSnapshot = snapshot
                 previousCoreTicks = ticks
                 scheduler.recordSample(at: clock())
@@ -167,7 +190,8 @@ actor Sampler {
                         snapshot: snapshot,
                         diff: diff,
                         cpu: cpu,
-                        memory: memory
+                        memory: memory,
+                        network: network
                     )
                 )
             } else {

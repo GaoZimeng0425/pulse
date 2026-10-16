@@ -120,6 +120,11 @@ struct DashboardView: View {
             MetricMainCardView(model: model.diskModel, isCompact: true)
             DiskVolumeBreakdownView(capacity: monitor.diskCapacity, isCompact: true)
             DiskSnapshotsCardView(listing: monitor.diskCapacity?.snapshots, isCompact: true)
+        case .network:
+            // 网络页(工单 06):主卡(下行大数字 + 上行/Today/7 天/接口)+
+            // 流量累计明细;组排行与网络无关,不放(磁盘同口径)。
+            MetricMainCardView(model: model.networkModel, isCompact: true)
+            NetworkTotalsCardView(totals: monitor.networkTotals, isCompact: true)
         case .battery:
             MetricMainCardView(model: model.batteryModel, isCompact: true)
         }

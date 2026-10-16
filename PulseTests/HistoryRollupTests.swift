@@ -64,6 +64,24 @@ final class HistoryRollupTests: XCTestCase {
         XCTAssertEqual(flushed?.systemLoadPeak ?? -1, 30, accuracy: 0.0001)
     }
 
+    /// 网络增量逐轮求和(工单 06):一分钟窗内的 rx/tx 增量合计随聚合冲刷,
+    /// 跨窗后清零重计(窗口互不污染)。
+    func testNetworkIncrementsSumWithinMinuteAndResetAcrossWindows() {
+        var buffer = MinuteRollupBuffer()
+        buffer.ingest(at: seconds(0), systemLoad: 10, groups: [], netRxBytes: 300, netTxBytes: 100)
+        buffer.ingest(at: seconds(5), systemLoad: 10, groups: [], netRxBytes: 200, netTxBytes: 400)
+
+        let flushed = try? XCTUnwrap(buffer.ingest(at: seconds(60), systemLoad: 1, groups: []))
+        XCTAssertEqual(flushed?.netRxBytes, 500)
+        XCTAssertEqual(flushed?.netTxBytes, 500)
+
+        // 下一窗从头累计:上一窗的量不泄漏。
+        buffer.ingest(at: seconds(60), systemLoad: 1, groups: [], netRxBytes: 7, netTxBytes: 9)
+        let next = try? XCTUnwrap(buffer.ingest(at: seconds(120), systemLoad: 1, groups: []))
+        XCTAssertEqual(next?.netRxBytes, 7)
+        XCTAssertEqual(next?.netTxBytes, 9)
+    }
+
     /// 所有在场组都被卷积(逐组一行,stableKey 升序);组消失即停记。
     func testEveryPresentGroupIsAggregatedInStableKeyOrder() {
         var buffer = MinuteRollupBuffer()
