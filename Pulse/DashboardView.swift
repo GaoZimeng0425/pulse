@@ -53,6 +53,11 @@ struct DashboardView: View {
             }
             .scrollIndicators(.never)
             .frame(height: Self.contentHeight)
+            // 触发中的告警(工单 P1-07):授权被拒的降级出口 + 常态状态展示;
+            // 无告警时不渲染。点开系统通知走主窗口深链,弹窗只做提示面。
+            if !monitor.alerts.activeAlerts.isEmpty {
+                AlertBannerView(center: monitor.alerts, isCompact: true)
+            }
             footer
         }
         .padding(14)

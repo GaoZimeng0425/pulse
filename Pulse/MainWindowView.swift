@@ -19,6 +19,8 @@ struct MainWindowView: View {
     let monitor: SystemMonitor
     /// 工具栏齿轮:设置窗(项目根目录)。
     @Environment(\.openSettings) private var openSettings
+    /// 告警通知路由(工单 P1-07):消费点开通知落下的 tab(nil = 无路由场景,预览)。
+    var alertRouter: AlertNotificationRouter?
 
     /// 两窗共用呈现模型(评审 F4):卡模型 / 会话状态 / 处置请求同出处。
     @State private var model: DashboardModel
@@ -27,12 +29,14 @@ struct MainWindowView: View {
     /// 工具栏搜索框:窗口本地会话态,与 tab 选中同层;过滤纯视图层,不动数据。
     @State private var searchQuery: String = ""
 
-    init(monitor: SystemMonitor, initialTab: MetricTab = .overview) {
+    init(monitor: SystemMonitor, initialTab: MetricTab = .overview, alertRouter: AlertNotificationRouter? = nil) {
         self.monitor = monitor
+        self.alertRouter = alertRouter
         _model = State(initialValue: DashboardModel(monitor: monitor))
         // 展示轴随电池可用性(工单 02):无内建电池的机器不含电池页。
+        // 窗口新建/重建时先取路由落点(点通知时窗口可能还没开)。
         _tabSelection = State(initialValue: MetricTabSelection(
-            current: initialTab,
+            current: alertRouter?.pendingTab ?? initialTab,
             axis: MetricTab.displayAxis(hasBattery: monitor.hasBattery)
         ))
     }
@@ -42,6 +46,7 @@ struct MainWindowView: View {
         return ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 pageHeader
+                AlertBannerView(center: monitor.alerts)
                 tabBody
             }
             .padding(.horizontal, 24)
@@ -51,6 +56,21 @@ struct MainWindowView: View {
         // 首次电池读数落地 → 电池页入轴(工单 02);被隐藏的当前 tab 回落总览。
         .onChange(of: monitor.hasBattery) { _, hasBattery in
             tabSelection.setAxis(MetricTab.displayAxis(hasBattery: hasBattery))
+        }
+        // 点开告警通知 → 直达对应 tab(工单 P1-07):窗口存活时响应广播;
+        // 窗口刚被 openWindow 拉起时 onAppear 消费落下的 pendingTab。
+        .onReceive(NotificationCenter.default.publisher(
+            for: AlertNotificationRouter.openMainWindowNotification
+        )) { notification in
+            if let raw = notification.userInfo?[AlertNotificationRouter.tabUserInfoKey] as? String,
+               let tab = MetricTab(rawValue: raw) {
+                tabSelection.current = tab
+            }
+        }
+        .onAppear {
+            if let tab = alertRouter?.consumePendingTab() {
+                tabSelection.current = tab
+            }
         }
         // spec 最小尺寸 ~720×560;弹窗的宽度约束是 MenuBarExtra 专用,此处不适用。
         .frame(minWidth: 720, minHeight: 560)
