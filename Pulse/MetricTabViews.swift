@@ -176,7 +176,8 @@ struct MetricPillTabBar: View {
                         Text(tab.title)
                     }
                     .font(.callout.weight(.medium))
-                    .padding(.horizontal, 12)
+                    // P1 起 tab 到 6-7 个:水平内距 12→9,保 720 最小窗宽不裁切。
+                    .padding(.horizontal, 9)
                     .padding(.vertical, 5)
                     .foregroundStyle(isSelected ? tab.accent.accentColor : Color.secondary)
                     .background(

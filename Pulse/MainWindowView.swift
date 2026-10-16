@@ -76,6 +76,8 @@ struct MainWindowView: View {
         .frame(minWidth: 720, minHeight: 560)
         .containerBackground(Surface.window, for: .window)
         .toolbar {
+            // 老样式:药丸 tab 居中挂工具栏 .principal。P1 加到 6-7 个后靠收紧
+            // 药丸内距(12→9)保 720 最小窗宽装得下,样式不变。
             ToolbarItem(placement: .principal) {
                 MetricPillTabBar(selection: $tabSelection)
             }
