@@ -7,12 +7,19 @@ options:
 settings:
   base:
     SWIFT_VERSION: "6.0"
+packages:
+  CocoaLumberjack:
+    url: https://github.com/CocoaLumberjack/CocoaLumberjack
+    from: 3.8.0
 targets:
   Pulse:
     type: application
     platform: macOS
     sources:
       - path: Pulse
+    dependencies:
+      - package: CocoaLumberjack
+        product: CocoaLumberjackSwift
     settings:
       base:
         PRODUCT_NAME: Pulse

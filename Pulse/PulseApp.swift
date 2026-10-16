@@ -10,9 +10,11 @@ struct PulseApp: App {
     @State private var monitor: SystemMonitor
 
     init() {
+        _ = LogService.shared // 拉起即建文件日志通道(~/.Pulse/logs,含退出留痕观察者)
         let store = ProjectRootsStore()
         _rootsStore = State(initialValue: store)
         _monitor = State(initialValue: SystemMonitor(projectRoots: store.projectRoots))
+        LogService.info("Pulse 启动(项目根 \(store.projectRoots.count) 个)", category: "App")
     }
 
     var body: some Scene {
