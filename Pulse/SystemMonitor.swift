@@ -30,15 +30,24 @@ final class SystemMonitor {
     /// 最近一轮采样留下的下钻输入(工单 06):组卡展开 / 进程详情从这里只读取数,
     /// 下钻不触发额外采集;首轮采样前为 nil。
     private(set) var drilldown: DrilldownState?
+    /// 电池读数(工单 02):最近一次交付,LastGood 语义——读失败交付上次好值,
+    /// 不回退为 nil、不白屏。弹窗与主窗口的电池 tab 读这里。
+    private(set) var battery: BatteryReading?
+    /// 本机有内建电池(工单 02):首次成功读数置真,电池 tab 随之入轴;
+    /// 台式机永无交付 → 恒假,电池页整页隐藏。只翻真不翻假。
+    private(set) var hasBattery = false
 
     private let sampler: Sampler
     /// 独立出生扫描(评审 S1):~2s 节奏登记新 pid,与采样节奏解耦。
     private let birthScanner: BirthScanner
+    /// 电池传感器(工单 02,ADR-0004 第一个真 provider):事件驱动,IOPS 通知。
+    private let batteryProvider: BatterySensorProvider
     /// 出生扫描最近交付的登记表:每轮采样落地时并入管线(只补缺)。
     private var birthLineage = LineageRegistry()
     private var pipeline: GroupingPipeline
     private let killService: any KillService
     private var samplingTask: Task<Void, Never>?
+    private var sensorTask: Task<Void, Never>?
     private var started = false
 
     init(
@@ -47,10 +56,12 @@ final class SystemMonitor {
         memoryStats: any MemoryStatsSource = LiveMemoryStatsSource(),
         projectRoots: [String] = [],
         killService: any KillService = LiveKillService(),
-        birthScanSource: any BirthScanSource = LiveBirthScanSource()
+        birthScanSource: any BirthScanSource = LiveBirthScanSource(),
+        batterySource: any BatterySource = LiveBatterySource()
     ) {
         self.sampler = Sampler(source: source, coreTicks: coreTicks, memoryStats: memoryStats)
         self.birthScanner = BirthScanner(source: birthScanSource)
+        self.batteryProvider = BatterySensorProvider(source: batterySource)
         self.pipeline = GroupingPipeline(
             configuration: GroupingConfiguration(
                 projectRoots: projectRoots,
@@ -60,9 +71,10 @@ final class SystemMonitor {
         self.killService = killService
     }
 
-    /// 启动采样循环(默认弹窗关闭节奏 5s)与独立出生扫描(~2s 节奏):
-    /// 菜单栏数字与组卡从拉起就是真的,采样间隙出生的短命父进程也留得下快照。
-    /// 幂等;由 UI 的 `.task` 触发。weak self:循环与 app 同寿命,不构成保留环。
+    /// 启动采样循环(默认弹窗关闭节奏 5s)、独立出生扫描(~2s 节奏)与电池
+    /// 传感器调度器(事件驱动):菜单栏数字与组卡从拉起就是真的,采样间隙
+    /// 出生的短命父进程也留得下快照。幂等;由 UI 的 `.task` 触发。
+    /// weak self:循环与 app 同寿命,不构成保留环。
     func start() {
         guard !started else { return }
         started = true
@@ -83,6 +95,17 @@ final class SystemMonitor {
                     self.apply(update)
                 }
             }
+        }
+        // 非心跳型传感器(ADR-0004):单一调度器 actor 按 cadence 驱动。
+        let provider = batteryProvider
+        let scheduler = SensorScheduler()
+        sensorTask = Task { [weak self] in
+            await scheduler.run([provider.driver { [weak self] reading in
+                guard let self else { return }
+                Task { @MainActor in
+                    self.applyBattery(reading)
+                }
+            }])
         }
     }
 
@@ -148,5 +171,14 @@ final class SystemMonitor {
             lineage: pipeline.lineage,
             processCPU: update.diff.processCPU
         )
+    }
+
+    /// 电池读数落地(工单 02):nil = 从未有过读数(无内建电池)→ 页面保持
+    /// 隐藏;有读数即 hasBattery 置真(此后读失败交付 lastGood 同值重画,
+    /// 不白屏不崩溃——driver 的 `snapshot() ?? lastGood` 交付口径)。
+    private func applyBattery(_ reading: BatteryReading?) {
+        guard let reading else { return }
+        hasBattery = true
+        battery = reading
     }
 }

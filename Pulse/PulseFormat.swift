@@ -110,6 +110,25 @@ enum PulseFormat {
         return "pid \(pid)"
     }
 
+    /// 电池时间估计(工单 02):分钟 → "3 小时 12 分"/"48 分钟"/"3 小时";
+    /// nil / ≤0(IOPS 未给估计)= "—",不伪造。
+    static func batteryTime(minutes: Int?) -> String {
+        guard let minutes, minutes > 0 else { return "—" }
+        if minutes >= 60 {
+            let hours = minutes / 60
+            let rest = minutes % 60
+            return rest == 0 ? "\(hours) 小时" : "\(hours) 小时 \(rest) 分"
+        }
+        return "\(minutes) 分钟"
+    }
+
+    /// 功率(工单 02 电池卡):瓦 → "18.2 W"(一位小数;tenth 整数运算拼串,
+    /// 不受系统区域小数点写法影响)。负值按 0 夹紧(方向语义由充电状态行表达)。
+    static func watts(_ value: Double) -> String {
+        let tenths = Int((max(0, value) * 10).rounded())
+        return "\(tenths / 10).\(tenths % 10) W"
+    }
+
     private static func basename(ofPath path: String?) -> String? {
         path.map { String($0.split(separator: "/").last ?? Substring($0)) }
     }

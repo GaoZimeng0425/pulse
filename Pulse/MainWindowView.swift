@@ -30,7 +30,11 @@ struct MainWindowView: View {
     init(monitor: SystemMonitor, initialTab: MetricTab = .overview) {
         self.monitor = monitor
         _model = State(initialValue: DashboardModel(monitor: monitor))
-        _tabSelection = State(initialValue: MetricTabSelection(current: initialTab))
+        // 展示轴随电池可用性(工单 02):无内建电池的机器不含电池页。
+        _tabSelection = State(initialValue: MetricTabSelection(
+            current: initialTab,
+            axis: MetricTab.displayAxis(hasBattery: monitor.hasBattery)
+        ))
     }
 
     var body: some View {
@@ -43,6 +47,10 @@ struct MainWindowView: View {
             .padding(.horizontal, 24)
             .padding(.top, 12)
             .padding(.bottom, 24)
+        }
+        // 首次电池读数落地 → 电池页入轴(工单 02);被隐藏的当前 tab 回落总览。
+        .onChange(of: monitor.hasBattery) { _, hasBattery in
+            tabSelection.setAxis(MetricTab.displayAxis(hasBattery: hasBattery))
         }
         // spec 最小尺寸 ~720×560;弹窗的宽度约束是 MenuBarExtra 专用,此处不适用。
         .frame(minWidth: 720, minHeight: 560)
@@ -126,6 +134,9 @@ struct MainWindowView: View {
                 RingCardView.memoryByApp(segments: content.memorySegments, totalBytes: content.memoryTotalBytes)
             }
             rankingCard
+        case .battery:
+            // 电池页(工单 02):六项读数主卡;组排行与电池无关,不放。
+            MetricMainCardView(model: model.batteryModel)
         }
     }
 

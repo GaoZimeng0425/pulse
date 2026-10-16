@@ -2,13 +2,14 @@ import Foundation
 
 // MARK: - 指标 tab 内容模型(工单 P0.6-03):弹窗图标 tab / 主窗口药丸 tab 的共享逻辑
 
-/// 指标 tab(工单 03):弹窗与主窗口共用同一组 tab——总览 / CPU / 内存,
-/// 后续指标(磁盘/网络,P1+)按 `Metric` 令牌表加 case 即可。
-/// 展示序(`allCases`)同时是键盘 ←/→ 的移动轴:总览最左、内存最右。
+/// 指标 tab(工单 03):弹窗与主窗口共用同一组 tab——总览 / CPU / 内存 / 电池
+/// (工单 02),后续指标(磁盘/网络,P1+)按 `Metric` 令牌表加 case 即可。
+/// 展示序(`allCases`)同时是键盘 ←/→ 的移动轴:总览最左、电池最右。
 enum MetricTab: String, CaseIterable, Identifiable, Sendable {
     case overview
     case cpu
     case memory
+    case battery
 
     var id: String { rawValue }
 
@@ -18,6 +19,7 @@ enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .overview: "总览"
         case .cpu: "CPU"
         case .memory: "内存"
+        case .battery: "电池"
         }
     }
 
@@ -27,44 +29,64 @@ enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .overview: "square.grid.2x2"
         case .cpu: "cpu"
         case .memory: "memorychip"
+        case .battery: "battery.100percent"
         }
     }
 
     /// 选中态强调色色源(工单 02 令牌表):总览以系统 CPU 负载为主视角取 cpu,
-    /// CPU/内存各取自家令牌——选中胶囊、meter、图表全由它派生。
+    /// CPU/内存/电池各取自家令牌——选中胶囊、meter、图表全由它派生。
     var accent: Metric {
         switch self {
         case .overview: .cpu
         case .cpu: .cpu
         case .memory: .memory
+        case .battery: .battery
         }
+    }
+
+    /// 展示轴(工单 02):无内建电池的机器隐藏电池页——轴同时是 tab 条渲染序
+    /// 与键盘 ←/→ 的移动范围(两端夹紧的端点随之收缩)。
+    static func displayAxis(hasBattery: Bool) -> [MetricTab] {
+        hasBattery ? allCases : allCases.filter { $0 != .battery }
     }
 }
 
-/// tab 选中状态 + 键盘切换语义(纯逻辑):←/→ 沿展示序移动,
-/// **两端夹紧不回绕**——可预期的键盘行为,不做环游。
+/// tab 选中状态 + 键盘切换语义(纯逻辑):←/→ 沿**展示轴**(displayAxis,
+/// 默认全部)移动,**两端夹紧不回绕**——可预期的键盘行为,不做环游。
 /// 视图焦点与按键接线(SwiftUI)属手动验收,这里只钉状态机。
 struct MetricTabSelection: Equatable, Sendable {
-    var current: MetricTab = .overview
+    /// 渲染序与键盘移动轴:无电池机器不含电池页(工单 02)。
+    private(set) var axis: [MetricTab]
+    /// 当前 tab:tab 条点击与键盘切换都直接写(能点到的必然在轴上)。
+    var current: MetricTab
 
-    init(current: MetricTab = .overview) {
-        self.current = current
+    init(current: MetricTab = .overview, axis: [MetricTab] = MetricTab.allCases) {
+        self.axis = axis
+        // 轴外 tab(如无电池机器深链注入 .battery)不留悬空选中:回落总览。
+        self.current = axis.contains(current) ? current : .overview
     }
 
-    /// ← 键:切向展示序前一个;已在最左则不动。
+    /// 电池页可用性变化(工单 02):换轴;被隐藏的当前 tab 回落总览。
+    mutating func setAxis(_ newAxis: [MetricTab]) {
+        axis = newAxis
+        if !newAxis.contains(current) {
+            current = .overview
+        }
+    }
+
+    /// ← 键:切向轴上前一个;已在最左则不动。
     mutating func moveLeft() {
         move(offset: -1)
     }
 
-    /// → 键:切向展示序后一个;已在最右则不动。
+    /// → 键:切向轴后一个;已在最右则不动。
     mutating func moveRight() {
         move(offset: 1)
     }
 
     private mutating func move(offset: Int) {
-        let tabs = MetricTab.allCases
-        guard let index = tabs.firstIndex(of: current) else { return }
-        current = tabs[clamped(index + offset, in: tabs.startIndex..<tabs.count)]
+        guard let index = axis.firstIndex(of: current) else { return }
+        current = axis[clamped(index + offset, in: axis.startIndex..<axis.count)]
     }
 }
 
@@ -127,13 +149,14 @@ struct MetricTabContent: Equatable, Sendable {
     /// CPU meter 归一榜首。
     let cpuLeader: Double
 
-    /// 折叠入口:总览/CPU tab 按组 CPU% 降序(与引擎既定序一致),内存 tab 按
-    /// 内存降序;分段基于全部组(与榜单口径无关,内存 tab 之外的 tab 也可渲染)。
+    /// 折叠入口:总览/CPU/电池 tab 按组 CPU% 降序(与引擎既定序一致;电池页
+    /// 不排组,榜单沿用 CPU 序供弹窗"当前最忙"卡),内存 tab 按内存降序;
+    /// 分段基于全部组(与榜单口径无关,内存 tab 之外的 tab 也可渲染)。
     static func build(groups: [ProcessGroup], tab: MetricTab) -> MetricTabContent {
         let ranked: [ProcessGroup]
         let metric: GroupCardMetric
         switch tab {
-        case .overview, .cpu:
+        case .overview, .cpu, .battery:
             ranked = groups.sorted { lhs, rhs in
                 if lhs.cpuPercent != rhs.cpuPercent { return lhs.cpuPercent > rhs.cpuPercent }
                 return lhs.id < rhs.id

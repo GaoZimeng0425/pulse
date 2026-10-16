@@ -45,6 +45,12 @@ final class DashboardModel {
         .memory(monitor.memory, trend: monitor.history.memoryUsed.values, host: .current)
     }
 
+    /// 电池卡(工单 02):六项读数读 monitor.battery(lastGood 语义——读失败
+    /// 不回退为 nil);未首读/无电池机器的占位模型只在轴内不会出现,仍给全占位兜底。
+    var batteryModel: MetricCardModel {
+        .battery(monitor.battery)
+    }
+
     // MARK: 26×14 微图数据(工单 03 兑现,评审 F3)
 
     /// 排行卡微图数据:榜单前 3 名(content.microGraphGroupIDs 资格)按当前口径
