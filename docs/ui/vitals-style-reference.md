@@ -186,7 +186,7 @@ tint 的渗透方式(关键机制,CSS + PANE-* 反复出现):
 6. **chip 状态徽章**(✓ Normal / working / idle 2 hours / 端口号)
    - 全圆 pill,tint(或 ink-2)14% 底 + 同色文字,可带 10px 图标(CSS `.chip`;PANE-projects)。
 7. **滑杆 slider**(Sound tab,SHOT2)
-   - 粗圆杆 + 白色圆 thumb,填充 tint;行内可拖(SHOT2 粉色滑杆)。Pulse 有意砍掉音量控制(tech-design §11),仅记录形态。
+   - 粗圆杆 + 白色圆 thumb,填充 tint;行内可拖(SHOT2 粉色滑杆)。Sound tab 已纳入复刻范围(tech-design §11,2026-10-15 起全功能复刻),形态照此实现。
 
 ---
 
@@ -198,7 +198,7 @@ Pulse 现状基线(已读):
 - 主窗口 `Pulse/MainWindowView.swift:25-47`:全部组 + 展开后 `SortableProcessTableView`(表头 CPU%/内存排序,`Pulse/ProcessTableOrder.swift:26-33` 点同列升降、换列降序)。
 - 采样现状:`Pulse/SystemMonitor.swift:18-24` 实时有 `systemCPULoad`、`allGroups`(组 CPU%、内存、进程数)、`drilldown`(每进程 CPU%/内存);采样节奏弹窗关闭 5s/打开 1s(GLOSSARY.md:9-11)。
 - **全仓库无 `import Charts`,无任何历史缓冲**(`rg "import Charts"`、`rg "RingBuffer|history" Pulse/` 均为空,本次执行确认)——图表与走势所需的"过去 N 个采样"目前不存在。
-- 有意砍掉的范围(tech-design §1/§11):每 App 音量(Sound)、蓝牙电量、GPU/能耗(root, P2)、30 天 SQLite 历史(P1)、告警引擎(P1 §6)、dev server finder(P1 §8)。
+- 尚未实现、但已全部纳入 roadmap 的范围(tech-design §10,2026-10-15 起 P1–P3 全功能复刻):磁盘/网络/电池系统卡 + Memory by Type(P1)、30 天 SQLite 历史(P1)、告警引擎(P1 §6)、dev server finder(P1 §8)、GPU/神经网络/温度风扇/声音/蓝牙/容器(P2)、每 App 能耗与 GPU + MCP(P3)。
 
 ### 4.1 Vitals 有、Pulse 没有(按用户可见影响排序)
 
@@ -212,12 +212,13 @@ Pulse 现状基线(已读):
 8. **头部无环境信息**:Vitals 报 `Apple M1 Max · 10 cores · 64 GB` + `Up 6d 4h`;Pulse 头部只有一行系统 CPU 负载。
 9. **排行无 meter**:Pulse 组卡/进程表是纯文字数值;Vitals 排行行内附占比条。
 
-### 4.2 有意推迟(不是差距,别顺手做)
+### 4.2 已排期(不是差距,按 tech-design §10 的节奏做,别顺手插队)
 
 - 30 天历史、Today/Last 7 Days 累计卷:**P1 SQLite**(tech-design §5)。图表的"近窗口"版不在此列(见 4.3-1)。
-- 告警引擎 / Worth a Look:**P1**(§6);Projects tab(dev server finder):**P1**(§8)。
-- GPU / Neural / 能耗、温度风扇:root/半私有 API,P2(§4 表)。
-- Sound 音量控制、Bluetooth 电量、多语言:**有意砍掉**(§11),不做。
+- 磁盘卡 / 网络卡(系统总量)/ 电池卡 / Memory by Type:**P1**(公开 API);告警引擎 / Worth a Look:**P1**(§6);Projects tab(dev server finder):**P1**(§8)。
+- GPU / Neural / 温度风扇 / Sound / Bluetooth / 容器 tab:**P2**(IOReport / SMC / CoreAudio / IOBluetooth / docker.sock,均免 root)。
+- 每 App 能耗与 GPU(root helper)、MCP server、Agents 用量卡:**P3**。
+- 多语言、license 体系:不做(自用)——这是仅剩的两处有意砍掉。
 
 ### 4.3 现在就便宜能做(不需要 P1)
 
@@ -253,7 +254,7 @@ Pulse 现状基线(已读):
 | Worth a Look / 告警卡 | P1 AlertEngine(§6);UI 壳可先用简化阈值卡占位 | 阈值规则 | ❌(P1) |
 | Today/7d 累计、30 天图 | SQLite rollup(§5)| P1 历史 | ❌(P1) |
 | Projects tab(dev server)| argv/端口枚举 + idle 判定(§8)| P1 | ❌(P1) |
-| Sound/Bluetooth tab | 不做(§11 有意砍掉) | — | ⛔ 排除 |
+| Sound/Bluetooth tab | Sound:CoreAudio 音量/输入电平/每 App 音量;Bluetooth:IOBluetooth 外设电量(§10 P2) | 采样新增 | 📅 P2 |
 
 ---
 
