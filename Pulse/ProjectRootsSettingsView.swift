@@ -35,7 +35,7 @@ struct ProjectRootsSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 560)
+        .frame(maxWidth: .infinity)
         .padding()
     }
 

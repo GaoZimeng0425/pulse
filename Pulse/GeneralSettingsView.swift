@@ -50,7 +50,7 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480)
+        .frame(maxWidth: .infinity)
         .padding()
         .onAppear { refreshLaunchAtLogin() }
     }
