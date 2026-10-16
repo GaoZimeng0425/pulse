@@ -4,7 +4,7 @@
 
 **Blocked by:** 00(组身份类型化后作库键)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] 六张表按 spec 落地,WAL 模式
 - [x] rollup 聚合正确且可注入时钟单测;5s 原始值不落盘(断言库中无对应数据)

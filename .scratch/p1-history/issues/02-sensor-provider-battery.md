@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)(电池不依赖探针)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] SensorProvider 协议 + 调度器 actor 落地;心跳型指标仍在 Sampler 循环,现有测试全绿
 - [x] 电池页在弹窗与主窗口 tab 体系出现,六项读数真实显示

@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] 报告含 spec 列明全部字段,纯文本可直接粘贴
 - [x] 日志尾部为本地时间戳、截取最近 N 行(避免巨型粘贴)
