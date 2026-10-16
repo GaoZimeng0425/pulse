@@ -210,7 +210,9 @@ extension GroupCategory {
             )
         case .project:
             GroupCardStyle(
-                symbolName: "hammer", iconColor: .secondary,
+                // 项目组统一图标:folder(目录 = 项目的自然隐喻,与 Vitals 的
+                // Projects 概念一致;旧 hammer 读作"构建工具",用户反馈怪)。
+                symbolName: "folder", iconColor: .secondary,
                 cardBackground: AnyShapeStyle(.quaternary),
                 accentColor: Metric.cpu.accentColor
             )
