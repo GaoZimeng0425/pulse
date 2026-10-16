@@ -15,11 +15,14 @@ import Foundation
 /// ③ 轮询循环只记状态迁移,不记每一跳(对方真实事故:每 2s 一条的轮询日志
 ///   占到全部日志量 96%,把有用日志全部挤出留存窗口)。
 final class LogService {
+    /// 日志目录唯一来源(GeneralSettingsView 的"打开日志文件夹"共用)。
+    static let logDirectory = NSHomeDirectory() + "/.Pulse/logs"
+
     nonisolated(unsafe) static let shared = LogService()
     private let fileLogger: DDFileLogger
 
     private init() {
-        let logDir = NSHomeDirectory() + "/.Pulse/logs"
+        let logDir = LogService.logDirectory
 
         let fm = FileManager.default
         if !fm.fileExists(atPath: logDir) {

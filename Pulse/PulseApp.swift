@@ -47,9 +47,15 @@ struct PulseApp: App {
         }
         .defaultSize(width: 880, height: 620)
 
-        // 设置窗(工单 07):项目根目录列表增删;入口在弹窗头部齿轮按钮。
+        // 设置窗(工单 07 → 2026-10-16 扩为多标签):通用(登录自启/日志/版本)
+        // + 项目根目录;入口在弹窗头部齿轮按钮。
         Settings {
-            ProjectRootsSettingsView(store: rootsStore)
+            TabView {
+                GeneralSettingsView()
+                    .tabItem { Label("通用", systemImage: "gearshape") }
+                ProjectRootsSettingsView(store: rootsStore)
+                    .tabItem { Label("项目根目录", systemImage: "folder.badge.gearshape") }
+            }
         }
     }
 }
