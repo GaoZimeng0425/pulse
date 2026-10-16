@@ -6,7 +6,7 @@ import SwiftUI
 /// 改动即时生效、重启保留;非法值由 MenuBarBadgeConfiguration 解码侧回默认。
 ///
 /// 网络槽位本单只做壳:选项可选、菜单栏显示占位"—",数据由工单 06 的
-/// 网络卡填充(契约注在 SystemMonitor.networkRate)。
+/// 网络卡填充(契约注在 SystemMonitor.network,徽标直取 rates)。
 struct MenuBarBadgeSettingsView: View {
     /// 槽位配置(与 MenuBarLoadLabel 同键共享,UserDefaults 即时广播)。
     @AppStorage("settings.menuBarBadge") private var configurationRaw = MenuBarBadgeConfiguration.default.rawValue

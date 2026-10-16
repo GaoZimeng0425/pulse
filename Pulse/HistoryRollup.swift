@@ -55,6 +55,10 @@ struct MinuteAggregate: Equatable, Sendable {
     /// rx = 接收 = 下行,tx = 发送 = 上行)。
     let netRxBytes: UInt64
     let netTxBytes: UInt64
+    /// 窗口内磁盘吞吐增量合计(system_min 的 disk_read/disk_written 列;
+    /// 差分丢弃轮为 0,与网络增量同口径)。
+    let diskReadBytes: UInt64
+    let diskWriteBytes: UInt64
 }
 
 /// 分钟窗卷积器(纯逻辑,工单 03"每 60 秒把环形缓冲卷积进分钟表"的聚合半边):
@@ -81,6 +85,9 @@ struct MinuteRollupBuffer: Sendable, Equatable {
     /// 当前窗的网络增量合计(工单 06):逐轮求和,跨窗清零重计。
     private var netRxBytes: UInt64 = 0
     private var netTxBytes: UInt64 = 0
+    /// 当前窗的磁盘吞吐增量合计(与网络增量同款记账)。
+    private var diskReadBytes: UInt64 = 0
+    private var diskWriteBytes: UInt64 = 0
 
     /// 采样进窗。跨入新分钟时返回上一分钟的聚合(该分钟有样本才非 nil);
     /// 时间戳早于当前窗(时钟回拨/乱序迟到)时丢弃该样本,不污染已聚合窗口。
@@ -90,7 +97,9 @@ struct MinuteRollupBuffer: Sendable, Equatable {
         systemLoad: Double,
         groups: [GroupSample],
         netRxBytes: UInt64 = 0,
-        netTxBytes: UInt64 = 0
+        netTxBytes: UInt64 = 0,
+        diskReadBytes: UInt64 = 0,
+        diskWriteBytes: UInt64 = 0
     ) -> MinuteAggregate? {
         let minute = HistoryWindows.minuteStart(of: now)
         if let current = currentMinuteStart {
@@ -102,18 +111,29 @@ struct MinuteRollupBuffer: Sendable, Equatable {
                 systemLoads = []
                 self.netRxBytes = 0
                 self.netTxBytes = 0
+                self.diskReadBytes = 0
+                self.diskWriteBytes = 0
                 accumulate(
                     systemLoad: systemLoad,
                     groups: groups,
                     netRxBytes: netRxBytes,
-                    netTxBytes: netTxBytes
+                    netTxBytes: netTxBytes,
+                    diskReadBytes: diskReadBytes,
+                    diskWriteBytes: diskWriteBytes
                 )
                 return flushed
             }
         } else {
             currentMinuteStart = minute
         }
-        accumulate(systemLoad: systemLoad, groups: groups, netRxBytes: netRxBytes, netTxBytes: netTxBytes)
+        accumulate(
+            systemLoad: systemLoad,
+            groups: groups,
+            netRxBytes: netRxBytes,
+            netTxBytes: netTxBytes,
+            diskReadBytes: diskReadBytes,
+            diskWriteBytes: diskWriteBytes
+        )
         return nil
     }
 
@@ -121,12 +141,16 @@ struct MinuteRollupBuffer: Sendable, Equatable {
         systemLoad: Double,
         groups: [GroupSample],
         netRxBytes: UInt64 = 0,
-        netTxBytes: UInt64 = 0
+        netTxBytes: UInt64 = 0,
+        diskReadBytes: UInt64 = 0,
+        diskWriteBytes: UInt64 = 0
     ) {
         systemLoads.append(systemLoad)
-        // 网络增量逐轮求和(加法可能进位,用 &+ 防溢出崩溃:历史记账宁绕回不算)。
+        // 增量逐轮求和(加法可能进位,用 &+ 防溢出崩溃:历史记账宁绕回不算)。
         self.netRxBytes = self.netRxBytes &+ netRxBytes
         self.netTxBytes = self.netTxBytes &+ netTxBytes
+        self.diskReadBytes = self.diskReadBytes &+ diskReadBytes
+        self.diskWriteBytes = self.diskWriteBytes &+ diskWriteBytes
         var presentByID: [GroupIdentity: GroupSample] = [:]
         for sample in groups {
             presentByID[sample.id] = sample // 同轮重复 id 以最后一条为准(与环形缓冲同口径)
@@ -163,7 +187,9 @@ struct MinuteRollupBuffer: Sendable, Equatable {
             systemLoadAverage: systemAverage,
             systemLoadPeak: systemLoads.max() ?? 0,
             netRxBytes: netRxBytes,
-            netTxBytes: netTxBytes
+            netTxBytes: netTxBytes,
+            diskReadBytes: diskReadBytes,
+            diskWriteBytes: diskWriteBytes
         )
     }
 }

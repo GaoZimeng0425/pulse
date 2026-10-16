@@ -67,7 +67,7 @@ P1 给 Pulse 装上时间维度和机器维度。**历史管线**把组级负载
 - **磁盘吞吐改走 IORegistry(本轮修正)**:每轮一次读块存储驱动的字节累计计数(stats 同款,内核账——短命进程与内核回写都在),差分带计数回退/elapsed 有限两件防护;放弃原 rusage 求和方案(每进程成本 + 短命进程漏账 + 页缓存口径两不靠)。**工单 0 探针**:若本机 NVMe 未在 IORegistry 露出统计,回退 rusage 求和并降到 30s 低频档。
 - **三卡算法(全部经调研钉死,MIT 来源须在文件头注明)**:
   - 磁盘卡:容器对账(statfs('/') → 容器号归约 → getmntinfo 同容器过滤 → 每卷 getattrlist 精确已用 → 差额记"其他卷");可清除 = 两种可用容量官方口径之差;快照列表 fs_snapshot_list(TM 前缀识别);不变式"各卷之和 + 其他卷 == 容器总量"做成单测。
-  - 网络卡:NET_RT_IFLIST2 差分 + 三件防御(首读置零/负值钳零/重连跳变丢弃)+ 主接口选择(SCDynamicStore 主接口 → 虚拟前缀降级 → getifaddrs 回退);不做 stats 的 VPN 除二 hack(选定物理口后不需要)。网络吞吐是心跳型,进 Sampler 循环(每轮一次 sysctl,便宜)。
+  - 网络卡:NET_RT_IFLIST2 差分 + 三件防御(首读置零/负值钳零/重连跳变丢弃)+ 主接口选择(SCDynamicStore 主接口 → 虚拟前缀降级 → getifaddrs 回退);不做 stats 的 VPN 除二 hack(选定物理口后不需要)。网络吞吐是心跳型,进 Sampler 循环(每轮一次 sysctl,便宜)。入向死表回退:主接口入向计数为死表时改读在场活口(累计入向字节最多者)。
   - 电池卡:IOPS 通知事件驱动不轮询;健康度走 IORegistry 容量回退链(arm64 分支);功率 = 电流×电压(SMC 精确功率是 P2);NotChargingReason 映射"优化充电已介入";设计容量为 0 钳 1 防除零;无电池机器整页隐藏。
 - **工单 0 = 三项探针**(先于三卡实现):①purgeable 两口径(CSDiskSpace vs CFURL 两 key 差值)在 macOS 26 的数值对照;②fs_snapshot_list 是否仍免 root 可列;③IORegistry 块驱动统计对本机 NVMe 的覆盖。结果写回调研文档 §5。
 - **卡片接入**:三卡进现有 MetricTabModel tab 体系(popover + 主窗口同构);读缺失显示占位不伪造,lastGood 降级;图表用 Canvas(与 P0.6 同决策),复用 MetricAccent 令牌;历史页近 1 小时视图读分钟表,现有卡片实时小图(内存环形缓冲)不动。

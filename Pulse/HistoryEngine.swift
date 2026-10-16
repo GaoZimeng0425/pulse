@@ -62,6 +62,11 @@ actor HistoryEngine {
     private var persistedLineagePIDs: Set<pid_t> = []
     /// 已持久化的组名(stableKey → name):改名才重写。
     private var persistedGroupNames: [String: String] = [:]
+    /// 库健康状态沿(过渡非轮询的日志惯例,LogService 教训③):落库或累计
+    /// 查询失败进入记一条,恢复成功再记一条,期间静默——持续失败若逐条记,
+    /// 5s 一轮会把日志刷满留存窗口。写读共用一面旗:库坏时两边都会失败,
+    /// 第一处记进入边,其余静默;先恢复者记恢复边。
+    private var databaseHealthy = true
 
     /// 构造:打开方负责给库(文件或内存);`now` 用于启动时的存量小时补卷积
     /// (上一会话收尾未及卷积的分钟行在此补齐,不悬空)。
@@ -99,7 +104,9 @@ actor HistoryEngine {
     /// 一轮采样进历史(每轮采样调用,`now` = 该轮采样时刻):
     /// 5s 原始值进内存缓冲;跨分钟冲刷上一分钟为行;跨小时卷积完整小时;
     /// 跨当地日顺带留存清理;出生登记与组元数据增量落库——同一事务。
-    /// `netRxBytes`/`netTxBytes` = 本轮网络记账增量(工单 06,差分丢弃轮为 0)。
+    /// `netRxBytes`/`netTxBytes` = 本轮网络记账增量(工单 06,差分丢弃轮为 0);
+    /// `diskReadBytes`/`diskWriteBytes` = 本轮磁盘吞吐记账增量(差分丢弃轮
+    /// 同为 0,与网络同口径)。
     func ingest(
         at now: Date,
         systemLoad: Double,
@@ -107,7 +114,9 @@ actor HistoryEngine {
         displayNames: [GroupIdentity: String],
         lineage: LineageRegistry,
         netRxBytes: UInt64 = 0,
-        netTxBytes: UInt64 = 0
+        netTxBytes: UInt64 = 0,
+        diskReadBytes: UInt64 = 0,
+        diskWriteBytes: UInt64 = 0
     ) {
         guard let database else { return }
         do {
@@ -117,7 +126,9 @@ actor HistoryEngine {
                     systemLoad: systemLoad,
                     groups: groups,
                     netRxBytes: netRxBytes,
-                    netTxBytes: netTxBytes
+                    netTxBytes: netTxBytes,
+                    diskReadBytes: diskReadBytes,
+                    diskWriteBytes: diskWriteBytes
                 ) {
                     try Self.insertMinute(aggregate, in: db)
                 }
@@ -138,10 +149,20 @@ actor HistoryEngine {
                 try persistLineage(lineage, seenAt: now, in: db)
                 try persistGroupMetadata(displayNames, in: db)
             }
+            markDatabaseHealthy()
         } catch {
-            // 过渡非轮询:失败记一条,不逐轮刷屏(日志惯例)。
-            LogService.error("历史落库失败:\(error)", category: "History")
+            // 过渡非轮询:失败态进入记一条,期间静默,恢复成功再记一条。
+            guard databaseHealthy else { return }
+            databaseHealthy = false
+            LogService.error("历史落库失败(此后静默至恢复):\(error)", category: "History")
         }
+    }
+
+    /// 状态沿恢复边:从失败态回到成功记一条(只在该边记,平时安静)。
+    private func markDatabaseHealthy() {
+        guard !databaseHealthy else { return }
+        databaseHealthy = true
+        LogService.info("历史库恢复,落库继续", category: "History")
     }
 
     // MARK: 网络 Today/7 天累计(工单 06)
@@ -184,18 +205,23 @@ actor HistoryEngine {
                 }
 
                 let (todayHourRx, todayHourTx) = try sum(table: "system_hour", lower: dayStartSeconds, upper: hourStart)
-                let (todayMinuteRx, todayMinuteTx) = try sum(table: "system_min", lower: hourStart, upper: nil)
                 let (weekHourRx, weekHourTx) = try sum(table: "system_hour", lower: weekStartSeconds, upper: hourStart)
-                let (weekMinuteRx, weekMinuteTx) = try sum(table: "system_min", lower: hourStart, upper: nil)
+                // 当前未卷积段的分钟表窗只有这一个([hourStart, ∞)),Today 与
+                // 7 天共用一次求和——同窗跑两遍是纯浪费(评审修复)。
+                let (currentMinuteRx, currentMinuteTx) = try sum(table: "system_min", lower: hourStart, upper: nil)
                 return NetworkTotalsReading(
-                    todayDownBytes: total(todayHourRx, todayMinuteRx),
-                    todayUpBytes: total(todayHourTx, todayMinuteTx),
-                    weekDownBytes: total(weekHourRx, weekMinuteRx),
-                    weekUpBytes: total(weekHourTx, weekMinuteTx)
+                    todayDownBytes: total(todayHourRx, currentMinuteRx),
+                    todayUpBytes: total(todayHourTx, currentMinuteTx),
+                    weekDownBytes: total(weekHourRx, currentMinuteRx),
+                    weekUpBytes: total(weekHourTx, currentMinuteTx)
                 )
             }
         } catch {
-            LogService.error("网络累计查询失败:\(error)", category: "History")
+            // 过渡非轮询:与 ingest 共用一面健康旗——库坏时两边都会失败,
+            // 第一处记进入边,这里静默;恢复边由先成功的一方记。
+            guard databaseHealthy else { return nil }
+            databaseHealthy = false
+            LogService.error("网络累计查询失败(此后静默至恢复):\(error)", category: "History")
             return nil
         }
     }
@@ -289,8 +315,9 @@ actor HistoryEngine {
 
     // MARK: 行写入与卷积
 
-    /// 分钟聚合 → sample_min + system_min 各一批行(组级磁盘两列与系统级
-    /// disk 两列本阶段恒空;系统级 net 两列自工单 06 起随聚合写入增量合计)。
+    /// 分钟聚合 → sample_min + system_min 各一批行(组级磁盘两列本阶段恒空;
+    /// 系统级 net/disk 四列随聚合写入增量合计——net 自工单 06,disk 与其同款
+    /// 差分增量口径接线)。
     private static func insertMinute(_ aggregate: MinuteAggregate, in db: Database) throws {
         let ts = HistoryWindows.epochSeconds(of: aggregate.minuteStart)
         for group in aggregate.groups {
@@ -313,8 +340,8 @@ actor HistoryEngine {
         try db.execute(
             sql: """
                 INSERT OR REPLACE INTO system_min
-                    (ts, load_avg, load_max, net_rx, net_tx)
-                VALUES (?, ?, ?, ?, ?)
+                    (ts, load_avg, load_max, net_rx, net_tx, disk_read, disk_written)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
             arguments: [
                 ts,
@@ -322,6 +349,8 @@ actor HistoryEngine {
                 aggregate.systemLoadPeak,
                 Int64(bitPattern: aggregate.netRxBytes),
                 Int64(bitPattern: aggregate.netTxBytes),
+                Int64(bitPattern: aggregate.diskReadBytes),
+                Int64(bitPattern: aggregate.diskWriteBytes),
             ]
         )
     }

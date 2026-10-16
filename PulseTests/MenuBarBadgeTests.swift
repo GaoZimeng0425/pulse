@@ -121,7 +121,7 @@ final class MenuBarBadgeTests: XCTestCase {
     /// 网络徽标主形态:紧凑上下行 "↓下载 ↑上传",MB/s 口径与磁盘速率一致。
     func testNetworkBadgeCompactDualFormat() {
         let content = MenuBarBadgeComposer.networkContent(
-            rate: NetworkRateReading(downloadBytesPerSecond: 12_400_000, uploadBytesPerSecond: 1_200_000)
+            rate: NetworkRates(upBytesPerSecond: 1_200_000, downBytesPerSecond: 12_400_000)
         )
         XCTAssertEqual(content.caption, "网络")
         XCTAssertEqual(content.text, "↓12.4 MB/s ↑1.2 MB/s")
@@ -136,7 +136,7 @@ final class MenuBarBadgeTests: XCTestCase {
     /// 放不下降级:紧凑双行超宽度预算 → 只显示下载。
     func testNetworkBadgeDegradesToDownloadOnlyWhenTooWide() {
         let content = MenuBarBadgeComposer.networkContent(
-            rate: NetworkRateReading(downloadBytesPerSecond: 888_800_000, uploadBytesPerSecond: 888_800_000)
+            rate: NetworkRates(upBytesPerSecond: 888_800_000, downBytesPerSecond: 888_800_000)
         )
         XCTAssertEqual(content.text, "↓888.8 MB/s")
     }
@@ -181,6 +181,50 @@ final class MenuBarBadgeTests: XCTestCase {
                 colorScheme: .dark
             )
         )
+    }
+
+    // MARK: - 渲染缓存 LRU(评审修复:徽标文案逐轮变新键,缓存必须有界)
+
+    /// 容量上界:插入超过容量,最旧键被淘汰,条数不再增长。
+    func testLRUCacheEvictsOldestBeyondCapacity() {
+        var cache = LRUBoundedCache<String, Int>(capacity: 3)
+        for (index, key) in ["a", "b", "c", "d"].enumerated() {
+            cache.insert(index, forKey: key)
+        }
+        XCTAssertEqual(cache.order, ["b", "c", "d"], "容量 3 时最旧的 a 被挤出")
+        XCTAssertNil(cache.hit("a"))
+        XCTAssertEqual(cache.hit("d"), 3)
+    }
+
+    /// 命中即续命:被访问的键挪到最新,淘汰顺位让给真正最旧的键。
+    func testLRUCacheHitRefreshesRecency() {
+        var cache = LRUBoundedCache<String, Int>(capacity: 3)
+        for (index, key) in ["a", "b", "c"].enumerated() {
+            cache.insert(index, forKey: key)
+        }
+        XCTAssertEqual(cache.hit("a"), 0, "命中返回值")
+        cache.insert(9, forKey: "d")
+        XCTAssertEqual(cache.order, ["c", "a", "d"], "a 因命中续命,b 成为最旧被挤出")
+        XCTAssertNil(cache.hit("b"))
+        XCTAssertEqual(cache.hit("a"), 0)
+        XCTAssertEqual(cache.hit("c"), 2, "c 未被命中过但仍未到淘汰顺位")
+    }
+
+    /// 重复插入同键:更新值且不产生重复序位。
+    func testLRUCacheReinsertUpdatesWithoutDuplicates() {
+        var cache = LRUBoundedCache<String, Int>(capacity: 2)
+        cache.insert(1, forKey: "a")
+        cache.insert(2, forKey: "b")
+        cache.insert(3, forKey: "a")
+        XCTAssertEqual(cache.order, ["b", "a"])
+        XCTAssertEqual(cache.hit("a"), 3, "同键再插更新值")
+    }
+
+    /// 渲染器容量锚点:策略常量(~20)与"网络速率几秒窗内来回切换仍命中"
+    /// 的量级一致——改这个数等于改新旧键命中率,先在此暴露。
+    @MainActor
+    func testRendererCacheCapacityIsBounded() {
+        XCTAssertEqual(MenuBarBadgeRenderer.cacheCapacity, 20)
     }
 
     // MARK: - 夹具

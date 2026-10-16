@@ -305,6 +305,39 @@ final class DiskSensorTests: XCTestCase {
         XCTAssertEqual(reading.trend.last?.read ?? -1, 1_000, accuracy: 1e-9) // 第 72 点:Δ1000/1s
     }
 
+    // MARK: - 吞吐记账增量(评审接线:历史落库消费,与网络增量同口径)
+
+    func testAccumulatorCarriesByteDeltasOnSuccessAndZeroOnDroppedRounds() {
+        // 成功轮:速率非零时增量 = 计数差(600B/300B)。
+        let accumulator = DiskThroughputAccumulator()
+        _ = accumulator.record(counters(read: 400, write: 200, uptime: 1_000_000_000)) // 首读
+        let good = accumulator.record(counters(read: 1_000, write: 500, uptime: 6_000_000_000))
+        XCTAssertEqual(good.readBytesDelta, 600)
+        XCTAssertEqual(good.writeBytesDelta, 300)
+
+        // 回退轮:速率钳零,增量同轮为 0(不把回退记成负数或巨大 IO)。
+        let rolledBack = accumulator.record(counters(read: 100, write: 100, uptime: 7_000_000_000))
+        XCTAssertEqual(rolledBack.readBytesDelta, 0)
+        XCTAssertEqual(rolledBack.writeBytesDelta, 0)
+
+        // 恢复轮从新基线起算:增量与速率同真。
+        let recovered = accumulator.record(counters(read: 1_100, write: 600, uptime: 8_000_000_000))
+        XCTAssertEqual(recovered.readBytesDelta, 1_000)
+        XCTAssertEqual(recovered.writeBytesDelta, 500)
+
+        // 真无 IO 轮:速率为 0 且增量如实为 0(与丢弃轮同形,语义都正确)。
+        let idle = accumulator.record(counters(read: 1_100, write: 600, uptime: 9_000_000_000))
+        XCTAssertEqual(idle.readBytesDelta, 0)
+        XCTAssertEqual(idle.writeBytesDelta, 0)
+    }
+
+    func testAccumulatorFirstReadingCarriesZeroDeltas() {
+        let accumulator = DiskThroughputAccumulator()
+        let first = accumulator.record(counters(read: 9_999, write: 9_999, uptime: 1_000_000_000))
+        XCTAssertEqual(first.readBytesDelta, 0, "首读只立基线,增量 0")
+        XCTAssertEqual(first.writeBytesDelta, 0)
+    }
+
     // MARK: - Provider:lastGood 与分档(ADR-0004 / 工单 05 验收框)
 
     func testCapacityProviderCadenceIsLowFrequency() {

@@ -60,8 +60,8 @@ struct NetworkRates: Equatable, Sendable {
 /// 一轮差分结果:速率 + 记账增量(Today/7 天累计 = 对增量逐轮求和落库)。
 /// 丢弃轮(首读/负值/跳变/换口)速率为 0、增量为 0;基线一律以本轮计数重立。
 struct NetworkRoundResult: Equatable, Sendable {
-    /// 本轮统计的接口(展示用;nil 不会出现——differ 只在计数在场时被调)。
-    let interface: String?
+    /// 本轮统计的接口(展示用;differ 只在计数在场时被调,恒有名)。
+    let interface: String
     let rates: NetworkRates
     let upBytesDelta: UInt64
     let downBytesDelta: UInt64

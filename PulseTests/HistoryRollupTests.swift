@@ -82,6 +82,24 @@ final class HistoryRollupTests: XCTestCase {
         XCTAssertEqual(next?.netTxBytes, 9)
     }
 
+    /// 磁盘吞吐增量逐轮求和(评审接线,与网络增量同款记账):窗内合计随聚合
+    /// 冲刷,跨窗清零重计。
+    func testDiskIncrementsSumWithinMinuteAndResetAcrossWindows() {
+        var buffer = MinuteRollupBuffer()
+        buffer.ingest(at: seconds(0), systemLoad: 10, groups: [], diskReadBytes: 700, diskWriteBytes: 30)
+        buffer.ingest(at: seconds(5), systemLoad: 10, groups: [], diskReadBytes: 300, diskWriteBytes: 20)
+
+        let flushed = try? XCTUnwrap(buffer.ingest(at: seconds(60), systemLoad: 1, groups: []))
+        XCTAssertEqual(flushed?.diskReadBytes, 1_000)
+        XCTAssertEqual(flushed?.diskWriteBytes, 50)
+
+        // 下一窗从头累计:上一窗的量不泄漏。
+        buffer.ingest(at: seconds(60), systemLoad: 1, groups: [], diskReadBytes: 7, diskWriteBytes: 9)
+        let next = try? XCTUnwrap(buffer.ingest(at: seconds(120), systemLoad: 1, groups: []))
+        XCTAssertEqual(next?.diskReadBytes, 7)
+        XCTAssertEqual(next?.diskWriteBytes, 9)
+    }
+
     /// 所有在场组都被卷积(逐组一行,stableKey 升序);组消失即停记。
     func testEveryPresentGroupIsAggregatedInStableKeyOrder() {
         var buffer = MinuteRollupBuffer()

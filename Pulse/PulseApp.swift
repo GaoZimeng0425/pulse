@@ -98,7 +98,7 @@ struct MenuBarLoadLabel: View {
                 cpuLoadPercent: monitor.systemCPULoad,
                 memory: monitor.memory,
                 diskAvailableBytes: monitor.diskCapacity?.availableForImportantUsageBytes,
-                networkRate: monitor.networkRate
+                networkRate: monitor.network?.rates
             )
         )
         Image(

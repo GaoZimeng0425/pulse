@@ -315,15 +315,8 @@ struct AlertEngine: Sendable {
     ) -> [AlertEvent] {
         var events: [AlertEvent] = []
         let presentKeys = Set(servers.map { Self.devServerSubjectKey(pid: $0.pid) })
-        // dev server 消失:firing 立即解除,状态清空(候选态安静丢弃)。
-        let vanished = subjects.filter { ref, _ in
+        events += resolveVanished { ref in
             ref.kind == .devServerIdle && !presentKeys.contains(ref.subjectKey)
-        }
-        for (ref, state) in vanished {
-            if state.phase == .firing {
-                events.append(.resolved(kind: ref.kind, subjectKey: ref.subjectKey))
-            }
-            subjects.removeValue(forKey: ref)
         }
         guard let policy = settings[.devServerIdle], policy.isEnabled else { return events }
         for server in servers {
@@ -351,17 +344,12 @@ struct AlertEngine: Sendable {
         let firstFeed = !hasSeededGroups
         hasSeededGroups = true
 
-        // 组消失:firing 立即解除(状态清空,重生即新 incarnation 从头计数);
-        // 候选态安静丢弃。先收集后删——字典不可边遍历边变。
-        let vanished = subjects.filter { ref, state in
-            isGroupScoped(ref.kind) && !presentKeys.contains(ref.subjectKey)
+        // 组消失与 dev server 消失同一处置(共享 resolveVanished);重生即
+        // 新 incarnation 从头计数。
+        let resolvedGroups = resolveVanished { ref in
+            Self.isGroupScoped(ref.kind) && !presentKeys.contains(ref.subjectKey)
         }
-        for (ref, state) in vanished {
-            if state.phase == .firing {
-                events.append(.resolved(kind: ref.kind, subjectKey: ref.subjectKey))
-            }
-            subjects.removeValue(forKey: ref)
-        }
+        events += resolvedGroups
 
         for group in groups {
             let key = Self.subjectKey(of: group.id)
@@ -392,7 +380,25 @@ struct AlertEngine: Sendable {
         return events
     }
 
-    private func isGroupScoped(_ kind: AlertKind) -> Bool {
+    /// 消失主体处置(dev server 与组两处同构的共享出口):本轮不在场
+    /// (谓词为真)的主体,firing 立即解除成事件,状态清空(候选态安静丢弃,
+    /// 重生即新 incarnation 从头计数)。先收集后删——字典不可边遍历边变。
+    private mutating func resolveVanished(
+        where isVanished: (SubjectRef) -> Bool
+    ) -> [AlertEvent] {
+        var events: [AlertEvent] = []
+        let gone = subjects.filter { ref, _ in isVanished(ref) }
+        for (ref, state) in gone {
+            if state.phase == .firing {
+                events.append(.resolved(kind: ref.kind, subjectKey: ref.subjectKey))
+            }
+            subjects.removeValue(forKey: ref)
+        }
+        return events
+    }
+
+    /// static:消失谓词闭包里引用它不捕获 self(值类型互斥检查要求)。
+    private static func isGroupScoped(_ kind: AlertKind) -> Bool {
         kind == .groupCPU || kind == .newGroupMemory
     }
 

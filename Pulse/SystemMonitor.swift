@@ -43,12 +43,9 @@ final class SystemMonitor {
     /// 磁盘吞吐读数(工单 05):系统级读写速率 + 走势,短档(5s)或回退档
     /// (30s,随源路径)交付;首轮前 nil → 速率列占位。
     private(set) var diskThroughput: DiskThroughputReading?
-    /// 网络速率读数(徽标壳契约,工单 09 预留/工单 06 填充):由心跳轮差分
-    /// 结果在落地处转换——徽标只消费上/下行字节速率;读缺失轮保留上次好值
-    /// (LastGood,同电池/磁盘口径),丢弃轮如实为 0。填充前恒 nil → 占位"—"。
-    private(set) var networkRate: NetworkRateReading?
     /// 网络页读数(工单 06):当前速率 + 锁定的物理口名;读缺失轮保留上次
-    /// 好值。首轮前 nil → 全占位。
+    /// 好值。首轮前 nil → 全占位。徽标槽位的网络速率也从这里取
+    /// (`network?.rates`,09 壳契约的副本类型已并入 NetworkRates)。
     private(set) var network: NetworkRatesReading?
     /// 网络速率走势(工单 06):心跳轮逐轮推进的纯逻辑环,面积图数据源。
     private(set) var networkTrend = NetworkTrendBuffer()
@@ -81,6 +78,10 @@ final class SystemMonitor {
     private let diskThroughputProvider: DiskThroughputProvider
     /// 出生扫描最近交付的登记表:每轮采样落地时并入管线(只补缺)。
     private var birthLineage = LineageRegistry()
+    /// 磁盘吞吐落库账本(评审接线):读数交付轮的增量逐笔 &+ 累计,采样轮
+    /// ingest 时整笔带走并清零——与网络增量同口径(丢弃/首读轮为 0,不伪造)。
+    private var pendingDiskReadBytes: UInt64 = 0
+    private var pendingDiskWriteBytes: UInt64 = 0
     private var pipeline: GroupingPipeline
     /// dev server 盘点器(工单 08):闲置环状态随采样轮推进,端口扫描走缝。
     private var devServerFinder: DevServerFinder
@@ -308,6 +309,12 @@ final class SystemMonitor {
             // 网络记账增量(工单 06):丢弃轮为 0,读缺失轮 0——不伪造。
             let netRx = update.network?.downBytesDelta ?? 0
             let netTx = update.network?.upBytesDelta ?? 0
+            // 磁盘吞吐记账增量(接线):自上轮 ingest 以来交付读数的增量合计,
+            // 带走即清零(读缺失/丢弃轮差分给 0,同网络口径)。
+            let diskRead = pendingDiskReadBytes
+            let diskWrite = pendingDiskWriteBytes
+            pendingDiskReadBytes = 0
+            pendingDiskWriteBytes = 0
             Task {
                 await engine.ingest(
                     at: now,
@@ -316,7 +323,9 @@ final class SystemMonitor {
                     displayNames: displayNames,
                     lineage: lineage,
                     netRxBytes: netRx,
-                    netTxBytes: netTx
+                    netTxBytes: netTx,
+                    diskReadBytes: diskRead,
+                    diskWriteBytes: diskWrite
                 )
                 // 累计在落库后读回(同一 actor,顺序即本轮写入先见);
                 // 引擎侧的 nil 只发生在库缺席,UI 保持占位。
@@ -375,20 +384,21 @@ final class SystemMonitor {
     }
 
     /// 磁盘吞吐读数落地(工单 05):nil 首轮前保持占位,此后 lastGood 口径同上。
+    /// 记账增量随读数累计进落库账本(接线);lastGood 读失败重投的是**已应用过**
+    /// 的同一读数,Equatable 去重防增量重复记账(重投 = 无新数据)。
     private func applyDiskThroughput(_ reading: DiskThroughputReading?) {
-        guard let reading else { return }
+        guard let reading, reading != diskThroughput else { return }
         diskThroughput = reading
+        pendingDiskReadBytes = pendingDiskReadBytes &+ reading.readBytesDelta
+        pendingDiskWriteBytes = pendingDiskWriteBytes &+ reading.writeBytesDelta
     }
 
-    /// 网络心跳轮落地(工单 06):速率读数 + 徽标契约转换 + 走势环推进。
+    /// 网络心跳轮落地(工单 06):速率读数 + 走势环推进。徽标直取
+    /// `network?.rates`(09 壳契约副本已并入 NetworkRates)。
     /// 读缺失(nil)整轮跳过,保留上次好值(不回退为 nil、不白屏);
     /// 丢弃轮(首读/重连跳变/换口)速率如实为 0——菜单栏与图表都见谷底。
     private func applyNetwork(_ result: NetworkRoundResult) {
         network = NetworkRatesReading(rates: result.rates, interfaceName: result.interface)
-        networkRate = NetworkRateReading(
-            downloadBytesPerSecond: result.rates.downBytesPerSecond,
-            uploadBytesPerSecond: result.rates.upBytesPerSecond
-        )
         networkTrend.append(result.rates)
     }
 }

@@ -275,6 +275,11 @@ struct DiskRatePoint: Equatable, Sendable {
 struct DiskThroughputReading: Equatable, Sendable {
     let current: DiskRates
     let trend: [DiskRatePoint]
+    /// 本轮记账增量(字节;历史落库消费,UI 形状不读,默认 0 让展示构造方
+    /// 免于关心):差分成功轮 = 计数差,首读/回退/丢弃轮 = 0——与网络增量
+    /// 同口径,落库只信增量,不信"速率 × 窗宽"折算。
+    var readBytesDelta: UInt64 = 0
+    var writeBytesDelta: UInt64 = 0
 
     /// 图表口径:读 + 写合计流量。
     var totalBytesPerSecond: Double {
@@ -397,13 +402,12 @@ struct LiveDiskCapacitySource: DiskCapacitySource {
             .mountPoint
         let snapshots = dataMountPoint.map { DiskSnapshotLister.list(mount: $0) } ?? .unavailable
 
-        // CFURL 两 key(读前清缓存保证同刻新鲜值,探针①同款):free 与 important。
+        // CFURL 两 key(读前清缓存保证同刻新鲜值,探针①同款):free(Int 口径)
+        // 与 important(Int64 口径),统一折成 Int64;key 未回包 → nil 占位。
         var rootURL = URL(fileURLWithPath: "/")
         rootURL.removeAllCachedResourceValues()
         let freeValues = try? rootURL.resourceValues(forKeys: [.volumeAvailableCapacityKey])
         let importantValues = try? rootURL.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-        // CFURL 两 key(读前清缓存保证同刻新鲜值,探针①同款):free(Int 口径)
-        // 与 important(Int64 口径),统一折成 Int64;key 未回包 → nil 占位。
         let free = freeValues.flatMap { $0.volumeAvailableCapacity }.map(Int64.init)
         let important = importantValues.flatMap { $0.volumeAvailableCapacityForImportantUsage }
         let volumeName: String? = (try? rootURL.resourceValues(forKeys: [.volumeLocalizedNameKey]))?
@@ -711,6 +715,18 @@ final class DiskThroughputAccumulator: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         let rates = DiskThroughputDiffer.rates(previous: previous, current: counters)
+        // 记账增量与差分同防(网络增量同口径):速率非零 = 差分成功轮,
+        // 取计数差(differ 的非负守卫保证不回退);速率为零 = 首读/回退/
+        // 丢弃轮或真无 IO,增量一律 0——速率与增量同真同零,不会一半一半。
+        let readBytesDelta: UInt64
+        let writeBytesDelta: UInt64
+        if let previous, rates != .zero {
+            readBytesDelta = counters.readBytes - previous.readBytes
+            writeBytesDelta = counters.writeBytes - previous.writeBytes
+        } else {
+            readBytesDelta = 0
+            writeBytesDelta = 0
+        }
         previous = counters
         readRates.append(rates.readBytesPerSecond)
         writeRates.append(rates.writeBytesPerSecond)
@@ -718,7 +734,9 @@ final class DiskThroughputAccumulator: @unchecked Sendable {
         let writes = writeRates.values
         return DiskThroughputReading(
             current: rates,
-            trend: (0..<reads.count).map { DiskRatePoint(read: reads[$0], write: writes[$0]) }
+            trend: (0..<reads.count).map { DiskRatePoint(read: reads[$0], write: writes[$0]) },
+            readBytesDelta: readBytesDelta,
+            writeBytesDelta: writeBytesDelta
         )
     }
 }

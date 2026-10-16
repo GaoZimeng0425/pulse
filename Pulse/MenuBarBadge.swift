@@ -60,14 +60,6 @@ struct MenuBarBadgeConfiguration: Equatable, RawRepresentable {
 
 // MARK: - 数据快照与渲染输入
 
-/// 网络速率读数(**工单 09 壳契约,字段由工单 06 填充**):徽标只消费
-/// 上/下行字节速率两个字段;06 落地时若网络卡读数类型与此不同,在
-/// SystemMonitor 落地处转换成本结构即可。填充前该字段恒 nil → 占位"—"。
-struct NetworkRateReading: Equatable, Sendable {
-    let downloadBytesPerSecond: Double
-    let uploadBytesPerSecond: Double
-}
-
 /// 徽标数据快照:视图层从 SystemMonitor 折叠而来,映射纯函数的唯一输入
 /// (全部合成值可注入,单测不触碰真实采样)。
 struct MenuBarBadgeData: Equatable {
@@ -77,8 +69,9 @@ struct MenuBarBadgeData: Equatable {
     var memory: MemoryBreakdown?
     /// 磁盘实际可用字节(important 口径,工单 05 的 lastGood);nil = 未到读数。
     var diskAvailableBytes: Int64?
-    /// 网络速率(工单 06 填充的壳契约);nil = 未上线/未到读数,占位。
-    var networkRate: NetworkRateReading?
+    /// 网络速率(工单 06 填充):直用 NetworkSensor 的 NetworkRates——09 的
+    /// 壳契约副本已并入该类型(字段不再两次转译);nil = 未上线/未到读数,占位。
+    var networkRate: NetworkRates?
 }
 
 /// 单枚徽标的渲染输入:纯值语义,不含 SwiftUI 颜色——强调级别由渲染器
@@ -155,14 +148,14 @@ enum MenuBarBadgeComposer {
         MenuBarBadgeContent(caption: "磁盘", text: PulseFormat.diskRemainingBadge(availableBytes), emphasis: .normal)
     }
 
-    /// 网络:紧凑上下行 "↓下载 ↑上传";数据未到(工单 06 之前)占位 "—";
+    /// 网络:紧凑上下行 "↓下载 ↑上传";数据未到占位 "—";
     /// 紧凑文本估算渲染宽超预算 → 降级只显示下载。
-    static func networkContent(rate: NetworkRateReading?) -> MenuBarBadgeContent {
+    static func networkContent(rate: NetworkRates?) -> MenuBarBadgeContent {
         guard let rate else {
             return MenuBarBadgeContent(caption: "网络", text: "—", emphasis: .normal)
         }
-        let download = PulseFormat.networkRateBadge(rate.downloadBytesPerSecond)
-        let upload = PulseFormat.networkRateBadge(rate.uploadBytesPerSecond)
+        let download = PulseFormat.networkRateBadge(rate.downBytesPerSecond)
+        let upload = PulseFormat.networkRateBadge(rate.upBytesPerSecond)
         let compact = "↓\(download) ↑\(upload)"
         if estimatedWidth(of: compact) <= networkWidthBudget {
             return MenuBarBadgeContent(caption: "网络", text: compact, emphasis: .normal)
@@ -180,17 +173,59 @@ enum MenuBarBadgeComposer {
 
 // MARK: - 位图渲染器(参数化,单张合成)
 
+/// 容量有界的 LRU 字典(纯逻辑):命中把键挪到最新,插入超容淘汰最旧。
+/// 渲染器缓存的记账与淘汰规则单测钉在这里;值类型不设约束(NSImage 存取
+/// 留在渲染器侧)。实现只有一张访问序表 + 一个字典,规模 ≤ 容量,线性
+/// 移除即可,不值得上双向链表。
+struct LRUBoundedCache<Key: Hashable, Value> {
+    let capacity: Int
+    private(set) var order: [Key] = []
+    private var storage: [Key: Value] = [:]
+
+    init(capacity: Int) {
+        precondition(capacity > 0, "LRU 容量必须为正")
+        self.capacity = capacity
+    }
+
+    /// 命中读值(并把键记为最新);未命中返回 nil。
+    mutating func hit(_ key: Key) -> Value? {
+        guard let value = storage[key] else { return nil }
+        touch(key)
+        return value
+    }
+
+    /// 插入/更新(键记为最新;超容淘汰最旧)。
+    mutating func insert(_ value: Value, forKey key: Key) {
+        storage[key] = value
+        touch(key)
+        while order.count > capacity {
+            let oldest = order.removeFirst()
+            storage.removeValue(forKey: oldest)
+        }
+    }
+
+    private mutating func touch(_ key: Key) {
+        order.removeAll { $0 == key }
+        order.append(key)
+    }
+}
+
 /// 菜单栏徽标位图渲染器:渲染输入数组 → ImageRenderer → 单张 NSImage,按
 /// (全部内容, 外观) 缓存——每轮采样最多一次位图化,值不变时零开销。
 /// 缓存键为纯函数(单测钉死"配置变键变"):槽位顺序 / 文案 / 强调级 /
 /// 外观任一变化都换键,内容相同的不同配置共享缓存不亏。
+/// 缓存有界(评审修复):徽标文案逐轮变新键(网络速率数字刷新最频),
+/// 无上限会常驻数周持续累积;上限 ~20 项——新旧键命中率稳态极高(负载/
+/// 内存/磁盘数字变化低频,网络速率在几秒窗内来回切换仍命中),被挤出的
+/// 旧键下次复访只重渲染一次(数毫秒),换来内存有界。
 @MainActor
 enum MenuBarBadgeRenderer {
-    private static var cache: [String: NSImage] = [:]
+    static let cacheCapacity = 20
+    private static var cache = LRUBoundedCache<String, NSImage>(capacity: cacheCapacity)
 
     static func image(for contents: [MenuBarBadgeContent], colorScheme: ColorScheme) -> NSImage {
         let key = cacheKey(for: contents, colorScheme: colorScheme)
-        if let cached = cache[key] { return cached }
+        if let cached = cache.hit(key) { return cached }
 
         let ink = colorScheme == .dark ? Color.white : Color.black
         let renderer = ImageRenderer(
@@ -227,7 +262,7 @@ enum MenuBarBadgeRenderer {
             rendered = fallback
         }
         rendered.isTemplate = false // 绝不让系统把颜色又模板化掉
-        cache[key] = rendered
+        cache.insert(rendered, forKey: key)
         return rendered
     }
 

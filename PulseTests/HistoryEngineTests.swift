@@ -57,7 +57,9 @@ final class HistoryEngineTests: XCTestCase {
         names: [GroupIdentity: String]? = nil,
         lineage: LineageRegistry = LineageRegistry(),
         netRx: UInt64 = 0,
-        netTx: UInt64 = 0
+        netTx: UInt64 = 0,
+        diskRead: UInt64 = 0,
+        diskWrite: UInt64 = 0
     ) async {
         let displayNames = names ?? Dictionary(
             uniqueKeysWithValues: groups.map { ($0.id, Self.title(of: $0.id)) }
@@ -69,7 +71,9 @@ final class HistoryEngineTests: XCTestCase {
             displayNames: displayNames,
             lineage: lineage,
             netRxBytes: netRx,
-            netTxBytes: netTx
+            netTxBytes: netTx,
+            diskReadBytes: diskRead,
+            diskWriteBytes: diskWrite
         )
     }
 
@@ -327,6 +331,33 @@ final class HistoryEngineTests: XCTestCase {
 
         XCTAssertEqual(try scalarInt("SELECT net_rx FROM system_min"), 500)
         XCTAssertEqual(try scalarInt("SELECT net_tx FROM system_min"), 500)
+    }
+
+    /// 磁盘吞吐增量落库(评审接线):system_min 的 disk_read/disk_written
+    /// 由分钟窗内增量求和写入——此前恒 NULL,历史页磁盘指标"暂无数据"。
+    func testMinuteRowsCarryDiskIncrements() async throws {
+        let engine = try makeMemoryEngine(now: minute0)
+        await ingest(engine, at: minute0, load: 1, groups: [], diskRead: 700, diskWrite: 30)
+        await ingest(engine, at: minute0.addingTimeInterval(5), load: 1, groups: [], diskRead: 300, diskWrite: 20)
+        await ingest(engine, at: minute0.addingTimeInterval(60), load: 1, groups: [])
+
+        XCTAssertEqual(try scalarInt("SELECT disk_read FROM system_min"), 1_000)
+        XCTAssertEqual(try scalarInt("SELECT disk_written FROM system_min"), 50)
+    }
+
+    /// 磁盘列接线后历史页查询开始有数:分钟行增量 → 小时卷积 SUM 生效,
+    /// series(.disk) 的桶值 = 字节合计 ÷ 桶宽(平均速率口径,与网络同款)。
+    func testDiskSeriesReadsIngestedIncrements() async throws {
+        let engine = try makeMemoryEngine(now: minute0)
+        await ingest(engine, at: minute0, load: 1, groups: [], diskRead: 700, diskWrite: 300)
+        await ingest(engine, at: minute0.addingTimeInterval(60), load: 1, groups: [])
+
+        let series = await engine.series(metric: .disk, range: .hour1, now: minute0.addingTimeInterval(120))
+        let diskSeries = try XCTUnwrap(series)
+        XCTAssertFalse(diskSeries.isEmpty, "磁盘历史不再恒空")
+        let filled = diskSeries.values.compactMap { $0 }
+        XCTAssertEqual(filled.count, 1, "只有 ingest 过的那一分钟有桶")
+        XCTAssertEqual(filled.first ?? -1, 1_000 / 60.0, accuracy: 1e-9, "1 分钟桶 1000 字节 → 平均速率")
     }
 
     /// Today/7 天累计与库内增量吻合,跨当地零点翻日,且已卷积分钟不重复计数:
