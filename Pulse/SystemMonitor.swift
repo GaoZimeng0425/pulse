@@ -42,6 +42,11 @@ final class SystemMonitor {
     /// 磁盘吞吐读数(工单 05):系统级读写速率 + 走势,短档(5s)或回退档
     /// (30s,随源路径)交付;首轮前 nil → 速率列占位。
     private(set) var diskThroughput: DiskThroughputReading?
+    /// 网络速率读数(**工单 09 预留的徽标壳契约,字段由工单 06 填充**):
+    /// 网络卡传感器落地时把读数写到此处——类型若与 NetworkRateReading 不同,
+    /// 在落地处转换即可(徽标只消费上/下行字节速率两个字段)。填充前恒 nil,
+    /// 菜单栏网络槽位显示占位"—",不伪造。
+    private(set) var networkRate: NetworkRateReading?
 
     private let sampler: Sampler
     /// 独立出生扫描(评审 S1):~2s 节奏登记新 pid,与采样节奏解耦。

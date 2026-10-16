@@ -33,7 +33,7 @@ struct SettingsView: View {
             get: { SettingsPage(rawValue: selectedPageRaw) ?? .general },
             set: { if let page = $0 { selectedPageRaw = page.rawValue } }
         )) {
-            // 页面尚少,单节直列;P1 入菜单徽标/采样节奏等时再分组。
+            // 页面尚少,P1 的菜单栏/告警页暂仍单节直列;分组待 P1 页并齐后统一做。
             ForEach(SettingsPage.allCases) { page in
                 sidebarRow(page)
                     .tag(page)
@@ -58,6 +58,7 @@ struct SettingsView: View {
         switch SettingsPage(rawValue: selectedPageRaw) ?? .general {
         case .general: GeneralSettingsView(monitor: monitor)
         case .projectRoots: ProjectRootsSettingsView(store: rootsStore)
+        case .menuBar: MenuBarBadgeSettingsView()
         }
     }
 }
@@ -67,6 +68,7 @@ struct SettingsView: View {
 enum SettingsPage: String, CaseIterable, Identifiable {
     case general
     case projectRoots
+    case menuBar
 
     var id: String { rawValue }
 
@@ -74,6 +76,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         switch self {
         case .general: "通用"
         case .projectRoots: "项目根目录"
+        case .menuBar: "菜单栏"
         }
     }
 
@@ -81,6 +84,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         switch self {
         case .general: "gearshape"
         case .projectRoots: "folder.badge.gearshape"
+        case .menuBar: "menubar.rectangle"
         }
     }
 
@@ -88,6 +92,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         switch self {
         case .general: Color(red: 0.62, green: 0.62, blue: 0.66)
         case .projectRoots: Color(red: 0.30, green: 0.55, blue: 0.95)
+        case .menuBar: Color(red: 0.58, green: 0.40, blue: 0.92)
         }
     }
 
@@ -95,6 +100,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         switch self {
         case .general: Color(red: 0.42, green: 0.42, blue: 0.47)
         case .projectRoots: Color(red: 0.15, green: 0.35, blue: 0.75)
+        case .menuBar: Color(red: 0.42, green: 0.22, blue: 0.78)
         }
     }
 }
