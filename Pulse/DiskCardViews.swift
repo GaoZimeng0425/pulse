@@ -34,6 +34,7 @@ struct DiskVolumeBreakdownView: View {
                     .foregroundStyle(.tertiary)
             }
         }
+        .padding(isCompact ? 12 : 16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Surface.card, in: .rect(cornerRadius: isCompact ? 12 : 18))
         .accessibilityElement(children: .combine)
@@ -111,6 +112,7 @@ struct DiskSnapshotsCardView: View {
             }
             content
         }
+        .padding(isCompact ? 12 : 16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Surface.card, in: .rect(cornerRadius: isCompact ? 12 : 18))
         .accessibilityElement(children: .combine)
