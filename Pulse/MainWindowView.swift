@@ -239,7 +239,7 @@ struct MainWindowView: View {
     }
 
     /// 排行卡:全部组;搜索生效时换成过滤后的组(无命中 → 专用空态);
-    /// 点行展开主窗口版进程表(表头可排序);前 3 名带 26×14 微图(工单 03 兑现)。
+    /// 点行展开主窗口版进程表(表头可排序)。
     /// meter 归一榜首仍取全榜单(content 口径),过滤不改变条的相对读数。
     @ViewBuilder
     private var rankingCard: some View {
@@ -265,7 +265,6 @@ struct MainWindowView: View {
             cpuLeader: content.cpuLeader,
             memoryLeaderBytes: content.memoryLeaderBytes,
             expandedGroupIDs: model.expandedGroupIDs,
-            microGraphValues: model.microGraphValues(for: content),
             onToggle: model.toggleExpansion(of:),
             onEndGroup: model.requestEndGroup
         ) { group in

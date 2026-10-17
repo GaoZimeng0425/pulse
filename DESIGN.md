@@ -139,7 +139,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{rounded.card}` | 18pt | 全尺寸卡片(总览卡、主卡、走势卡) |
 | `{rounded.card-compact}` | 12pt | 弹窗紧凑卡 |
 | `{rounded.inner}` | 10pt | 卡内嵌套表区 / 次级容器 |
-| `{rounded.chip}` | 8pt | 徽章底、微图容器 |
+| `{rounded.chip}` | 8pt | 徽章底、行选中底 |
 | `{rounded.pill}` | 胶囊 | 状态 chip、药丸 tab、搜索框、meter 条 |
 
 圆角不随尺寸缩放(小元素不自动变小圆角)——形状由容器语义决定,由本表查得。

@@ -4,7 +4,7 @@ import Observation
 // MARK: - 弹窗与主窗口共用呈现模型(工单 P0.6-05,评审 F4 去重)
 
 /// 两窗共用的呈现模型:弹窗(DashboardView)与主窗口(MainWindowView)对同一份
-/// SystemMonitor 数据做完全相同的折叠——指标卡模型、tab 内容、26×14 微图数据、
+/// SystemMonitor 数据做完全相同的折叠——指标卡模型、tab 内容、
 /// 展开/下钻会话状态与处置请求。原先散在两个视图里的重复实现收敛到这里,
 /// 视图只保留各自的外形(弹窗紧凑 / 窗口常规)与 tab 选中态(两窗独立)。
 @Observable
@@ -67,30 +67,6 @@ final class DashboardModel {
             trend: monitor.networkTrend.totalBytesPerSecond,
             totals: monitor.networkTotals
         )
-    }
-
-    // MARK: 26×14 微图数据(工单 03 兑现,评审 F3)
-
-    /// 排行卡微图数据:榜单前 3 名(content.microGraphGroupIDs 资格)按当前口径
-    /// 取组历史序列——CPU 口径 = 组 CPU%,内存口径 = 组内存字节;
-    /// 无历史的组(榜单资格先于首个采样点)不入表,行内不画。
-    func microGraphValues(for content: MetricTabContent) -> [GroupIdentity: [Double]] {
-        guard !content.microGraphGroupIDs.isEmpty else { return [:] }
-        var values: [GroupIdentity: [Double]] = [:]
-        for group in content.ranking where content.microGraphGroupIDs.contains(group.id) {
-            guard let series = monitor.history.series(forGroup: group.id) else { continue }
-            switch content.metric {
-            case .cpu:
-                if !series.cpuPercent.values.isEmpty {
-                    values[group.id] = series.cpuPercent.values
-                }
-            case .memory:
-                if !series.memoryBytes.values.isEmpty {
-                    values[group.id] = series.memoryBytes.values.map(Double.init)
-                }
-            }
-        }
-        return values
     }
 
     // MARK: 会话状态与处置请求(工单 08;确认 + 执行在 KillRequestFlow)

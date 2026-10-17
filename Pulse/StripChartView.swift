@@ -11,34 +11,12 @@ import SwiftUI
 /// Charts 每图都有轴/布局开销,Canvas 一次 draw 最省(参考文档 §5 同推荐)。
 /// 采样节奏 1–5s 一轮,无需柱高过渡动画,重绘即最新。
 ///
-/// 工单 P0.6-03 组卡瘦身:补 compact 变体(§3.1 变体条款:紧凑行 26×14、
-/// gap-px、无轨道)——13 槽、1px 间距、透明底,给组卡行内的迷你微图用。
-///
 /// tint 缺省 = CPU 指标强调色(P0.6-02:替换 01 的占位蓝 StripChartPalette;
-/// 调用方有更强语境时显式传色——组卡传当前口径的强调色,孤儿橙)。
+/// 调用方有更强语境时显式传色——指标卡传当前口径的强调色)。
 struct StripChartView: View {
-    /// 形态:full = 44 柱 + 9% 轨道;compact = 13 柱 + 1px 间距 + 无轨道。
-    enum Style {
-        case full
-        case compact
-
-        /// 槽位与间距随形态取值(§3.1 主形态 / 变体条款)。
-        var slotCount: Int {
-            switch self {
-            case .full: 44
-            case .compact: 13
-            }
-        }
-
-        var barSpacing: CGFloat {
-            switch self {
-            case .full: 2
-            case .compact: 1 // HTML 变体:gap-px
-            }
-        }
-
-        var showsTrack: Bool { self == .full }
-    }
+    /// 槽位与柱距(§3.1 主形态:44 槽、2px 间距、9% 轨道)。
+    private static let slotCount = 44
+    private static let barSpacing: CGFloat = 2
 
     /// 零值/空槽的垫底高度(§3.1 "旧值以 2% 垫底")。
     private static let floorFraction: CGFloat = 0.02
@@ -50,38 +28,31 @@ struct StripChartView: View {
     /// 柱条与轨道色。
     var tint: Color
     /// 归一化上限:有语义域时给定(系统负载固定 0–100),
-    /// nil = 按窗口内最大值归一(组 CPU% 可 >100%,无固定域)。
+    /// nil = 按窗口内最大值归一(指标无固定域时不猜测)。
     var domainMax: Double?
-    /// 形态(工单 03:组卡行内微图用 .compact;调用方以 frame 约定 26×14)。
-    var style: Style = .full
 
     init(
         values: [Double],
         tint: Color = Metric.cpu.accentColor,
-        domainMax: Double? = nil,
-        style: Style = .full
+        domainMax: Double? = nil
     ) {
         self.values = values
         self.tint = tint
         self.domainMax = domainMax
-        self.style = style
     }
 
     var body: some View {
         Canvas { context, size in
             draw(in: &context, size: size)
         }
-        // 轨道:tint 9%(§1.1 color-mix 口径),圆角 8;compact 变体无轨道。
-        .background(
-            style.showsTrack ? AnyShapeStyle(tint.opacity(0.09)) : AnyShapeStyle(.clear),
-            in: .rect(cornerRadius: 8)
-        )
+        // 轨道:tint 9%(§1.1 color-mix 口径),圆角 8。
+        .background(tint.opacity(0.09), in: .rect(cornerRadius: 8))
         .accessibilityHidden(true) // 数值信息由统计行的文字承载
     }
 
     private func draw(in context: inout GraphicsContext, size: CGSize) {
-        let slots = style.slotCount
-        let spacing = style.barSpacing
+        let slots = Self.slotCount
+        let spacing = Self.barSpacing
         let barWidth = max(1, (size.width - spacing * CGFloat(slots - 1)) / CGFloat(slots))
 
         // 右对齐取最近 N 个;无语义域时窗口最大值归一(全零序列退化为垫底柱)。
@@ -138,16 +109,6 @@ struct StripChartView: View {
             domainMax: 100
         )
         .frame(height: 14)
-        // compact 变体(工单 03 组卡瘦身):26×14、1px 间距、无轨道。
-        let ramp: [Double] = (0..<13).map { index in Double(index) * 6.5 }
-        HStack(spacing: 24) {
-            StripChartView(values: ramp, style: .compact)
-                .frame(width: 26, height: 14)
-            StripChartView(values: [42], style: .compact)
-                .frame(width: 26, height: 14)
-            StripChartView(values: [], style: .compact)
-                .frame(width: 26, height: 14)
-        }
     }
     .padding(16)
     .frame(width: 308)

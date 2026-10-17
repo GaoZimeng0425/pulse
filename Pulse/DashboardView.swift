@@ -131,7 +131,6 @@ struct DashboardView: View {
     }
 
     /// "当前最忙"排行卡:全部组,榜单序随 tab;点行展开组内进程(只读最近一轮采样);
-    /// 前 3 名带 26×14 微图(工单 03 兑现,数据按口径从采样历史折叠)。
     private var rankingCard: some View {
         RankingCardView(
             title: "当前最忙",
@@ -140,7 +139,6 @@ struct DashboardView: View {
             cpuLeader: content.cpuLeader,
             memoryLeaderBytes: content.memoryLeaderBytes,
             expandedGroupIDs: model.expandedGroupIDs,
-            microGraphValues: model.microGraphValues(for: content),
             density: .compact,
             onToggle: model.toggleExpansion(of:),
             onEndGroup: model.requestEndGroup
@@ -224,7 +222,7 @@ struct GroupCardStyle {
     /// 夹在真 App 图标之间显得突兀——改为实心圆角方块 + 白符号,形态对齐 app logo。
     let tileColor: Color
     let cardBackground: AnyShapeStyle
-    /// 指标强调色:CPU 口径下驱动卡内 meter/微图(孤儿橙)。工单 03 tab 化后
+    /// 指标强调色:CPU 口径下驱动卡内 meter(孤儿橙)。工单 03 tab 化后
     /// 内存口径由 RankingRowView 按当前 tab 的指标另行覆盖(孤儿仍橙,语义不变)。
     let accentColor: Color
 }

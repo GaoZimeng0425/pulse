@@ -21,9 +21,6 @@ struct RankingCardView<Expanded: View>: View {
     let cpuLeader: Double
     let memoryLeaderBytes: UInt64
     let expandedGroupIDs: Set<GroupIdentity>
-    /// 26×14 微图数据(工单 03 兑现,评审 F3):组身份 → 按当前口径的近期序列,
-    /// 由调用方(DashboardModel)从采样历史折叠;不在表内的行不带微图。
-    var microGraphValues: [GroupIdentity: [Double]] = [:]
     var density: Density = .regular
     let onToggle: (GroupIdentity) -> Void
     let onEndGroup: (ProcessGroup) -> Void
@@ -45,7 +42,6 @@ struct RankingCardView<Expanded: View>: View {
                         group: group,
                         metric: metric,
                         meterFraction: meterFraction(for: group),
-                        microGraph: microGraphValues[group.id],
                         isExpanded: isExpanded,
                         isCompact: density == .compact,
                         onToggle: { onToggle(group.id) },
@@ -86,16 +82,13 @@ struct RankingCardView<Expanded: View>: View {
     }
 }
 
-/// 排行行:图标 + 名称 / 副文 | 微图 + meter + 数值 + 展开指示。
+/// 排行行:图标 + 名称 / 副文 | meter + 数值 + 展开指示。
 /// 组 CPU% > 100%(工单 04 徽章语义)在名称行内挂红色 高负载 chip;
 /// "结束整组"(工单 08)悬停时出现在行尾,右键菜单同入口;点击只是请求确认。
 struct RankingRowView: View {
     let group: ProcessGroup
     let metric: GroupCardMetric
     let meterFraction: Double
-    /// 26×14 微图(工单 03 紧凑行"部分带微图"):非 nil 即渲染,数据由调用方
-    /// 按当前口径(榜单前 3 名)折叠注入。
-    var microGraph: [Double]?
     let isExpanded: Bool
     let isCompact: Bool
     let onToggle: () -> Void
@@ -125,11 +118,6 @@ struct RankingRowView: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: 8)
-                if let microGraph {
-                    // 26×14 紧凑微图(§3-1 变体条款):色随行内口径(meter 同色)。
-                    StripChartView(values: microGraph, tint: accent, style: .compact)
-                        .frame(width: 26, height: 14)
-                }
                 MeterBar(fraction: meterFraction, tint: accent)
                     .frame(width: isCompact ? 52 : 110)
                 Text(valueText)

@@ -117,7 +117,7 @@ private func clamped(_ value: Int, in range: Range<Int>) -> Int {
 // MARK: - 组卡读数口径(工单 03 纠偏:应用行回紧凑形态)
 
 /// 组卡的大数字口径:CPU tab(与总览)以 CPU% 为主读数、内存为副文;
-/// 内存 tab 互换(内存大数字 + CPU% 副文)。meter 与微图随口径同换。
+/// 内存 tab 互换(内存大数字 + CPU% 副文)。meter 随口径同换。
 enum GroupCardMetric: Equatable, Sendable {
     case cpu
     case memory
@@ -149,20 +149,16 @@ struct MemoryRingSegment: Identifiable, Equatable, Sendable {
 // MARK: - 单 tab 展示内容(纯逻辑)
 
 /// 单个 tab 的展示内容(工单 03):由全部组 + tab 一次性折叠出该 tab UI 所需的
-/// 全部口径——组卡榜单、微图资格、组卡读数口径、内存环形分段与两个 meter 榜首。
+/// 全部口径——组卡榜单、组卡读数口径、内存环形分段与两个 meter 榜首。
 /// "哪个 tab 展示什么"只有这一个出处,弹窗与主窗口共用;单测即本接缝。
 struct MetricTabContent: Equatable, Sendable {
-    /// 26×14 微图资格:当前榜单前 3 名(参考文档 §2 紧凑行"部分带微图")。
-    static let microGraphLimit = 3
     /// Memory by App 环形分段:top-5 + 其他(工单 03 拍板口径)。
     static let memorySegmentLimit = 5
 
     let tab: MetricTab
     /// 本 tab 的组卡榜单(降序口径随 tab;同值次键 id 升序,跨采样轮稳定)。
     let ranking: [ProcessGroup]
-    /// 有 26×14 微图资格的组身份集合(榜单前缀)。
-    let microGraphGroupIDs: Set<GroupIdentity>
-    /// 组卡读数口径(大数字/meter/微图随它切换)。
+    /// 组卡读数口径(大数字/meter 随它切换)。
     let metric: GroupCardMetric
     /// Memory by App 环形分段;空组或全零内存 → 空(由空态兜底,不出坏图)。
     let memorySegments: [MemoryRingSegment]
@@ -200,7 +196,6 @@ struct MetricTabContent: Equatable, Sendable {
         return MetricTabContent(
             tab: tab,
             ranking: ranked,
-            microGraphGroupIDs: Set(ranked.prefix(microGraphLimit).map(\.id)),
             metric: metric,
             memorySegments: segments(for: groups, totalBytes: totalBytes),
             memoryTotalBytes: totalBytes,

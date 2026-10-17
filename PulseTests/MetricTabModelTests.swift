@@ -3,7 +3,7 @@ import XCTest
 
 /// 接缝:指标 tab 内容模型(工单 P0.6-03,纯逻辑)。
 /// 弹窗图标 tab / 主窗口药丸 tab 共用的"哪个 tab 展示什么"在此钉死:
-/// tab 顺序与中文标题、键盘 ←/→ 切换语义、每 tab 的组排行口径、微图资格、
+/// tab 顺序与中文标题、键盘 ←/→ 切换语义、每 tab 的组排行口径、
 /// 内存环形分段(top5 + 其他)。SwiftUI 外观(图标/药丸/选中胶囊)属预览 +
 /// 手动验收,不在此接缝。
 final class MetricTabModelTests: XCTestCase {
@@ -241,41 +241,6 @@ final class MetricTabModelTests: XCTestCase {
         )
     }
 
-    func testMicroGraphGoesToTopOfCurrentRanking() {
-        // 26×14 微图资格 = 当前 tab 榜单前 3 名(工单 03 纠偏:紧凑行的前几名)。
-        // CPU 序与内存序在此例故意不同,证明资格跟随当前榜单而非固定某一指标。
-        let groups = [
-            group("gA", cpu: 100, mem: 100),
-            group("gB", cpu: 90, mem: 5_000),
-            group("gC", cpu: 80, mem: 4_000),
-            group("gD", cpu: 70, mem: 300),
-        ]
-
-        // CPU 榜(总览/CPU tab)前 3 = CPU 最高的 gA/gB/gC。
-        XCTAssertEqual(
-            MetricTabContent.build(groups: groups, tab: .overview).microGraphGroupIDs,
-            Set(identities(["gA", "gB", "gC"]))
-        )
-        // 内存榜前 3 = 内存最高的 gB/gC/gD(与 CPU 榜不同集合)。
-        XCTAssertEqual(
-            MetricTabContent.build(groups: groups, tab: .memory).microGraphGroupIDs,
-            Set(identities(["gB", "gC", "gD"]))
-        )
-    }
-
-    func testMicroGraphCoversWholeShortList() {
-        // 组数不足限额:全榜都给微图资格(2 组 = 2 个 id)。
-        let groups = [
-            group("only", cpu: 12, mem: 300),
-            group("idle", cpu: 0, mem: 30),
-        ]
-
-        XCTAssertEqual(
-            MetricTabContent.build(groups: groups, tab: .overview).microGraphGroupIDs,
-            Set(identities(["only", "idle"]))
-        )
-    }
-
     func testMeterLeadersFollowFullGroupList() {
         // meter 归一榜首(工单 02 口径)取全部组的最大值,与榜单同源。
         let groups = [
@@ -370,7 +335,6 @@ final class MetricTabModelTests: XCTestCase {
         // 空载 / 首轮采样前:榜单空、榜首 0、分段空、总量 0——不出坏图。
         let content = MetricTabContent.build(groups: [], tab: .memory)
         XCTAssertTrue(content.ranking.isEmpty)
-        XCTAssertTrue(content.microGraphGroupIDs.isEmpty)
         XCTAssertTrue(content.memorySegments.isEmpty)
         XCTAssertEqual(content.memoryTotalBytes, 0)
         XCTAssertEqual(content.memoryLeaderBytes, 0)
