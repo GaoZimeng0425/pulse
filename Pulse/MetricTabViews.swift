@@ -158,8 +158,11 @@ struct MetricIconTabBar: View {
     }
 }
 
-/// 主窗口药丸文字 tab(工单 03,参考文档 §2.1 主窗口:图标+文字全圆药丸):
-/// 选中态与图标 tab 同配方(强调色 15% 底 + 强调色前景);渲染序同展示轴。
+/// 主窗口药丸 tab(工单 03 图标+文字全圆药丸;P1 验收走查改为**选中带文字、
+/// 未选中纯图标**:7 个 tab 后工具栏把中间某枚药丸的文字压缩成省略号——压缩
+/// 只压一处、其余完好的怪象用"只让选中项带文字"根治,总量恒定不随窗口宽摆动;
+/// 视觉配方不变:选中 = 强调色 15% 底 + 强调色前景,渲染序同展示轴。
+/// 未选中项的可达性与悬停提示不缺席(a11yLabel + help)。
 struct MetricPillTabBar: View {
     @Binding var selection: MetricTabSelection
 
@@ -173,11 +176,15 @@ struct MetricPillTabBar: View {
                     HStack(spacing: 5) {
                         Image(systemName: tab.symbolName)
                             .font(.system(size: 11, weight: .medium))
-                        Text(tab.title)
+                        if isSelected {
+                            Text(tab.title)
+                                // 选中文字从图标侧展开淡入;容器的 value 动画让胶囊
+                                // 随之生长、其余药丸滑移让位(键盘 ←/→ 切换同样生效)。
+                                .transition(.scale(scale: 0.6, anchor: .leading).combined(with: .opacity))
+                        }
                     }
                     .font(.callout.weight(.medium))
-                    // P1 起 tab 到 6-7 个:水平内距 12→7,搜索框同步缩窄,7 个 tab 在 720 最小窗宽不裁切。
-                    .padding(.horizontal, 7)
+                    .padding(.horizontal, 9)
                     .padding(.vertical, 5)
                     .foregroundStyle(isSelected ? tab.accent.accentColor : Color.secondary)
                     .background(
@@ -189,9 +196,12 @@ struct MetricPillTabBar: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(tab.title)
                 .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+                .help(tab.title)
             }
         }
         .metricTabKeyboard($selection)
+        // 选中态变化(点按或键盘)统一走这条动画:文字展开/收起 + 胶囊宽度过渡。
+        .animation(.snappy(duration: 0.2), value: selection.current)
     }
 }
 

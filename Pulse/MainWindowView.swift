@@ -106,6 +106,10 @@ struct MainWindowView: View {
                 .help("设置项目根目录")
             }
         }
+        // 工具栏不展示窗口标题(Window 场景名"Pulse")——标题文字占掉左侧一截,
+        // 是 720 最小窗宽下工具栏溢出(搜索框被收进 >> 菜单)的推手之一;
+        // NSWindow.title 仍是 Pulse,离屏守卫按标题找窗口不受影响。
+        .toolbar(removing: .title)
         .modifier(KillFailureAlert(report: $model.killFailureReport))
     }
 
@@ -351,6 +355,8 @@ private struct MainSearchField: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(Color.primary.opacity(0.06), in: .capsule)
+        // 132(原 168):右侧空间收紧后,工具栏在 720 最小窗宽也装得下,
+        // 不再触发 >> 溢出菜单(用户拍板:宁可框窄,不要溢出菜单)。
         .frame(width: 132)
     }
 }
