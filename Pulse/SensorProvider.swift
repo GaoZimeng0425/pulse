@@ -59,6 +59,33 @@ final class SensorLastGoodBox<Value: Sendable>: @unchecked Sendable {
     }
 }
 
+// MARK: - 可见性闸门
+
+/// 可见性闸门(工单 01):模块排行类低频源的采样成本闸门——任何窗口可见
+/// 才真正读数,否则 tick 在门口空转(不跑全进程 rusage、不起 nettop 子进程)。
+/// 锁保护的微小盒子,与 SensorLastGoodBox 同款纪律(协议要求非隔离读取,
+/// 不能挂 actor)。
+final class SensorVisibilityGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var visible = false
+
+    /// 设置可见性;返回是否发生翻转(调用方据此决定清不清差分账本)。
+    @discardableResult
+    func setVisible(_ newValue: Bool) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        let changed = visible != newValue
+        visible = newValue
+        return changed
+    }
+
+    var isVisible: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return visible
+    }
+}
+
 // MARK: - 调度登记(类型擦除核心)
 
 /// 调度器眼里的一项登记:节奏 + "读一次并交付"。provider 经 `driver(deliver:)`

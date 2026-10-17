@@ -595,43 +595,35 @@ struct IORegistryDiskThroughputSource: DiskThroughputSource {
 }
 
 /// rusage 求和回退源(stats readers.swift:448-457 同款读数):全进程
-/// proc_pid_rusage 的磁盘字节求和。成本 ~每进程一次系统调用 → 30s 低频档;
-/// 口径只算用户态进程(不含内核回写),且新进程的终身累计会整块进账
-/// (差分防护钳不住正向跳变)——回退档如实接受这两点,注释在此言明。
+/// proc_pid_rusage 的磁盘字节求和。模块排行(工单 01)引入共享的
+/// ProcessRusageTableSource 后,这里改为消费同一趟 per-pid 结果求和——
+/// 全进程 rusage 循环全仓库只剩 LiveProcessRusageTableSource 一处,不再
+/// 两个源各养一趟。成本 ~每进程一次系统调用 → 30s 低频档;口径只算用户态
+/// 进程(不含内核回写),且新进程的终身累计会整块进账(差分防护钳不住
+/// 正向跳变)——回退档如实接受这两点,注释在此言明。
 struct RusageSumDiskThroughputSource: DiskThroughputSource {
+    private let processRusage: any ProcessRusageTableSource
+
+    /// 注入 per-pid rusage 表源;默认 Live 实现(与模块排行共用一个循环)。
+    init(processRusage: any ProcessRusageTableSource = LiveProcessRusageTableSource()) {
+        self.processRusage = processRusage
+    }
+
     /// 低频档(工单原文预案;30 点 × 30s = 15 分钟走势)。
     var cadenceSeconds: TimeInterval { 30 }
 
     func readCounters() -> DiskIOCounters? {
+        guard let table = processRusage.readTable() else { return nil }
         var readSum: UInt64 = 0
         var writeSum: UInt64 = 0
-        for pid in Self.allPIDs() {
-            var usage = rusage_info_current()
-            let result = withUnsafeMutablePointer(to: &usage) {
-                $0.withMemoryRebound(to: (rusage_info_t?).self, capacity: 1) {
-                    proc_pid_rusage(pid, RUSAGE_INFO_CURRENT, $0)
-                }
-            }
-            guard result != -1 else { continue }
-            readSum &+= UInt64(clamping: usage.ri_diskio_bytesread)
-            writeSum &+= UInt64(clamping: usage.ri_diskio_byteswritten)
+        for sample in table.samples.values {
+            readSum &+= sample.diskBytesRead
+            writeSum &+= sample.diskBytesWritten
         }
         return DiskIOCounters(
             readBytes: readSum, writeBytes: writeSum,
             atUptimeNanos: DispatchTime.now().uptimeNanoseconds
         )
-    }
-
-    private static func allPIDs() -> [pid_t] {
-        let count = proc_listallpids(nil, 0)
-        guard count > 0 else { return [] }
-        var buffer = [pid_t](repeating: 0, count: Int(count))
-        let capacity = Int32(buffer.count)
-        let filled = buffer.withUnsafeMutableBytes {
-            proc_listallpids($0.baseAddress, capacity)
-        }
-        guard filled > 0 else { return [] }
-        return Array(buffer.prefix(Int(filled)))
     }
 }
 
