@@ -172,7 +172,7 @@ struct RankingRowView: View {
             .help("结束整组(需确认)")
             .accessibilityLabel("结束整组 \(group.name)")
             Image(systemName: "chevron.right")
-                .font(.system(size: 9, weight: .semibold))
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.tertiary)
                 .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 .frame(width: 10)

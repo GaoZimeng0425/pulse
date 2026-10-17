@@ -56,7 +56,7 @@ struct DevServerCardView: View {
 
     /// 空态:与"暂无活动组"同族的安静两行。
     private var emptyState: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 2) {
             Text("没有在跑的 dev server")
                 .font(.system(size: 12.5, weight: .medium))
                 .foregroundStyle(.secondary)

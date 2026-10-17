@@ -382,7 +382,7 @@ struct MetricCardView: View {
                 Text(model.caption)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
                     FigureText(value: model.figureValue, unit: model.figureUnit, size: 34)
                     Spacer(minLength: 8)
                     if let chip = model.chip {
@@ -445,7 +445,7 @@ struct MetricCardView: View {
             StripChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
                 .frame(height: 36)
         }
-        .padding(10)
+        .padding(12)
     }
 }
 
@@ -481,7 +481,7 @@ struct MetricBadge: View {
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(tint)
             .frame(width: 22, height: 22)
-            .background(tint.opacity(0.16), in: .rect(cornerRadius: 7))
+            .background(tint.opacity(0.16), in: .rect(cornerRadius: 8))
     }
 }
 
@@ -501,8 +501,8 @@ struct MetricChipView: View {
 
     private struct ChipLabelStyle: LabelStyle {
         func makeBody(configuration: Configuration) -> some View {
-            HStack(spacing: 3) {
-                configuration.icon.font(.system(size: 9.5))
+            HStack(spacing: 2) {
+                configuration.icon.font(.system(size: 10.5))
                 configuration.title
             }
         }

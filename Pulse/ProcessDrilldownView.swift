@@ -67,12 +67,12 @@ struct ProcessRowView: View {
                 }
             }
             .font(.caption)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 isSelected ? Color.accentColor.opacity(0.15) : Color.clear,
-                in: .rect(cornerRadius: 6)
+                in: .rect(cornerRadius: 8)
             )
             .contentShape(.rect)
         }
@@ -115,7 +115,7 @@ struct ProcessDetailView: View {
             endProcessRow
         }
         .font(.caption)
-        .padding(10)
+        .padding(12)
         .background(Color.primary.opacity(0.06), in: .rect(cornerRadius: 8))
         .padding(.horizontal, 6)
         .padding(.bottom, 4)

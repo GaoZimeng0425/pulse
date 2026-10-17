@@ -59,7 +59,7 @@ struct DiskVolumeBreakdownView: View {
 
     private func row(_ label: String, usedBytes: UInt64, totalBytes: UInt64, prominent: Bool = false)
         -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline) {
                 Text(label)
                     .font(.system(size: 11.5, weight: prominent ? .medium : .regular))

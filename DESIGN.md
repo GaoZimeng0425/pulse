@@ -20,6 +20,8 @@ typography:
   figure-overview: "34pt bold rounded, tabular"
   figure-main: "44pt bold rounded, tabular"
   page-title: "26pt bold"
+  section-title: "17pt bold"
+  figure-mini: "17pt semibold rounded, tabular"
   card-title: "12.5pt semibold"
   body: "12pt"
   caption: "11pt"
@@ -93,6 +95,8 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{typography.figure-main}` | 44pt bold `.rounded` + `monospacedDigit` | 指标 tab 主卡大数字 |
 | `{typography.figure-overview}` | 34pt bold `.rounded` + `monospacedDigit` | 总览卡大数字(单位半号 48%) |
 | `{typography.page-title}` | 26pt bold | 主窗口页名 |
+| `{typography.section-title}` | 17pt bold | 节标题("此刻"/"当前最忙") |
+| `{typography.figure-mini}` | 17pt semibold `.rounded` + `monospacedDigit` | 历史页均值/峰值等次级数字 |
 | `{typography.card-title}` | 12.5pt semibold,指标色 | 卡片标题行 |
 | `{typography.body}` | 12pt | 统计数值(semibold + `monospacedDigit`)、正文 |
 | `{typography.caption}` | 11pt | 说明、表头、次级标签 |
@@ -180,12 +184,20 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 
 ## 已知偏差(重构时收编,不新增)
 
-盘点于 2026-10-17(rg 全量扫描),以下现状不符合本文件,遇到对应文件改动时顺带收编:
+2026-10-17 首轮收编已完成(rg 全量盘点 → 逐项落码):圆角 6/7/9pt → `{rounded.chip}`
+8pt(进程行选中底/设置图标砖/徽章/弹窗底排按钮);标签-值行距 3pt → `{spacing.micro}`
+2pt ×5 处;卡间 18pt → `{spacing.card-gap}` 16;弹窗紧凑卡与进程详情内距 10 →
+`{spacing.card-padding-compact}` 12;进程行水平内距 10 → 12(表头同步,列对齐不变);
+chip 图标 9.5pt → micro 10.5;排行行 chevron 9pt → 10。
 
-- 圆角 6/7/9pt(`ProcessDrilldownView` 6、`SettingsView`/`MetricBadge` 7、
-  `DashboardView` 9)→ 收编到 `{rounded.chip}` 8pt。
-- 行距 3/5/7pt 散点(`OverviewCards` 3、药丸内距 5 等)→ 微调时归 2/4/6/8。
-- 字号 9/9.5/12.5/13/16/17pt 散点 → 归 `micro`/`caption`/`body`/`page-title` 四档,
-  大数字族除外。
-- 卡间 `spacing: 18`(`MainWindowView` 网格)→ 归 `{spacing.card-gap}` 16。
-- 卡内距 10pt(弹窗紧凑卡)→ 与 `{spacing.card-padding-compact}` 12 对齐。
+勘误(盘点时误报,实为合法形态,不改):12.5pt = `{typography.card-title}`;
+13pt/16pt 出现在 **图标与容器尺寸**(图标 tab、设置图标砖、图标砖边长),不受文字角色约束;
+17pt 已立为 `{typography.section-title}` / `{typography.figure-mini}` 两角色。
+
+仍挂账:
+- **11.5pt 文字散点**(DiskCardViews ×6、NetworkCardViews、DevServerViews、
+  HistoryView、DashboardView、FooterButtonStyle 等 20+ 处)——量太大不盲扫,
+  待专项一轮逐处归 `{typography.caption}` 11 或 `{typography.body}` 12(动到对应
+  文件时顺带,或单开收编票)。
+- `padding(.vertical, 28)`(RingCardView 空态)不在令牌表,但是 4pt 网格倍数且
+  单点使用,暂视为合法;第二次出现时立令牌。

@@ -120,7 +120,7 @@ private struct SidebarIconView: View {
     let tintB: Color
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 7, style: .continuous)
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
             .fill(
                 LinearGradient(
                     colors: [tintA, tintB],
@@ -129,7 +129,7 @@ private struct SidebarIconView: View {
                 )
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .strokeBorder(Color.white.opacity(0.25), lineWidth: 0.5)
             )
             .frame(width: 26, height: 26)

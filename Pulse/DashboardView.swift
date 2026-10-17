@@ -209,7 +209,7 @@ struct FooterButtonStyle: ButtonStyle {
             .frame(height: 30)
             .background(
                 configuration.isPressed ? Surface.cardHigh : Surface.card,
-                in: .rect(cornerRadius: 9)
+                in: .rect(cornerRadius: 8)
             )
             .contentShape(.rect)
     }

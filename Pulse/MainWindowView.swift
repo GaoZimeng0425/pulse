@@ -45,7 +45,7 @@ struct MainWindowView: View {
     var body: some View {
         @Bindable var model = model
         return ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 16) {
                 pageHeader
                 AlertBannerView(center: monitor.alerts)
                 tabBody
@@ -170,7 +170,7 @@ struct MainWindowView: View {
     /// 内容头(SHOT1:`Overview` 大标题 + `Apple M1 Max · 10 cores · 64 GB`)。
     private var pageHeader: some View {
         let host = HostInfo.current
-        return VStack(alignment: .leading, spacing: 3) {
+        return VStack(alignment: .leading, spacing: 2) {
             Text(tabSelection.current.title)
                 .font(.system(size: 26, weight: .bold))
             Text(PulseFormat.hostSummary(
@@ -419,7 +419,7 @@ struct SortableProcessTableView: View {
             headerButton(title: "内存", key: .memory, minWidth: 56)
         }
         .font(.caption)
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 12)
         .padding(.top, 6)
     }
 
