@@ -85,6 +85,11 @@ struct MetricCardModel {
     /// 走势归一上限:CPU 固定 0–100,内存 = 物理总量。
     let domainMax: Double
 
+    /// 总览卡底部走势形态:默认 44 柱 strip;CPU 用面积线(用户拍板 2026-10-17:
+    /// 与 CPU tab 主卡同观感,同一指标两处读数统一)。
+    enum TrendStyle { case strip, area }
+    var trendStyle: TrendStyle = .strip
+
     var tint: Color { metric.accentColor }
 }
 
@@ -114,7 +119,8 @@ extension MetricCardModel {
                 MetricCardStat(label: "峰值", value: statistics.map { PulseFormat.cpuPercent($0.peak) } ?? "—"),
             ],
             trend: trend,
-            domainMax: 100
+            domainMax: 100,
+            trendStyle: .area
         )
     }
 
@@ -326,8 +332,9 @@ extension BatteryChargeStatus {
 }
 
 /// 指标卡:full = 主窗口总览网格(徽章 + 名称 + chevron / 34pt 大数字 / 三列小统计 /
-/// 36pt 高 44 柱 strip);compact = 弹窗双列小卡(名称 / 大数字 + 一句补充 /
-/// 36pt 44 柱 strip——工单 05 "指标卡底部 = strip",评审 F7 由 22pt 面积线对齐)。
+/// 36pt 高走势——形态随 model.trendStyle,CPU 面积线、其余 44 柱 strip);
+/// compact = 弹窗双列小卡(名称 / 大数字 + 一句补充 / 36pt 44 柱 strip——工单 05
+/// "指标卡底部 = strip",评审 F7 由 22pt 面积线对齐)。
 /// 整卡可点,跳到对应指标 tab(Vitals `data-goto`)。
 struct MetricCardView: View {
     enum Style {
@@ -401,8 +408,16 @@ struct MetricCardView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            StripChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
-                .frame(height: 36)
+            // 走势形态按模型走(model.trendStyle):CPU 面积线(与 CPU tab 主卡
+            // 同观感,用户拍板 2026-10-17),其余指标维持 36pt 44 柱 strip。
+            switch model.trendStyle {
+            case .area:
+                AreaTrendChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
+                    .frame(height: 36)
+            case .strip:
+                StripChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
+                    .frame(height: 36)
+            }
         }
         .padding(16)
     }
@@ -425,8 +440,8 @@ struct MetricCardView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            // 底部走势与 full 形态同款(工单 05 票面:36pt 高 44 柱 strip);
-            // 面积线形态专属指标 tab 主卡(CPU tab 面积图),不在此用。
+            // 弹窗紧凑卡恒为 strip(不随 model.trendStyle):空间只有 36pt,
+            // 用户拍板范围是主窗口总览卡,弹窗形态维持工单 05 票面。
             StripChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
                 .frame(height: 36)
         }
