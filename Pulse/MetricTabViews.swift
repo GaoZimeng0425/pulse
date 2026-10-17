@@ -202,6 +202,8 @@ struct MetricPillTabBar: View {
         .metricTabKeyboard($selection)
         // 选中态变化(点按或键盘)统一走这条动画:文字展开/收起 + 胶囊宽度过渡。
         .animation(.snappy(duration: 0.2), value: selection.current)
+        // 首尾药丸与系统玻璃底(inner 的胶囊容器)留出内距,不再贴边。
+        .padding(.horizontal, 4)
     }
 }
 
