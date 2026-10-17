@@ -14,6 +14,10 @@
 
 单上下文布局:根目录 `GLOSSARY.md` + `docs/adr/`。见 `docs/agents/domain.md`。
 
+### Visual design
+
+UI 的唯一视觉宪法是根目录 `DESIGN.md`(google-labs-code/design.md 格式:YAML 令牌 + 八章)。**写/改任何 SwiftUI 视图前先读它**;数值不在令牌表里 = 先补表再写码;已拍板样式不得静默回退;已知偏差只许在对应文件改动时顺带收编。
+
 ## 代码检索与修改工具策略
 
 按问题选工具,不要裸 grep 硬啃影响面问题,也不要小题大做:
