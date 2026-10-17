@@ -48,9 +48,9 @@ final class MenuBarBadgeTests: XCTestCase {
         XCTAssertEqual(contents.map(\.caption), ["RAM", "CPU"])
     }
 
-    /// 默认态(工单验收①):与改动前逐像素一致的同源输入——
-    /// CPU 文案走 PulseFormat.cpuPercent、超 70% 变红,RAM 占比 + 压力变色,
-    /// 标签字面量 "CPU"/"RAM" 与旧双徽标逐字相同。
+    /// 默认态(工单验收①):与改动前同源同文案——CPU 文案走
+    /// PulseFormat.cpuPercent、超 70% 变红,RAM 占比 + 压力变色,标签字面量
+    /// "CPU"/"RAM" 与旧双徽标逐字相同;槽位定宽按同一参考串("100%")取值。
     func testComposeDefaultMatchesCurrentBadgeInputs() {
         let contents = MenuBarBadgeComposer.compose(
             .default,
@@ -59,8 +59,14 @@ final class MenuBarBadgeTests: XCTestCase {
         XCTAssertEqual(
             contents,
             [
-                MenuBarBadgeContent(caption: "CPU", text: "43%", emphasis: .normal),
-                MenuBarBadgeContent(caption: "RAM", text: "50%", emphasis: .normal),
+                MenuBarBadgeContent(
+                    caption: "CPU", text: "43%", emphasis: .normal,
+                    slotWidth: MenuBarBadgeComposer.slotWidth(for: "100%")
+                ),
+                MenuBarBadgeContent(
+                    caption: "RAM", text: "50%", emphasis: .normal,
+                    slotWidth: MenuBarBadgeComposer.slotWidth(for: "100%")
+                ),
             ]
         )
     }
@@ -225,6 +231,39 @@ final class MenuBarBadgeTests: XCTestCase {
     @MainActor
     func testRendererCacheCapacityIsBounded() {
         XCTAssertEqual(MenuBarBadgeRenderer.cacheCapacity, 20)
+    }
+
+    // MARK: - 槽位定宽(2026-10-17 用户反馈:数字位数变化带动状态项宽度抖动)
+
+    /// CPU/RAM/磁盘三槽给定宽(按各自最大现实读数量宽),网络槽不定宽——
+    /// 渲染端以 .frame(width:) 钉死位图宽,依赖此映射;占位读数同在定宽槽内。
+    func testSlotWidthPinnedForCPURAMAndDiskNotNetwork() {
+        for slot in [MenuBarBadgeMetric.cpu, .ram, .diskRemaining] {
+            let content = MenuBarBadgeComposer.compose(
+                MenuBarBadgeConfiguration(slots: [slot]),
+                data: Self.sampleData
+            )[0]
+            XCTAssertNotNil(content.slotWidth, "\(slot) 槽应定宽")
+        }
+        let network = MenuBarBadgeComposer.compose(
+            MenuBarBadgeConfiguration(slots: [.networkRate]),
+            data: Self.sampleData
+        )[0]
+        XCTAssertNil(network.slotWidth, "网络槽不定宽(单位跨档文本长度本就跨档)")
+    }
+
+    /// 定宽覆盖最大现实读数:CPU/RAM 三位数 "100%"、磁盘三位数 GB 不得溢出
+    /// 定宽槽(monospacedDigit 同字数同宽,槽宽取参考串 + 2pt 余量)。
+    func testSlotWidthCoversWidestRealisticReading() {
+        let widest = MenuBarBadgeContent(caption: "CPU", text: "100%", emphasis: .normal)
+        let reference = MenuBarBadgeComposer.slotWidth(for: "100%")
+        XCTAssertGreaterThanOrEqual(
+            reference,
+            ceil(MenuBarBadgeComposer.estimatedWidth(of: widest.text)),
+            "参考串本身必须装得下"
+        )
+        // 位图宽由渲染器落实,此处钉住纯函数缝:同参考串必得同槽宽(确定性)。
+        XCTAssertEqual(reference, MenuBarBadgeComposer.slotWidth(for: "100%"))
     }
 
     // MARK: - 夹具

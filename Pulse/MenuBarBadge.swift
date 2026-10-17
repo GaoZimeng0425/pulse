@@ -82,6 +82,12 @@ struct MenuBarBadgeContent: Equatable {
     let text: String
     /// 强调级:normal = 墨色随外观,warning = 橙,critical = 红。
     let emphasis: Emphasis
+    /// 槽位定宽(nil = 自然宽):按该指标**最大现实读数**量好钉死,数字位数
+    /// 逐轮变化(38%↔100%)不再改变位图宽——状态项宽度恒定,相邻菜单栏图标
+    /// 不被挤动(2026-10-17 用户反馈"menu 有时宽度会变")。网络槽不定宽:
+    /// 速率单位跨档(KB/MB/GB)文本长度本就跨档,按最坏情形钉死会长期大片
+    /// 留白,得不偿失。
+    var slotWidth: CGFloat? = nil
 
     enum Emphasis: Equatable {
         case normal
@@ -120,19 +126,21 @@ enum MenuBarBadgeComposer {
     }
 
     /// CPU:口径 = PulseFormat.cpuPercent(0–100%),超 70% 红——与可配置前
-    /// 的双徽标同源,默认态逐像素一致的第一半。
+    /// 的双徽标同源,默认态逐像素一致的第一半。槽位按最大现实读数 "100%" 定宽。
     static func cpuContent(load: Double?) -> MenuBarBadgeContent {
         MenuBarBadgeContent(
             caption: "CPU",
             text: PulseFormat.cpuPercent(load ?? 0),
-            emphasis: (load ?? 0) > cpuRedThreshold ? .critical : .normal
+            emphasis: (load ?? 0) > cpuRedThreshold ? .critical : .normal,
+            slotWidth: slotWidth(for: "100%")
         )
     }
 
     /// RAM:已用占总内存百分比,压力偏高橙/紧张红——默认态的第二半。
+    /// 槽位同 CPU 按 "100%" 定宽;占位 "–" 也在定宽槽内,首轮前后不变宽。
     static func ramContent(memory: MemoryBreakdown?) -> MenuBarBadgeContent {
         guard let memory, memory.totalBytes > 0 else {
-            return MenuBarBadgeContent(caption: "RAM", text: "–", emphasis: .normal)
+            return MenuBarBadgeContent(caption: "RAM", text: "–", emphasis: .normal, slotWidth: slotWidth(for: "100%"))
         }
         let percent = Double(memory.usedBytes) / Double(memory.totalBytes) * 100
         let emphasis: MenuBarBadgeContent.Emphasis = switch memory.pressure {
@@ -140,12 +148,23 @@ enum MenuBarBadgeComposer {
         case .warning: .warning
         case .normal: .normal
         }
-        return MenuBarBadgeContent(caption: "RAM", text: PulseFormat.cpuPercent(percent), emphasis: emphasis)
+        return MenuBarBadgeContent(
+            caption: "RAM",
+            text: PulseFormat.cpuPercent(percent),
+            emphasis: emphasis,
+            slotWidth: slotWidth(for: "100%")
+        )
     }
 
     /// 磁盘剩余:实际可用(important 口径)十进制 GB 整数,读数未到占位 "—"。
+    /// 槽位按三位数 "999 GB" 定宽(>1TB 剩余的四位数是罕见事件,可接受)。
     static func diskContent(availableBytes: Int64?) -> MenuBarBadgeContent {
-        MenuBarBadgeContent(caption: "磁盘", text: PulseFormat.diskRemainingBadge(availableBytes), emphasis: .normal)
+        MenuBarBadgeContent(
+            caption: "磁盘",
+            text: PulseFormat.diskRemainingBadge(availableBytes),
+            emphasis: .normal,
+            slotWidth: slotWidth(for: "999 GB")
+        )
     }
 
     /// 网络:紧凑上下行 "↓下载 ↑上传";数据未到占位 "—";
@@ -168,6 +187,12 @@ enum MenuBarBadgeComposer {
     static func estimatedWidth(of text: String, fontSize: CGFloat = 11.5) -> CGFloat {
         let font = NSFont.menuBarFont(ofSize: fontSize)
         return (text as NSString).size(withAttributes: [.font: font]).width
+    }
+
+    /// 槽位定宽 = 参考串(该指标最大现实读数形态)估算宽 + 2pt 余量。
+    /// 数字 monospacedDigit 同字数必同宽,余量吸收字体族与字重差异。
+    static func slotWidth(for reference: String) -> CGFloat {
+        ceil(estimatedWidth(of: reference)) + 2
     }
 }
 
@@ -235,7 +260,8 @@ enum MenuBarBadgeRenderer {
                         caption: content.caption,
                         valueText: content.text,
                         valueColor: color(for: content.emphasis, ink: ink),
-                        ink: ink
+                        ink: ink,
+                        slotWidth: content.slotWidth
                     )
                 }
             }
@@ -276,7 +302,15 @@ enum MenuBarBadgeRenderer {
     }
 
     /// 单枚徽标:小标签在数字上方(与可配置前的双徽标逐像素同款)。
-    private static func badge(caption: String, valueText: String, valueColor: Color, ink: Color) -> some View {
+    /// 数值行可带定宽槽(nil = 自然宽):左对齐钉住数字左缘,位数增减只向右
+    /// 伸缩,位图总宽恒定——状态项宽度不再随读数抖动。
+    private static func badge(
+        caption: String,
+        valueText: String,
+        valueColor: Color,
+        ink: Color,
+        slotWidth: CGFloat?
+    ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(caption)
                 .font(.system(size: 7, weight: .semibold))
@@ -285,6 +319,7 @@ enum MenuBarBadgeRenderer {
                 .font(.system(size: 11.5, weight: .medium))
                 .monospacedDigit()
                 .foregroundStyle(valueColor)
+                .frame(width: slotWidth, alignment: .leading)
         }
         .padding(.horizontal, 1)
     }
