@@ -136,4 +136,18 @@ final class PulseFormatTests: XCTestCase {
         XCTAssertEqual(PulseFormat.milliseconds(0.00004), "<0.1 ms")
         XCTAssertEqual(PulseFormat.milliseconds(0), "0 ms")
     }
+
+    // MARK: 能耗影响排行(工单 01)
+
+    func testCPUSecondsAndWakeupsPerSecondShowOneDecimal() {
+        XCTAssertEqual(PulseFormat.cpuSeconds(0), "0.0 秒")
+        XCTAssertEqual(PulseFormat.cpuSeconds(3.14159), "3.1 秒")
+        XCTAssertEqual(PulseFormat.wakeupsPerSecond(0), "0.0 次/秒")
+        XCTAssertEqual(PulseFormat.wakeupsPerSecond(2.46), "2.5 次/秒")
+    }
+
+    func testCPUSecondsAndWakeupsClampNegativeToZero() {
+        XCTAssertEqual(PulseFormat.cpuSeconds(-1), "0.0 秒")
+        XCTAssertEqual(PulseFormat.wakeupsPerSecond(-0.5), "0.0 次/秒")
+    }
 }

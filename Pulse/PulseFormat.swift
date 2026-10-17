@@ -203,6 +203,18 @@ enum PulseFormat {
         return "\(tenths / 10).\(tenths % 10) W"
     }
 
+    /// CPU 秒数(工单 01 电池页能耗影响排行主值):秒 → "4.2 秒"(一位小数,
+    /// 十分位手算拼串不随系统区域漂移,与 watts 同因;负值按 0 夹紧)。
+    static func cpuSeconds(_ seconds: Double) -> String {
+        "\(oneDecimal(max(0, seconds))) 秒"
+    }
+
+    /// 每秒唤醒次数(工单 01 能耗影响排行副文):"2.4 次/秒"。分母是约定
+    /// 5 秒节拍,由聚合层折好传入,这里只管展示。
+    static func wakeupsPerSecond(_ countPerSecond: Double) -> String {
+        "\(oneDecimal(max(0, countPerSecond))) 次/秒"
+    }
+
     /// 时长(工单 11 诊断报告"运行时长"):最大两级单位,负数(时钟回拨)按 0 夹紧。
     /// 与 systemUptime 同取级策略,但不带"已运行"前缀——报告里它只是字段值。
     static func duration(seconds: TimeInterval) -> String {
