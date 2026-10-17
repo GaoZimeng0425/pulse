@@ -55,6 +55,23 @@ final class SystemMonitor {
     /// dev server 盘点(工单 08):每轮采样对 argv 命中的候选进程合成状态
     /// (闲置时长/内存/监听端口);无候选为空数组。主窗口总览页卡片读这里。
     private(set) var devServers: [DevServerStatus] = []
+    /// 模块排行·能耗影响(工单 01):每 pid 一轮差分 {CPU 增量, 唤醒增量,
+    /// 复合分}。仅窗口可见时 5s 采样;隐藏即清账,重开首轮记基线不出数,
+    /// 首轮前为空。电池页排行卡读这里。
+    private(set) var energyImpacts: [pid_t: ProcessEnergyImpact] = [:]
+    /// 能耗影响排行最近一次数据变化时刻(数据未变化的轮不推进)。
+    private(set) var energyImpactsUpdatedAt: Date?
+    /// 模块排行·磁盘每进程(工单 01):每 pid 读写速率。仅窗口可见时 30s
+    /// 采样,门控语义同上;首轮前为空。磁盘页排行卡读这里。
+    private(set) var diskProcessRates: [pid_t: ProcessDiskRates] = [:]
+    /// 磁盘每进程排行最近一次数据变化时刻。
+    private(set) var diskProcessRatesUpdatedAt: Date?
+    /// 模块排行·网络每进程(工单 01):每 pid 上下行速率(nettop 子进程
+    /// 差分)。仅窗口可见时 5s 采样,门控语义同上;首轮前为空。
+    /// 网络页排行卡读这里。
+    private(set) var networkProcessRates: [pid_t: ProcessNetworkRates] = [:]
+    /// 网络每进程排行最近一次数据变化时刻。
+    private(set) var networkProcessRatesUpdatedAt: Date?
     /// 告警编排(工单 P1-07):每轮采样与磁盘容量读数喂进来,触发/恢复的
     /// 系统通知与应用内提示都由它出。设置页也读它(alerts.store)。
     let alerts: AlertCenter
@@ -76,6 +93,16 @@ final class SystemMonitor {
     /// 磁盘吞吐传感器(工单 05,ADR-0004):短档 5s(IORegistry 主路径)或
     /// 低频档 30s(rusage 回退),节奏随源路径在构造期钉死。
     private let diskThroughputProvider: DiskThroughputProvider
+    /// 模块排行三源(工单 01,ADR-0004):能耗影响 5s / 磁盘每进程 30s /
+    /// 网络每进程 5s,全部仅窗口可见时跑(SensorVisibilityGate);能耗与
+    /// 磁盘共享同一个 per-pid rusage 表源(同一趟循环,各持差分账本)。
+    private let energyImpactProvider: ProcessEnergyImpactProvider
+    private let diskProcessRateProvider: ProcessDiskRateProvider
+    private let networkProcessRateProvider: ProcessNetworkRateProvider
+    /// 排行门控的两个可见性信号(工单 01):弹窗在场(既有信号)与主窗口
+    /// 模块页在场(新信号),任一为真即开闸——见 updateRankingGates。
+    private var popoverVisible = false
+    private var moduleRankingsVisible = false
     /// 出生扫描最近交付的登记表:每轮采样落地时并入管线(只补缺)。
     private var birthLineage = LineageRegistry()
     /// 磁盘吞吐落库账本(评审接线):读数交付轮的增量逐笔 &+ 累计,采样轮
@@ -101,6 +128,8 @@ final class SystemMonitor {
         batterySource: any BatterySource = LiveBatterySource(),
         diskCapacitySource: any DiskCapacitySource = LiveDiskCapacitySource(),
         diskThroughputSource: any DiskThroughputSource = LiveDiskThroughputSource.adoptingBestPath(),
+        processRusageSource: any ProcessRusageTableSource = LiveProcessRusageTableSource(),
+        nettopSource: any NettopCSVSource = LiveNettopCSVSource(),
         devServerPortScanner: any DevServerPortScanning = LiveDevServerPortScanner(),
         alertCenter: AlertCenter = AlertCenter()
     ) {
@@ -110,6 +139,9 @@ final class SystemMonitor {
         self.batteryProvider = BatterySensorProvider(source: batterySource)
         self.diskCapacityProvider = DiskCapacityProvider(source: diskCapacitySource)
         self.diskThroughputProvider = DiskThroughputProvider(source: diskThroughputSource)
+        self.energyImpactProvider = ProcessEnergyImpactProvider(source: processRusageSource)
+        self.diskProcessRateProvider = ProcessDiskRateProvider(source: processRusageSource)
+        self.networkProcessRateProvider = ProcessNetworkRateProvider(source: nettopSource)
         self.alerts = alertCenter
         self.pipeline = GroupingPipeline(
             configuration: GroupingConfiguration(
@@ -172,6 +204,9 @@ final class SystemMonitor {
         let capacityProvider = diskCapacityProvider
         let throughputProvider = diskThroughputProvider
         let provider = batteryProvider
+        let energyProvider = energyImpactProvider
+        let diskProcessProvider = diskProcessRateProvider
+        let networkProcessProvider = networkProcessRateProvider
         let scheduler = SensorScheduler()
         // 通知授权现状只查不弹(工单 07:弹窗仅在用户首开规则时由设置动作触发)。
         let alerts = alerts
@@ -198,15 +233,56 @@ final class SystemMonitor {
                         self.applyDiskThroughput(reading)
                     }
                 },
+                // 模块排行三源(工单 01):调度器按各自 cadence 驱动;可见性
+                // 门控在 provider 内部(setPopoverVisible/setModuleRankingsVisible
+                // 折算下发),门关时 tick 在门口空转,零采样成本。
+                energyProvider.driver { [weak self] reading in
+                    guard let self else { return }
+                    Task { @MainActor in
+                        self.applyEnergyImpacts(reading)
+                    }
+                },
+                diskProcessProvider.driver { [weak self] reading in
+                    guard let self else { return }
+                    Task { @MainActor in
+                        self.applyDiskProcessRates(reading)
+                    }
+                },
+                networkProcessProvider.driver { [weak self] reading in
+                    guard let self else { return }
+                    Task { @MainActor in
+                        self.applyNetworkProcessRates(reading)
+                    }
+                },
             ])
         }
     }
 
     /// 弹窗可见性变化:采样节奏在 5s/1s 间切换(合盖省电,spec)。
-    /// 出生扫描不受弹窗影响:登记的完整性不依赖观看。
+    /// 出生扫描不受弹窗影响:登记的完整性不依赖观看。弹窗也是模块排行
+    /// (工单 01)的可见性信号之一:弹窗在场即开闸(见 updateRankingGates)。
     func setPopoverVisible(_ visible: Bool) {
+        popoverVisible = visible
+        updateRankingGates()
         let sampler = self.sampler
         Task { await sampler.setPopoverVisible(visible) }
+    }
+
+    /// 模块排行可见性变化(工单 01):主窗口模块页在场时由 UI 调用。与弹窗
+    /// 信号合并门控——任一窗口可见即开闸,全关才停采(采样成本闸门)。
+    func setModuleRankingsVisible(_ visible: Bool) {
+        moduleRankingsVisible = visible
+        updateRankingGates()
+    }
+
+    /// 折算两个可见性信号为排行门控(工单 01 约定:任何窗口可见才跑
+    /// 5s/30s 低频档):翻转为全关时各 provider 清差分账本,重开首轮记基线
+    /// 不出数,不出横跨隐藏期的巨差;重复同值调用是 no-op(闸门报告翻转)。
+    private func updateRankingGates() {
+        let anyWindowVisible = popoverVisible || moduleRankingsVisible
+        energyImpactProvider.setVisible(anyWindowVisible)
+        diskProcessRateProvider.setVisible(anyWindowVisible)
+        networkProcessRateProvider.setVisible(anyWindowVisible)
     }
 
     /// 项目根变更(工单 07 设置窗):立即写入管线配置,**下一轮采样即以新根归组**
@@ -400,5 +476,26 @@ final class SystemMonitor {
     private func applyNetwork(_ result: NetworkRoundResult) {
         network = NetworkRatesReading(rates: result.rates, interfaceName: result.interface)
         networkTrend.append(result.rates)
+    }
+
+    /// 模块排行落地三件(工单 01):字典按 pid。driver 语义下 nil = 基线轮 /
+    /// 读失败 → lastGood 重投,与上轮同值时 Equatable 去重跳过(不空转刷新,
+    /// 更新时间戳只在数据真变化时推进)。
+    private func applyEnergyImpacts(_ reading: [pid_t: ProcessEnergyImpact]?) {
+        guard let reading, reading != energyImpacts else { return }
+        energyImpacts = reading
+        energyImpactsUpdatedAt = Date()
+    }
+
+    private func applyDiskProcessRates(_ reading: [pid_t: ProcessDiskRates]?) {
+        guard let reading, reading != diskProcessRates else { return }
+        diskProcessRates = reading
+        diskProcessRatesUpdatedAt = Date()
+    }
+
+    private func applyNetworkProcessRates(_ reading: [pid_t: ProcessNetworkRates]?) {
+        guard let reading, reading != networkProcessRates else { return }
+        networkProcessRates = reading
+        networkProcessRatesUpdatedAt = Date()
     }
 }

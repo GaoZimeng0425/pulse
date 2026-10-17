@@ -58,6 +58,15 @@ struct MainWindowView: View {
         .onChange(of: monitor.hasBattery) { _, hasBattery in
             tabSelection.setAxis(MetricTab.displayAxis(hasBattery: hasBattery))
         }
+        // 模块排行采样闸(工单 01):主窗口停在电池/磁盘/网络页才开闸,切走或
+        // 关窗即关。只表达主窗口自己的贡献——与弹窗信号的 OR 合并在 monitor
+        // 内做,这里不碰弹窗语义;重复同值调用在 provider 侧是 no-op。
+        .onChange(of: tabSelection.current) { _, newTab in
+            monitor.setModuleRankingsVisible(newTab.hostsModuleRanking)
+        }
+        .onDisappear {
+            monitor.setModuleRankingsVisible(false)
+        }
         // 点开告警通知 → 直达对应 tab(工单 P1-07):窗口存活时响应广播;
         // 窗口刚被 openWindow 拉起时 onAppear 消费落下的 pendingTab。
         .onReceive(NotificationCenter.default.publisher(
@@ -72,6 +81,9 @@ struct MainWindowView: View {
             if let tab = alertRouter?.consumePendingTab() {
                 tabSelection.current = tab
             }
+            // 模块排行闸(工单 01):窗口可能直接深链落在排行页,进场即按当前
+            // tab 开闸(onChange 只管后续切换,不覆盖进场初值)。
+            monitor.setModuleRankingsVisible(tabSelection.current.hostsModuleRanking)
             MainWindowView.repositionIfOffscreen()
             // 系统窗口恢复套旧 frame 发生在 onAppear 之后——补一拍延迟守卫。
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
@@ -229,18 +241,48 @@ struct MainWindowView: View {
             rankingCard
         case .battery:
             // 电池页(工单 02):六项读数主卡;组排行与电池无关,不放。
+            // 能耗影响排行(工单 01):主卡之下,rusage 差分按组聚合,只读。
             MetricMainCardView(model: model.batteryModel)
+            ModuleRankingCardView(
+                title: "能耗影响",
+                rows: ModuleRankingAggregator.energyRows(
+                    impacts: monitor.energyImpacts,
+                    groups: monitor.allGroups
+                ),
+                accent: Metric.battery.accentColor,
+                cadenceNote: "5 秒一档"
+            )
         case .disk:
             // 磁盘页(工单 05):主卡 + 各卷对账明细 + 快照列表(弹窗同构,紧凑)。
+            // 读写最多排行(工单 01):各卷明细/快照之下,每进程 rusage 速率归组。
             MetricMainCardView(model: model.diskModel)
             HStack(alignment: .top, spacing: 16) {
                 DiskVolumeBreakdownView(capacity: monitor.diskCapacity)
                 DiskSnapshotsCardView(listing: monitor.diskCapacity?.snapshots)
             }
+            ModuleRankingCardView(
+                title: "读写最多",
+                rows: ModuleRankingAggregator.diskRows(
+                    rates: monitor.diskProcessRates,
+                    groups: monitor.allGroups
+                ),
+                accent: Metric.disk.accentColor,
+                cadenceNote: "30 秒一档"
+            )
         case .network:
             // 网络页(工单 06):主卡 + 流量累计明细(弹窗同构,紧凑)。
+            // 每进程流量排行(工单 01):流量累计之下,nettop 速率归组,只读。
             MetricMainCardView(model: model.networkModel)
             NetworkTotalsCardView(totals: monitor.networkTotals)
+            ModuleRankingCardView(
+                title: "每进程流量",
+                rows: ModuleRankingAggregator.networkRows(
+                    rates: monitor.networkProcessRates,
+                    groups: monitor.allGroups
+                ),
+                accent: Metric.network.accentColor,
+                cadenceNote: "5 秒一档"
+            )
         case .history:
             // 历史页(工单 04):指标 × 时间范围 Canvas 走势;查询走引擎 actor,
             // 主窗口是它唯一的入口(弹窗轴滤掉了历史页)。

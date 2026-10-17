@@ -114,6 +114,17 @@ private func clamped(_ value: Int, in range: Range<Int>) -> Int {
     Swift.min(Swift.max(value, range.lowerBound), range.upperBound - 1)
 }
 
+// MARK: - 模块排行可见性判据(工单 01)
+
+extension MetricTab {
+    /// 承载模块排行卡的 tab(电池·能耗影响 / 磁盘·读写最多 / 网络·每进程流量)。
+    /// 主窗口可见性接线的判据来源(纯数据,成员资格由单测钉死)。
+    static let moduleRankingTabs: Set<MetricTab> = [.battery, .disk, .network]
+
+    /// 当前 tab 是否开排行采样闸(工单 01:模块页可见才跑 5s/30s 低频档)。
+    var hostsModuleRanking: Bool { Self.moduleRankingTabs.contains(self) }
+}
+
 // MARK: - 组卡读数口径(工单 03 纠偏:应用行回紧凑形态)
 
 /// 组卡的大数字口径:CPU tab(与总览)以 CPU% 为主读数、内存为副文;

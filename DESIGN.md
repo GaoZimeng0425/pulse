@@ -154,6 +154,13 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 - **MetricMainCardView**:左列 200pt(标签 / 44pt 数字 / chip / 2×2 统计)+
   右列 56 点面积图,卡高 176pt。compact(弹窗)竖排:数字行 / 64pt 面积图 / 四列统计;
   底部走势组件 full / compact 同一(用户拍板:同一指标两处读数同观感)。
+- **ModuleRankingCardView(模块排行卡,工单 01)**:电池/磁盘/网络三页各一张只读排行
+  (能耗影响 / 读写最多 / 每进程流量;主窗口专属,弹窗不放)。行配方对齐排行行
+  regular 档——图标 22、名称 13 medium、副文 10.5、数值 13 semibold `monospacedDigit`、
+  meter 110 宽榜首归一;**无悬停结束按钮、不可展开**(只读,处置入口不进)。
+  卡 = Surface.card + `{rounded.card}` 18 圆角 + `{spacing.card-padding}` 16 内距,
+  标题 = `{typography.card-title}`(12.5 semibold 指标色,随所在模块取令牌);
+  空态安静文案"暂无数据…",底部节拍注脚(电池/网络"5 秒一档"、磁盘"30 秒一档")。
 - **AreaTrendChartView**:56 点、线 2px 指标色、线下渐变 32%→0、4 条 8% 网格线、
   2% 左垫底;**StripChartView**:44 柱、36pt 高。二者都是自绘 Canvas,不引 Charts。
 - **MetricPillTabBar**:未选中纯图标 / 选中图标+文字(用户拍板,2026-10-16);

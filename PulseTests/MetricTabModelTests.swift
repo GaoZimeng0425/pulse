@@ -347,4 +347,18 @@ final class MetricTabModelTests: XCTestCase {
         XCTAssertTrue(content.memorySegments.isEmpty)
         XCTAssertEqual(content.memoryTotalBytes, 0)
     }
+
+    // MARK: - 模块排行可见性判据(工单 01)
+
+    func testModuleRankingTabsAreExactlyTheThreeModulePages() {
+        // 排行卡只上电池/磁盘/网络三页(工单拍板);成员资格钉死,防手滑增删。
+        XCTAssertEqual(MetricTab.moduleRankingTabs, [.battery, .disk, .network])
+        XCTAssertTrue(MetricTab.battery.hostsModuleRanking)
+        XCTAssertTrue(MetricTab.disk.hostsModuleRanking)
+        XCTAssertTrue(MetricTab.network.hostsModuleRanking)
+        XCTAssertFalse(MetricTab.overview.hostsModuleRanking)
+        XCTAssertFalse(MetricTab.cpu.hostsModuleRanking)
+        XCTAssertFalse(MetricTab.memory.hostsModuleRanking)
+        XCTAssertFalse(MetricTab.history.hostsModuleRanking)
+    }
 }

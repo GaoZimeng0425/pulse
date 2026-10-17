@@ -45,7 +45,9 @@ final class LiveProcessSource: ProcessSource, @unchecked Sendable {
     }()
 
     /// tick → 纳秒。整数乘除(ticks ≤ 开机时长 × 24MHz,×125 远不溢出 UInt64)。
-    private static func nanoseconds(fromTicks ticks: UInt64) -> UInt64 {
+    /// internal:模块排行的 per-pid rusage 源(LiveProcessRusageTableSource)
+    /// 复用同一换算——ri_user_time 同为 mach tick,勿再自造(工单 01)。
+    static func nanoseconds(fromTicks ticks: UInt64) -> UInt64 {
         ticks * UInt64(timebase.numer) / UInt64(timebase.denom)
     }
 
