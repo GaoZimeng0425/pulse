@@ -187,9 +187,19 @@ struct MainWindowView: View {
     private var tabBody: some View {
         switch tabSelection.current {
         case .overview:
-            HStack(alignment: .top, spacing: 16) {
+            // 总览模块卡网格(用户拍板 2026-10-17:全部模块一屏可点,点卡跳对应
+            // tab——CPU/内存页排行即按本模块排序);电池卡随有无内建电池。
+            LazyVGrid(
+                columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible())],
+                spacing: 16
+            ) {
                 MetricCardView(model: model.cpuModel) { tabSelection.current = .cpu }
                 MetricCardView(model: model.memoryModel) { tabSelection.current = .memory }
+                MetricCardView(model: model.diskModel) { tabSelection.current = .disk }
+                MetricCardView(model: model.networkModel) { tabSelection.current = .network }
+                if monitor.hasBattery {
+                    MetricCardView(model: model.batteryModel) { tabSelection.current = .battery }
+                }
             }
             SectionTitle(title: "此刻")
                 .padding(.top, 6)

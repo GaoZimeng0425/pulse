@@ -108,7 +108,7 @@ struct RankingRowView: View {
                             .lineLimit(1)
                             .truncationMode(.middle)
                         if let badge = StatusBadgeRules.groupBadge(cpuPercent: group.cpuPercent) {
-                            MetricChipView(chip: badge.chip)
+                            MetricChipView(chip: badge.chip, compact: true)
                                 .fixedSize()
                         }
                     }

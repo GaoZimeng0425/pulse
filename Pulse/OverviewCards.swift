@@ -331,10 +331,9 @@ extension BatteryChargeStatus {
     }
 }
 
-/// 指标卡:full = 主窗口总览网格(徽章 + 名称 + chevron / 34pt 大数字 / 三列小统计 /
+/// 指标卡:full = 总览模块卡网格(徽章 + 名称 + chevron / 34pt 大数字 / 三列小统计 /
 /// 36pt 高走势——形态随 model.trendStyle,CPU 面积线、其余 44 柱 strip);
-/// compact = 弹窗双列小卡(名称 / 大数字 + 一句补充 / 36pt 44 柱 strip——工单 05
-/// "指标卡底部 = strip",评审 F7 由 22pt 面积线对齐)。
+/// compact = 弹窗双列小卡(名称 / 大数字 + 一句补充 / 36pt 走势,与 full 同组件)。
 /// 整卡可点,跳到对应指标 tab(Vitals `data-goto`)。
 struct MetricCardView: View {
     enum Style {
@@ -408,18 +407,24 @@ struct MetricCardView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            // 走势形态按模型走(model.trendStyle):CPU 面积线(与 CPU tab 主卡
-            // 同观感,用户拍板 2026-10-17),其余指标维持 36pt 44 柱 strip。
-            switch model.trendStyle {
-            case .area:
-                AreaTrendChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
-                    .frame(height: 36)
-            case .strip:
-                StripChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
-                    .frame(height: 36)
-            }
+            // 走势形态按模型走(model.trendStyle):CPU 面积线,其余 44 柱 strip。
+            trendChart
         }
         .padding(16)
+    }
+
+    /// 底部走势(full / compact 共用同一组件,用户拍板 2026-10-17:弹窗与主窗口
+    /// 同一指标必须同观感,不再分叉):CPU 面积线,其余 44 柱 strip。
+    @ViewBuilder
+    private var trendChart: some View {
+        switch model.trendStyle {
+        case .area:
+            AreaTrendChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
+                .frame(height: 36)
+        case .strip:
+            StripChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
+                .frame(height: 36)
+        }
     }
 
     private var compactBody: some View {
@@ -440,10 +445,8 @@ struct MetricCardView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            // 弹窗紧凑卡恒为 strip(不随 model.trendStyle):空间只有 36pt,
-            // 用户拍板范围是主窗口总览卡,弹窗形态维持工单 05 票面。
-            StripChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
-                .frame(height: 36)
+            // 底部走势与 full 同一组件(model.trendStyle 随行,用户拍板 2026-10-17)。
+            trendChart
         }
         .padding(12)
     }
@@ -486,23 +489,27 @@ struct MetricBadge: View {
 }
 
 /// 状态 chip(§3-6):全圆 pill,tint 14% 底 + 同色文字与图标。
+/// compact = 排行行内用的小号(字 10.5 / 图标 10 / 内距 6×2),卡面用常规号。
 struct MetricChipView: View {
     let chip: MetricCardChip
+    var compact = false
 
     var body: some View {
         Label(chip.title, systemImage: chip.systemImage)
-            .labelStyle(ChipLabelStyle())
-            .font(.system(size: 11, weight: .semibold))
+            .labelStyle(ChipLabelStyle(iconSize: compact ? 10 : 10.5))
+            .font(.system(size: compact ? 10.5 : 11, weight: .semibold))
             .foregroundStyle(chip.tint)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
+            .padding(.horizontal, compact ? 6 : 8)
+            .padding(.vertical, compact ? 2 : 3)
             .background(chip.tint.opacity(0.14), in: .capsule)
     }
 
     private struct ChipLabelStyle: LabelStyle {
+        let iconSize: CGFloat
+
         func makeBody(configuration: Configuration) -> some View {
             HStack(spacing: 2) {
-                configuration.icon.font(.system(size: 10.5))
+                configuration.icon.font(.system(size: iconSize))
                 configuration.title
             }
         }

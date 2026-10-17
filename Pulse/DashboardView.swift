@@ -101,9 +101,19 @@ struct DashboardView: View {
         case .overview, .history:
             // 历史 tab 不在弹窗轴上(工单 04 拍板:popover 不加历史),与总览
             // 合并分支只为 switch 穷举(深链误注入时按总览回落,不留坏页)。
-            HStack(spacing: 8) {
+            // 总览模块卡网格(用户拍板 2026-10-17,与主窗口同构:全部模块一屏
+            // 可点);内容在 ScrollView 内,卡多即滚动。
+            LazyVGrid(
+                columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible())],
+                spacing: 8
+            ) {
                 MetricCardView(model: model.cpuModel, style: .compact) { tabSelection.current = .cpu }
                 MetricCardView(model: model.memoryModel, style: .compact) { tabSelection.current = .memory }
+                MetricCardView(model: model.diskModel, style: .compact) { tabSelection.current = .disk }
+                MetricCardView(model: model.networkModel, style: .compact) { tabSelection.current = .network }
+                if monitor.hasBattery {
+                    MetricCardView(model: model.batteryModel, style: .compact) { tabSelection.current = .battery }
+                }
             }
         case .cpu:
             MetricMainCardView(model: model.cpuModel, isCompact: true)
