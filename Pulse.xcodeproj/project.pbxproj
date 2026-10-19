@@ -118,6 +118,7 @@
 		E3F2869B41C8D8D9CAC55BE7 /* AlertNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 589A8C576E9A9D9ADBD19310 /* AlertNotification.swift */; };
 		E4A99F8C1ACA71DF7876AF70 /* AcceptanceAnchorEndToEndTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C71FCD146BC0C56EF25AEE9 /* AcceptanceAnchorEndToEndTests.swift */; };
 		E4F96C3034A732D97973EDBA /* DiagnosticReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A72E4A9FD692096E36A0C948 /* DiagnosticReport.swift */; };
+		E51ED75C0AB66949E0707600 /* NettopWatchdogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE62A3533CA867B81B4B903B /* NettopWatchdogTests.swift */; };
 		E559247BAA70D0A1868BD156 /* LiveProcessSourceSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A992F5F503CAD7CB90DD838 /* LiveProcessSourceSmokeTests.swift */; };
 		E9FB46EA364DC9CBF4A6BA36 /* MeterBarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E785F53B70C02534AC3EBF8 /* MeterBarTests.swift */; };
 		EB0CDD553EA6D376380B5006 /* StripChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F3216AB5859694E2E2665D7 /* StripChartView.swift */; };
@@ -262,6 +263,7 @@
 		D7AFEB823D5DBD7ABCFCC137 /* SamplerWakeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SamplerWakeTests.swift; sourceTree = "<group>"; };
 		D9D6EBE02A216138FDB93C8A /* DevServerViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevServerViews.swift; sourceTree = "<group>"; };
 		DCA4A32138D3658BE3DDD03F /* ProjectRootsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRootsStore.swift; sourceTree = "<group>"; };
+		DE62A3533CA867B81B4B903B /* NettopWatchdogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NettopWatchdogTests.swift; sourceTree = "<group>"; };
 		DF3E209527FBD12B7B4014D9 /* DevServerFinderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevServerFinderTests.swift; sourceTree = "<group>"; };
 		DF43629A17EF4D982135C6DC /* ProjectRootsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRootsStoreTests.swift; sourceTree = "<group>"; };
 		DFA46EAEACE1FFB5C9B9CEF7 /* RankingCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingCard.swift; sourceTree = "<group>"; };
@@ -430,6 +432,7 @@
 				9378B86940EBE30E057F718D /* MetricTabModelTests.swift */,
 				54905C2E05E8CD6A1C463E10 /* ModuleRankingAggregatorTests.swift */,
 				6A98A79159A39E317CC43DA0 /* NettopProcessRateTests.swift */,
+				DE62A3533CA867B81B4B903B /* NettopWatchdogTests.swift */,
 				D594128FBC10276D6F62A60E /* NetworkSensorTests.swift */,
 				4A05CDA8C1EBF16044C21BFD /* ParentChainQueryTests.swift */,
 				922EBEDDF974C9C5C567A5C8 /* ProcArgsParserTests.swift */,
@@ -576,6 +579,7 @@
 				2F681644821F7D9946A73E92 /* MetricTabModelTests.swift in Sources */,
 				37AFCB7A2174D9924AB1CDE8 /* ModuleRankingAggregatorTests.swift in Sources */,
 				1C5A865136AB22A28BB0D947 /* NettopProcessRateTests.swift in Sources */,
+				E51ED75C0AB66949E0707600 /* NettopWatchdogTests.swift in Sources */,
 				B13A211B9FD087858718B9AE /* NetworkSensorTests.swift in Sources */,
 				FDE435939BE1165CF3D5121F /* ParentChainQueryTests.swift in Sources */,
 				616D7878CF54B2A29104277C /* ProcArgsParserTests.swift in Sources */,

@@ -64,9 +64,72 @@ protocol NettopCSVSource: Sendable {
     func read() async -> String?
 }
 
+/// 单趟 nettop 的收尾方式(状态沿日志的取值,票 A 中6)。
+enum NettopRunOutcome: Equatable, Sendable {
+    /// 超时前自行退出(正常)。
+    case completed
+    /// 子进程起不来(路径缺失等),附原因。
+    case launchFailed(String)
+    /// 超时,SIGTERM 收尾。
+    case terminated
+    /// 超时且宽限期内不响应 SIGTERM,SIGKILL 收尾。
+    case killed
+    /// 超时前自行退出,但退出码非零或被信号终止(典型:系统更新改掉 -k 列名,
+    /// nettop 立即以 64 退出、stdout 为空——不能当正常收尾静默吞掉)。
+    case exitedAbnormally(status: Int32)
+}
+
+/// 单趟结果:输出文本(nil = 起不来)+ 收尾方式。
+struct NettopRun: Sendable {
+    let text: String?
+    let outcome: NettopRunOutcome
+}
+
+/// nettop 状态沿日志(票 A 中6;transition-not-tick,沿 HistoryEngine.databaseHealthy
+/// 惯例):收尾方式变化才记一条——进入失败记错误、换一种失败再记、恢复记一条,
+/// 持续同态静默。5s 一档的子进程若逐趟记失败,会把有用日志挤出留存窗口
+/// (LogService 教训③)。纯值状态机,单测钉死。
+struct NettopHealthLog {
+    struct Entry: Equatable {
+        enum Level: Equatable {
+            case info
+            case error
+        }
+
+        let level: Level
+        let message: String
+    }
+
+    private var last: NettopRunOutcome = .completed
+
+    /// 登记一趟收尾方式;返回应记的日志(nil = 同态静默)。
+    mutating func transition(to outcome: NettopRunOutcome) -> Entry? {
+        guard outcome != last else { return nil }
+        let previous = last
+        last = outcome
+        if outcome == .completed {
+            return Entry(level: .info, message: "nettop 恢复正常(上一态:\(Self.describe(previous)))")
+        }
+        return Entry(level: .error, message: "\(Self.describe(outcome))(此后同态静默,恢复再记)")
+    }
+
+    private static func describe(_ outcome: NettopRunOutcome) -> String {
+        switch outcome {
+        case .completed: "正常"
+        case .launchFailed(let reason): "nettop 起不来:\(reason)"
+        case .terminated: "nettop 超时,SIGTERM 收尾"
+        case .killed: "nettop 超时且不响应 SIGTERM,SIGKILL 收尾"
+        case .exitedAbnormally(let status): "nettop 异常退出(状态 \(status))"
+        }
+    }
+}
+
 /// Live 源:每趟在专用串行队列上同步跑一次 nettop(调度 tick 是 async,
-/// 但子进程等待是阻塞的——排到队列上,不占协作线程池)。超时 5s:看门狗
-/// SIGTERM 逼出 EOF;失败 / 无输出如实返回 nil / 空文本,绝不抛出、绝不崩。
+/// 但子进程等待是阻塞的——排到队列上,不占协作线程池)。超时 5s 看门狗
+/// SIGTERM 逼出 EOF,宽限 1s 仍在跑即 SIGKILL(票 A 中6:吞 SIGTERM 的子进程
+/// 曾能让队列永久冻结——这是唯一不能自愈的源);失败 / 无输出如实返回
+/// nil / 空文本,绝不抛出、绝不崩;收尾方式按状态沿记日志。
+/// 命令与时限可注入:测试用 /bin/sh 扮 nettop 验证升级链,不真实起 nettop。
 final class LiveNettopCSVSource: NettopCSVSource, @unchecked Sendable {
     static let executablePath = "/usr/bin/nettop"
     /// -P 按进程聚合(行首列 = 名称.pid);-L 1 只取一次采样;-n 不做地址名称
@@ -81,55 +144,166 @@ final class LiveNettopCSVSource: NettopCSVSource, @unchecked Sendable {
     static let extraEnvironment = ["NSUnbufferedIO": "YES", "LC_ALL": "en_US.UTF-8"]
     /// 超时:nettop -L 1 正常亚秒返回;5s 容忍系统高载,超过即 SIGTERM 收尾。
     static let timeout: TimeInterval = 5
+    /// SIGTERM 后的宽限:正常进程收到 SIGTERM 毫秒级退出,1s 仍在跑即判定吞信号。
+    static let killGrace: TimeInterval = 1
 
+    private let executablePath: String
+    private let arguments: [String]
+    private let timeout: TimeInterval
+    private let killGrace: TimeInterval
     private let queue = DispatchQueue(label: "com.gaozimeng.pulse.nettop", qos: .utility)
+    /// 状态沿日志:只在专用串行队列上读写(无需另加锁)。
+    private var health = NettopHealthLog()
+
+    init(
+        executablePath: String = LiveNettopCSVSource.executablePath,
+        arguments: [String] = LiveNettopCSVSource.arguments,
+        timeout: TimeInterval = LiveNettopCSVSource.timeout,
+        killGrace: TimeInterval = LiveNettopCSVSource.killGrace
+    ) {
+        self.executablePath = executablePath
+        self.arguments = arguments
+        self.timeout = timeout
+        self.killGrace = killGrace
+    }
 
     func read() async -> String? {
+        await run().text
+    }
+
+    /// 跑一趟并交付收尾方式(read 的全量版;测试经此观察升级链)。
+    func run() async -> NettopRun {
         await withCheckedContinuation { continuation in
-            queue.async {
-                continuation.resume(returning: Self.runOnce())
+            queue.async { [self] in
+                let run = runOnce()
+                logTransition(to: run.outcome)
+                continuation.resume(returning: run)
             }
         }
     }
 
-    /// 单趟子进程执行(静态:无 self 捕获,闭包 Sendable 干净)。
-    private static func runOnce() -> String? {
+    private func logTransition(to outcome: NettopRunOutcome) {
+        // @unchecked Sendable 的前提(health 只在专用串行队列上读写),Debug 下可执行检查。
+        dispatchPrecondition(condition: .onQueue(queue))
+        guard let entry = health.transition(to: outcome) else { return }
+        switch entry.level {
+        case .info: LogService.info(entry.message, category: "Nettop")
+        case .error: LogService.error(entry.message, category: "Nettop")
+        }
+    }
+
+    /// 单趟子进程执行(专用串行队列上同步跑)。
+    private func runOnce() -> NettopRun {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executablePath)
         process.arguments = arguments
         // 继承环境再覆盖两项:nettop 依赖的框架路径等保持原样。
         var environment = ProcessInfo.processInfo.environment
-        for (key, value) in extraEnvironment { environment[key] = value }
+        for (key, value) in Self.extraEnvironment { environment[key] = value }
         process.environment = environment
+        // Pipe 两端不带 CLOEXEC:Process 以 CLOEXEC_DEFAULT 起子进程、run() 后即关
+        // 父进程写端,本 App 亦无别处起子进程;将来若别处加 system/popen/fork,
+        // 须防其在这几毫秒里继承写端(否则 SIGKILL 了 nettop 也等不到 EOF)。
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
         do {
             try process.run()
         } catch {
-            return nil // 起不来(路径缺失等):nil = 读失败,消费方保 lastGood
+            // 起不来(路径缺失等):nil = 读失败,消费方保 lastGood。
+            return NettopRun(text: nil, outcome: .launchFailed(error.localizedDescription))
         }
-        // Process 非 Sendable,但看门狗与读端对它的访问无竞争:读端只碰管道
-        // (专用串行队列),看门狗只看 isRunning / 发 terminate,对象生命周期
-        // 由本函数持有到底——@unchecked 声明安全。
-        let handle = UnsafeSendableProcess(process)
+        let watchdog = NettopWatchdog(process)
+        watchdog.arm(timeout: timeout, killGrace: killGrace)
         // 读端在本(专用串行)队列阻塞到 EOF:管道缓冲有限,必须与子进程
-        // 写端并行排空;EOF 由进程退出或看门狗 SIGTERM 逼出。
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + timeout) {
-            if handle.process.isRunning { handle.process.terminate() }
+        // 写端并行排空;EOF 由进程退出或看门狗信号逼出。读错误按无输出处理
+        // (readToEnd 抛 Swift 错误;旧 readDataToEndOfFile 抛 ObjC 异常接不住)。
+        let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
+        // waitUntilExit 无超时:子进程先关 stdout 再赖着不走时全靠看门狗兜底——
+        // 看门狗不可在 EOF 后取消(代码审查 M3)。
+        process.waitUntilExit()
+        watchdog.markFinished()
+        // 信号收尾的半截输出照常交付:完整行仍是合法累计值,解析器逐行容错。
+        // 看门狗没出手时才看退出方式:非零退出 / 被信号终止如实记异常。
+        var outcome = watchdog.outcome
+        if outcome == .completed,
+           process.terminationReason != .exit || process.terminationStatus != 0 {
+            outcome = .exitedAbnormally(status: process.terminationStatus)
         }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        if process.isRunning { process.waitUntilExit() }
-        // 不看退出码:SIGTERM 收尾的半截输出里,完整行仍是合法累计值,
-        // 解析器逐行容错(坏行跳过)。
-        return String(decoding: data, as: UTF8.self)
+        return NettopRun(text: String(decoding: data, as: UTF8.self), outcome: outcome)
     }
 }
 
-/// Process 的 @unchecked Sendable 盒(见 LiveNettopCSVSource.runOnce 注释)。
-private final class UnsafeSendableProcess: @unchecked Sendable {
-    let process: Process
-    init(_ process: Process) { self.process = process }
+/// 看门狗(票 A 中6):超时 SIGTERM,宽限期后仍在跑即对整个进程组 SIGKILL,
+/// 并记下升级到哪一级(先记后发信号:读端在收尾之后读取,必见最终级别)。
+/// Process 非 Sendable,但这里只碰 isRunning / terminate / processIdentifier,
+/// 读端只碰管道——@unchecked 声明安全。生命周期:定时器闭包强持有看门狗
+/// (连同 Process)到最后一级定时器触发,正常收尾时比 runOnce 晚约一个超时
+/// 释放,稳态最多多留一个;这份强持有正是 waitUntilExit 的兜底,不可提前取消。
+private final class NettopWatchdog: @unchecked Sendable {
+    /// SIGKILL 后仍未收尾的观测延迟:不可中断睡眠 / 管道写端被他人持有时,
+    /// 读端永久阻塞在已卡住的串行队列上,状态沿日志永远等不到——在全局队列
+    /// 上单独记一条(只记日志,不改状态)。
+    static let stuckReportDelay: TimeInterval = 2
+
+    private let process: Process
+    private let lock = NSLock()
+    private var escalation: NettopRunOutcome = .completed
+    private var finished = false
+
+    init(_ process: Process) {
+        self.process = process
+    }
+
+    var outcome: NettopRunOutcome {
+        lock.lock()
+        defer { lock.unlock() }
+        return escalation
+    }
+
+    /// 读端收尾(EOF + 进程回收)后调用:之后的卡死观测不再报警。
+    func markFinished() {
+        lock.lock()
+        defer { lock.unlock() }
+        finished = true
+    }
+
+    private var isFinished: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return finished
+    }
+
+    func arm(timeout: TimeInterval, killGrace: TimeInterval) {
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + timeout) { [self] in
+            guard process.isRunning else { return }
+            escalate(to: .terminated)
+            process.terminate()
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + killGrace) { [self] in
+                guard process.isRunning else { return }
+                escalate(to: .killed)
+                // Process 让子进程自成进程组(pgid == pid):整组 SIGKILL 连继承了管道
+                // 写端的孙进程一并收尾;组不存在返回 ESRCH,不误伤。再对 pid 兜底。
+                // isRunning 与 kill 之间的窗口极短;pid 被复用需进程号绕满一圈,可忽略。
+                let pid = process.processIdentifier
+                kill(-pid, SIGKILL)
+                kill(pid, SIGKILL)
+                DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + Self.stuckReportDelay) { [self] in
+                    guard !isFinished else { return }
+                    LogService.error(
+                        "nettop SIGKILL 后 \(Self.stuckReportDelay)s 仍未收尾,读端可能永久阻塞,网络每进程排行将停更",
+                        category: "Nettop"
+                    )
+                }
+            }
+        }
+    }
+
+    private func escalate(to outcome: NettopRunOutcome) {
+        lock.lock()
+        defer { lock.unlock() }
+        escalation = outcome
+    }
 }
 
 // MARK: - 网络每进程排行
