@@ -19,9 +19,23 @@ final class LogService {
     static let logDirectory = NSHomeDirectory() + "/.Pulse/logs"
 
     nonisolated(unsafe) static let shared = LogService()
-    private let fileLogger: DDFileLogger
+
+    /// 是否运行在 xctest 宿主进程(单元测试托管在 app 内,TEST_HOST 同进程)。
+    /// 测试夹具会走真实 AlertCenter 路径发告警,若文件日志照常落
+    /// ~/.Pulse/logs,夹具读数(磁盘 19 GiB、负载 80% 等)会混进生产日志,
+    /// 与真实"启动"埋点同排——2026-10-19"冷启动磁盘告警 20.4GB"误报即
+    /// 源于此(实际磁盘可用 190GB,告警从未在 app 内触发过)。测试进程不装
+    /// 文件日志,生产日志只反映真实运行;环境表可注入,判定本身可单测。
+    static func isRunningTests(
+        _ environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> Bool {
+        environment["XCTestConfigurationFilePath"] != nil
+    }
 
     private init() {
+        DDLog.add(DDOSLogger.sharedInstance)
+
+        guard !Self.isRunningTests() else { return }
         let logDir = LogService.logDirectory
 
         let fm = FileManager.default
@@ -29,11 +43,9 @@ final class LogService {
             try? fm.createDirectory(atPath: logDir, withIntermediateDirectories: true)
         }
 
-        DDLog.add(DDOSLogger.sharedInstance)
-
         let logFileManager = DDLogFileManagerDefault(logsDirectory: logDir)
         logFileManager.maximumNumberOfLogFiles = 14
-        fileLogger = DDFileLogger(logFileManager: logFileManager)
+        let fileLogger = DDFileLogger(logFileManager: logFileManager)
         fileLogger.rollingFrequency = 60 * 60 * 24
         // 本地时区格式化器(教训 ①),格式与默认实现保持一致。
         let localTimestamp = DateFormatter()
