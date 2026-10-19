@@ -42,7 +42,7 @@ struct PulseApp: App {
         _ = LogService.shared // 拉起即建文件日志通道(~/.Pulse/logs,含退出留痕观察者)
         let store = ProjectRootsStore()
         _rootsStore = State(initialValue: store)
-        _monitor = State(initialValue: SystemMonitor(projectRoots: store.projectRoots))
+        _monitor = State(initialValue: SystemMonitor.live(projectRoots: store.projectRoots))
         // delegate 必须在通知到达前挂上(app 拉起即挂;点开横幅 → 路由到主窗口)。
         let router = AlertNotificationRouter()
         UNUserNotificationCenter.current().delegate = router
