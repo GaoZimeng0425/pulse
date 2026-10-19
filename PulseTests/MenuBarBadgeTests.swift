@@ -266,6 +266,31 @@ final class MenuBarBadgeTests: XCTestCase {
         XCTAssertEqual(reference, MenuBarBadgeComposer.slotWidth(for: "100%"))
     }
 
+    /// 最大现实读数不折行、不撑宽(2026-10-19 用户反馈:CPU 100% 时菜单栏文字
+    /// 变两行)——走真实渲染器断言位图尺寸:最宽读数与个位数读数同高(单行)
+    /// 同宽(定宽不抖)。上一条只拿估算器自证,量不出绘制字重(medium + 等宽
+    /// 数字)比估算字体宽 ~3pt 的差,"100%" 因此溢出定宽槽被折成两行。
+    @MainActor
+    func testWidestReadingsRenderSingleLineWithinPinnedWidth() {
+        let pairs: [(narrow: MenuBarBadgeContent, widest: MenuBarBadgeContent)] = [
+            (MenuBarBadgeComposer.cpuContent(load: 5), MenuBarBadgeComposer.cpuContent(load: 100)),
+            (
+                MenuBarBadgeComposer.ramContent(memory: Self.memory(total: 100, used: 5, pressure: .normal)),
+                MenuBarBadgeComposer.ramContent(memory: Self.memory(total: 100, used: 100, pressure: .normal))
+            ),
+            (
+                MenuBarBadgeComposer.diskContent(availableBytes: 5_000_000_000),
+                MenuBarBadgeComposer.diskContent(availableBytes: 999_000_000_000)
+            ),
+        ]
+        for (narrow, widest) in pairs {
+            let narrowImage = MenuBarBadgeRenderer.image(for: [narrow], colorScheme: .light)
+            let widestImage = MenuBarBadgeRenderer.image(for: [widest], colorScheme: .light)
+            XCTAssertEqual(widestImage.size.height, narrowImage.size.height, "\(widest.text) 折行")
+            XCTAssertEqual(widestImage.size.width, narrowImage.size.width, "\(widest.text) 撑宽")
+        }
+    }
+
     // MARK: - 夹具
 
     /// 合成数据(单测不制造真实负载):CPU 42.6% → "43%",RAM 恰好 50%。

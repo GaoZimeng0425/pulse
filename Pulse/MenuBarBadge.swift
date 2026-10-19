@@ -182,17 +182,23 @@ enum MenuBarBadgeComposer {
         return MenuBarBadgeContent(caption: "网络", text: "↓\(download)", emphasis: .normal)
     }
 
+    /// 徽标数值字号(渲染器与槽位量宽共用的唯一出处,DESIGN.md 菜单栏特例)。
+    static let valueFontSize: CGFloat = 11.5
+
     /// 文本估算渲染宽(点):菜单栏字体实测——同字同字号必同宽,宽度判定
     /// 因此确定可测;徽标实际绘制带 monospacedDigit,此处允许近似。
-    static func estimatedWidth(of text: String, fontSize: CGFloat = 11.5) -> CGFloat {
+    static func estimatedWidth(of text: String, fontSize: CGFloat = valueFontSize) -> CGFloat {
         let font = NSFont.menuBarFont(ofSize: fontSize)
         return (text as NSString).size(withAttributes: [.font: font]).width
     }
 
-    /// 槽位定宽 = 参考串(该指标最大现实读数形态)估算宽 + 2pt 余量。
-    /// 数字 monospacedDigit 同字数必同宽,余量吸收字体族与字重差异。
+    /// 槽位定宽 = 参考串(该指标最大现实读数形态)按**实际绘制字体**量宽 +
+    /// 2pt 余量。不能用 estimatedWidth 量:等宽数字的 "1" 与其他数字同宽、
+    /// 字重 medium,"100%" 比菜单栏常规字体宽 ~3pt——2026-10-19 前按常规字体
+    /// 量,"100%" 溢出定宽槽被折成两行(用户反馈)。
     static func slotWidth(for reference: String) -> CGFloat {
-        ceil(estimatedWidth(of: reference)) + 2
+        let font = NSFont.monospacedDigitSystemFont(ofSize: valueFontSize, weight: .medium)
+        return ceil((reference as NSString).size(withAttributes: [.font: font]).width) + 2
     }
 }
 
@@ -303,7 +309,9 @@ enum MenuBarBadgeRenderer {
 
     /// 单枚徽标:小标签在数字上方(与可配置前的双徽标逐像素同款)。
     /// 数值行可带定宽槽(nil = 自然宽):左对齐钉住数字左缘,位数增减只向右
-    /// 伸缩,位图总宽恒定——状态项宽度不再随读数抖动。
+    /// 伸缩,位图总宽恒定——状态项宽度不再随读数抖动。槽宽是**下限**:数值
+    /// 恒单行(fixedSize),超出参考串的罕见读数(>1TB 剩余的四位数)只撑宽,
+    /// 绝不折行。
     private static func badge(
         caption: String,
         valueText: String,
@@ -316,10 +324,11 @@ enum MenuBarBadgeRenderer {
                 .font(.system(size: 7, weight: .semibold))
                 .foregroundStyle(ink.opacity(0.55))
             Text(valueText)
-                .font(.system(size: 11.5, weight: .medium))
+                .font(.system(size: MenuBarBadgeComposer.valueFontSize, weight: .medium))
                 .monospacedDigit()
                 .foregroundStyle(valueColor)
-                .frame(width: slotWidth, alignment: .leading)
+                .fixedSize()
+                .frame(minWidth: slotWidth, alignment: .leading)
         }
         .padding(.horizontal, 1)
     }
