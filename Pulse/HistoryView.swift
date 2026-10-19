@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - 历史页(工单 04):指标 × 时间范围 Canvas 走势
 // 取数口径(表档/列/聚合/空段)全在 HistoryQueries.swift,本文件只消费
-// HistorySeries——查询经 monitor.historySeries 走引擎 actor(UI 线程零 SQL,
+// HistorySeries——查询经 monitor.history.series 走引擎 actor(UI 线程零 SQL,
 // spec User Story 10);UI 不单测,预览 + 真机验收(spec 既定)。
 
 /// 历史页:选指标(系统负载/CPU/内存/网络/磁盘)× 选范围(近 1 小时/24 小时/
@@ -55,7 +55,7 @@ struct HistoryTabView: View {
 
     /// 重查当前选择(最新时刻取窗)。
     private func reload() async {
-        series = await monitor.historySeries(metric: metric, range: range)
+        series = await monitor.history.series(metric: metric, range: range)
     }
 
     /// 曲线卡:统计行(仅非空桶)+ Canvas 走势 / "暂无数据"占位。

@@ -29,7 +29,8 @@ final class SystemMonitor {
     /// 采样历史(工单 P0.6-01):系统负载 + 每组 CPU%/内存的近期窗口
     /// (~60 点),随每轮 apply 推进;走势图与 avg/peak 统计读这里。
     /// 纯逻辑在 SampleHistoryStore(单测见 SampleHistoryTests),此处仅粘合。
-    private(set) var history = SampleHistoryStore()
+    /// (落库的历史管线是另一回事:功能模块 `history`。)
+    private(set) var sampleHistory = SampleHistoryStore()
     /// 最近一轮采样留下的下钻输入(工单 06):组卡展开 / 进程详情从这里只读取数,
     /// 下钻不触发额外采集;首轮采样前为 nil。
     private(set) var drilldown: DrilldownState?
@@ -51,9 +52,6 @@ final class SystemMonitor {
     private(set) var network: NetworkRatesReading?
     /// 网络速率走势(工单 06):心跳轮逐轮推进的纯逻辑环,面积图数据源。
     private(set) var networkTrend = NetworkTrendBuffer()
-    /// 网络 Today/7 天累计(工单 06):历史库 SQL 聚合,随每轮采样在落库后
-    /// 读回;库缺席/查询失败为 nil → 累计列占位。
-    private(set) var networkTotals: NetworkTotalsReading?
     /// dev server 盘点(工单 08):每轮采样对 argv 命中的候选进程合成状态
     /// (闲置时长/内存/监听端口);无候选为空数组。主窗口总览页卡片读这里。
     private(set) var devServers: [DevServerStatus] = []
@@ -63,11 +61,12 @@ final class SystemMonitor {
     /// 模块排行(工单 01,MonitorFeature):电池/磁盘/网络三页的排行行与主干同轮出,
     /// 自带 nettop 传感器与采样成本闸门;init 内登记。主窗口排行卡直读这里。
     let rankings: RankingsFeature
+    /// 历史功能模块(工单 03/04/06,ADR-0003):每轮落库(串行写入)、出生登记回灌、
+    /// 网络 Today/7 天累计与历史页查询都在它那里;构造即登记。库打开失败(引擎
+    /// 缺席)时整体降级,实时页不受影响。
+    let history: HistoryFeature
 
     private let sampler: Sampler
-    /// 历史引擎(工单 03):5s 采样经它卷积落库 + 出生登记持久化 + 唤醒清基线。
-    /// 库打开失败时为 nil(已记日志),历史降级缺席,实时页不受影响。
-    private let historyEngine: HistoryEngine?
     /// 唤醒通知观察者(与 app 同寿命,start 建立一次;monitor 是 app 唯一的
     /// @State 管线持有者,观察者随进程结束——闭包 weak self,无保留环,
     /// deinit 属非隔离上下文,不做摘除)。
@@ -84,10 +83,6 @@ final class SystemMonitor {
     /// 窗口可见性的两个信号(工单 01):弹窗在场(既有信号)与主窗口模块页在场
     /// (新信号);值真变化时派发给已注册的功能模块(排行闸门在 RankingsFeature)。
     private var visibility = MonitorVisibility()
-    /// 磁盘吞吐落库账本(评审接线):读数交付轮的增量逐笔 &+ 累计,采样轮
-    /// ingest 时整笔带走并清零——与网络增量同口径(丢弃/首读轮为 0,不伪造)。
-    private var pendingDiskReadBytes: UInt64 = 0
-    private var pendingDiskWriteBytes: UInt64 = 0
     /// 主干纯内核:出生登记(扫描 / 回灌并入 + 采样轮兜底)、归组配置与下钻
     /// 构建;每轮 apply 产出 RoundContext。
     private var spine: RoundSpine
@@ -133,7 +128,7 @@ final class SystemMonitor {
             networkCounters: networkCounters,
             heartbeatRelay: heartbeatRelay
         )
-        self.historyEngine = historyEngine
+        self.history = HistoryFeature(engine: historyEngine)
         self.birthScanner = BirthScanner(source: birthScanSource)
         self.batteryProvider = BatterySensorProvider(source: batterySource)
         self.diskCapacityProvider = DiskCapacityProvider(source: diskCapacitySource)
@@ -155,6 +150,13 @@ final class SystemMonitor {
         self.killService = killService
         self.devServerFinder = DevServerFinder(portScanner: devServerPortScanner)
         register(rankings)
+        // 出生登记回灌(工单 03):库中既往登记即时并入主干——重启后,此前归到
+        // 宿主的断链进程仍归原宿主(验收锚点①先半)。只补缺、同 pid 先进登记表者
+        // 为准:扫描表要等下一轮采样才并入,回灌赶在其前落地即胜(规则钉在 RoundSpineTests)。
+        history.onLineageRestored = { [weak self] restored in
+            self?.spine.mergeBirths(restored)
+        }
+        register(history)
     }
 
     /// 真实装配(PulseApp 唯一入口):全部 Live 源 + 应用历史库(打开失败降级为
@@ -201,18 +203,6 @@ final class SystemMonitor {
     func start() {
         guard !started else { return }
         started = true
-        // 出生登记回灌(工单 03):库中既往登记即时并入主干——重启后,此前归到
-        // 宿主的断链进程仍归原宿主(验收锚点①先半)。合并只补缺,同 pid 先进
-        // 登记表者为准:扫描表要等下一轮采样才并入,回灌赶在其前落地即胜
-        // (pid 复用不区分,LineageRegistry 的已知限制;规则钉在 RoundSpineTests)。
-        if let historyEngine {
-            let engine = historyEngine
-            Task { [weak self] in
-                let restored = await engine.importLineage()
-                guard let self else { return }
-                self.spine.mergeBirths(restored)
-            }
-        }
         // 唤醒处理(spec):差分基线清零——唤醒后第一轮作废,无巨大尖刺。
         // 观察者与 app 同寿命,随 monitor 释放移除。
         wakeObserver = NotificationCenter.default.addObserver(
@@ -283,12 +273,13 @@ final class SystemMonitor {
     }
 
     /// 停机(单测收尾用):取消采样 / 出生扫描 / 传感器调度三条循环(电池事件流
-    /// 随之摘除 RunLoop source),摘除唤醒观察者。产品运行期 monitor 与 app 同
-    /// 寿命,从不调用;停机后不再重启(start 的幂等标记保持)。
+    /// 随之摘除 RunLoop source),收历史串行写入流,摘除唤醒观察者。产品运行期
+    /// monitor 与 app 同寿命,从不调用;停机后不再重启(start 的幂等标记保持)。
     func stop() {
         samplingTask?.cancel()
         scanTask?.cancel()
         sensorTask?.cancel()
+        history.stop()
         if let wakeObserver {
             NotificationCenter.default.removeObserver(wakeObserver)
         }
@@ -334,18 +325,6 @@ final class SystemMonitor {
         return await sampler.samplingStats()
     }
 
-    /// 历史页查询(工单 04):引擎保持私有,UI 只拿曲线——SQL 全在引擎 actor
-    /// 上执行(后台队列不掉帧,spec User Story 10)。引擎缺席(库打开失败,
-    /// 03 的降级路径)→ nil,页面按"暂无数据"占位处理,不打断页面。
-    func historySeries(
-        metric: HistoryMetricKey,
-        range: HistoryRange,
-        now: Date = Date()
-    ) async -> HistorySeries? {
-        guard let historyEngine else { return nil }
-        return await historyEngine.series(metric: metric, range: range, now: now)
-    }
-
     /// 结束进程(工单 08):UI 确认后调用——SIGTERM 逐目标投递,
     /// 永不包含自身 pid(getpid),失败逐目标浮出(KillReport)。
     /// 下轮采样自然反映消失;此处仅 MainActor 粘合(编排单测见 KillActionTests)。
@@ -377,66 +356,18 @@ final class SystemMonitor {
         memory = update.memory
         let context = spine.advance(update)
         allGroups = context.groups
-        // 组采样快照:内存环形缓冲(工单 P0.6-01)与历史落库(工单 03)同一份形状。
-        let groupSamples = allGroups.map { group in
-            GroupSample(
-                id: group.id,
-                cpuPercent: group.cpuPercent,
-                memoryBytes: group.memoryBytes,
-                processCount: group.processes.count
-            )
-        }
-        // 采样历史随同一轮推进:在场组追加,消失组逐出。
-        history.advance(
+        // 采样历史随同一轮推进:在场组追加,消失组逐出。组采样与历史落库同一个
+        // 折算(GroupSample(group:),落库在历史模块的 onRound)。
+        sampleHistory.advance(
             systemCPULoad: update.systemCPULoad,
             memoryUsedBytes: update.memory?.usedBytes,
-            groups: groupSamples
+            groups: allGroups.map(GroupSample.init(group:))
         )
         drilldown = context.drilldown
-        // 网络心跳轮(工单 06):速率/徽标/走势在 UI 粘合层落地,增量随后
-        // 随落库 Task 进历史引擎(见下方 historyEngine 分支)。
+        // 网络心跳轮(工单 06):速率/徽标/走势在 UI 粘合层落地;记账增量随同轮
+        // 上下文由历史模块落库(HistoryFeature.onRound)。
         if let network = update.network {
             applyNetwork(network)
-        }
-        // 历史管线(工单 03):5s 原始值只进引擎的内存缓冲,分钟卷积 / 小时卷积 /
-        // 留存清理 / 出生登记与组元数据落库都在引擎侧一个事务完成;旁路失败只记日志。
-        // 采样时刻在 MainActor 上现取(Task 外),顺序即 apply 顺序。
-        if let historyEngine {
-            let engine = historyEngine
-            let now = Date()
-            let displayNames = Dictionary(
-                allGroups.map { ($0.id, $0.name) },
-                uniquingKeysWith: { _, rhs in rhs }
-            )
-            let lineage = context.lineage
-            // 网络记账增量(工单 06):丢弃轮为 0,读缺失轮 0——不伪造。
-            let netRx = update.network?.downBytesDelta ?? 0
-            let netTx = update.network?.upBytesDelta ?? 0
-            // 磁盘吞吐记账增量(接线):自上轮 ingest 以来交付读数的增量合计,
-            // 带走即清零(读缺失/丢弃轮差分给 0,同网络口径)。
-            let diskRead = pendingDiskReadBytes
-            let diskWrite = pendingDiskWriteBytes
-            pendingDiskReadBytes = 0
-            pendingDiskWriteBytes = 0
-            Task {
-                await engine.ingest(
-                    at: now,
-                    systemLoad: update.systemCPULoad,
-                    groups: groupSamples,
-                    displayNames: displayNames,
-                    lineage: lineage,
-                    netRxBytes: netRx,
-                    netTxBytes: netTx,
-                    diskReadBytes: diskRead,
-                    diskWriteBytes: diskWrite
-                )
-                // 累计在落库后读回(同一 actor,顺序即本轮写入先见);
-                // 引擎侧的 nil 只发生在库缺席,UI 保持占位。
-                let totals = await engine.networkTotals(now: now)
-                Task { @MainActor in
-                    self.networkTotals = totals
-                }
-            }
         }
         // 告警喂食(工单 P1-07):系统负载 + 全部组(引擎只读聚合口径,不持快照)。
         alerts.ingestSampling(
@@ -491,13 +422,13 @@ final class SystemMonitor {
     }
 
     /// 磁盘吞吐读数落地(工单 05):nil 首轮前保持占位,此后 lastGood 口径同上。
-    /// 记账增量随读数累计进落库账本(接线);lastGood 读失败重投的是**已应用过**
-    /// 的同一读数,Equatable 去重防增量重复记账(重投 = 无新数据)。
+    /// 每份交付都转交历史模块记账——恰好一次由它的内核负责(HistoryFeed:重投的
+    /// 同一读数不再记);展示侧同值不重画。
     private func applyDiskThroughput(_ reading: DiskThroughputReading?) {
-        guard let reading, reading != diskThroughput else { return }
+        guard let reading else { return }
+        history.recordDiskThroughput(reading)
+        guard reading != diskThroughput else { return }
         diskThroughput = reading
-        pendingDiskReadBytes = pendingDiskReadBytes &+ reading.readBytesDelta
-        pendingDiskWriteBytes = pendingDiskWriteBytes &+ reading.writeBytesDelta
     }
 
     /// 网络心跳轮落地(工单 06):速率读数 + 走势环推进。徽标直取

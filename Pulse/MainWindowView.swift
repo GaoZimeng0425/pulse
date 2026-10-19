@@ -268,7 +268,7 @@ struct MainWindowView: View {
             // 网络页(工单 06):主卡 + 流量累计明细(弹窗同构,紧凑)。
             // 每进程流量排行(工单 01):流量累计之下,nettop 速率归组,只读。
             MetricMainCardView(model: model.networkModel)
-            NetworkTotalsCardView(totals: monitor.networkTotals)
+            NetworkTotalsCardView(totals: monitor.history.networkTotals)
             ModuleRankingCardView(
                 title: "每进程流量",
                 rows: monitor.rankings.networkRows,
