@@ -12,9 +12,13 @@ struct AlertSettingsView: View {
         Form {
             if center.authorizationDenied {
                 Section {
-                    Text("系统通知已被拒绝——规则照常判定,告警降级为应用内提示。到 系统设置 → 通知 → Pulse 打开即可恢复,无需重启。")
+                    Text("系统通知已被拒绝——规则照常判定,告警降级为应用内提示。在系统设置里打开 Pulse 的通知即可恢复,无需重启。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    // 拒绝后系统不再弹授权窗:一键直达 系统设置 → 通知 → Pulse。
+                    Button("打开系统通知设置…") {
+                        SystemNotificationSettings.open()
+                    }
                 }
             }
             ForEach(AlertKind.allCases.filter(\.isDataSourceWired)) { kind in

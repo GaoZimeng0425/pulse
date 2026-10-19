@@ -201,6 +201,30 @@ final class AlertCenterTests: XCTestCase {
         XCTAssertTrue(center.authorizationDenied)
     }
 
+    func testSyncOnReturnPicksUpSystemSettingsChangeWithoutPrompting() async {
+        // 用户经「打开系统通知设置」入口改完授权、切回 app:同步现状,降级提示
+        // 随之消失;同步只读不请求(app 每次回前台都会同步,请求会刷屏日志)。
+        let sender = FakeAlertSender()
+        sender.status = .denied
+        let center = AlertCenter(
+            store: AlertSettingsStore(defaults: makeDefaults()),
+            sender: sender,
+            clock: { Date() }
+        )
+        center.store.setEnabled(true, for: .diskAvailable)
+        await center.refreshAuthorization()
+        XCTAssertTrue(center.authorizationDenied)
+
+        sender.status = .authorized
+        await center.syncAuthorizationStatus()
+        XCTAssertTrue(center.notificationsAuthorized)
+        XCTAssertFalse(center.authorizationDenied)
+
+        sender.status = .notDetermined
+        await center.syncAuthorizationStatus()
+        XCTAssertEqual(sender.authorizationRequestCount, 0, "同步从不请求")
+    }
+
     func testEnablingInSystemSettingsTakesEffectOnNextFire() async {
         // 启动时已拒绝;用户随后在系统设置里打开通知——下一次触发即发,无需重启。
         let sender = FakeAlertSender()

@@ -82,6 +82,12 @@ final class AlertCenter {
 
     // MARK: - 设置动作(设置页调用)
 
+    /// app 回前台时同步授权现状(用户经「打开系统通知设置」改完切回来,降级
+    /// 提示即时更新)。只读不请求:回前台很频繁,请求失败会刷屏日志。
+    func syncAuthorizationStatus() async {
+        apply(await sender.authorizationStatus())
+    }
+
     /// 开关规则:写存储(即时生效并持久);开规则而授权未落定时请求授权
     /// (系统侧幂等:已落定不弹窗,只回现状)。
     func setEnabled(_ enabled: Bool, for kind: AlertKind) {

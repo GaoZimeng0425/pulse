@@ -89,6 +89,13 @@ struct PulseApp: App {
                 )) { _ in
                     openWindow(id: MainWindowSceneID.value)
                 }
+                // 回前台同步通知授权现状:用户经「打开系统通知设置」改完切回来,
+                // 降级提示即时更新(常驻标签是全 app 唯一常在的挂点)。
+                .onReceive(NotificationCenter.default.publisher(
+                    for: NSApplication.didBecomeActiveNotification
+                )) { _ in
+                    Task { await monitor.alerts.syncAuthorizationStatus() }
+                }
         }
         .menuBarExtraStyle(.window)
 

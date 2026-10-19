@@ -22,9 +22,16 @@ struct AlertBannerView: View {
                     row(occurrence)
                 }
                 if center.authorizationDenied {
-                    Text("系统通知已被拒绝,告警仅在应用内提示(到 系统设置 → 通知 → Pulse 打开即可恢复)。")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        Text("系统通知已被拒绝,告警仅在应用内提示。")
+                            .foregroundStyle(.secondary)
+                        // 拒绝后系统不再弹授权窗:一键直达 系统设置 → 通知 → Pulse。
+                        Button("打开系统通知设置") {
+                            SystemNotificationSettings.open()
+                        }
+                        .buttonStyle(.link)
+                    }
+                    .font(.caption2)
                 }
             }
             .padding(.horizontal, isCompact ? 10 : 12)

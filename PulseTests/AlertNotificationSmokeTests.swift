@@ -39,6 +39,14 @@ final class AlertNotificationSmokeTests: XCTestCase {
         )
     }
 
+    func testSystemNotificationSettingsDeepLinkSelectsThisApp() {
+        // 授权被拒后的恢复入口:直达 系统设置 → 通知 → 本 app(?id= 选中 bundle)。
+        XCTAssertEqual(
+            SystemNotificationSettings.url(bundleIdentifier: "com.gaozimeng.pulse")?.absoluteString,
+            "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=com.gaozimeng.pulse"
+        )
+    }
+
     // MARK: - Live 冒烟
 
     func testLiveSenderAuthorizationQueryRuns() async {

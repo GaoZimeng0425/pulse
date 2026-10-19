@@ -78,6 +78,28 @@ struct LiveAlertNotificationSender: AlertNotificationSending {
     }
 }
 
+// MARK: - 系统通知设置深链(授权被拒时的恢复入口)
+
+/// 系统设置 → 通知 → 本 app 的深链(macOS 13+ 设置扩展 id,`?id=` 直接选中本 app)。
+/// 拒绝后系统不再弹授权窗,用户只能去系统设置里打开——入口必须一键直达,
+/// 不让用户自己翻找(2026-10-19 走查用户反馈)。
+enum SystemNotificationSettings {
+    static func url(bundleIdentifier: String) -> URL? {
+        URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(bundleIdentifier)")
+    }
+
+    @MainActor
+    static func open() {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier,
+              let url = url(bundleIdentifier: bundleIdentifier),
+              NSWorkspace.shared.open(url)
+        else {
+            LogService.error("打开系统通知设置失败", category: "Alert")
+            return
+        }
+    }
+}
+
 // MARK: - 文案拼装与路由解析(纯逻辑,冒烟/单测钉死)
 
 enum AlertNotificationContent {
