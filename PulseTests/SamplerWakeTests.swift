@@ -9,13 +9,18 @@ final class SamplerWakeTests: XCTestCase {
 
     /// 门闩时间轴:sleep 挂起到测试放行为止(放行同时推进时钟)——用于在
     /// 采样轮之间插入 actor 消息(唤醒清基线)。流关闭视为停机信号。
-    private final class GatedTimeline: @unchecked Sendable {
+    /// internal:SamplerRankingTests(排行门控)共用同一份。
+    final class GatedTimeline: @unchecked Sendable {
         struct GateClosed: Error {}
 
         private let lock = NSLock()
         private var current: Date
         private var closed = false
         private var pending: CheckedContinuation<Void, Error>?
+        /// 放行许可:pass 时尚无挂起的 sleep(循环刚交付、还没走到 sleep)
+        /// 就攒一个,下一次 sleep 直接放行——否则这次唤醒会丢,测试空等到超时。
+        /// 多余许可只造成一次空醒(时钟未推进 → wait > 0 → 再睡),不会多采一轮。
+        private var permits = 0
 
         init(start: Date) {
             current = start
@@ -36,6 +41,9 @@ final class SamplerWakeTests: XCTestCase {
                     defer { lock.unlock() }
                     if closed {
                         continuation.resume(throwing: GateClosed())
+                    } else if permits > 0 {
+                        permits -= 1
+                        continuation.resume()
                     } else {
                         pending = continuation
                     }
@@ -49,6 +57,9 @@ final class SamplerWakeTests: XCTestCase {
             current = current.addingTimeInterval(seconds)
             let resumed = pending
             pending = nil
+            if resumed == nil {
+                permits += 1
+            }
             lock.unlock()
             resumed?.resume()
         }

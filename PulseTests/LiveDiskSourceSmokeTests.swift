@@ -45,9 +45,16 @@ final class LiveDiskSourceSmokeTests: XCTestCase {
 
     func testLiveThroughputDeliversMonotoneCounters() async throws {
         // 吞吐源冒烟:两次读,计数器单调不减(回退即防护钳零——回退源口径不同)。
-        let source = LiveDiskThroughputSource.adoptingBestPath()
+        // 回退档取心跳中继(票 A 高2):每次读前发布一张新的真实心跳快照——
+        // 否则两次读同一张,单调断言恒真,回退档等于没测。
+        let relay = HeartbeatRusageRelay()
+        let heartbeat = LiveProcessSource()
+        let source = LiveDiskThroughputSource.adoptingBestPath(fallbackHeartbeat: relay)
         print("[smoke] disk 吞吐路径: cadence=\(source.cadenceSeconds)s (5=IORegistry 主路径 / 30=rusage 回退)")
-        guard let first = source.readCounters(), let second = source.readCounters() else {
+        relay.publish(heartbeat.snapshot())
+        let first = source.readCounters()
+        relay.publish(heartbeat.snapshot())
+        guard let first, let second = source.readCounters() else {
             throw XCTSkip("吞吐源读不到(非典型栈):rusage 回退也不可用,跳过")
         }
         XCTAssertGreaterThanOrEqual(second.readBytes, first.readBytes, "计数器应单调不减")

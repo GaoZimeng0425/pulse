@@ -62,7 +62,8 @@ final class SensorLastGoodBox<Value: Sendable>: @unchecked Sendable {
 // MARK: - 可见性闸门
 
 /// 可见性闸门(工单 01):模块排行类低频源的采样成本闸门——任何窗口可见
-/// 才真正读数,否则 tick 在门口空转(不跑全进程 rusage、不起 nettop 子进程)。
+/// 才真正读数,否则 tick 在门口空转(不起 nettop 子进程;能耗/磁盘排行已随
+/// 票 A 高2 并入心跳,门控在 Sampler.setRankingsActive)。
 /// 锁保护的微小盒子,与 SensorLastGoodBox 同款纪律(协议要求非隔离读取,
 /// 不能挂 actor)。
 final class SensorVisibilityGate: @unchecked Sendable {

@@ -83,3 +83,8 @@ body 里,与 allGroups 两套时钟)/ 视图内联 cpuLeader。tie-break/leader/
 - 锚点④:如实记 1.10% + 另立常驻成本追击票(issues/04)。
 - 票件:issues/01(票 A,ready-for-agent)/ 02(票 B,blocked by 01)/ 03(票 C)/ 04(追击,blocked by 01)。
 - 走查遗留「冷启动磁盘告警 20.4GB」同日结案为误报(测试夹具污染生产日志,修复 `7aa505a`),与本审查无关。
+
+## 补遗(2026-10-19 架构讨论)
+- **测试宿主读写生产历史库**(审查未覆盖,lsof 实测):单测托管在 app 内,宿主走完整 PulseApp 装配 → 以读写方式打开 `~/Library/Application Support/Pulse/history.sqlite`、起真实采样、读真实项目根。已修 `0c892c1`(@main 入口在测试时起空壳 TestHostApp;回归钉 TestHostIsolationTests)。残余:SystemMonitor 的 `HistoryEngine.openDefault()` 默认参数仍会让直接 `SystemMonitor()` 的测试/预览误连生产库——并入票 A 高1。
+- **高2 已落地**(票 A 首段),中5 前提随之消失,建议撤销——见 issues/01。
+- 用户反馈的菜单栏 CPU 100% 折行与本审查无关,已修 `b0a6167`(定宽槽按常规字体量宽、实际绘制 medium + 等宽数字,溢出 0.5pt 折行)。

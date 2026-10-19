@@ -58,6 +58,8 @@ final class LiveProcessSourceSmokeTests: XCTestCase {
         XCTAssertGreaterThan(me.cpuTimeNanoseconds, 0, "跑着测试的进程累计 CPU 时间应 > 0")
         XCTAssertGreaterThan(me.residentMemoryBytes, 0, "常驻内存应 > 0")
         XCTAssertGreaterThan(me.physicalFootprintBytes, 0, "物理足迹应 > 0")
+        // 票 A 高2:唤醒计数随心跳同一次 rusage V3 读出(能耗排行的原料)。
+        XCTAssertGreaterThan(me.wakeups, 0, "跑着测试的进程累计唤醒应 > 0")
     }
 
     func testConsecutiveSweepsKeepIdentityStableThroughCache() {

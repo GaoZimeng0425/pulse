@@ -84,6 +84,9 @@ struct SamplingUpdate: Sendable {
     /// 换口)速率为 0、增量 0 但结果在场。nil = 本轮读缺失(无可用接口 /
     /// sysctl 失败),UI 占位、历史增量为 0,不伪造。
     let network: NetworkRoundResult?
+    /// 模块排行(票 A 高2):两本账本随心跳同轮推进,满窗才出数;排行门关时
+    /// 恒为 empty(不推进差分)。
+    let rankings: ProcessRankingRound
 }
 
 /// 采样 actor:以自适应节奏驱动 ProcessSource(进程明细)与 CoreTickSource
@@ -102,6 +105,8 @@ actor Sampler {
     private let memoryStats: any MemoryStatsSource
     /// 网络计数源(工单 06,心跳型):每轮一次 sysctl,住采样循环不另起节奏。
     private let networkCounters: any NetworkCountersSource
+    /// 心跳中继(票 A 高2):每轮发布快照,磁盘求和回退源按需取表;nil = 无人取。
+    private let heartbeatRelay: HeartbeatRusageRelay?
     private let clock: Clock
     private let sleep: Sleeping
     private let maxSleepSlice: TimeInterval
@@ -114,12 +119,17 @@ actor Sampler {
     private var previousNetworkCounters: NetworkCounters?
     /// 采样累计统计(工单 11:诊断报告取数)。
     private var stats = SamplingStats()
+    /// 模块排行两本账本(票 A 高2):吃心跳快照,不另起全进程 rusage 扫描。
+    private var rankings = ProcessRankingLedgers()
+    /// 排行门控(任一窗口可见):关 = 不推进差分;关的翻转即清账。
+    private var rankingsActive = false
 
     init(
         source: any ProcessSource,
         coreTicks: any CoreTickSource = LiveCoreTickSource(),
         memoryStats: any MemoryStatsSource = LiveMemoryStatsSource(),
         networkCounters: any NetworkCountersSource = LiveNetworkCountersSource(),
+        heartbeatRelay: HeartbeatRusageRelay? = nil,
         clock: @escaping Clock = { Date() },
         sleep: @escaping Sleeping = { try await Task.sleep(nanoseconds: UInt64($0 * 1_000_000_000)) },
         maxSleepSlice: TimeInterval = 0.5
@@ -128,6 +138,7 @@ actor Sampler {
         self.coreTicks = coreTicks
         self.memoryStats = memoryStats
         self.networkCounters = networkCounters
+        self.heartbeatRelay = heartbeatRelay
         self.clock = clock
         self.sleep = sleep
         self.maxSleepSlice = maxSleepSlice
@@ -138,15 +149,28 @@ actor Sampler {
         scheduler.setPopoverVisible(visible)
     }
 
+    /// 排行门控(票 A 高2,工单 01 预算口径"任何窗口可见才跑"):开 = 账本随
+    /// 心跳推进;翻转为关即清账——重开首轮只记基线,不出横跨隐藏期的巨差。
+    /// 同值重复调用是 no-op。
+    func setRankingsActive(_ active: Bool) {
+        guard active != rankingsActive else { return }
+        rankingsActive = active
+        if !active {
+            rankings.reset()
+        }
+    }
+
     /// 作废差分基线(工单 03,spec 唤醒处理):系统睡眠唤醒后调用——
     /// 唤醒后的第一轮无前值,进程 CPU 差分与每核 tick 系统负载双双退化为 0
     /// (CPUDiffer/CoreTickDiffer 的首采口径),不产生一根横跨睡眠的巨大尖刺;
-    /// 网络差分基线同步作废(工单 06):睡眠期累计量一并跳过,首轮丢弃。
+    /// 网络差分基线同步作废(工单 06):睡眠期累计量一并跳过,首轮丢弃;
+    /// 排行账本同轨清账(票 A 高2)。
     /// 挂唤醒通知的接线在 SystemMonitor.start(UI 粘合层)。
     func invalidateDeltas() {
         previousSnapshot = nil
         previousCoreTicks = nil
         previousNetworkCounters = nil
+        rankings.reset()
     }
 
     /// 采样累计统计(工单 11:诊断报告在复制时按需取一次)。
@@ -176,6 +200,10 @@ actor Sampler {
                 if networkCounters != nil {
                     previousNetworkCounters = networkCounters
                 }
+                // 模块排行(票 A 高2):同一张快照推进账本(门关不推进),并发布给
+                // 心跳中继——全进程 rusage 只在 source.snapshot() 里读这一趟。
+                let rankingRound = rankingsActive ? rankings.record(snapshot) : .empty
+                heartbeatRelay?.publish(snapshot)
                 previousSnapshot = snapshot
                 previousCoreTicks = ticks
                 scheduler.recordSample(at: clock())
@@ -191,7 +219,8 @@ actor Sampler {
                         diff: diff,
                         cpu: cpu,
                         memory: memory,
-                        network: network
+                        network: network,
+                        rankings: rankingRound
                     )
                 )
             } else {

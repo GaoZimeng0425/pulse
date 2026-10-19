@@ -37,6 +37,14 @@ struct RawProcess: Identifiable, Equatable, Sendable {
     let diskBytesRead: UInt64
     /// 累计磁盘写字节(ri_diskio_byteswritten)。
     let diskBytesWritten: UInt64
+    /// 累计唤醒次数(ri_pkg_idle_wkups + ri_interrupt_wkups,与磁盘字节同一次
+    /// rusage 读出;能耗排行的原料,票 A 高2)。
+    let wakeups: UInt64
+    /// 累计计数(CPU 时间 / 唤醒 / 磁盘字节)是否真读到(PROC_PIDTASKINFO 与
+    /// rusage V3 都成功)。读失败的字段记 0 照常入快照,但跨轮差分的消费方
+    /// (模块排行账本)须跳过该 pid——否则瞬时失败恢复那一轮会把进程终身
+    /// 累计当成一窗增量。合成快照默认 true。
+    let countersAvailable: Bool
     /// 启动时刻(KERN_PROC 的 p_starttime);查不到 → nil。
     let startTime: Date?
 
@@ -61,6 +69,8 @@ struct RawProcess: Identifiable, Equatable, Sendable {
         physicalFootprintBytes: UInt64 = 0,
         diskBytesRead: UInt64 = 0,
         diskBytesWritten: UInt64 = 0,
+        wakeups: UInt64 = 0,
+        countersAvailable: Bool = true,
         startTime: Date? = nil
     ) {
         self.pid = pid
@@ -75,6 +85,8 @@ struct RawProcess: Identifiable, Equatable, Sendable {
         self.physicalFootprintBytes = physicalFootprintBytes
         self.diskBytesRead = diskBytesRead
         self.diskBytesWritten = diskBytesWritten
+        self.wakeups = wakeups
+        self.countersAvailable = countersAvailable
         self.startTime = startTime
     }
 }

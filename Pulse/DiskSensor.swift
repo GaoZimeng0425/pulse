@@ -595,47 +595,50 @@ struct IORegistryDiskThroughputSource: DiskThroughputSource {
 }
 
 /// rusage 求和回退源(stats readers.swift:448-457 同款读数):全进程
-/// proc_pid_rusage 的磁盘字节求和。模块排行(工单 01)引入共享的
-/// ProcessRusageTableSource 后,这里改为消费同一趟 per-pid 结果求和——
-/// 全进程 rusage 循环全仓库只剩 LiveProcessRusageTableSource 一处,不再
-/// 两个源各养一趟。成本 ~每进程一次系统调用 → 30s 低频档;口径只算用户态
-/// 进程(不含内核回写),且新进程的终身累计会整块进账(差分防护钳不住
-/// 正向跳变)——回退档如实接受这两点,注释在此言明。
+/// proc_pid_rusage 的磁盘字节求和。票 A 高2 起消费心跳中继的快照——心跳
+/// 每轮本就带每 pid 磁盘字节,全进程 rusage 循环全仓库只剩 LiveProcessSource
+/// 一处,求和零额外系统调用。计数时刻取中继的发布时刻(采到的时刻),不取
+/// 读的时刻。30s 低频档;心跳首轮前无数(读失败 → lastGood/占位,首个速率
+/// 因此最多晚一档);口径只算用户态进程(不含内核回写),且新进程的终身
+/// 累计会整块进账(差分防护钳不住正向跳变)——回退档如实接受,注释在此言明。
 struct RusageSumDiskThroughputSource: DiskThroughputSource {
-    private let processRusage: any ProcessRusageTableSource
+    private let heartbeat: HeartbeatRusageRelay
 
-    /// 注入 per-pid rusage 表源;默认 Live 实现(与模块排行共用一个循环)。
-    init(processRusage: any ProcessRusageTableSource = LiveProcessRusageTableSource()) {
-        self.processRusage = processRusage
+    /// 注入心跳中继(运行期 = SystemMonitor 持有、Sampler 每轮发布的那一个)。
+    init(heartbeat: HeartbeatRusageRelay) {
+        self.heartbeat = heartbeat
     }
 
     /// 低频档(工单原文预案;30 点 × 30s = 15 分钟走势)。
     var cadenceSeconds: TimeInterval { 30 }
 
     func readCounters() -> DiskIOCounters? {
-        guard let table = processRusage.readTable() else { return nil }
+        guard let latest = heartbeat.latest() else { return nil }
         var readSum: UInt64 = 0
         var writeSum: UInt64 = 0
-        for sample in table.samples.values {
-            readSum &+= sample.diskBytesRead
-            writeSum &+= sample.diskBytesWritten
+        for process in latest.snapshot.processes where process.countersAvailable {
+            readSum &+= process.diskBytesRead
+            writeSum &+= process.diskBytesWritten
         }
         return DiskIOCounters(
             readBytes: readSum, writeBytes: writeSum,
-            atUptimeNanos: DispatchTime.now().uptimeNanoseconds
+            atUptimeNanos: latest.uptimeNanos
         )
     }
 }
 
 /// 吞吐源路径选择(构造期一次探测钉死,探针③结论):IORegistry 命中 → 主路径;
 /// 向上遍历失败或键缺失 → rusage 求和回退(两档节奏由各自 cadenceSeconds 体现,
-/// 调度器按登记节奏驱动 = spec"调度器体现分档")。
+/// 调度器按登记节奏驱动 = spec"调度器体现分档")。回退档的表源由调用方给
+/// (心跳中继,票 A 高2)。
 enum LiveDiskThroughputSource {
-    static func adoptingBestPath() -> any DiskThroughputSource {
+    static func adoptingBestPath(
+        fallbackHeartbeat: HeartbeatRusageRelay
+    ) -> any DiskThroughputSource {
         let registry = IORegistryDiskThroughputSource()
         // 探针读(结果丢弃):只判路径可用性,基线由首轮正式读另立。
         if registry.readCounters() != nil { return registry }
-        return RusageSumDiskThroughputSource()
+        return RusageSumDiskThroughputSource(heartbeat: fallbackHeartbeat)
     }
 }
 
@@ -679,7 +682,8 @@ final class DiskThroughputProvider: SensorProvider {
 
     var lastGood: DiskThroughputReading? { slot.current }
 
-    init(source: any DiskThroughputSource = LiveDiskThroughputSource.adoptingBestPath()) {
+    /// 源由调用方选定(SystemMonitor 经 adoptingBestPath 带心跳中继构造)。
+    init(source: any DiskThroughputSource) {
         self.source = source
     }
 

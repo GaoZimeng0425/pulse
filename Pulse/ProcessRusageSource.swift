@@ -1,20 +1,20 @@
 import Darwin
 import Foundation
 
-// 模块排行·进程级 rusage 数据层(工单 01):能耗影响与每进程磁盘两个排行
-// 共用一趟全进程 proc_pid_rusage——一次调用同时给出 CPU tick、唤醒计数、
-// 磁盘字节,没必要让两个源各养一趟全进程循环(系统级磁盘求和回退源
-// RusageSumDiskThroughputSource 也消费这里的表)。OS 边界薄协议缝(ADR-0004
-// 同款),测试接合成表注入;差分全部 transition-not-tick:对相邻两趟的累计值
-// 差分、速率对两趟墙钟间隔折算,负差分钳 0。
+// 模块排行·进程级 rusage 数据层(工单 01;架构审查票 A 高2 采集通道合一):
+// 能耗影响与每进程磁盘两本差分账本直接吃心跳快照——LiveProcessSource 每轮本就
+// 对每个 pid 读一次 rusage V3(CPU / 唤醒 / 磁盘字节),全进程 rusage 循环全仓库
+// 只此一处,不再另起第二趟扫描。账本住 Sampler 心跳循环,满窗才出数(能耗 5s /
+// 磁盘 30s,与卡底注脚同口径);可见性门控降级为推进/暂停差分
+// (Sampler.setRankingsActive)。系统级磁盘求和回退源经 HeartbeatRusageRelay
+// 取同一张心跳快照。差分全部 transition-not-tick:对满窗两端的累计值差分、速率
+// 对实际墙钟间隔折算,负差分钳 0。
 
-// MARK: - 一趟全进程 rusage 采样表
+// MARK: - per-pid rusage 表(差分的输入形状)
 
 /// 单 pid 的 rusage 累计取值(差分的输入)。
 struct ProcessRusageSample: Equatable, Sendable {
-    /// CPU 累计(用户 + 系统,纳秒)。rusage 的 ri_user_time/ri_system_time
-    /// 是 mach tick 不是纳秒,换算复用 LiveProcessSource.nanoseconds(fromTicks:),
-    /// 表里只放换算后的纳秒——差分层不碰 tick 口径。
+    /// CPU 累计(用户 + 系统,纳秒;心跳快照已从 mach tick 换算)。
     let cpuNanoseconds: UInt64
     /// 唤醒累计(空闲唤醒 + 中断唤醒;Activity Monitor 能耗同款原料)。
     let wakeups: UInt64
@@ -24,85 +24,84 @@ struct ProcessRusageSample: Equatable, Sendable {
     let diskBytesWritten: UInt64
 }
 
-/// 一趟全进程 rusage 的采样表 + 采样时刻(墙钟;差分对墙钟)。
+/// 一张 per-pid rusage 表 + 采样时刻(墙钟;差分对墙钟)。
 struct ProcessRusageTable: Sendable {
     let takenAt: Date
     let samples: [pid_t: ProcessRusageSample]
 }
 
-/// 薄源协议(ADR-0004):读一趟全进程 rusage 表。nil = 进程列表本身读不到
-/// (灾难级失败);单 pid 读失败(受限 / 采样间隙退出,proc_pid_rusage 返回
-/// -1 + EINVAL)在实现内跳过该 pid,不中断整趟。
-protocol ProcessRusageTableSource: Sendable {
-    func readTable() -> ProcessRusageTable?
-}
-
-/// Live 源:proc_listallpids 全列一遍 + 每 pid 一次 proc_pid_rusage。
-/// 全仓库唯一的全进程 rusage 循环;指针重绑写法沿用探针验证的旧
-/// RusageSumDiskThroughputSource 实现(DiskSensor.swift 同款)。
-final class LiveProcessRusageTableSource: ProcessRusageTableSource, @unchecked Sendable {
-    func readTable() -> ProcessRusageTable? {
-        let pids = LiveProcessSource.listPIDs()
-        guard !pids.isEmpty else { return nil }
+extension ProcessRusageTable {
+    /// 心跳快照 → rusage 表:字段与 RawProcess 一一对应;重复 pid 保留首个
+    /// (与 ProcessSnapshot.processesByPID 同口径)。计数没读到的 pid 跳过
+    /// (不以 0 入表):基线轮缺席 = 下一窗按新面孔记基线,瞬时读失败恢复时
+    /// 不会把终身累计当一窗增量。
+    init(snapshot: ProcessSnapshot) {
         var samples: [pid_t: ProcessRusageSample] = [:]
-        samples.reserveCapacity(pids.count)
-        for pid in pids {
-            var usage = rusage_info_current()
-            let result = withUnsafeMutablePointer(to: &usage) {
-                $0.withMemoryRebound(to: (rusage_info_t?).self, capacity: 1) {
-                    proc_pid_rusage(pid, RUSAGE_INFO_CURRENT, $0)
-                }
-            }
-            // 受限 pid / 刚退出:-1 + EINVAL,跳过不中断(工单口径)。
-            guard result != -1 else { continue }
-            samples[pid] = ProcessRusageSample(
-                cpuNanoseconds: LiveProcessSource.nanoseconds(
-                    fromTicks: usage.ri_user_time &+ usage.ri_system_time
-                ),
-                wakeups: usage.ri_pkg_idle_wkups &+ usage.ri_interrupt_wkups,
-                diskBytesRead: usage.ri_diskio_bytesread,
-                diskBytesWritten: usage.ri_diskio_byteswritten
+        samples.reserveCapacity(snapshot.processes.count)
+        for process in snapshot.processes
+        where process.countersAvailable && samples[process.pid] == nil {
+            samples[process.pid] = ProcessRusageSample(
+                cpuNanoseconds: process.cpuTimeNanoseconds,
+                wakeups: process.wakeups,
+                diskBytesRead: process.diskBytesRead,
+                diskBytesWritten: process.diskBytesWritten
             )
         }
-        return ProcessRusageTable(takenAt: Date(), samples: samples)
+        self.init(takenAt: snapshot.takenAt, samples: samples)
+    }
+}
+
+/// 心跳中继:Sampler 每轮发布最新快照,低频消费方(磁盘求和回退源,30s)
+/// 按需取用——共享心跳那一趟 rusage,不另起扫描。发布时刻按单调时钟一并
+/// 记下:消费方的计数时刻必须是**采到**的时刻而非读中继的时刻(两者最多差
+/// 一个心跳,拿读的时刻折算速率会随相位漂移出锯齿)。锁保护的微小盒子
+/// (与 SensorLastGoodBox 同款纪律:跨 Sampler / SensorScheduler 两个并发域)。
+final class HeartbeatRusageRelay: @unchecked Sendable {
+    private let lock = NSLock()
+    private var published: (snapshot: ProcessSnapshot, uptimeNanos: UInt64)?
+
+    func publish(
+        _ snapshot: ProcessSnapshot,
+        atUptimeNanos uptimeNanos: UInt64 = DispatchTime.now().uptimeNanoseconds
+    ) {
+        lock.lock()
+        defer { lock.unlock() }
+        published = (snapshot, uptimeNanos)
+    }
+
+    /// 最新一轮快照 + 发布时刻(单调时钟纳秒);心跳首轮前 nil。
+    func latest() -> (snapshot: ProcessSnapshot, uptimeNanos: UInt64)? {
+        lock.lock()
+        defer { lock.unlock() }
+        return published
     }
 }
 
 // MARK: - 能耗影响排行(工单 01)
 
-/// 单进程能耗影响读数(一轮差分):原始增量 + 复合分,UI 按 impact 排序。
+/// 单进程能耗影响读数(一窗差分):原始增量 + 复合分,UI 按 impact 排序。
 struct ProcessEnergyImpact: Equatable, Sendable {
-    /// 本窗口 CPU 时间增量(纳秒,用户 + 系统)。
-    let cpuNanosDelta: UInt64
-    /// 本窗口唤醒增量(次)。
-    let wakeupsDelta: UInt64
-    /// 复合分 = CPU 增量 + 唤醒增量 × 每唤醒 50ms(权重见 Accumulator 注释)。
-    let impact: UInt64
-}
-
-/// 能耗影响差分账本(锁保护的微小盒子,与 DiskThroughputAccumulator 同款纪律):
-/// 首见 pid(整表首趟 / 新 pid / 消失后复现的 pid)记基线不出数;消失 pid 丢弃
-/// (基线整表以本轮为准);负差分钳 0(计数回绕 / 重置不吃巨大值)。
-final class ProcessEnergyImpactAccumulator: @unchecked Sendable {
     /// 每唤醒折算 CPU 纳秒(50ms)。**约定权重,非实测**:与 Activity Monitor
     /// 同款原料(rusage CPU 时间 + 唤醒),但 AM 未公开公式、各实现自定折算,
     /// 50ms/次取"唤醒打断深度睡眠 ≈ 中等代价"的常见量级——注释在此言明。
     static let nanosecondsPerWakeup: UInt64 = 50_000_000
 
-    private let lock = NSLock()
-    private var previous: ProcessRusageTable?
+    /// 本窗口 CPU 时间增量(纳秒,用户 + 系统)。
+    let cpuNanosDelta: UInt64
+    /// 本窗口唤醒增量(次)。
+    let wakeupsDelta: UInt64
+    /// 复合分 = CPU 增量 + 唤醒增量 × 每唤醒 50ms。
+    let impact: UInt64
 
-    /// 折叠一轮差分;nil = 基线轮(整表首趟,本轮不出数)。
-    func record(_ table: ProcessRusageTable) -> [pid_t: ProcessEnergyImpact]? {
-        lock.lock()
-        defer { lock.unlock() }
-        guard let baseline = previous else {
-            previous = table
-            return nil
-        }
+    /// 满窗两端差分:只出两端都在场的 pid(首见 pid 记基线不出数、消失 pid
+    /// 丢弃、复现 pid 按新面孔);负差分钳 0(计数回绕 / 重置不吃巨大值)。
+    static func diff(
+        from baseline: ProcessRusageTable,
+        to current: ProcessRusageTable
+    ) -> [pid_t: ProcessEnergyImpact] {
         var impacts: [pid_t: ProcessEnergyImpact] = [:]
-        impacts.reserveCapacity(table.samples.count)
-        for (pid, sample) in table.samples {
+        impacts.reserveCapacity(current.samples.count)
+        for (pid, sample) in current.samples {
             guard let base = baseline.samples[pid] else { continue }
             let cpuNanosDelta = sample.cpuNanoseconds >= base.cpuNanoseconds
                 ? sample.cpuNanoseconds - base.cpuNanoseconds : 0
@@ -111,88 +110,30 @@ final class ProcessEnergyImpactAccumulator: @unchecked Sendable {
             impacts[pid] = ProcessEnergyImpact(
                 cpuNanosDelta: cpuNanosDelta,
                 wakeupsDelta: wakeupsDelta,
-                impact: cpuNanosDelta &+ wakeupsDelta &* Self.nanosecondsPerWakeup
+                impact: cpuNanosDelta &+ wakeupsDelta &* nanosecondsPerWakeup
             )
         }
-        previous = table
         return impacts
-    }
-
-    /// 隐藏即清账:重开首轮重新记基线,不出横跨隐藏期的巨差。
-    func reset() {
-        lock.lock()
-        defer { lock.unlock() }
-        previous = nil
-    }
-}
-
-/// 能耗影响 provider(工单 01,ADR-0004):低频档 5s,**仅窗口可见时跑**
-/// (全进程 rusage 一趟,门控关掉即零成本);差分状态由 accumulator 持有,
-/// 读失败交付 lastGood 不白屏。
-final class ProcessEnergyImpactProvider: SensorProvider {
-    typealias Reading = [pid_t: ProcessEnergyImpact]
-
-    let cadence: SensorCadence = .every(seconds: 5)
-
-    private let source: any ProcessRusageTableSource
-    private let gate = SensorVisibilityGate()
-    private let accumulator = ProcessEnergyImpactAccumulator()
-    private let slot = SensorLastGoodBox<Reading>()
-
-    var lastGood: Reading? { slot.current }
-
-    init(source: any ProcessRusageTableSource = LiveProcessRusageTableSource()) {
-        self.source = source
-    }
-
-    /// 可见性切换(合并门控由 SystemMonitor 折算后下发):翻转为关时清差分
-    /// 账本——隐藏期计数照旧累计,不清账会在重开首轮出横跨隐藏期的巨差。
-    func setVisible(_ visible: Bool) {
-        if gate.setVisible(visible), !visible { accumulator.reset() }
-    }
-
-    func snapshot() async -> Reading? {
-        guard gate.isVisible else { return nil } // 没窗口在看:门口空转,零成本
-        guard let table = source.readTable() else { return nil }
-        guard let reading = accumulator.record(table) else { return nil } // 基线轮
-        slot.store(reading)
-        return reading
     }
 }
 
 // MARK: - 磁盘每进程排行(工单 01)
 
-/// 单进程磁盘读写速率(字节/秒;一轮差分对两趟墙钟间隔折算)。
+/// 单进程磁盘读写速率(字节/秒;一窗差分对实际墙钟间隔折算)。
 struct ProcessDiskRates: Equatable, Sendable {
     let readBytesPerSec: Double
     let writeBytesPerSec: Double
-}
 
-/// 磁盘每进程差分账本(锁保护的微小盒子):首见 pid 记基线不出数、消失 pid
-/// 丢弃、负差分钳 0——与能耗影响同三件防护;速率防服装置沿用
-/// DiskThroughputDiffer(首读置零 / elapsed 非正钳零 / 回退钳零)。
-final class ProcessDiskRateAccumulator: @unchecked Sendable {
-    private let lock = NSLock()
-    private var previous: ProcessRusageTable?
-
-    /// 折叠一轮差分;nil = 基线轮或病态轮(墙钟未前进)。
-    func record(_ table: ProcessRusageTable) -> [pid_t: ProcessDiskRates]? {
-        lock.lock()
-        defer { lock.unlock() }
-        guard let baseline = previous else {
-            previous = table
-            return nil
-        }
-        // transition-not-tick:速率分母是两趟的实际墙钟间隔,不是标称节拍——
-        // 节拍漂移 / 调度抖动不会歪折算;间隔未前进(病态时钟)整轮钳零。
-        let elapsed = table.takenAt.timeIntervalSince(baseline.takenAt)
-        guard elapsed > 0 else {
-            previous = table
-            return nil
-        }
+    /// 满窗两端差分(在场 pid 口径同能耗);速率分母是实际间隔而非标称窗长
+    /// ——节拍漂移 / 调度抖动不会歪折算;回退钳零。
+    static func diff(
+        from baseline: ProcessRusageTable,
+        to current: ProcessRusageTable,
+        elapsed: TimeInterval
+    ) -> [pid_t: ProcessDiskRates] {
         var rates: [pid_t: ProcessDiskRates] = [:]
-        rates.reserveCapacity(table.samples.count)
-        for (pid, sample) in table.samples {
+        rates.reserveCapacity(current.samples.count)
+        for (pid, sample) in current.samples {
             guard let base = baseline.samples[pid] else { continue }
             let read = sample.diskBytesRead >= base.diskBytesRead
                 ? sample.diskBytesRead - base.diskBytesRead : 0
@@ -203,46 +144,100 @@ final class ProcessDiskRateAccumulator: @unchecked Sendable {
                 writeBytesPerSec: Double(write) / elapsed
             )
         }
-        previous = table
         return rates
-    }
-
-    /// 隐藏即清账(同能耗影响)。
-    func reset() {
-        lock.lock()
-        defer { lock.unlock() }
-        previous = nil
     }
 }
 
-/// 磁盘每进程 provider(工单 01,ADR-0004):低频档 30s,仅窗口可见时跑;
-/// 消费与能耗影响同一个 ProcessRusageTableSource 缝(各持差分账本,互不干扰)。
-final class ProcessDiskRateProvider: SensorProvider {
-    typealias Reading = [pid_t: ProcessDiskRates]
+// MARK: - 满窗账本(住 Sampler 心跳循环)
 
-    let cadence: SensorCadence = .every(seconds: 30)
+/// 一轮心跳的排行产出:各窗满窗才出数;nil = 本轮该窗未满(或基线轮)。
+struct ProcessRankingRound: Equatable, Sendable {
+    var energyImpacts: [pid_t: ProcessEnergyImpact]?
+    var diskRates: [pid_t: ProcessDiskRates]?
 
-    private let source: any ProcessRusageTableSource
-    private let gate = SensorVisibilityGate()
-    private let accumulator = ProcessDiskRateAccumulator()
-    private let slot = SensorLastGoodBox<Reading>()
+    static let empty = ProcessRankingRound()
+}
 
-    var lastGood: Reading? { slot.current }
+/// 满窗基线(两本账本共用一份推进规则):首趟立基线不出数;未满窗不推进
+/// (基线保持,满窗差分跨整窗——1s 心跳下也是 5s 窗,不是最后 1s);满窗交出
+/// 基线并以本趟重立。间隔越界则以本趟重立不出数:为负 = 墙钟回拨;超过
+/// 上限 = 心跳断档(睡眠后首轮先于唤醒清账通知到达、进程被挂起)——能耗是
+/// 窗口绝对增量不按时长归一,跨断档的一窗会把整段累计当 5s 显示。
+private struct RusageWindow: Sendable {
+    /// 满窗容差:吸收轮距略短于窗长的抖动。远小于最短心跳 1s——1s 心跳下
+    /// 仍在第 5 轮满窗;5s 心跳下轮距若因调度改动短了几毫秒也不至于整窗翻倍。
+    static let tolerance: TimeInterval = 0.25
+    /// 窗长上限倍数:弹窗开合让心跳在窗中途 1s → 5s 切换,单窗最长约 9s,
+    /// 3 倍窗长留足余量;超出即视为断档。
+    static let maximumSpan: Double = 3
 
-    init(source: any ProcessRusageTableSource = LiveProcessRusageTableSource()) {
-        self.source = source
+    let seconds: TimeInterval
+    private var baseline: ProcessRusageTable?
+
+    init(seconds: TimeInterval) {
+        self.seconds = seconds
     }
 
-    /// 可见性切换(同能耗影响)。
-    func setVisible(_ visible: Bool) {
-        if gate.setVisible(visible), !visible { accumulator.reset() }
+    /// 推进一趟;满窗返回 (基线, 实际间隔),否则 nil。表惰性取用:未满窗
+    /// 的轮不建表(1s 心跳下五轮只建一次)。
+    mutating func advance(
+        at time: Date,
+        table: () -> ProcessRusageTable
+    ) -> (baseline: ProcessRusageTable, elapsed: TimeInterval)? {
+        guard let baseline else {
+            self.baseline = table()
+            return nil
+        }
+        let elapsed = time.timeIntervalSince(baseline.takenAt)
+        guard elapsed >= 0, elapsed <= seconds * Self.maximumSpan else {
+            self.baseline = table()
+            return nil
+        }
+        guard elapsed >= seconds - Self.tolerance else { return nil }
+        self.baseline = table()
+        return (baseline, elapsed)
     }
 
-    func snapshot() async -> Reading? {
-        guard gate.isVisible else { return nil }
-        guard let table = source.readTable() else { return nil }
-        guard let reading = accumulator.record(table) else { return nil }
-        slot.store(reading)
-        return reading
+    mutating func reset() {
+        baseline = nil
+    }
+}
+
+/// 模块排行两本差分账本(值类型状态机,Sampler 持有并逐轮喂心跳快照):
+/// 能耗影响 5s 窗、磁盘每进程 30s 窗,两窗各自独立推进。
+struct ProcessRankingLedgers: Sendable {
+    /// 能耗影响窗(工单 01 节奏契约;卡底"5 秒一档"、唤醒/秒的折算分母同源)。
+    static let energyWindow: TimeInterval = 5
+    /// 磁盘每进程窗(卡底"30 秒一档")。
+    static let diskWindow: TimeInterval = 30
+
+    private var energy = RusageWindow(seconds: Self.energyWindow)
+    private var disk = RusageWindow(seconds: Self.diskWindow)
+
+    /// 喂一轮心跳快照,返回本轮满窗的读数。
+    mutating func record(_ snapshot: ProcessSnapshot) -> ProcessRankingRound {
+        var built: ProcessRusageTable?
+        let table = {
+            if let built { return built }
+            let fresh = ProcessRusageTable(snapshot: snapshot)
+            built = fresh
+            return fresh
+        }
+        var round = ProcessRankingRound.empty
+        if let closed = energy.advance(at: snapshot.takenAt, table: table) {
+            round.energyImpacts = ProcessEnergyImpact.diff(from: closed.baseline, to: table())
+        }
+        if let closed = disk.advance(at: snapshot.takenAt, table: table) {
+            round.diskRates = ProcessDiskRates.diff(
+                from: closed.baseline, to: table(), elapsed: closed.elapsed
+            )
+        }
+        return round
+    }
+
+    /// 清账(门关 / 唤醒):下一轮重新记基线,不出横跨隐藏期或睡眠的巨差。
+    mutating func reset() {
+        energy.reset()
+        disk.reset()
     }
 }

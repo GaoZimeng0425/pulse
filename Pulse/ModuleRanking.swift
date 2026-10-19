@@ -29,10 +29,10 @@ enum ModuleRankingAggregator {
     /// "其他进程"桶的行键。
     static let otherProcessesKey = "other-processes"
 
-    /// 能耗副文"唤醒/秒"的分母 = 能耗档的**约定节拍**(5 秒,数据层
-    /// ProcessEnergyImpactProvider 的 cadence)。数据层对能耗故意不出速率
-    /// (复合分是窗口差分),这里按节拍折算每秒,与卡底"5 秒一档"注脚同口径。
-    private static let energyWindowSeconds: Double = 5
+    /// 能耗副文"唤醒/秒"的分母 = 能耗档的**约定窗长**(数据层
+    /// ProcessRankingLedgers.energyWindow,唯一出处)。数据层对能耗故意不出速率
+    /// (复合分是窗口差分),这里按窗长折算每秒,与卡底"5 秒一档"注脚同口径。
+    private static let energyWindowSeconds = ProcessRankingLedgers.energyWindow
 
     /// 单 pid 原始读数(聚合输入):rankValue = 排序与 meter 归一口径;
     /// primary = 主值展示原值;secondaryA/B = 副文原值(语义随指标)。

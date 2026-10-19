@@ -55,14 +55,15 @@ final class SystemMonitor {
     /// dev server 盘点(工单 08):每轮采样对 argv 命中的候选进程合成状态
     /// (闲置时长/内存/监听端口);无候选为空数组。主窗口总览页卡片读这里。
     private(set) var devServers: [DevServerStatus] = []
-    /// 模块排行·能耗影响(工单 01):每 pid 一轮差分 {CPU 增量, 唤醒增量,
-    /// 复合分}。仅窗口可见时 5s 采样;隐藏即清账,重开首轮记基线不出数,
-    /// 首轮前为空。电池页排行卡读这里。
+    /// 模块排行·能耗影响(工单 01):每 pid 一窗差分 {CPU 增量, 唤醒增量,
+    /// 复合分}。仅窗口可见时随心跳推进、满 5s 窗出数(票 A 高2:吃心跳快照,
+    /// 不另起扫描);隐藏即清账,重开首轮记基线不出数,首轮前为空。
+    /// 电池页排行卡读这里。
     private(set) var energyImpacts: [pid_t: ProcessEnergyImpact] = [:]
     /// 能耗影响排行最近一次数据变化时刻(数据未变化的轮不推进)。
     private(set) var energyImpactsUpdatedAt: Date?
-    /// 模块排行·磁盘每进程(工单 01):每 pid 读写速率。仅窗口可见时 30s
-    /// 采样,门控语义同上;首轮前为空。磁盘页排行卡读这里。
+    /// 模块排行·磁盘每进程(工单 01):每 pid 读写速率。满 30s 窗出数,
+    /// 门控语义同上;首轮前为空。磁盘页排行卡读这里。
     private(set) var diskProcessRates: [pid_t: ProcessDiskRates] = [:]
     /// 磁盘每进程排行最近一次数据变化时刻。
     private(set) var diskProcessRatesUpdatedAt: Date?
@@ -93,11 +94,9 @@ final class SystemMonitor {
     /// 磁盘吞吐传感器(工单 05,ADR-0004):短档 5s(IORegistry 主路径)或
     /// 低频档 30s(rusage 回退),节奏随源路径在构造期钉死。
     private let diskThroughputProvider: DiskThroughputProvider
-    /// 模块排行三源(工单 01,ADR-0004):能耗影响 5s / 磁盘每进程 30s /
-    /// 网络每进程 5s,全部仅窗口可见时跑(SensorVisibilityGate);能耗与
-    /// 磁盘共享同一个 per-pid rusage 表源(同一趟循环,各持差分账本)。
-    private let energyImpactProvider: ProcessEnergyImpactProvider
-    private let diskProcessRateProvider: ProcessDiskRateProvider
+    /// 模块排行·网络每进程(工单 01,ADR-0004):nettop 子进程 5s,仅窗口
+    /// 可见时跑(SensorVisibilityGate)。能耗与磁盘两本排行账本住 Sampler
+    /// 心跳循环(票 A 高2),门控经 setRankingsActive 下发。
     private let networkProcessRateProvider: ProcessNetworkRateProvider
     /// 排行门控的两个可见性信号(工单 01):弹窗在场(既有信号)与主窗口
     /// 模块页在场(新信号),任一为真即开闸——见 updateRankingGates。
@@ -127,20 +126,27 @@ final class SystemMonitor {
         historyEngine: HistoryEngine? = HistoryEngine.openDefault(),
         batterySource: any BatterySource = LiveBatterySource(),
         diskCapacitySource: any DiskCapacitySource = LiveDiskCapacitySource(),
-        diskThroughputSource: any DiskThroughputSource = LiveDiskThroughputSource.adoptingBestPath(),
-        processRusageSource: any ProcessRusageTableSource = LiveProcessRusageTableSource(),
+        diskThroughputSource: (any DiskThroughputSource)? = nil,
         nettopSource: any NettopCSVSource = LiveNettopCSVSource(),
         devServerPortScanner: any DevServerPortScanning = LiveDevServerPortScanner(),
         alertCenter: AlertCenter = AlertCenter()
     ) {
-        self.sampler = Sampler(source: source, coreTicks: coreTicks, memoryStats: memoryStats)
+        // 心跳中继(票 A 高2):磁盘求和回退源经它取心跳那一趟 rusage,不另起扫描。
+        let heartbeatRelay = HeartbeatRusageRelay()
+        self.sampler = Sampler(
+            source: source,
+            coreTicks: coreTicks,
+            memoryStats: memoryStats,
+            heartbeatRelay: heartbeatRelay
+        )
         self.historyEngine = historyEngine
         self.birthScanner = BirthScanner(source: birthScanSource)
         self.batteryProvider = BatterySensorProvider(source: batterySource)
         self.diskCapacityProvider = DiskCapacityProvider(source: diskCapacitySource)
-        self.diskThroughputProvider = DiskThroughputProvider(source: diskThroughputSource)
-        self.energyImpactProvider = ProcessEnergyImpactProvider(source: processRusageSource)
-        self.diskProcessRateProvider = ProcessDiskRateProvider(source: processRusageSource)
+        self.diskThroughputProvider = DiskThroughputProvider(
+            source: diskThroughputSource
+                ?? LiveDiskThroughputSource.adoptingBestPath(fallbackHeartbeat: heartbeatRelay)
+        )
         self.networkProcessRateProvider = ProcessNetworkRateProvider(source: nettopSource)
         self.alerts = alertCenter
         self.pipeline = GroupingPipeline(
@@ -204,8 +210,6 @@ final class SystemMonitor {
         let capacityProvider = diskCapacityProvider
         let throughputProvider = diskThroughputProvider
         let provider = batteryProvider
-        let energyProvider = energyImpactProvider
-        let diskProcessProvider = diskProcessRateProvider
         let networkProcessProvider = networkProcessRateProvider
         let scheduler = SensorScheduler()
         // 通知授权现状只查不弹(工单 07:弹窗仅在用户首开规则时由设置动作触发)。
@@ -233,21 +237,9 @@ final class SystemMonitor {
                         self.applyDiskThroughput(reading)
                     }
                 },
-                // 模块排行三源(工单 01):调度器按各自 cadence 驱动;可见性
-                // 门控在 provider 内部(setPopoverVisible/setModuleRankingsVisible
-                // 折算下发),门关时 tick 在门口空转,零采样成本。
-                energyProvider.driver { [weak self] reading in
-                    guard let self else { return }
-                    Task { @MainActor in
-                        self.applyEnergyImpacts(reading)
-                    }
-                },
-                diskProcessProvider.driver { [weak self] reading in
-                    guard let self else { return }
-                    Task { @MainActor in
-                        self.applyDiskProcessRates(reading)
-                    }
-                },
+                // 模块排行·网络每进程(工单 01):调度器按 cadence 驱动;可见性
+                // 门控在 provider 内部(updateRankingGates 折算下发),门关时
+                // tick 在门口空转,不起 nettop 子进程。能耗/磁盘两本排行住心跳。
                 networkProcessProvider.driver { [weak self] reading in
                     guard let self else { return }
                     Task { @MainActor in
@@ -275,13 +267,14 @@ final class SystemMonitor {
         updateRankingGates()
     }
 
-    /// 折算两个可见性信号为排行门控(工单 01 约定:任何窗口可见才跑
-    /// 5s/30s 低频档):翻转为全关时各 provider 清差分账本,重开首轮记基线
-    /// 不出数,不出横跨隐藏期的巨差;重复同值调用是 no-op(闸门报告翻转)。
+    /// 折算两个可见性信号为排行门控(工单 01 约定:任何窗口可见才推进):
+    /// 翻转为全关时清差分账本,重开首轮记基线不出数,不出横跨隐藏期的巨差;
+    /// 重复同值调用是 no-op。能耗/磁盘账本在 Sampler(推进/暂停差分),
+    /// 网络每进程在 nettop provider(门关不起子进程)。
     private func updateRankingGates() {
         let anyWindowVisible = popoverVisible || moduleRankingsVisible
-        energyImpactProvider.setVisible(anyWindowVisible)
-        diskProcessRateProvider.setVisible(anyWindowVisible)
+        let sampler = self.sampler
+        Task { await sampler.setRankingsActive(anyWindowVisible) }
         networkProcessRateProvider.setVisible(anyWindowVisible)
     }
 
@@ -370,6 +363,14 @@ final class SystemMonitor {
         // 随落库 Task 进历史引擎(见下方 historyEngine 分支)。
         if let network = update.network {
             applyNetwork(network)
+        }
+        // 模块排行(票 A 高2):两本账本随心跳同轮推进,满窗才出数;nil = 本轮
+        // 该窗未满,保留上次读数。
+        if let impacts = update.rankings.energyImpacts {
+            applyEnergyImpacts(impacts)
+        }
+        if let rates = update.rankings.diskRates {
+            applyDiskProcessRates(rates)
         }
         // 历史管线(工单 03):5s 原始值只进引擎的内存缓冲,分钟卷积 / 小时卷积 /
         // 留存清理 / 出生登记与组元数据落库都在引擎侧一个事务完成;旁路失败只记日志。
@@ -478,17 +479,17 @@ final class SystemMonitor {
         networkTrend.append(result.rates)
     }
 
-    /// 模块排行落地三件(工单 01):字典按 pid。driver 语义下 nil = 基线轮 /
-    /// 读失败 → lastGood 重投,与上轮同值时 Equatable 去重跳过(不空转刷新,
-    /// 更新时间戳只在数据真变化时推进)。
-    private func applyEnergyImpacts(_ reading: [pid_t: ProcessEnergyImpact]?) {
-        guard let reading, reading != energyImpacts else { return }
+    /// 模块排行落地三件(工单 01):字典按 pid。与上轮同值时 Equatable 去重
+    /// 跳过(不空转刷新,更新时间戳只在数据真变化时推进);网络每进程走
+    /// driver 语义,nil = 基线轮 / 读失败 → lastGood 重投,同样去重。
+    private func applyEnergyImpacts(_ reading: [pid_t: ProcessEnergyImpact]) {
+        guard reading != energyImpacts else { return }
         energyImpacts = reading
         energyImpactsUpdatedAt = Date()
     }
 
-    private func applyDiskProcessRates(_ reading: [pid_t: ProcessDiskRates]?) {
-        guard let reading, reading != diskProcessRates else { return }
+    private func applyDiskProcessRates(_ reading: [pid_t: ProcessDiskRates]) {
+        guard reading != diskProcessRates else { return }
         diskProcessRates = reading
         diskProcessRatesUpdatedAt = Date()
     }

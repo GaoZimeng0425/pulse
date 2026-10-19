@@ -8,7 +8,9 @@ import Darwin
 ///   (kp_ppid 宏不导入 Swift)与 `kp_proc.p_starttime`
 /// - 可执行路径:`proc_pidpath`
 /// - CPU 累计时间 / 常驻内存:`proc_pidinfo(PROC_PIDTASKINFO)`
-/// - 物理足迹 / 磁盘字节:`proc_pid_rusage(RUSAGE_INFO_V3)`
+/// - 物理足迹 / 磁盘字节 / 唤醒计数:`proc_pid_rusage(RUSAGE_INFO_V3)`——
+///   全仓库唯一的全进程 rusage 循环(票 A 高2:模块排行与磁盘求和回退源
+///   都吃这张心跳快照,不另起扫描)
 /// - argv:`sysctl(KERN_PROCARGS2)`,解析见 `ProcArgsParser`
 /// - cwd:`proc_pidinfo(PROC_PIDVNODEPATHINFO)`(`proc_vnodepathinfo` 直接导入 Swift,
 ///   无需手写 vnode_info_path 布局)
@@ -45,8 +47,6 @@ final class LiveProcessSource: ProcessSource, @unchecked Sendable {
     }()
 
     /// tick → 纳秒。整数乘除(ticks ≤ 开机时长 × 24MHz,×125 远不溢出 UInt64)。
-    /// internal:模块排行的 per-pid rusage 源(LiveProcessRusageTableSource)
-    /// 复用同一换算——ri_user_time 同为 mach tick,勿再自造(工单 01)。
     static func nanoseconds(fromTicks ticks: UInt64) -> UInt64 {
         ticks * UInt64(timebase.numer) / UInt64(timebase.denom)
     }
@@ -104,6 +104,8 @@ final class LiveProcessSource: ProcessSource, @unchecked Sendable {
                     physicalFootprintBytes: usage?.ri_phys_footprint ?? 0,
                     diskBytesRead: usage?.ri_diskio_bytesread ?? 0,
                     diskBytesWritten: usage?.ri_diskio_byteswritten ?? 0,
+                    wakeups: usage.map { $0.ri_pkg_idle_wkups &+ $0.ri_interrupt_wkups } ?? 0,
+                    countersAvailable: task != nil && usage != nil,
                     startTime: Self.startTime(from: kinfo)
                 )
             )
