@@ -1,6 +1,6 @@
 # P0.5:最小主窗口(全部组视图 + 双入口)
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 

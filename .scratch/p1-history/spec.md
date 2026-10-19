@@ -1,6 +1,6 @@
 # P1:历史 + 基础传感器(历史页 / 磁盘·网络·电池卡 / 告警 / dev server / 三个小件)
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 
