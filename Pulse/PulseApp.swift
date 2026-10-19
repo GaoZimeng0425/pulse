@@ -2,7 +2,31 @@ import SwiftUI
 import AppKit
 import UserNotifications
 
+/// 进程入口:xctest 宿主只起空壳 App(TestHostApp),真实运行才走完整装配。
+/// 单元测试托管在 app 内(TEST_HOST 同进程),宿主若走 PulseApp,拉起即建
+/// SystemMonitor → 以读写方式打开生产历史库、启动真实采样与落库、读真实
+/// 项目根与告警设置——与 /Applications 里的常驻实例同写一份库
+/// (2026-10-19 实测,回归钉见 TestHostIsolationTests)。
 @main
+enum PulseMain {
+    @MainActor
+    static func main() {
+        if LogService.isRunningTests() {
+            TestHostApp.main()
+        } else {
+            PulseApp.main()
+        }
+    }
+}
+
+/// 测试宿主空壳:无菜单栏项、无采样、无历史库、无通知 delegate——
+/// 测试需要的对象一律在用例内自行注入构造。
+struct TestHostApp: App {
+    var body: some Scene {
+        Settings { EmptyView() }
+    }
+}
+
 struct PulseApp: App {
     /// 项目根配置(工单 07):UserDefaults 持久,设置窗编辑的唯一事实来源。
     @State private var rootsStore: ProjectRootsStore
