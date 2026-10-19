@@ -241,14 +241,12 @@ struct MainWindowView: View {
             rankingCard
         case .battery:
             // 电池页(工单 02):六项读数主卡;组排行与电池无关,不放。
-            // 能耗影响排行(工单 01):主卡之下,rusage 差分按组聚合,只读。
+            // 能耗影响排行(工单 01):主卡之下,rusage 差分按组聚合(RankingsFeature
+            // 与组同轮出行),只读。
             MetricMainCardView(model: model.batteryModel)
             ModuleRankingCardView(
                 title: "能耗影响",
-                rows: ModuleRankingAggregator.energyRows(
-                    impacts: monitor.energyImpacts,
-                    groups: monitor.allGroups
-                ),
+                rows: monitor.rankings.energyRows,
                 accent: Metric.battery.accentColor,
                 cadenceNote: "5 秒一档"
             )
@@ -262,10 +260,7 @@ struct MainWindowView: View {
             }
             ModuleRankingCardView(
                 title: "读写最多",
-                rows: ModuleRankingAggregator.diskRows(
-                    rates: monitor.diskProcessRates,
-                    groups: monitor.allGroups
-                ),
+                rows: monitor.rankings.diskRows,
                 accent: Metric.disk.accentColor,
                 cadenceNote: "30 秒一档"
             )
@@ -276,10 +271,7 @@ struct MainWindowView: View {
             NetworkTotalsCardView(totals: monitor.networkTotals)
             ModuleRankingCardView(
                 title: "每进程流量",
-                rows: ModuleRankingAggregator.networkRows(
-                    rates: monitor.networkProcessRates,
-                    groups: monitor.allGroups
-                ),
+                rows: monitor.rankings.networkRows,
                 accent: Metric.network.accentColor,
                 cadenceNote: "5 秒一档"
             )
