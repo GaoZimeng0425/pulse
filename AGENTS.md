@@ -2,6 +2,8 @@
 
 ## Agent skills
 
+流程技能(mattpocock/skills,版本锁在 `skills-lock.json`)的唯一出处是 `.zcode/skills/`;Claude Code 经 `.claude/skills -> ../.zcode/skills` 软链读同一份,两边流程一致。增删 / 升级技能只动 `.zcode/skills/`,不要在 `.claude/skills` 里另放副本。
+
 ### Issue tracker
 
 议题以本地 markdown 文件形式跟踪,位于 `.scratch/<feature-slug>/`。见 `docs/agents/issue-tracker.md`。
