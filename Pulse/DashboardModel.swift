@@ -36,13 +36,13 @@ final class DashboardModel {
         .cpu(
             breakdown: monitor.cpuBreakdown,
             load: monitor.systemCPULoad,
-            statistics: monitor.history.systemCPULoad.statistics,
-            trend: monitor.history.systemCPULoad.values
+            statistics: monitor.sampleHistory.systemCPULoad.statistics,
+            trend: monitor.sampleHistory.systemCPULoad.values
         )
     }
 
     var memoryModel: MetricCardModel {
-        .memory(monitor.memory, trend: monitor.history.memoryUsed.values, host: .current)
+        .memory(monitor.memory, trend: monitor.sampleHistory.memoryUsed.values, host: .current)
     }
 
     /// 电池卡(工单 02):六项读数读 monitor.battery(lastGood 语义——读失败
@@ -59,13 +59,13 @@ final class DashboardModel {
     }
 
     /// 网络卡(工单 06):实时速率读心跳差分(monitor.network,LastGood),
-    /// Today/7 天累计读历史库聚合(monitor.networkTotals),走势 = 速率环;
+    /// Today/7 天累计读历史库聚合(monitor.history.networkTotals),走势 = 速率环;
     /// 未首读时全占位(MetricCardModel.network 兜底)。
     var networkModel: MetricCardModel {
         .network(
             reading: monitor.network,
             trend: monitor.networkTrend.totalBytesPerSecond,
-            totals: monitor.networkTotals
+            totals: monitor.history.networkTotals
         )
     }
 
