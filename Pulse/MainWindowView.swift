@@ -523,7 +523,7 @@ struct SortableProcessTableView: View {
         parentPID: 0,
         executablePath: "/System/Library/CoreServices/WindowServer.app/Contents/MacOS/WindowServer"
     )
-    let monitor = SystemMonitor(
+    let monitor = SystemMonitor.preview(
         source: SyntheticProcessSource(snapshots: [
             ProcessSnapshot(takenAt: now, processes: apps + [windowServer]),
             ProcessSnapshot(

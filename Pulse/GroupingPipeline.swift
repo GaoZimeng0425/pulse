@@ -7,8 +7,8 @@ import Foundation
 /// 经 `mergeBirths` 并入)与每轮采样的 `registeringBirths` 兜底——
 /// 后者仍保留,覆盖扫描间隙的漏网。
 ///
-/// 值类型状态机:SystemMonitor(呈现层)每轮把快照与差分进程 CPU% 喂进来,
-/// 拿到弹窗要显示的 Top 组;单测用 SyntheticProcessSource 序列驱动。
+/// 值类型状态机:主干 RoundSpine(SystemMonitor 持有)每轮把快照与差分进程 CPU%
+/// 喂进来,取截取前的全部组;单测用 SyntheticProcessSource 序列驱动。
 struct GroupingPipeline {
     /// 弹窗展示组数(spec:Top-5)。
     static let defaultDisplayLimit = 5

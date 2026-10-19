@@ -265,7 +265,7 @@ struct HistoryCurveView: View {
             )
         }
     }
-    let monitor = SystemMonitor(historyEngine: HistoryEngine(database: queue))
+    let monitor = SystemMonitor.preview(historyEngine: HistoryEngine(database: queue))
     return HistoryTabView(monitor: monitor)
         .padding(24)
         .frame(width: 680)

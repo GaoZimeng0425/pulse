@@ -437,7 +437,7 @@ struct KillFailureAlert: ViewModifier {
             ),
         ]
     }
-    let monitor = SystemMonitor(
+    let monitor = SystemMonitor.preview(
         source: SyntheticProcessSource(snapshots: [
             ProcessSnapshot(
                 takenAt: now,
