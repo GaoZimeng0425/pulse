@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - 模块排行聚合(工单 01 UI 层):每 pid 读数字典 → 按组聚合的排行行
 // 数据层只交每 pid 的差分/速率字典;展示要的是"按组聚合"的榜。pid → 组走
-// monitor 最新一轮归组结果(allGroups,组内成员即 pid 清单)——不重跑归组
+// 最新一轮归组结果(RankingBoard 传入主干同轮的 groups,组内成员即 pid 清单)——不重跑归组
 // 引擎:归组需要 cwd / argv / 父链全套输入,主窗口采样循环已经算好,这里只查表。
 // 快照里查不到的 pid(采样间隙新起 / 刚退出 / 受限查询)聚进"其他进程"桶:
 // 不伪造组身份,图标由视图给通用符号瓦片。纯函数,单测见 ModuleRankingAggregatorTests。
