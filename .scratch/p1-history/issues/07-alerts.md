@@ -17,7 +17,7 @@
 - **引擎(Pulse/AlertEngine.swift,纯逻辑)**:五元组落地为「匹配(喂食种类+主体)× 阈值 × 持续时长 × 冷却期」+ 方向(above/below);进入 = 连续 3 次越阈且跨越 sustain(无时长要求的规则仅看次数),退出 = 连续 6 次安全侧(阈值∓20%,迟滞带内两不靠——两侧计数都清零);冷却期锚定"上次实际发出",冷却期内重满足不重发、期满当轮即发(持续多时的越阈每过一个冷却期再提醒一次)。逐主体(组)独立状态;组消失即解除(firing→resolved),重生 incarnation 从头计数。
 - **新组内存语义(实现拍板)**:"新组" = 上一轮不在场、本轮在场的 incarnation(SampleHistoryStore 逐出语义同源);出生窗 = 该 incarnation 前 3 个观察(= 进入次数,出生即超阈且稳住三轮才触发),窗外的内存增长是正常使用不告警;app 启动首轮只立基线,已在跑的组不算新组(首读置零惯例)。
 - **设置(AlertSettingsStore)**:UserDefaults JSON 存 {开关, 阈值}(键 alertRuleConfigs);持续/冷却/方向随种类预设定型不可改;设置变更由引擎按策略表变化检测——立即解除在发告警并清计数(冷却锚点与新组序龄保留),即"阈值可改、即时生效"。
-- **通知(AlertNotification.swift)**:发送缝三件事直通 UNUserNotificationCenter(授权请求/状态查询/发送);identifier = 种类|主体(重发替换不堆叠);userInfo 带路由。授权时序:首开任一规则(0→1 迁移)才请求,标记持久(alertAuthorizationRequestedKey)只此一次;拒绝 → authorizationDenied 置位,规则照常判定,应用内横幅(AlertBannerView,主窗口 + 弹窗共用)即降级出口。
+- **通知(AlertNotification.swift)**:发送缝三件事直通 UNUserNotificationCenter(授权请求/状态查询/发送);identifier = 种类|主体(重发替换不堆叠);userInfo 带路由。授权时序:首开任一规则(0→1 迁移)才请求,标记持久(alertAuthorizationRequestedKey)只此一次〔**2026-10-19 已撤**:标记与系统现状脱节导致误判拒绝,改以系统三态为准,见 spec 修订〕;拒绝 → authorizationDenied 置位,规则照常判定,应用内横幅(AlertBannerView,主窗口 + 弹窗共用)即降级出口。
 - **路由**:点开通知 → delegate 解析路由 → NSApp.activate(LSUIElement .accessory 下先激活再开窗,弹窗按钮同序沉淀)→ 记 pendingTab → 广播;MenuBarExtra 常驻标签视图持 openWindow 响应广播开窗,主窗口 onAppear/onReceive 消费落点切 tab。popover 无法程序化打开,深链一律落主窗口(spec 既定)。
 - **喂食(SystemMonitor)**:每轮采样(系统负载 + 全部组聚合口径)与磁盘容量读数(Finder「可用」口径,读不到不喂)进 AlertCenter;引擎零新调度,挂在既有采样交付节奏上。
 - **单测纪律**:全合成序列 + 注入时钟/假 sender,零真实负载、零真实等待(真负载触发验证属工单 12 锚点③);新增 AlertEngineTests 13 + AlertSettingsStoreTests 6 + AlertCenterTests 6 + AlertNotificationSmokeTests 4,全量 382 例绿。

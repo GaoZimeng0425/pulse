@@ -33,6 +33,17 @@ struct AlertBannerView: View {
                     }
                     .font(.caption2)
                 }
+                if center.authorizationRequestFailed {
+                    HStack(spacing: 6) {
+                        Text("系统通知授权未完成,告警仅在应用内提示。")
+                            .foregroundStyle(.secondary)
+                        Button("重新请求") {
+                            center.retryAuthorization()
+                        }
+                        .buttonStyle(.link)
+                    }
+                    .font(.caption2)
+                }
             }
             .padding(.horizontal, isCompact ? 10 : 12)
             .padding(.vertical, isCompact ? 6 : 8)
@@ -94,5 +105,6 @@ struct AlertBannerView: View {
 private struct PreviewDeniedAlertSender: AlertNotificationSending {
     func requestAuthorization() async -> Bool { false }
     func authorizationStatus() async -> NotificationAuthorization { .denied }
+    func authorizationDiagnostics() async -> String { "preview" }
     func send(_ payload: AlertNotificationPayload) async {}
 }

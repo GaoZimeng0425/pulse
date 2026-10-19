@@ -13,14 +13,14 @@ final class AlertSettingsStore {
     /// 键名即持久化契约,勿改(改了会丢用户配置)。
     static let storageKey = "alertRuleConfigs"
 
-    /// 当前配置(缺省 = 预设阈值 + 全关;首次开启任一规则才请求通知授权)。
-    /// 授权状态不在这里记:以系统三态为准(AlertCenter 现查),本地"请求过"
-    /// 标记曾与系统现状脱节、误判拒绝(2026-10-19),已撤。
+    /// 当前配置(缺省 = 预设阈值 + 全关)。授权状态不在这里记:以系统三态为准
+    /// (AlertCenter 现查),本地"请求过"标记曾与系统现状脱节、误判拒绝
+    /// (2026-10-19),已撤。
     private(set) var configs: [AlertKind: AlertRuleConfig]
 
     private let persist: ([AlertKind: AlertRuleConfig]) -> Void
 
-    /// 任一规则开着(授权时序:从假到真的迁移点请求授权)。
+    /// 任一规则开着(授权时序:有规则开着而系统还没问过时才请求授权)。
     var isAnyEnabled: Bool {
         configs.values.contains(where: \.isEnabled)
     }
@@ -36,6 +36,8 @@ final class AlertSettingsStore {
 
     /// 生产构造:UserDefaults(标准库);测试注入独立 suite。
     convenience init(defaults: UserDefaults = .standard) {
+        // 已撤的"授权请求过"标记(2026-10-19)留在用户偏好里的孤儿键,顺手清掉。
+        defaults.removeObject(forKey: "alertAuthorizationRequested")
         self.init(
             load: { Self.decode(defaults.data(forKey: Self.storageKey)) },
             persist: { configs in

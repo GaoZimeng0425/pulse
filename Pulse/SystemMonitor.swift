@@ -212,8 +212,7 @@ final class SystemMonitor {
         let provider = batteryProvider
         let networkProcessProvider = networkProcessRateProvider
         let scheduler = SensorScheduler()
-        // 通知授权现状只查不弹(工单 07:弹窗仅在用户首开规则时由设置动作触发)。
-        let alerts = alerts
+        // 通知授权:启动现查;规则开着而系统还没问过则补一次请求(AlertCenter)。
         Task { [weak self] in
             await self?.alerts.refreshAuthorization()
         }

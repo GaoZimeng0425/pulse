@@ -12,15 +12,20 @@ final class AlertCenterTests: XCTestCase {
     // MARK: - 测试替身
 
     /// 假 sender:模拟系统授权三态——请求前为 `status`(默认没问过),请求后按
-    /// `grantResult` 落定(系统侧幂等:已落定不再变);记录请求次数与已发通知。
-    /// 锁的临界区收进同步私有方法(锁不可落在 async 词法上下文,SensorSchedulerTests
-    /// 的 FakeSleeper 同款纪律)。
+    /// `grantResult` 落定(系统侧幂等:已落定不再变);`requestFails` 模拟请求
+    /// 抛错收场、系统仍没问过;`holdRequests` 让请求挂起到 `releaseRequests()`
+    /// (模拟弹窗等用户作答,真机实测可挂 14 小时)。记录请求次数(进入即记)
+    /// 与已发通知。锁的临界区收进同步私有方法(锁不可落在 async 词法上下文,
+    /// SensorSchedulerTests 的 FakeSleeper 同款纪律)。
     private final class FakeAlertSender: AlertNotificationSending, @unchecked Sendable {
         private let lock = NSLock()
         private var requests = 0
         private var delivered: [AlertNotificationPayload] = []
         private var current: NotificationAuthorization = .notDetermined
+        private var held: [CheckedContinuation<Void, Never>] = []
         var grantResult = true
+        var requestFails = false
+        var holdRequests = false
 
         var authorizationRequestCount: Int {
             lock.lock(); defer { lock.unlock() }
@@ -39,22 +44,50 @@ final class AlertCenterTests: XCTestCase {
         }
 
         func requestAuthorization() async -> Bool {
-            recordRequest()
+            countRequest()
+            if holdRequests {
+                await withCheckedContinuation { continuation in
+                    hold(continuation)
+                }
+            }
+            return settleRequest()
+        }
+
+        /// 放行全部挂起中的请求(模拟用户作答)。
+        func releaseRequests() {
+            lock.lock()
+            let continuations = held
+            held = []
+            lock.unlock()
+            continuations.forEach { $0.resume() }
         }
 
         func authorizationStatus() async -> NotificationAuthorization {
             status
         }
 
+        func authorizationDiagnostics() async -> String {
+            "fake"
+        }
+
         func send(_ payload: AlertNotificationPayload) async {
             record(payload)
         }
 
-        /// 没问过才"弹窗"并按 grantResult 落定;已落定原样返回。
-        private func recordRequest() -> Bool {
+        private func countRequest() {
             lock.lock(); defer { lock.unlock() }
             requests += 1
-            if current == .notDetermined {
+        }
+
+        private func hold(_ continuation: CheckedContinuation<Void, Never>) {
+            lock.lock(); defer { lock.unlock() }
+            held.append(continuation)
+        }
+
+        /// 没问过才"弹窗"并按 grantResult 落定;抛错收场则保持没问过;已落定原样返回。
+        private func settleRequest() -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            if current == .notDetermined, !requestFails {
                 current = grantResult ? .authorized : .denied
             }
             return current == .authorized
@@ -245,6 +278,143 @@ final class AlertCenterTests: XCTestCase {
         XCTAssertEqual(sender.sent.count, 1, "发送前现查授权")
         XCTAssertTrue(center.notificationsAuthorized)
         XCTAssertFalse(center.authorizationDenied, "现查结果回写状态,降级提示随之消失")
+    }
+
+    /// 每例开着磁盘规则的告警中心(授权相关用例共用)。
+    private func diskRuleCenter(_ sender: FakeAlertSender) -> AlertCenter {
+        let center = AlertCenter(
+            store: AlertSettingsStore(defaults: makeDefaults()),
+            sender: sender,
+            clock: { Date() }
+        )
+        center.store.setEnabled(true, for: .diskAvailable)
+        return center
+    }
+
+    /// 磁盘读数连续越阈到触发(无持续时长要求,连续 3 次即入)。
+    private func fireDiskAlert(_ center: AlertCenter) {
+        for _ in 0..<AlertEngine.minimumConsecutiveEnter {
+            center.ingestDisk(availableBytes: 1_073_741_824)
+        }
+    }
+
+    func testConcurrentRequestPathsSendSingleRequest() async {
+        // 在途去重:请求挂起(弹窗等作答)期间,启动补请求与再开规则都不重复请求。
+        let sender = FakeAlertSender()
+        sender.holdRequests = true
+        let center = diskRuleCenter(sender)
+        let launch = Task { await center.refreshAuthorization() }
+        await settle()
+        center.setEnabled(true, for: .systemLoad)
+        center.setEnabled(true, for: .groupCPU)
+        await settle()
+        XCTAssertEqual(sender.authorizationRequestCount, 1, "在途期间只此一次")
+        sender.releaseRequests()
+        await launch.value
+        await settle()
+        XCTAssertTrue(center.notificationsAuthorized)
+    }
+
+    func testFailedRequestKeepsNotDeterminedAndAllowsRetry() async {
+        // 请求抛错收场、系统仍没问过:不臆断拒绝,如实标"请求未完成"并允许重试。
+        let sender = FakeAlertSender()
+        sender.requestFails = true
+        let center = diskRuleCenter(sender)
+        await center.refreshAuthorization()
+        XCTAssertFalse(center.authorizationDenied, "没问过 ≠ 已拒绝")
+        XCTAssertTrue(center.authorizationRequestFailed, "请求未完成须可见")
+
+        sender.requestFails = false
+        center.retryAuthorization()
+        await settle()
+        XCTAssertEqual(sender.authorizationRequestCount, 2)
+        XCTAssertTrue(center.notificationsAuthorized)
+        XCTAssertFalse(center.authorizationRequestFailed, "落定后提示消失")
+    }
+
+    func testAlertFiredWhilePromptPendingIsDeliveredOnceGranted() async {
+        // 代码审查 HIGH:弹窗等作答期间触发的告警,授权落定后补发——持续性告警
+        // 不会再次触发,不补发则整段会话都收不到这条系统通知。
+        let sender = FakeAlertSender()
+        sender.holdRequests = true
+        let center = diskRuleCenter(sender)
+        let launch = Task { await center.refreshAuthorization() }
+        await settle()
+        fireDiskAlert(center)
+        await settle()
+        XCTAssertEqual(sender.sent.count, 0, "未授权不发")
+
+        sender.releaseRequests()
+        await launch.value
+        await settle()
+        XCTAssertEqual(sender.sent.map(\.identifier), ["diskAvailable|disk"], "授权后补发触发中告警,只补一次")
+    }
+
+    func testGrantInSystemSettingsResendsActiveAlertsOnReturn() async {
+        // 已拒绝时触发 → 用户经入口去系统设置打开 → 切回 app 同步即补发。
+        let sender = FakeAlertSender()
+        sender.status = .denied
+        let center = diskRuleCenter(sender)
+        await center.refreshAuthorization()
+        fireDiskAlert(center)
+        await settle()
+        XCTAssertEqual(sender.sent.count, 0)
+
+        sender.status = .authorized
+        await center.syncAuthorizationStatus()
+        await settle()
+        XCTAssertEqual(sender.sent.count, 1)
+        await center.syncAuthorizationStatus()
+        await settle()
+        XCTAssertEqual(sender.sent.count, 1, "已授权再同步不重复补发")
+    }
+
+    func testRevokedInSystemSettingsStopsSending() async {
+        let sender = FakeAlertSender()
+        sender.status = .authorized
+        let center = diskRuleCenter(sender)
+        await center.refreshAuthorization()
+        sender.status = .denied
+        fireDiskAlert(center)
+        await settle()
+        XCTAssertEqual(sender.sent.count, 0, "系统设置里关掉后不再发")
+        XCTAssertTrue(center.authorizationDenied)
+    }
+
+    func testAllAlertsFiredInOneRoundAreDelivered() async {
+        let sender = FakeAlertSender()
+        sender.status = .authorized
+        let clock = MutableClock(t0)
+        let center = AlertCenter(
+            store: AlertSettingsStore(defaults: makeDefaults()),
+            sender: sender,
+            clock: { clock.now }
+        )
+        center.store.setEnabled(true, for: .groupCPU)
+        center.store.setThreshold(100, for: .groupCPU)
+        await center.refreshAuthorization()
+        // 两组同轮越阈并持续过 10 分钟 → 同一轮各触发一条。
+        for _ in 0..<123 {
+            center.ingestSampling(systemCPULoad: 10, groups: [
+                group(.app(bundlePath: "/Applications/A.app"), name: "A", cpu: 150),
+                group(.app(bundlePath: "/Applications/B.app"), name: "B", cpu: 150),
+            ])
+            clock.advance(5)
+        }
+        await settle()
+        XCTAssertEqual(Set(sender.sent.map(\.identifier)).count, 2, "同轮两条都送达")
+    }
+
+    func testPathsThatMustNotRequest() async {
+        // 已拒绝时开规则、关规则都不请求(系统不会再弹窗,请求只会白跑)。
+        let sender = FakeAlertSender()
+        sender.status = .denied
+        let center = diskRuleCenter(sender)
+        await center.refreshAuthorization()
+        center.setEnabled(true, for: .systemLoad)
+        center.setEnabled(false, for: .systemLoad)
+        await settle()
+        XCTAssertEqual(sender.authorizationRequestCount, 0)
     }
 
     // MARK: - 已授权:发通知带路由

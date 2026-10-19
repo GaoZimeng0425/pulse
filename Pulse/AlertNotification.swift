@@ -15,6 +15,22 @@ enum NotificationAuthorization: Equatable, Sendable {
     case notDetermined
     case denied
     case authorized
+
+    /// 系统原值 → 三态(纯映射,单测钉死):provisional 静默送达算可发
+    /// (本 app 从不申请 provisional);未知新值按拒绝——不弹窗、不循环请求,
+    /// 原值随状态变化日志里的系统侧明细留痕。
+    init(_ status: UNAuthorizationStatus) {
+        switch status {
+        case .authorized, .provisional:
+            self = .authorized
+        case .notDetermined:
+            self = .notDetermined
+        case .denied:
+            self = .denied
+        @unknown default:
+            self = .denied
+        }
+    }
 }
 
 /// 发送缝:AlertCenter 只认此协议;单测注入假 sender 记录调用。
@@ -23,6 +39,9 @@ protocol AlertNotificationSending: Sendable {
     func requestAuthorization() async -> Bool
     /// 当前授权状态(只读查询,永不弹窗)。
     func authorizationStatus() async -> NotificationAuthorization
+    /// 系统侧授权明细(状态原值 / 横幅开关 / 通知中心开关 / 提醒样式),只在
+    /// 状态变化时取一次写日志——"已授权但横幅样式为无"这类看不见的情形靠它排查。
+    func authorizationDiagnostics() async -> String
     /// 发一条告警通知。
     func send(_ payload: AlertNotificationPayload) async
 }
@@ -53,16 +72,13 @@ struct LiveAlertNotificationSender: AlertNotificationSending {
     }
 
     func authorizationStatus() async -> NotificationAuthorization {
+        NotificationAuthorization(await UNUserNotificationCenter.current().notificationSettings().authorizationStatus)
+    }
+
+    func authorizationDiagnostics() async -> String {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
-        switch settings.authorizationStatus {
-        case .authorized, .provisional, .ephemeral:
-            return .authorized
-        case .notDetermined:
-            return .notDetermined
-        default:
-            // .denied 与未来新增值:按拒绝处理——不弹窗、不循环请求。
-            return .denied
-        }
+        return "status=\(settings.authorizationStatus.rawValue) alert=\(settings.alertSetting.rawValue)"
+            + " center=\(settings.notificationCenterSetting.rawValue) style=\(settings.alertStyle.rawValue)"
     }
 
     func send(_ payload: AlertNotificationPayload) async {
@@ -74,7 +90,12 @@ struct LiveAlertNotificationSender: AlertNotificationSending {
         let request = UNNotificationRequest(
             identifier: payload.identifier, content: content, trigger: nil
         )
-        try? await UNUserNotificationCenter.current().add(request)
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+        } catch {
+            // 投递失败如实留痕(已授权却投不出去时,签名 / 注册异常靠它排查)。
+            LogService.error("通知投递失败(\(payload.identifier)):\(error)", category: "Alert")
+        }
     }
 }
 

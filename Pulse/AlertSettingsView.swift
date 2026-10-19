@@ -21,6 +21,16 @@ struct AlertSettingsView: View {
                     }
                 }
             }
+            if center.authorizationRequestFailed {
+                Section {
+                    Text("系统通知授权请求没有完成(弹窗可能被勿扰模式收起,或系统报错)——告警暂时仅在应用内提示。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("重新请求授权") {
+                        center.retryAuthorization()
+                    }
+                }
+            }
             ForEach(AlertKind.allCases.filter(\.isDataSourceWired)) { kind in
                 ruleSection(kind)
             }
@@ -148,5 +158,6 @@ struct AlertSettingsView: View {
 private struct SettingsPreviewDeniedSender: AlertNotificationSending {
     func requestAuthorization() async -> Bool { false }
     func authorizationStatus() async -> NotificationAuthorization { .denied }
+    func authorizationDiagnostics() async -> String { "preview" }
     func send(_ payload: AlertNotificationPayload) async {}
 }

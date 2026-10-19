@@ -39,6 +39,16 @@ final class AlertNotificationSmokeTests: XCTestCase {
         )
     }
 
+    func testSystemStatusMapsToThreeStates() {
+        // 显式映射(代码审查 LOW):provisional 静默送达算可发;未知新值按拒绝
+        // (不弹窗、不循环请求)。
+        XCTAssertEqual(NotificationAuthorization(.authorized), .authorized)
+        XCTAssertEqual(NotificationAuthorization(.provisional), .authorized)
+        XCTAssertEqual(NotificationAuthorization(.notDetermined), .notDetermined)
+        XCTAssertEqual(NotificationAuthorization(.denied), .denied)
+        XCTAssertEqual(NotificationAuthorization(UNAuthorizationStatus(rawValue: 99)!), .denied)
+    }
+
     func testSystemNotificationSettingsDeepLinkSelectsThisApp() {
         // 授权被拒后的恢复入口:直达 系统设置 → 通知 → 本 app(?id= 选中 bundle)。
         XCTAssertEqual(
