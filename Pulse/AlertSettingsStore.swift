@@ -12,37 +12,26 @@ final class AlertSettingsStore {
     /// UserDefaults 键:JSON 字典 {kindRawValue: {isEnabled, threshold}}。
     /// 键名即持久化契约,勿改(改了会丢用户配置)。
     static let storageKey = "alertRuleConfigs"
-    /// 授权已请求标记键(跨启动:确保系统通知授权"首次开启才请求"只发生一次)。
-    static let authorizationRequestedKey = "alertAuthorizationRequested"
 
     /// 当前配置(缺省 = 预设阈值 + 全关;首次开启任一规则才请求通知授权)。
+    /// 授权状态不在这里记:以系统三态为准(AlertCenter 现查),本地"请求过"
+    /// 标记曾与系统现状脱节、误判拒绝(2026-10-19),已撤。
     private(set) var configs: [AlertKind: AlertRuleConfig]
 
     private let persist: ([AlertKind: AlertRuleConfig]) -> Void
-    private let persistAuthorizationFlag: (Bool) -> Void
 
     /// 任一规则开着(授权时序:从假到真的迁移点请求授权)。
     var isAnyEnabled: Bool {
         configs.values.contains(where: \.isEnabled)
     }
 
-    var hasRequestedAuthorization: Bool {
-        authorizationRequested
-    }
-
-    private var authorizationRequested: Bool
-
     /// 注入读写闭包的构造(测试 / 预览)。
     init(
         load: () -> [AlertKind: AlertRuleConfig],
-        persist: @escaping ([AlertKind: AlertRuleConfig]) -> Void,
-        loadAuthorizationFlag: () -> Bool,
-        persistAuthorizationFlag: @escaping (Bool) -> Void
+        persist: @escaping ([AlertKind: AlertRuleConfig]) -> Void
     ) {
         self.configs = Self.mergingPresets(load())
         self.persist = persist
-        self.authorizationRequested = loadAuthorizationFlag()
-        self.persistAuthorizationFlag = persistAuthorizationFlag
     }
 
     /// 生产构造:UserDefaults(标准库);测试注入独立 suite。
@@ -51,9 +40,7 @@ final class AlertSettingsStore {
             load: { Self.decode(defaults.data(forKey: Self.storageKey)) },
             persist: { configs in
                 defaults.set(Self.encode(configs), forKey: Self.storageKey)
-            },
-            loadAuthorizationFlag: { defaults.bool(forKey: Self.authorizationRequestedKey) },
-            persistAuthorizationFlag: { defaults.set($0, forKey: Self.authorizationRequestedKey) }
+            }
         )
     }
 
@@ -79,13 +66,6 @@ final class AlertSettingsStore {
         config.threshold = threshold
         configs[kind] = config
         persist(configs)
-    }
-
-    /// 标记授权已请求过(跨启动只此一次)。
-    func markAuthorizationRequested() {
-        guard !authorizationRequested else { return }
-        authorizationRequested = true
-        persistAuthorizationFlag(true)
     }
 
     /// 引擎每轮喂食取的策略快照(用户配置 × 种类预设)。

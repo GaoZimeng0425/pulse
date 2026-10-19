@@ -3,7 +3,7 @@ import XCTest
 
 /// 接缝:告警规则配置持久层(UserDefaults 注入独立 suite,ProjectRootsStore 同款)。
 /// 钉死:预设默认值、编解码往返、缺项/坏数据回落预设、改动即写即生效、
-/// isAnyEnabled 的 0→1 迁移(授权时序锚点)与 hasRequestedAuthorization。
+/// isAnyEnabled 的 0→1 迁移(授权时序锚点)。
 @MainActor
 final class AlertSettingsStoreTests: XCTestCase {
 
@@ -58,16 +58,6 @@ final class AlertSettingsStoreTests: XCTestCase {
         XCTAssertTrue(store.isAnyEnabled, "还有别条开着")
         store.setEnabled(false, for: .systemLoad)
         XCTAssertFalse(store.isAnyEnabled)
-    }
-
-    func testMarkAuthorizationRequestedPersistsOnce() {
-        let defaults = makeDefaults()
-        let store = AlertSettingsStore(defaults: defaults)
-        XCTAssertFalse(store.hasRequestedAuthorization)
-
-        store.markAuthorizationRequested()
-        XCTAssertTrue(store.hasRequestedAuthorization)
-        XCTAssertTrue(AlertSettingsStore(defaults: defaults).hasRequestedAuthorization, "跨启动持久(首次才请求的判定依据)")
     }
 
     // MARK: - 坏数据防御

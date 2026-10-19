@@ -2,21 +2,24 @@ import XCTest
 @testable import Pulse
 
 /// 接缝:AlertCenter 编排(注入假 sender 与时钟)。钉死工单的授权时序与降级:
-/// 首开任一规则才请求授权(且只一次);拒绝后规则照常判定、只走应用内提示;
-/// 已授权才发系统通知;resolved 清应用内列表。引擎状态机本身已在
+/// 授权以系统三态为准(没问过 / 已拒绝 / 已授权)——有规则开着而系统没问过
+/// 就请求(开规则时或启动时);拒绝后规则照常判定、只走应用内提示;发送前现查
+/// 授权(系统设置里打开即生效);resolved 清应用内列表。引擎状态机本身已在
 /// AlertEngineTests 钉死,这里只测编排。
 @MainActor
 final class AlertCenterTests: XCTestCase {
 
     // MARK: - 测试替身
 
-    /// 假 sender:记录授权请求次数与已发通知;授权结果可设定。
+    /// 假 sender:模拟系统授权三态——请求前为 `status`(默认没问过),请求后按
+    /// `grantResult` 落定(系统侧幂等:已落定不再变);记录请求次数与已发通知。
     /// 锁的临界区收进同步私有方法(锁不可落在 async 词法上下文,SensorSchedulerTests
     /// 的 FakeSleeper 同款纪律)。
     private final class FakeAlertSender: AlertNotificationSending, @unchecked Sendable {
         private let lock = NSLock()
         private var requests = 0
         private var delivered: [AlertNotificationPayload] = []
+        private var current: NotificationAuthorization = .notDetermined
         var grantResult = true
 
         var authorizationRequestCount: Int {
@@ -29,22 +32,32 @@ final class AlertCenterTests: XCTestCase {
             return delivered
         }
 
-        func requestAuthorization() async -> Bool {
-            recordRequest()
-            return grantResult
+        /// 系统侧现状(测试可直接改:模拟用户在系统设置里开关通知)。
+        var status: NotificationAuthorization {
+            get { lock.lock(); defer { lock.unlock() }; return current }
+            set { lock.lock(); defer { lock.unlock() }; current = newValue }
         }
 
-        func isAuthorized() async -> Bool {
-            grantResult
+        func requestAuthorization() async -> Bool {
+            recordRequest()
+        }
+
+        func authorizationStatus() async -> NotificationAuthorization {
+            status
         }
 
         func send(_ payload: AlertNotificationPayload) async {
             record(payload)
         }
 
-        private func recordRequest() {
+        /// 没问过才"弹窗"并按 grantResult 落定;已落定原样返回。
+        private func recordRequest() -> Bool {
             lock.lock(); defer { lock.unlock() }
             requests += 1
+            if current == .notDetermined {
+                current = grantResult ? .authorized : .denied
+            }
+            return current == .authorized
         }
 
         private func record(_ payload: AlertNotificationPayload) {
@@ -108,13 +121,12 @@ final class AlertCenterTests: XCTestCase {
             clock: { clock.now }
         )
 
-        XCTAssertFalse(center.store.hasRequestedAuthorization)
         center.setEnabled(true, for: .systemLoad)
         await settle()
         XCTAssertEqual(sender.authorizationRequestCount, 1, "首次开启任一规则 → 请求授权")
         XCTAssertTrue(center.notificationsAuthorized)
 
-        // 再开别的规则 / 关了再开:不再请求(已请求过的标记持久在存储里)。
+        // 再开别的规则 / 关了再开:不再请求(系统已落定为已授权)。
         center.setEnabled(true, for: .groupCPU)
         center.setEnabled(false, for: .systemLoad)
         center.setEnabled(true, for: .systemLoad)
@@ -143,6 +155,72 @@ final class AlertCenterTests: XCTestCase {
         }
         XCTAssertEqual(center.activeAlerts.count, 1, "拒绝授权不影响判定,应用内提示照常")
         XCTAssertEqual(sender.sent.count, 0, "拒绝后不发系统通知")
+    }
+
+    /// 2026-10-19 真机:规则早已开着、本地也记过"请求过",系统里却从未登记
+    /// (没问过)——旧逻辑据本地标记误判"已拒绝"、永不再问,告警只剩应用内提示。
+    /// 现以系统三态为准:启动时没问过且有规则开着 → 补一次真请求。
+    func testLaunchWithRulesEnabledButNeverAskedRequestsAuthorization() async {
+        let sender = FakeAlertSender()
+        let center = AlertCenter(
+            store: AlertSettingsStore(defaults: makeDefaults()),
+            sender: sender,
+            clock: { Date() }
+        )
+        center.store.setEnabled(true, for: .diskAvailable) // 上次会话已开的规则
+        await center.refreshAuthorization()
+        XCTAssertEqual(sender.authorizationRequestCount, 1, "没问过 + 有规则 → 启动即请求")
+        XCTAssertTrue(center.notificationsAuthorized)
+        XCTAssertFalse(center.authorizationDenied)
+    }
+
+    func testLaunchWithAllRulesDisabledDoesNotPrompt() async {
+        // 首开任一规则才请求(spec):全关时启动不弹窗,也不误报拒绝。
+        let sender = FakeAlertSender()
+        let center = AlertCenter(
+            store: AlertSettingsStore(defaults: makeDefaults()),
+            sender: sender,
+            clock: { Date() }
+        )
+        await center.refreshAuthorization()
+        XCTAssertEqual(sender.authorizationRequestCount, 0)
+        XCTAssertFalse(center.authorizationDenied, "没问过 ≠ 已拒绝")
+    }
+
+    func testSystemDeniedIsReportedWithoutPrompting() async {
+        let sender = FakeAlertSender()
+        sender.status = .denied
+        let center = AlertCenter(
+            store: AlertSettingsStore(defaults: makeDefaults()),
+            sender: sender,
+            clock: { Date() }
+        )
+        center.store.setEnabled(true, for: .diskAvailable)
+        await center.refreshAuthorization()
+        XCTAssertEqual(sender.authorizationRequestCount, 0, "已拒绝:系统不会再弹窗,不请求")
+        XCTAssertTrue(center.authorizationDenied)
+    }
+
+    func testEnablingInSystemSettingsTakesEffectOnNextFire() async {
+        // 启动时已拒绝;用户随后在系统设置里打开通知——下一次触发即发,无需重启。
+        let sender = FakeAlertSender()
+        sender.status = .denied
+        let center = AlertCenter(
+            store: AlertSettingsStore(defaults: makeDefaults()),
+            sender: sender,
+            clock: { Date() }
+        )
+        center.store.setEnabled(true, for: .diskAvailable)
+        await center.refreshAuthorization()
+        sender.status = .authorized
+
+        for _ in 0..<AlertEngine.minimumConsecutiveEnter {
+            center.ingestDisk(availableBytes: 1_073_741_824)
+        }
+        await settle()
+        XCTAssertEqual(sender.sent.count, 1, "发送前现查授权")
+        XCTAssertTrue(center.notificationsAuthorized)
+        XCTAssertFalse(center.authorizationDenied, "现查结果回写状态,降级提示随之消失")
     }
 
     // MARK: - 已授权:发通知带路由

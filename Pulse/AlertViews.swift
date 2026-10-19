@@ -22,7 +22,7 @@ struct AlertBannerView: View {
                     row(occurrence)
                 }
                 if center.authorizationDenied {
-                    Text("系统通知未授权,告警仅在应用内提示(可在设置 → 告警中重新开启授权)。")
+                    Text("系统通知已被拒绝,告警仅在应用内提示(到 系统设置 → 通知 → Pulse 打开即可恢复)。")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -62,9 +62,7 @@ struct AlertBannerView: View {
             load: {
                 [AlertKind.diskAvailable: AlertRuleConfig(isEnabled: true, threshold: 20 * 1_073_741_824)]
             },
-            persist: { _ in },
-            loadAuthorizationFlag: { true },
-            persistAuthorizationFlag: { _ in }
+            persist: { _ in }
         ),
         sender: PreviewDeniedAlertSender(),
         clock: { Date() }
@@ -88,6 +86,6 @@ struct AlertBannerView: View {
 /// 预览用假 sender(拒绝授权,呈现降级提示)。
 private struct PreviewDeniedAlertSender: AlertNotificationSending {
     func requestAuthorization() async -> Bool { false }
-    func isAuthorized() async -> Bool { false }
+    func authorizationStatus() async -> NotificationAuthorization { .denied }
     func send(_ payload: AlertNotificationPayload) async {}
 }

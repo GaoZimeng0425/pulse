@@ -12,7 +12,7 @@ struct AlertSettingsView: View {
         Form {
             if center.authorizationDenied {
                 Section {
-                    Text("系统通知未授权——规则照常判定,告警降级为应用内提示。关闭再重新开启任一规则可重新走授权(系统不再弹窗时,请到 系统设置 → 通知 → Pulse 打开)。")
+                    Text("系统通知已被拒绝——规则照常判定,告警降级为应用内提示。到 系统设置 → 通知 → Pulse 打开即可恢复,无需重启。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -133,9 +133,7 @@ struct AlertSettingsView: View {
                     AlertKind.diskAvailable: AlertRuleConfig(isEnabled: true, threshold: 20 * 1_073_741_824),
                 ]
             },
-            persist: { _ in },
-            loadAuthorizationFlag: { true },
-            persistAuthorizationFlag: { _ in }
+            persist: { _ in }
         ),
         sender: SettingsPreviewDeniedSender()
     )
@@ -145,6 +143,6 @@ struct AlertSettingsView: View {
 /// 预览用假 sender(拒绝授权,呈现降级提示;文件内私有,与其他预览替身互不相干)。
 private struct SettingsPreviewDeniedSender: AlertNotificationSending {
     func requestAuthorization() async -> Bool { false }
-    func isAuthorized() async -> Bool { false }
+    func authorizationStatus() async -> NotificationAuthorization { .denied }
     func send(_ payload: AlertNotificationPayload) async {}
 }

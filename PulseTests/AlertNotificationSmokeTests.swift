@@ -43,8 +43,8 @@ final class AlertNotificationSmokeTests: XCTestCase {
 
     func testLiveSenderAuthorizationQueryRuns() async {
         // 只读查询(getNotificationSettings),不弹授权窗;返回值本身即真机现状。
-        let authorized = await LiveAlertNotificationSender().isAuthorized()
-        print("[smoke] 通知授权现状: \(authorized)")
+        let status = await LiveAlertNotificationSender().authorizationStatus()
+        print("[smoke] 通知授权现状: \(status)")
         // 请求授权动作会弹窗,不在冒烟内(真机走查覆盖,工单验收项)。
     }
 

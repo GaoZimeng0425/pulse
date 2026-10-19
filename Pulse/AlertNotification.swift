@@ -8,12 +8,21 @@ import AppKit
 // 缝上无逻辑(纯逻辑在 AlertNotificationContent 的文案拼装与路由解析,可单测;
 // 真实授权弹窗与系统投递属真机走查,冒烟即 spec 测试决策)。
 
+/// 系统通知授权三态。"没问过"与"已拒绝"必须分开:前者还能弹窗请求,后者
+/// 系统不再弹窗、只能去 系统设置 → 通知 打开(2026-10-19 真机:二者合成一个
+/// false 后,从未登记的 app 被误判为拒绝、永不再问)。
+enum NotificationAuthorization: Equatable, Sendable {
+    case notDetermined
+    case denied
+    case authorized
+}
+
 /// 发送缝:AlertCenter 只认此协议;单测注入假 sender 记录调用。
 protocol AlertNotificationSending: Sendable {
     /// 请求授权(true = 已授权)。系统侧幂等:已授权/已拒绝时不再弹窗。
     func requestAuthorization() async -> Bool
     /// 当前授权状态(只读查询,永不弹窗)。
-    func isAuthorized() async -> Bool
+    func authorizationStatus() async -> NotificationAuthorization
     /// 发一条告警通知。
     func send(_ payload: AlertNotificationPayload) async
 }
@@ -29,18 +38,30 @@ struct AlertNotificationPayload: Equatable, Sendable {
 
 /// Darwin 薄适配器(与 LiveDiskCapacitySource 同一角色)。
 struct LiveAlertNotificationSender: AlertNotificationSending {
+    /// 请求失败(签名 / 系统拒绝登记等)如实记日志——曾被 try? 吞掉,
+    /// 授权链路断在哪里无从查起。
     func requestAuthorization() async -> Bool {
-        (try? await UNUserNotificationCenter.current()
-            .requestAuthorization(options: [.alert, .sound])) ?? false
+        do {
+            let granted = try await UNUserNotificationCenter.current()
+                .requestAuthorization(options: [.alert, .sound])
+            LogService.info("通知授权请求结果:\(granted ? "已允许" : "未允许")", category: "Alert")
+            return granted
+        } catch {
+            LogService.error("通知授权请求失败:\(error)", category: "Alert")
+            return false
+        }
     }
 
-    func isAuthorized() async -> Bool {
+    func authorizationStatus() async -> NotificationAuthorization {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         switch settings.authorizationStatus {
         case .authorized, .provisional, .ephemeral:
-            return true
+            return .authorized
+        case .notDetermined:
+            return .notDetermined
         default:
-            return false
+            // .denied 与未来新增值:按拒绝处理——不弹窗、不循环请求。
+            return .denied
         }
     }
 
