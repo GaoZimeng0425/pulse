@@ -12,3 +12,6 @@ xcuserdata/
 # SwiftPM / Swift(应用项目:Package.resolved 应提交,不入 ignore)
 .build/
 .swiftpm/
+
+# Claude Code 子代理的临时 worktree
+.claude/worktrees/
