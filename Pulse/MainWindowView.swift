@@ -437,7 +437,7 @@ struct SortableProcessTableView: View {
         // 进程行 meter 榜首(工单 P0.6-02):当前表内 CPU% 最大者——
         // 无论按哪列排序,meter 恒以 CPU 占比取值(CPU 指标驱动 meter),
         // 换列排序只换行序,不换条的口径。
-        let cpuLeader = rows.map(\.cpuPercent).max() ?? 0
+        let cpuLeader = Leaderboard.leader(rows, by: \.cpuPercent)
         VStack(spacing: 0) {
             tableHeader
             LazyVStack(spacing: 0) {

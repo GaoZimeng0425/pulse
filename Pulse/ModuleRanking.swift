@@ -115,12 +115,14 @@ enum ModuleRankingAggregator {
     /// 1. 零值行剔除——0 差分 / 0 速率的进程是纯噪声(与 MemoryRingSegment
     ///    零字节分段同口径);全零时出空榜,交卡片空态安静兜底;
     /// 2. 有组的按组身份合计,快照外的 pid 全进"其他进程"桶;
-    /// 3. 主值降序(次键规范键字典序,与组榜单同款,跨采样轮稳定)。
+    /// 3. 主值降序(次键规范键字典序,与组榜单同款,跨采样轮稳定)——
+    ///    排序与 meter 榜首走 Leaderboard 内核,与组卡榜单同一份口径。
     private static func rows(
         _ readingsByPID: [pid_t: Readings],
         groups: [ProcessGroup],
         format: (Readings) -> (primaryText: String, subtitle: String)
     ) -> [ModuleRankingRow] {
+        // 零值行剔除是模块排行的站点口径,有意不收进 Leaderboard 内核(组 tab 保留零值组)。
         let active = readingsByPID.filter { $0.value.rankValue > 0 }
 
         // pid → 组:归组引擎保证一个 pid 只归一组,查表即归组(后写覆盖不可能发生)。
@@ -160,15 +162,9 @@ enum ModuleRankingAggregator {
 
         // meter 归一榜首 = 当前行集 rankValue 最大值(MeterNormalization:榜首满条,
         // 空榜/空载不除零)。行集非空时 leader > 0(零值行已剔除)。
-        let leader = totalsByID.values.map(\.rankValue).max() ?? 0
+        let leader = Leaderboard.leader(totalsByID.values, by: \.rankValue)
 
-        return totalsByID
-            .sorted { lhs, rhs in
-                if lhs.value.rankValue != rhs.value.rankValue {
-                    return lhs.value.rankValue > rhs.value.rankValue
-                }
-                return lhs.key < rhs.key
-            }
+        return Leaderboard.ranked(totalsByID, by: { $0.value.rankValue }, id: { $0.key })
             .map { key, readings in
                 let meta = metaByID[key]!
                 let text = format(readings)
