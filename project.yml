@@ -37,6 +37,12 @@ targets:
         DEVELOPMENT_TEAM: ""
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
+      configs:
+        # Debug(含单测宿主、worktree 开发运行)用独立 bundle id:不与 /Applications 的
+        # Release 版共用通知授权、偏好域与 LaunchServices 身份(2026-10-19:同一 id 的
+        # 46 条 ad-hoc 注册曾让系统通知授权错乱、设置列表里找不到 Pulse)。
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: com.gaozimeng.pulse.debug
   PulseTests:
     type: bundle.unit-test
     platform: macOS
