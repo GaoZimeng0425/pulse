@@ -84,7 +84,7 @@ final class RoundSpineTests: XCTestCase {
         XCTAssertEqual(categoryOfRustc(in: control), .orphan, "无出生记录的断链 rustc 应落孤儿(对照组)")
 
         var spine = makeSpine(projectRoots: [octokRoot])
-        spine.mergeBirths(brokenChainBirths)
+        spine.restoreBirths(brokenChainBirths)
         let context = spine.advance(round(brokenChainLive(at: base)))
 
         let project = context.groups.first { $0.category == .project }
@@ -103,10 +103,10 @@ final class RoundSpineTests: XCTestCase {
         XCTAssertEqual(context.groups.first { $0.category == .project }?.processes.map(\.pid), [11, 100])
     }
 
-    /// 同一 pid 两份出生记录冲突(pid 复用:扫描说 rustc 生在 launchd 下 → 孤儿;回灌
-    /// 说生在 cargo 下 → 项目组):先进登记表者为准。回灌即时并入,扫描表要等下一次
-    /// advance——所以回灌赶在该轮之前落地即胜;扫描表已随某轮并入,晚到的回灌改不动它。
-    func testFirstBirthRecordIntoTheRegistryWinsBetweenRestoreAndScanner() {
+    /// 扫描说 rustc(100)生在 launchd 下(Pulse 重启时它早已被重挂),回灌说它生在
+    /// cargo 下:同一进程(可执行路径与 argv 一致)→ 回灌的出生记录胜,与谁先进登记表
+    /// 无关——扫描先并入、回灌晚到同样改得回来(验收锚点①:重启后断链进程仍归原宿主)。
+    func testRestoredBirthOfTheSameProcessWinsOverLiveRecordInEitherOrder() {
         let scannerSaysLaunchd = LineageRegistry().registeringBirths(in: ProcessSnapshot(processes: [
             RawProcess(
                 pid: 100,
@@ -118,20 +118,54 @@ final class RoundSpineTests: XCTestCase {
 
         var restoreFirst = makeSpine(projectRoots: [octokRoot])
         restoreFirst.stageScannerBirths(scannerSaysLaunchd)
-        restoreFirst.mergeBirths(brokenChainBirths)
-        let restoredWins = restoreFirst.advance(round(brokenChainLive(at: base)))
-        XCTAssertEqual(categoryOfRustc(in: restoredWins), .project)
+        restoreFirst.restoreBirths(brokenChainBirths)
+        let restoredFirstRound = restoreFirst.advance(round(brokenChainLive(at: base)))
+        XCTAssertEqual(categoryOfRustc(in: restoredFirstRound), .project)
 
         var scannerFirst = makeSpine(projectRoots: [octokRoot])
         scannerFirst.stageScannerBirths(scannerSaysLaunchd)
         let firstRound = scannerFirst.advance(round(brokenChainLive(at: base)))
-        scannerFirst.mergeBirths(brokenChainBirths)
+        scannerFirst.restoreBirths(brokenChainBirths)
         let laterRound = scannerFirst.advance(round(
             brokenChainLive(at: base.addingTimeInterval(5)),
             after: brokenChainLive(at: base)
         ))
-        XCTAssertEqual(categoryOfRustc(in: firstRound), .orphan)
-        XCTAssertEqual(categoryOfRustc(in: laterRound), .orphan)
+        XCTAssertEqual(categoryOfRustc(in: firstRound), .orphan, "回灌落地前只有活记录")
+        XCTAssertEqual(categoryOfRustc(in: laterRound), .project, "晚到的回灌改得回同一进程的记录")
+        XCTAssertEqual(laterRound.lineage.entries[100]?.parentPID, 12)
+    }
+
+    /// pid 复用:回灌说 pid 100 是 cargo 下的 rustc,现场 pid 100 却是另一个程序
+    /// (zsh)→ 活记录胜,zsh 不被回灌的旧记录拉进项目组;无活记录的 cargo(12)照常
+    /// 取回灌记录。回灌先到、活记录后到亦然。
+    func testLiveRecordWinsOverRestoredBirthWhenThePidWasReused() {
+        let reused = ProcessSnapshot(takenAt: base, processes: [
+            RawProcess(pid: 100, parentPID: 1, executablePath: "/bin/zsh", argv: ["-zsh"]),
+        ])
+
+        var spine = makeSpine(projectRoots: [octokRoot])
+        spine.restoreBirths(brokenChainBirths)
+        let context = spine.advance(round(reused))
+
+        XCTAssertNotEqual(categoryOfRustc(in: context), .project)
+        XCTAssertEqual(context.lineage.entries[100]?.executablePath, "/bin/zsh")
+        XCTAssertEqual(context.lineage.entries[100]?.parentPID, 1)
+        XCTAssertEqual(context.lineage.entries[12]?.parentPID, 11, "无活记录的 pid 仍取回灌记录")
+    }
+
+    /// 路径读不到(受限进程)无从判别是否同一进程:按 pid 复用论,活记录胜——
+    /// 上一会话的受限守护 812 不会把旧父 pid 套到今天复用 812 的另一个受限进程上。
+    func testLiveRecordWinsWhenNeitherSideHasAReadablePath() {
+        let restored = LineageRegistry().registeringBirths(in: ProcessSnapshot(processes: [
+            RawProcess(pid: 812, parentPID: 300),
+        ]))
+        var spine = makeSpine(projectRoots: [])
+        spine.restoreBirths(restored)
+        let context = spine.advance(round(ProcessSnapshot(takenAt: base, processes: [
+            RawProcess(pid: 812, parentPID: 1),
+        ])))
+
+        XCTAssertEqual(context.lineage.entries[812]?.parentPID, 1)
     }
 
     // MARK: 下钻与组同轮同源

@@ -46,7 +46,7 @@ extension HistoryEngine {
 /// 交付的磁盘吞吐读数进账本;每轮主干上下文到来时,连同账本整笔折成一份落库入参
 /// 并清账。网络增量随心跳同轮到达(`context.update.network`),不进账本。
 ///
-/// 磁盘记账恰好一次(架构评审甲5):吞吐 driver 读失败时重投**上次好值**——同一个
+/// 磁盘记账恰好一次(arch-review-2026-10-18 甲5):吞吐 driver 读失败时重投**上次好值**——同一个
 /// 读数值(`snapshot() ?? lastGood`)。内核记住最近记过的读数,与之相等即视为重投、
 /// 不再记账;不相等即新数据,增量累加。契约在此显式成立并有单测钉住,不再依赖
 /// 展示层的去重。已知边界:两份新读数逐字段全等(速率、走势窗、增量都相同)会被
@@ -67,7 +67,7 @@ struct HistoryFeed: Sendable {
 
     /// 本轮落库入参:组采样 / 展示名 / 出生登记取本轮主干上下文,网络增量取本轮
     /// 心跳(nil 记 0),磁盘增量整笔带走账本并清零。`now` 由壳给(采样时刻口径)。
-    mutating func makeIngest(from context: RoundContext, at now: Date) -> HistoryIngest {
+    mutating func takeIngest(from context: RoundContext, at now: Date) -> HistoryIngest {
         let ingest = HistoryIngest(
             at: now,
             systemLoad: context.update.systemCPULoad,

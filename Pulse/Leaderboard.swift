@@ -1,8 +1,8 @@
 import Foundation
 
-// MARK: - 榜单内核(架构审查高3)
+// MARK: - 榜单内核(arch-review-2026-10-18/01 高3)
 
-/// 榜单内核(高3):按值降序、同值身份升序(跨采样轮稳定)、榜首 = 最大值(meter 归一分母)。
+/// 榜单内核(arch-review-2026-10-18/01 高3):按值降序、同值身份升序(跨采样轮稳定)、榜首 = 最大值(meter 归一分母)。
 ///
 /// 组卡榜单(MetricTabContent)、模块排行(ModuleRankingAggregator)、进程表 meter
 /// (MainWindowView)与归组引擎输出序(GroupingEngine)共用这一份口径——此前各自

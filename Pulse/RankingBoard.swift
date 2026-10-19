@@ -3,7 +3,7 @@ import Darwin
 
 // MARK: - 模块排行纯值内核(RankingsFeature 的值核)
 
-/// 模块排行纯值内核(工单 01 三张榜:能耗影响 / 读写最多 / 每进程流量):持有最新一轮
+/// 模块排行纯值内核(工单 module-rankings/01 三张榜:能耗影响 / 读写最多 / 每进程流量):持有最新一轮
 /// 的组与三份最新每 pid 读数,经 ModuleRankingAggregator 出按组聚合的排行行。
 /// AlertCenter + AlertEngine 同款样板:值类型、无副作用、无时钟,由 RankingsFeature
 /// (MainActor 薄壳)持有;单测见 RankingBoardTests。
@@ -15,6 +15,8 @@ struct RankingBoard: Sendable {
     private var groups: [ProcessGroup] = []
     /// 能耗影响最近一窗(每 pid 差分):满窗轮整份替换。
     private var energyImpacts: [pid_t: ProcessEnergyImpact] = [:]
+    /// 能耗这一窗的实际跨度(唤醒/秒的折算分母),随 energyImpacts 整份替换。
+    private var energyWindowSeconds = ProcessRankingLedgers.energyWindow
     /// 磁盘每进程最近一窗(每 pid 读写速率):满窗轮整份替换。
     private var diskRates: [pid_t: ProcessDiskRates] = [:]
     /// 网络每进程最近一次交付(nettop 每 pid 上下行速率):有读数即整份替换。
@@ -26,6 +28,7 @@ struct RankingBoard: Sendable {
         self.groups = groups
         if let impacts = rankings.energyImpacts {
             energyImpacts = impacts
+            energyWindowSeconds = rankings.energyWindowSeconds ?? ProcessRankingLedgers.energyWindow
         }
         if let rates = rankings.diskRates {
             diskRates = rates
@@ -42,7 +45,11 @@ struct RankingBoard: Sendable {
 
     /// 电池页·能耗影响行。
     var energyRows: [ModuleRankingRow] {
-        ModuleRankingAggregator.energyRows(impacts: energyImpacts, groups: groups)
+        ModuleRankingAggregator.energyRows(
+            impacts: energyImpacts,
+            windowSeconds: energyWindowSeconds,
+            groups: groups
+        )
     }
 
     /// 磁盘页·读写最多行。

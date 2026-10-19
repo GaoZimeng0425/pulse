@@ -153,6 +153,9 @@ struct ProcessDiskRates: Equatable, Sendable {
 /// 一轮心跳的排行产出:各窗满窗才出数;nil = 本轮该窗未满(或基线轮)。
 struct ProcessRankingRound: Equatable, Sendable {
     var energyImpacts: [pid_t: ProcessEnergyImpact]?
+    /// 能耗这一窗的实际跨度(秒;与 energyImpacts 同生同灭):心跳在窗中途 1s ↔ 5s
+    /// 切换时实际窗 5–9s,唤醒/秒按它折算而非标称窗长。
+    var energyWindowSeconds: TimeInterval?
     var diskRates: [pid_t: ProcessDiskRates]?
 
     static let empty = ProcessRankingRound()
@@ -206,7 +209,8 @@ private struct RusageWindow: Sendable {
 /// 模块排行两本差分账本(值类型状态机,Sampler 持有并逐轮喂心跳快照):
 /// 能耗影响 5s 窗、磁盘每进程 30s 窗,两窗各自独立推进。
 struct ProcessRankingLedgers: Sendable {
-    /// 能耗影响窗(工单 01 节奏契约;卡底"5 秒一档"、唤醒/秒的折算分母同源)。
+    /// 能耗影响窗(工单 module-rankings/01 节奏契约;卡底"5 秒一档"同源)。唤醒/秒
+    /// 的折算分母是每窗实际跨度(ProcessRankingRound.energyWindowSeconds)。
     static let energyWindow: TimeInterval = 5
     /// 磁盘每进程窗(卡底"30 秒一档")。
     static let diskWindow: TimeInterval = 30
@@ -226,6 +230,7 @@ struct ProcessRankingLedgers: Sendable {
         var round = ProcessRankingRound.empty
         if let closed = energy.advance(at: snapshot.takenAt, table: table) {
             round.energyImpacts = ProcessEnergyImpact.diff(from: closed.baseline, to: table())
+            round.energyWindowSeconds = closed.elapsed
         }
         if let closed = disk.advance(at: snapshot.takenAt, table: table) {
             round.diskRates = ProcessDiskRates.diff(

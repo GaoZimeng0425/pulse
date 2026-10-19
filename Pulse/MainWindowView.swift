@@ -241,7 +241,7 @@ struct MainWindowView: View {
             rankingCard
         case .battery:
             // 电池页(工单 02):六项读数主卡;组排行与电池无关,不放。
-            // 能耗影响排行(工单 01):主卡之下,rusage 差分按组聚合(RankingsFeature
+            // 能耗影响排行(工单 module-rankings/01):主卡之下,rusage 差分按组聚合(RankingsFeature
             // 与组同轮出行),只读。
             MetricMainCardView(model: model.batteryModel)
             ModuleRankingCardView(

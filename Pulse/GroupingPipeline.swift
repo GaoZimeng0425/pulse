@@ -13,8 +13,13 @@ struct GroupingPipeline {
     /// 弹窗展示组数(spec:Top-5)。
     static let defaultDisplayLimit = 5
 
-    /// 出生登记表随轮次增长(内存版,重启即失——P0 决定)。
+    /// 出生登记表随轮次增长:本会话活记录(出生扫描并入 + 采样轮兜底)与历史回灌
+    /// (工单 p1-history/03)汇在一张表里。同 pid 冲突按身份裁决、每个 pid 只裁一次:
+    /// 同一进程取回灌(出生时刻的父链比重挂 launchd 之后的现场更真),pid 复用取
+    /// 活记录(Entry.isSameProcess)。
     private(set) var lineage = LineageRegistry()
+    /// 记录取自回灌、尚未遇到本会话活记录对质的 pid:活记录到来时裁决一次即移出。
+    private var unsettledRestoredPIDs: Set<pid_t> = []
     /// 全部组(工单 P0.5-01):最近一轮 update 截取**之前**的完整榜单,
     /// 与 Top 组同序同源——主窗口读这里,弹窗读 update 的返回值。
     private(set) var allGroups: [ProcessGroup] = []
@@ -40,7 +45,38 @@ struct GroupingPipeline {
     /// 并入出生扫描器(BirthScanner)在外部登记的出生(评审 S1):只补缺,
     /// 不改既有记录;扫描间隙出生、又在下一轮采样前退场的短命父进程由此留下快照。
     mutating func mergeBirths(_ external: LineageRegistry) {
-        lineage = lineage.merging(external)
+        for (pid, entry) in external.entries {
+            adoptLive(pid: pid, entry: entry)
+        }
+    }
+
+    /// 并入历史回灌的出生登记(工单 p1-history/03):已有活记录的 pid 当场裁决
+    /// (同一进程取回灌,pid 复用留活记录);其余补缺,待活记录到来时再裁。
+    /// 已有回灌记录的 pid 不覆盖(首记为准)。
+    mutating func restoreBirths(_ restored: LineageRegistry) {
+        for (pid, entry) in restored.entries {
+            if let existing = lineage.entries[pid] {
+                if !unsettledRestoredPIDs.contains(pid), existing.isSameProcess(as: entry) {
+                    lineage.replace(pid: pid, with: entry)
+                }
+            } else {
+                lineage.replace(pid: pid, with: entry)
+                unsettledRestoredPIDs.insert(pid)
+            }
+        }
+    }
+
+    /// 一条活记录到来:无记录即登记;记录取自回灌且尚未裁决 → 裁决一次(pid 复用则
+    /// 活记录覆盖);其余既有记录不动(活记录之间首记为准)。
+    private mutating func adoptLive(pid: pid_t, entry: LineageRegistry.Entry) {
+        guard let existing = lineage.entries[pid] else {
+            lineage.replace(pid: pid, with: entry)
+            return
+        }
+        guard unsettledRestoredPIDs.remove(pid) != nil else { return }
+        if !existing.isSameProcess(as: entry) {
+            lineage.replace(pid: pid, with: entry)
+        }
     }
 
     /// 一轮采样的推进。新出生进程的 CPU%(差分为 nil,无前值)按 0 计——
@@ -49,7 +85,12 @@ struct GroupingPipeline {
         snapshot: ProcessSnapshot,
         processCPU: [ProcessCPU]
     ) -> [ProcessGroup] {
-        lineage = lineage.registeringBirths(in: snapshot)
+        for process in snapshot.processes {
+            adoptLive(pid: process.pid, entry: LineageRegistry.Entry(
+                parentPID: process.parentPID,
+                identity: process.identity
+            ))
+        }
 
         let groups = GroupingEngine.groups(
             from: snapshot,

@@ -8,7 +8,8 @@ import Foundation
 ///   首次出现的进程补登记,覆盖扫描间隙的漏网。
 /// 两者的表经 `merging(_:)` 只补缺地汇合;归组引擎自身不持有、不更新任何状态。
 /// 每个进程只在首次出现时登记(pid、父 pid、路径、cwd、argv);父链经由各进程
-/// 自己的记录串联而成。重启即失(P0 决定,SQLite 随 P1);pid 复用不做区分(已知限制)。
+/// 自己的记录串联而成。历史回灌的上一会话记录在 GroupingPipeline 里与活记录逐 pid 裁决:
+/// 按身份判别 pid 复用,活记录胜(本会话内两个活来源之间的 pid 复用仍不区分,已知限制)。
 struct LineageRegistry: Equatable, Sendable {
     /// 单条出生记录:进程出生时刻的可归属字段。
     /// 路径 / cwd / argv 收拢进 `ProcessIdentity`(D1)——与 RawProcess 同一份三元组。
@@ -26,6 +27,16 @@ struct LineageRegistry: Equatable, Sendable {
         init(parentPID: pid_t, identity: ProcessIdentity) {
             self.parentPID = parentPID
             self.identity = identity
+        }
+
+        /// 两份记录是否属同一进程(pid 复用判别):可执行路径都读到且一致,且 argv
+        /// 一致——任一侧 argv 为空视为没读到,不据此区分。任一侧路径读不到(受限
+        /// 进程)即无从判别,按不同进程论(活记录胜)。cwd 不比:进程可以改工作目录,
+        /// 出生时刻与现场本就可能不同。
+        func isSameProcess(as other: Entry) -> Bool {
+            guard let path = executablePath, let otherPath = other.executablePath,
+                  path == otherPath else { return false }
+            return argv.isEmpty || other.argv.isEmpty || argv == other.argv
         }
     }
 
@@ -60,5 +71,11 @@ struct LineageRegistry: Equatable, Sendable {
             merged.entries[pid] = entry
         }
         return merged
+    }
+
+    /// 写入 / 覆盖一条记录(GroupingPipeline 裁决回灌与活记录冲突时用;常规登记
+    /// 一律走只补缺的 register / registeringBirths / merging)。
+    mutating func replace(pid: pid_t, with entry: Entry) {
+        entries[pid] = entry
     }
 }

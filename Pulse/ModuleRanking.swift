@@ -29,11 +29,6 @@ enum ModuleRankingAggregator {
     /// "其他进程"桶的行键。
     static let otherProcessesKey = "other-processes"
 
-    /// 能耗副文"唤醒/秒"的分母 = 能耗档的**约定窗长**(数据层
-    /// ProcessRankingLedgers.energyWindow,唯一出处)。数据层对能耗故意不出速率
-    /// (复合分是窗口差分),这里按窗长折算每秒,与卡底"5 秒一档"注脚同口径。
-    private static let energyWindowSeconds = ProcessRankingLedgers.energyWindow
-
     /// 单 pid 原始读数(聚合输入):rankValue = 排序与 meter 归一口径;
     /// primary = 主值展示原值;secondaryA/B = 副文原值(语义随指标)。
     /// 文案在归组**之后**从合计值格式化——组行数值必须等于成员之和,
@@ -46,17 +41,20 @@ enum ModuleRankingAggregator {
     }
 
     /// 电池页·能耗影响行(工单 01):主值 = 本档 CPU 时间(秒,一位小数),
-    /// 副文 = 唤醒/秒;排序与 meter 按复合分 impact——唤醒重的进程名次不亏
+    /// 副文 = 唤醒/秒——数据层对能耗故意不出速率(复合分是窗口差分),这里按这一窗的
+    /// 实际跨度 `windowSeconds` 折算每秒(ProcessRankingRound.energyWindowSeconds);排序与 meter 按复合分 impact——唤醒重的进程名次不亏
     /// (主值只管展示,复合分才是"影响"的口径)。
     static func energyRows(
         impacts: [pid_t: ProcessEnergyImpact],
+        windowSeconds: TimeInterval,
         groups: [ProcessGroup]
     ) -> [ModuleRankingRow] {
+        let perSecond = windowSeconds > 0 ? 1 / windowSeconds : 0
         let readings = impacts.mapValues { impact in
             Readings(
                 rankValue: Double(impact.impact),
                 primary: Double(impact.cpuNanosDelta) / 1_000_000_000,
-                secondaryA: Double(impact.wakeupsDelta) / energyWindowSeconds
+                secondaryA: Double(impact.wakeupsDelta) * perSecond
             )
         }
         return rows(readings, groups: groups) { aggregate in

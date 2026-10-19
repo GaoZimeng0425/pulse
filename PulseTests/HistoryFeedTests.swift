@@ -86,7 +86,7 @@ final class HistoryFeedTests: XCTestCase {
 
         feed.recordDiskThroughput(reading)
         feed.recordDiskThroughput(reading)
-        let ingest = feed.makeIngest(from: context(), at: ingestAt)
+        let ingest = feed.takeIngest(from: context(), at: ingestAt)
 
         XCTAssertEqual(ingest.diskReadBytes, 4_096)
         XCTAssertEqual(ingest.diskWriteBytes, 1_024)
@@ -99,8 +99,8 @@ final class HistoryFeedTests: XCTestCase {
 
         feed.recordDiskThroughput(diskReading(read: 4_096, write: 1_024, rate: 800))
         feed.recordDiskThroughput(diskReading(read: 8_192, write: 2_048, rate: 1_600))
-        let first = feed.makeIngest(from: context(), at: ingestAt)
-        let second = feed.makeIngest(from: context(), at: ingestAt.addingTimeInterval(5))
+        let first = feed.takeIngest(from: context(), at: ingestAt)
+        let second = feed.takeIngest(from: context(), at: ingestAt.addingTimeInterval(5))
 
         XCTAssertEqual(first.diskReadBytes, 12_288)
         XCTAssertEqual(first.diskWriteBytes, 3_072)
@@ -114,9 +114,9 @@ final class HistoryFeedTests: XCTestCase {
         let reading = diskReading(read: 4_096, write: 1_024, rate: 800)
 
         feed.recordDiskThroughput(reading)
-        let drained = feed.makeIngest(from: context(), at: ingestAt)
+        let drained = feed.takeIngest(from: context(), at: ingestAt)
         feed.recordDiskThroughput(reading)
-        let afterRedelivery = feed.makeIngest(from: context(), at: ingestAt.addingTimeInterval(5))
+        let afterRedelivery = feed.takeIngest(from: context(), at: ingestAt.addingTimeInterval(5))
 
         XCTAssertEqual(drained.diskReadBytes, 4_096)
         XCTAssertEqual(afterRedelivery.diskReadBytes, 0)
@@ -135,7 +135,7 @@ final class HistoryFeedTests: XCTestCase {
             downBytesDelta: 1_500
         )
 
-        let ingest = feed.makeIngest(from: context(network: network), at: ingestAt)
+        let ingest = feed.takeIngest(from: context(network: network), at: ingestAt)
 
         XCTAssertEqual(ingest.netRxBytes, 1_500)
         XCTAssertEqual(ingest.netTxBytes, 300)
@@ -145,7 +145,7 @@ final class HistoryFeedTests: XCTestCase {
     func testRoundWithoutNetworkReadingIngestsZeroNetBytes() {
         var feed = HistoryFeed()
 
-        let ingest = feed.makeIngest(from: context(network: nil), at: ingestAt)
+        let ingest = feed.takeIngest(from: context(network: nil), at: ingestAt)
 
         XCTAssertEqual(ingest.netRxBytes, 0)
         XCTAssertEqual(ingest.netTxBytes, 0)
@@ -157,7 +157,7 @@ final class HistoryFeedTests: XCTestCase {
     func testGroupSamplesAndDisplayNamesComeFromTheRoundGroups() {
         var feed = HistoryFeed()
 
-        let ingest = feed.makeIngest(from: twoAppsContext(), at: ingestAt)
+        let ingest = feed.takeIngest(from: twoAppsContext(), at: ingestAt)
 
         XCTAssertEqual(ingest.groups, [
             GroupSample(id: waifuX, cpuPercent: 75, memoryBytes: 500_000_000, processCount: 2),
@@ -171,7 +171,7 @@ final class HistoryFeedTests: XCTestCase {
     func testIngestCarriesGivenTimeRoundSystemLoadAndRoundLineage() {
         var feed = HistoryFeed()
 
-        let ingest = feed.makeIngest(from: twoAppsContext(), at: ingestAt)
+        let ingest = feed.takeIngest(from: twoAppsContext(), at: ingestAt)
 
         XCTAssertEqual(ingest.at, ingestAt)
         XCTAssertEqual(ingest.systemLoad, 42.5)

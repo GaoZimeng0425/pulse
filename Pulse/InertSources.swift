@@ -95,20 +95,24 @@ extension SystemMonitor {
         historyEngine: HistoryEngine? = HistoryEngine(database: try? HistoryDatabase.openInMemory())
     ) -> SystemMonitor {
         SystemMonitor(
-            source: source,
-            coreTicks: LiveCoreTickSource(),
-            memoryStats: LiveMemoryStatsSource(),
-            networkCounters: LiveNetworkCountersSource(),
+            sources: MonitorSources(
+                process: source,
+                coreTicks: LiveCoreTickSource(),
+                memoryStats: LiveMemoryStatsSource(),
+                networkCounters: LiveNetworkCountersSource(),
+                birthScan: InertBirthScanSource(),
+                battery: InertBatterySource(),
+                diskCapacity: InertDiskCapacitySource(),
+                diskThroughput: { _ in InertDiskThroughputSource() },
+                devServerPortScanner: InertDevServerPortScanner(),
+                killService: InertKillService()
+            ),
             projectRoots: projectRoots,
-            killService: InertKillService(),
-            birthScanSource: InertBirthScanSource(),
-            historyEngine: historyEngine,
-            batterySource: InertBatterySource(),
-            diskCapacitySource: InertDiskCapacitySource(),
-            diskThroughputSource: { _ in InertDiskThroughputSource() },
-            nettopSource: InertNettopCSVSource(),
-            devServerPortScanner: InertDevServerPortScanner(),
-            alertCenter: .inert()
+            alerts: .inert(),
+            features: MonitorFeatures(
+                rankings: RankingsFeature(nettopSource: InertNettopCSVSource()),
+                history: HistoryFeature(engine: historyEngine)
+            )
         )
     }
 }

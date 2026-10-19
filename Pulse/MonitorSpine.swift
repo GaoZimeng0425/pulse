@@ -26,9 +26,10 @@ struct RoundContext: Sendable {
 /// 快照、同一登记表、同一差分构建下钻输入。值类型,由 SystemMonitor(MainActor)
 /// 持有;单测见 RoundSpineTests。
 ///
-/// 出生登记的三个来源全部只补缺、同 pid 先进登记表者为准(pid 复用不区分,
-/// LineageRegistry 的已知限制):历史回灌经 `mergeBirths` 即时并入;出生扫描的
-/// 累计表经 `stageScannerBirths` 暂存、每次 advance 开头并入;最后是本轮快照兜底。
+/// 出生登记三个来源:出生扫描的累计表经 `stageScannerBirths` 暂存、每次 advance
+/// 开头并入,其后本轮快照兜底——这两个是本会话活记录,只补缺、先进者为准;历史
+/// 回灌经 `restoreBirths` 即时叠加,与活记录同 pid 时按身份判别:同一进程取回灌
+/// (重启保归因),pid 复用则活记录胜——与到达先后无关(规则钉在 RoundSpineTests)。
 struct RoundSpine {
     private var pipeline: GroupingPipeline
     /// 出生扫描最近交付的累计登记表(整表替换):每次 advance 归组之前并入。
@@ -38,9 +39,9 @@ struct RoundSpine {
         pipeline = GroupingPipeline(configuration: configuration)
     }
 
-    /// 即时并入外部出生登记(历史库回灌):只补缺,不改既有记录。
-    mutating func mergeBirths(_ external: LineageRegistry) {
-        pipeline.mergeBirths(external)
+    /// 即时叠加历史库回灌的出生登记:同 pid 按身份判别,pid 复用时活记录胜。
+    mutating func restoreBirths(_ restored: LineageRegistry) {
+        pipeline.restoreBirths(restored)
     }
 
     /// 暂存出生扫描最近交付的累计登记表(BirthScanner 每 ~2s 交付一份整表,只增
@@ -50,7 +51,7 @@ struct RoundSpine {
         scannerBirths = latest
     }
 
-    /// 更新项目根(设置窗,工单 07):立即写入归组配置,下一次 advance 即以新根
+    /// 更新项目根(设置窗,工单 p0/07):立即写入归组配置,下一次 advance 即以新根
     /// 归组(增删 ≤1 轮生效);清空列表 = 回到父链上溯的降级路径。
     mutating func setProjectRoots(_ roots: [String]) {
         pipeline.setProjectRoots(roots)
@@ -89,29 +90,53 @@ struct MonitorVisibility: Equatable, Sendable {
     var anyWindow: Bool { popover || moduleRankings }
 }
 
+/// 功能模块回调主干 / 心跳的明确接口(SystemMonitor.start 时交给每个模块):模块
+/// 构造只吃自己的采集源,对主干与心跳的影响只经这两个口——装配因此可以挪到工厂
+/// (`SystemMonitor.live` / `preview`),不必在 SystemMonitor.init 里两段式接线。
+@MainActor
+struct MonitorHost {
+    /// 叠加历史库回灌的出生登记进主干(RoundSpine.restoreBirths)。
+    let restoreBirths: (LineageRegistry) -> Void
+    /// 心跳排行账本门控(Sampler.setRankingsActive):宿主给每条消息编代号,
+    /// 迟到的旧消息在 Sampler 侧丢弃。
+    let setRankingsActive: (Bool) -> Void
+
+    /// 全不接线的宿主(单测直驱模块用)。
+    static let inert = MonitorHost(restoreBirths: { _ in }, setRankingsActive: { _ in })
+}
+
 /// 功能模块扩展点(ADR-0003 预约「每个服务以独立模块 + 小协议扩展点组织,经注册表
 /// 组装」,此处兑现):每个功能(历史 / 告警 / 排行 / dev server / 网络 / 磁盘 / 电池,
 /// 及 P2 传感器)= @Observable 薄壳 + 纯值内核(AlertCenter + AlertEngine 即样板),
-/// 经 SystemMonitor 注册表组装;视图直读模块自身状态。编译期模块,不是运行时插件
-/// (ADR-0003)。四个钩子都有默认空实现,模块只实现自己关心的。
+/// 由工厂构造、经 MonitorFeatures 注册列表交给 SystemMonitor;视图直读模块自身状态。
+/// 编译期模块,不是运行时插件(ADR-0003)。钩子都有默认空实现,模块只实现自己关心的。
 @MainActor
 protocol MonitorFeature: AnyObject {
     /// 每轮心跳落地(SystemMonitor 的既有发布状态已更新为同一轮之后):主干产出的
     /// 同轮上下文;模块据此推进自身状态、执行自身效果(落库 / 告警 / 通知)。
     func onRound(_ context: RoundContext)
-    /// 窗口可见性变化:值真变化才派发(同值重复调用不派发);初值为全不可见。
+    /// 窗口可见性变化:值真变化才派发(同值重复调用不派发);初值为全不可见,
+    /// 可能早于 start 到达。
     func visibilityChanged(_ visibility: MonitorVisibility)
+    /// 磁盘吞吐读数交付(SystemMonitor 的磁盘吞吐传感器,每份交付都派发,含读失败
+    /// 时重投的上次好值)。磁盘迁成功能模块后,这一钩子随之收回。
+    func diskThroughputDelivered(_ reading: DiskThroughputReading)
     /// 本模块自有的非心跳传感器(ADR-0004 SensorScheduler 登记项):SystemMonitor.start
     /// 时取一次,与既有传感器同一个调度器驱动。心跳型读数不走这里(住 Sampler,
     /// 经 onRound 的 `context.update` 送达)。
     func sensorDrivers() -> [SensorDriver]
-    /// 随 SystemMonitor.start 启动一次(start 幂等,模块不会被启动两次)。
-    func start()
+    /// 随 SystemMonitor.start 启动一次(start 幂等,模块不会被启动两次),同时拿到
+    /// 回调主干 / 心跳的宿主接口。
+    func start(_ host: MonitorHost)
+    /// 随 SystemMonitor.stop 停机一次(单测收尾;产品运行期不调用)。
+    func stop()
 }
 
 extension MonitorFeature {
     func onRound(_ context: RoundContext) {}
     func visibilityChanged(_ visibility: MonitorVisibility) {}
+    func diskThroughputDelivered(_ reading: DiskThroughputReading) {}
     func sensorDrivers() -> [SensorDriver] { [] }
-    func start() {}
+    func start(_ host: MonitorHost) {}
+    func stop() {}
 }

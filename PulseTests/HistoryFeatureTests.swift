@@ -2,10 +2,10 @@ import GRDB
 import XCTest
 @testable import Pulse
 
-/// 历史功能模块薄壳(HistoryFeature):真 SQLite 内存库(绝不开生产库)+ 注入时钟。
-/// 钉住壳的接线:start 把库中出生登记交给回灌出口;逐轮落库经单一串行写入者、严格
-/// 按轮次顺序生效,累计在每笔落库之后读回发布;引擎缺席整体降级;SystemMonitor
-/// 登记了它,每轮心跳真的流到库里。
+/// 历史功能模块薄壳(HistoryFeature)唯一的壳层测试:真 SQLite 内存库(绝不开生产库)
+/// + 注入时钟,钉住逐轮落库经单一串行写入者、严格按轮次顺序生效,累计在每笔落库之后
+/// 读回发布。其余逻辑在纯内核 HistoryFeed(HistoryFeedTests);壳层不另测(2026-10-19
+/// 拍板:测试只写在 RoundSpine / Leaderboard / 各模块纯内核这些接缝上)。
 @MainActor
 final class HistoryFeatureTests: XCTestCase {
     /// 对齐到分钟边界的基准时刻。
@@ -31,16 +31,6 @@ final class HistoryFeatureTests: XCTestCase {
         func next() -> Date {
             lock.lock(); defer { lock.unlock() }
             return times.removeFirst()
-        }
-    }
-
-    /// 回灌出口的收件箱(MainActor 上收)。
-    @MainActor
-    private final class RestoreInbox {
-        private(set) var received: [LineageRegistry] = []
-
-        func receive(_ lineage: LineageRegistry) {
-            received.append(lineage)
         }
     }
 
@@ -107,7 +97,7 @@ final class HistoryFeatureTests: XCTestCase {
         let engine = HistoryEngine(database: queue, now: minute0, calendar: calendar)
         let clock = SteppingClock([5, 10, 15, 65, 125].map { minute0.addingTimeInterval($0) })
         let feature = HistoryFeature(engine: engine, clock: { clock.next() })
-        feature.start()
+        feature.start(.inert)
         defer { feature.stop() }
 
         for (load, down) in zip([10.0, 20, 30, 50, 70], [UInt64(100), 200, 300, 400, 500]) {
@@ -122,88 +112,5 @@ final class HistoryFeatureTests: XCTestCase {
         ])
         XCTAssertEqual(feature.networkTotals?.weekDownBytes, 1_000)
         XCTAssertEqual(feature.networkTotals?.todayUpBytes, 0)
-    }
-
-    // MARK: - 回灌
-
-    /// 上一会话落过库的出生登记(worker 200 生在 host 100 下):新会话 start 后经
-    /// 回灌出口交出一次,字段原样。
-    func testStartHandsLineageRestoredFromTheDatabaseToTheRestoreOutlet() async throws {
-        let queue = try HistoryDatabase.openInMemory()
-        var births = LineageRegistry()
-        births.register(pid: 200, entry: LineageRegistry.Entry(
-            parentPID: 100,
-            identity: ProcessIdentity(executablePath: "/usr/local/bin/worker", cwd: "/Users/x/work", argv: ["worker"])
-        ))
-        let previousSession = HistoryEngine(database: queue, now: minute0, calendar: calendar)
-        await previousSession.ingest(at: minute0, systemLoad: 1, groups: [], displayNames: [:], lineage: births)
-
-        let feature = HistoryFeature(
-            engine: HistoryEngine(database: queue, now: minute0.addingTimeInterval(120), calendar: calendar)
-        )
-        let inbox = RestoreInbox()
-        feature.onLineageRestored = { inbox.receive($0) }
-        feature.start()
-        defer { feature.stop() }
-        await waitUntil("回灌交出") { !inbox.received.isEmpty }
-
-        XCTAssertEqual(inbox.received.count, 1)
-        let restored = try XCTUnwrap(inbox.received.first)
-        XCTAssertEqual(restored.entries.keys.sorted(), [200])
-        XCTAssertEqual(restored.entries[200]?.parentPID, 100)
-        XCTAssertEqual(restored.entries[200]?.executablePath, "/usr/local/bin/worker")
-    }
-
-    // MARK: - 引擎缺席
-
-    /// 库打开失败的降级路径:start 不起写入者、不回灌;喂轮次与磁盘读数都不发布
-    /// 累计;查询 nil。
-    func testWithoutEngineNothingIsRestoredOrPublishedAndSeriesIsNil() async {
-        let feature = HistoryFeature(engine: nil)
-        let inbox = RestoreInbox()
-        feature.onLineageRestored = { inbox.receive($0) }
-
-        feature.start()
-        feature.recordDiskThroughput(DiskThroughputReading(current: .zero, trend: [], readBytesDelta: 4_096))
-        feature.onRound(round(load: 10, netDown: 100))
-        await Task.yield()
-        let series = await feature.series(metric: .systemLoad, range: .hour1, now: minute0)
-
-        XCTAssertNil(feature.networkTotals)
-        XCTAssertTrue(inbox.received.isEmpty)
-        XCTAssertNil(series)
-    }
-
-    // MARK: - SystemMonitor 接线
-
-    /// SystemMonitor 构造即登记历史模块:start 后首轮心跳经 onRound 落进注入的内存库,
-    /// 累计读回发布到 `monitor.history`(惰性网络源 → 增量 0,累计全 0 而非 nil)。
-    func testSystemMonitorFeedsRoundsIntoItsHistoryFeature() async throws {
-        let monitor = SystemMonitor(
-            source: SyntheticProcessSource(processes: [
-                RawProcess(pid: 50, parentPID: 1, executablePath: "/Applications/WaifuX.app/Contents/MacOS/WaifuX"),
-            ]),
-            coreTicks: InertCoreTickSource(),
-            memoryStats: InertMemoryStatsSource(),
-            networkCounters: InertNetworkCountersSource(),
-            projectRoots: [],
-            killService: InertKillService(),
-            birthScanSource: InertBirthScanSource(),
-            historyEngine: HistoryEngine(database: try HistoryDatabase.openInMemory()),
-            batterySource: InertBatterySource(),
-            diskCapacitySource: InertDiskCapacitySource(),
-            diskThroughputSource: { _ in InertDiskThroughputSource() },
-            nettopSource: InertNettopCSVSource(),
-            devServerPortScanner: InertDevServerPortScanner(),
-            alertCenter: AlertCenter.inert()
-        )
-
-        monitor.start()
-        defer { monitor.stop() }
-        await waitUntil("首笔落库后的累计") { monitor.history.networkTotals != nil }
-
-        XCTAssertEqual(monitor.history.networkTotals, NetworkTotalsReading(
-            todayDownBytes: 0, todayUpBytes: 0, weekDownBytes: 0, weekUpBytes: 0
-        ))
     }
 }

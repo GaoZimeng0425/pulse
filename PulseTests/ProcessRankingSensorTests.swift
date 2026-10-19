@@ -118,6 +118,19 @@ final class ProcessRankingSensorTests: XCTestCase {
         XCTAssertNil(rounds[6].energyImpacts, "满窗后以本轮重立基线,新窗重新计")
     }
 
+    func testEnergyRoundCarriesTheActualWindowLength() {
+        // 弹窗开合让心跳在窗中途 1s → 5s 切换:满窗那轮实际跨 8s,不是标称 5s——
+        // 能耗读数带上实际窗长,唤醒/秒按它折算(架构审查 arch-review-2026-10-18/01 L1)。
+        let rounds = feed([
+            snapshot(at: 0, (100, 0, 0, 0, 0)),
+            snapshot(at: 3, (100, 100, 4, 0, 0)),
+            snapshot(at: 8, (100, 200, 16, 0, 0)),
+        ])
+        XCTAssertNil(rounds[1].energyWindowSeconds, "未满窗不带窗长")
+        XCTAssertEqual(rounds[2].energyWindowSeconds ?? 0, 8, accuracy: 1e-9)
+        XCTAssertEqual(rounds[2].energyImpacts?[100]?.wakeupsDelta, 16)
+    }
+
     func testDiskWindowIsIndependentOfEnergyWindow() {
         // 5s 心跳下能耗每轮出数,磁盘 30s 窗只在第 30s 出数,速率按 30s 折算。
         let rounds = feed(stride(from: 0, through: 30, by: 5).map { second in
