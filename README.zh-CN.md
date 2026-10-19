@@ -7,6 +7,7 @@
 ![UI](https://img.shields.io/badge/UI-SwiftUI-0096FF?logo=swift&logoColor=white)
 ![Root](https://img.shields.io/badge/root-not%20required-success)
 ![Tests](https://img.shields.io/badge/unit%20tests-535-green)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
 macOS 菜单栏系统监视器,回答活动监视器不回答的问题:**到底是谁在吃我的机器?**不是一千行进程列表,而是应用分组、项目级归因,和那一个真正该背锅的进程——连它的 cwd 和完整 argv 都给你。
 
@@ -115,3 +116,7 @@ sh scripts/test.sh --only SomeTests  # 只跑单个套件
 - **UI 形态与数字口径基准**:[Vitals](https://vitalsmac.com)(闭源,仅做行为对齐,未接触其代码)
 - **算法参考(MIT,移植处已在文件头注明)**:[exelban/stats](https://github.com/exelban/stats)(GPU/ANE/SMC/网络/电池)、[henrydennis/petal](https://github.com/henrydennis/petal)(APFS 容器级容量)、[jithin-sabu/purge-app](https://github.com/jithin-sabu/purge-app)(产物目录学与活跃度判定)
 - **点子参考(未使用其任何代码)**:[tw93/Mole](https://github.com/tw93/Mole)(GPL-3.0)
+
+## 许可证
+
+Pulse 以 [MIT 许可证](LICENSE)发布。上文致谢的第三方算法移植部分沿用其各自的 MIT 条款,在使用处的文件头有注明。

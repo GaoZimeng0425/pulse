@@ -7,6 +7,7 @@
 ![UI](https://img.shields.io/badge/UI-SwiftUI-0096FF?logo=swift&logoColor=white)
 ![Root](https://img.shields.io/badge/root-not%20required-success)
 ![Tests](https://img.shields.io/badge/unit%20tests-535-green)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
 A native macOS menu bar system monitor that answers the question Activity Monitor won't: **what is actually eating my machine?** Not a 1000-row process list — app groups, project-level attribution, and the one process that matters, down to its cwd and full argv.
 
@@ -115,3 +116,7 @@ By permission tier, root-free first:
 - **UI & metric-semantics baseline**: [Vitals](https://vitalsmac.com) (closed-source — behavior alignment only, its code was never touched)
 - **Algorithm references (MIT, ports noted in file headers)**: [exelban/stats](https://github.com/exelban/stats) (GPU/ANE/SMC/network/battery), [henrydennis/petal](https://github.com/henrydennis/petal) (APFS container capacity), [jithin-sabu/purge-app](https://github.com/jithin-sabu/purge-app) (artifact catalogs & activity heuristics)
 - **Ideas only, no code**: [tw93/Mole](https://github.com/tw93/Mole) (GPL-3.0)
+
+## License
+
+Pulse is released under the [MIT License](LICENSE). Third-party algorithm ports credited above keep their own MIT terms, noted in the headers of the files that use them.
