@@ -88,3 +88,5 @@ body 里,与 allGroups 两套时钟)/ 视图内联 cpuLeader。tie-break/leader/
 - **测试宿主读写生产历史库**(审查未覆盖,lsof 实测):单测托管在 app 内,宿主走完整 PulseApp 装配 → 以读写方式打开 `~/Library/Application Support/Pulse/history.sqlite`、起真实采样、读真实项目根。已修 `0c892c1`(@main 入口在测试时起空壳 TestHostApp;回归钉 TestHostIsolationTests)。残余:SystemMonitor 的 `HistoryEngine.openDefault()` 默认参数仍会让直接 `SystemMonitor()` 的测试/预览误连生产库——并入票 A 高1。
 - **高2 已落地**(票 A 首段),中5 前提随之消失,建议撤销——见 issues/01。
 - 用户反馈的菜单栏 CPU 100% 折行与本审查无关,已修 `b0a6167`(定宽槽按常规字体量宽、实际绘制 medium + 等宽数字,溢出 0.5pt 折行)。
+- **环境清理(2026-10-19,用户拍板)**:通知授权错乱的环境根因——`com.gaozimeng.pulse` 在 LaunchServices 有 46 条 ad-hoc 注册(21 条已删 worktree 路径 + 22 个已删 worktree 留下的 DerivedData Debug 副本 + 3 条正当)。已注销 43 条并 `lsregister -gc`、`-f` 重注册 /Applications 版,余 3 条正当注册;Debug 配置改用 `com.gaozimeng.pulse.debug`(`a82444a`),单测宿主与开发运行不再共用 Release 版的通知授权 / 偏好域 / 注册身份。告警通知修复后真机首投成功(16:24:08)。
+- **残余(未处理,记档)**:①Debug 运行仍与 Release 共用 `~/Library/Application Support/Pulse/history.sqlite` 与 `~/.Pulse/logs`(路径按名字不按 bundle id)——Xcode 里直接 Run 的 Debug 版会写生产历史库;测试宿主已由 `0c892c1` 空壳入口隔离。可在票 05(PulseCore)或后续让存储路径随 bundle id 分流。②22 个 DerivedData `Pulse-*` 目录仍在磁盘上(仅注销未删除),被 Spotlight 重新发现时可能重新注册;需要时可在 Xcode 里清 DerivedData。
