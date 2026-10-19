@@ -9,7 +9,7 @@ Issues and specs for this repo live as markdown files in `.scratch/`.
 - Implementation issues are one file per ticket at `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`, never a single combined tickets file
 - Triage state is recorded as a `Status:` line near the top of each issue file (see `triage-labels.md` for the role strings)
 - Comments and conversation history append to the bottom of the file under a `## Comments` heading
-- 代码注释引用工单一律写全名 `<feature-slug>/<NN>`(如 `p1-history/06`)——编号只在目录内唯一,裸写"工单 06"会撞号(2026-10-19 拍板;存量裸号不批量改,在所在文件改动时顺带补全)
+- 代码注释引用工单一律写全名 `<feature-slug>/<NN>`(如 `p1-history/06`)——编号只在目录内唯一,裸写"工单 06"会撞号(2026-10-19 拍板)。规则只管**新写**的注释(含挪动重写的段落);存量裸号不强制补——裸号本身有歧义,补全要逐条考证所指工单,不属于顺手活
 
 ## When a skill says "publish to the issue tracker"
 
