@@ -1,5 +1,9 @@
 # Pulse
 
+<p align="center">
+  <img src="Pulse/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png" width="120" alt="Pulse 应用图标">
+</p>
+
 [English](README.md) | **简体中文**
 
 ![Platform](https://img.shields.io/badge/platform-macOS%2026%2B-black)
