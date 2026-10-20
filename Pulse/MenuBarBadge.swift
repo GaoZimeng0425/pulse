@@ -9,7 +9,7 @@ import SwiftUI
 
 // MARK: - 槽位配置
 
-/// 徽标槽位指标(工单 09 四选一)。
+/// 徽标槽位指标(工单 p1-history/09;四项可同时上屏)。
 enum MenuBarBadgeMetric: String, CaseIterable {
     case cpu
     case ram
@@ -21,22 +21,23 @@ enum MenuBarBadgeMetric: String, CaseIterable {
         switch self {
         case .cpu: "CPU 负载"
         case .ram: "内存占用"
-        case .diskRemaining: "磁盘剩余"
+        case .diskRemaining: "磁盘剩余 %"
         case .networkRate: "网络速率"
         }
     }
 }
 
-/// 槽位配置:1–3 个槽位,每槽一指标,顺序即菜单栏从左到右。
+/// 槽位配置:1 到「指标总数」个槽位(四项可同时上屏,2026-10-20 用户要求),每槽一
+/// 指标,顺序即菜单栏从左到右。
 /// 以逗号连接的 rawValue 进 @AppStorage(RawRepresentable 直存),
 /// 持久与"配置即时生效、重启保留"都由 UserDefaults 承担。
 struct MenuBarBadgeConfiguration: Equatable, RawRepresentable {
-    /// 合法槽位数(spec:1–3)。
-    static let slotRange = 1...3
+    /// 合法槽位数:1 到指标总数(原 spec 1–3,2026-10-20 放开)。
+    static let slotRange = 1...MenuBarBadgeMetric.allCases.count
     /// 默认配置(Round-2 共识):CPU + RAM,与可配置前的现状一致。
     static let `default` = MenuBarBadgeConfiguration(slots: [.cpu, .ram])
 
-    /// 降级(spec 验收):非法配置(空 / 超 3 槽)回落默认,不崩不猜。
+    /// 降级(spec 验收):非法配置(空 / 超上限)回落默认,不崩不猜。
     init(slots: [MenuBarBadgeMetric]) {
         self.slots = Self.slotRange.contains(slots.count) ? slots : Self.default.slots
     }
@@ -67,8 +68,10 @@ struct MenuBarBadgeData: Equatable {
     var cpuLoadPercent: Double?
     /// 内存构成:RAM 占比与压力变色的来源;nil = 首轮前,占位。
     var memory: MemoryBreakdown?
-    /// 磁盘实际可用字节(important 口径,工单 05 的 lastGood);nil = 未到读数。
+    /// 磁盘实际可用字节(important 口径,工单 p1-history/05 的 lastGood);nil = 未到读数。
     var diskAvailableBytes: Int64?
+    /// 磁盘容器总容量(剩余百分比的分母);nil = 未到读数。
+    var diskTotalBytes: UInt64?
     /// 网络速率(工单 06 填充):直用 NetworkSensor 的 NetworkRates——09 的
     /// 壳契约副本已并入该类型(字段不再两次转译);nil = 未上线/未到读数,占位。
     var networkRate: NetworkRates?
@@ -77,8 +80,10 @@ struct MenuBarBadgeData: Equatable {
 /// 单枚徽标的渲染输入:纯值语义,不含 SwiftUI 颜色——强调级别由渲染器
 /// 映射成色,缓存键得以用值比较(Equatable)。
 struct MenuBarBadgeContent: Equatable {
-    /// 数字上方的小标签("CPU"/"RAM"/"磁盘"/"网络")。
+    /// 数字上方的小标签("CPU"/"RAM"/"磁盘"/"网络");叠两行版式不绘制,只作无障碍
+    /// 与调试文案。
     let caption: String
+    /// 数值文案;叠两行版式以 "\n" 分上下两行。
     let text: String
     /// 强调级:normal = 墨色随外观,warning = 橙,critical = 红。
     let emphasis: Emphasis
@@ -88,6 +93,13 @@ struct MenuBarBadgeContent: Equatable {
     /// 速率单位跨档(KB/MB/GB)文本长度本就跨档,按最坏情形钉死会长期大片
     /// 留白,得不偿失。
     var slotWidth: CGFloat? = nil
+    /// 版式:小标签 + 数字(默认),或不带标签的上下两行小字(网络上下行)。
+    var layout: Layout = .captioned
+
+    enum Layout: Equatable {
+        case captioned
+        case stacked
+    }
 
     enum Emphasis: Equatable {
         case normal
@@ -99,13 +111,8 @@ struct MenuBarBadgeContent: Equatable {
 // MARK: - 配置 → 渲染输入(纯函数,spec 钉死的测试缝)
 
 /// 槽位配置 × 数据快照 → 有序徽标内容。降级规则全在此折叠:
-/// 读数缺失占位("–"/"—",不伪造);网络紧凑双行放不下 → 只显示下载。
+/// 读数缺失占位("–"/"—",不伪造)。
 enum MenuBarBadgeComposer {
-    /// 网络徽标宽度预算(点,策略常量):紧凑双行典型宽 115–125pt、
-    /// 超宽数字 ≥135pt(本机菜单栏字体实测),预算取中间 132——典型速率
-    /// 保持双行,数字过长(三位整数百 MB 级对撞)自动降级只显示下载。
-    static let networkWidthBudget: CGFloat = 132
-
     /// CPU 变红阈值:与菜单栏红线同一出处语义。字面量直写绕开
     /// SystemMonitor 的 MainActor 隔离(先例:StatusBadgeRules),漂移由
     /// MenuBarBadgeTests 的 @MainActor 断言拦截。
@@ -119,7 +126,8 @@ enum MenuBarBadgeComposer {
             switch slot {
             case .cpu: cpuContent(load: data.cpuLoadPercent)
             case .ram: ramContent(memory: data.memory)
-            case .diskRemaining: diskContent(availableBytes: data.diskAvailableBytes)
+            case .diskRemaining:
+                diskContent(availableBytes: data.diskAvailableBytes, totalBytes: data.diskTotalBytes)
             case .networkRate: networkContent(rate: data.networkRate)
             }
         }
@@ -156,34 +164,43 @@ enum MenuBarBadgeComposer {
         )
     }
 
-    /// 磁盘剩余:实际可用(important 口径)十进制 GB 整数,读数未到占位 "—"。
-    /// 槽位按三位数 "999 GB" 定宽(>1TB 剩余的四位数是罕见事件,可接受)。
-    static func diskContent(availableBytes: Int64?) -> MenuBarBadgeContent {
-        MenuBarBadgeContent(
+    /// 磁盘剩余:实际可用(important 口径)占容器总容量的百分比(2026-10-20 用户
+    /// 拍板,替代 GB 整数);任一读数未到或总量为 0 占位 "—"。槽位同 CPU 按 "100%" 定宽。
+    static func diskContent(availableBytes: Int64?, totalBytes: UInt64?) -> MenuBarBadgeContent {
+        let text: String
+        if let availableBytes, let totalBytes, totalBytes > 0 {
+            text = PulseFormat.cpuPercent(Double(max(0, availableBytes)) / Double(totalBytes) * 100)
+        } else {
+            text = "—"
+        }
+        return MenuBarBadgeContent(
             caption: "磁盘",
-            text: PulseFormat.diskRemainingBadge(availableBytes),
+            text: text,
             emphasis: .normal,
-            slotWidth: slotWidth(for: "999 GB")
+            slotWidth: slotWidth(for: "100%")
         )
     }
 
-    /// 网络:紧凑上下行 "↓下载 ↑上传";数据未到占位 "—";
-    /// 紧凑文本估算渲染宽超预算 → 降级只显示下载。
+    /// 网络:上行在上、下行在下叠两行(2026-10-20 用户拍板,Stats 同款),两行都恒
+    /// 显示——不再超宽降级只留下载;数据未到两行各占位 "—"。槽位按两行里最宽的
+    /// 现实读数 "↓999.9 KB/s"(跨到 MB 前的最长串)定宽。
     static func networkContent(rate: NetworkRates?) -> MenuBarBadgeContent {
-        guard let rate else {
-            return MenuBarBadgeContent(caption: "网络", text: "—", emphasis: .normal)
-        }
-        let download = PulseFormat.networkRateBadge(rate.downBytesPerSecond)
-        let upload = PulseFormat.networkRateBadge(rate.upBytesPerSecond)
-        let compact = "↓\(download) ↑\(upload)"
-        if estimatedWidth(of: compact) <= networkWidthBudget {
-            return MenuBarBadgeContent(caption: "网络", text: compact, emphasis: .normal)
-        }
-        return MenuBarBadgeContent(caption: "网络", text: "↓\(download)", emphasis: .normal)
+        let upload = rate.map { PulseFormat.networkRateBadge($0.upBytesPerSecond) } ?? "—"
+        let download = rate.map { PulseFormat.networkRateBadge($0.downBytesPerSecond) } ?? "—"
+        return MenuBarBadgeContent(
+            caption: "网络",
+            text: "↑\(upload)\n↓\(download)",
+            emphasis: .normal,
+            slotWidth: slotWidth(for: "↓999.9 KB/s", fontSize: stackedFontSize),
+            layout: .stacked
+        )
     }
 
     /// 徽标数值字号(渲染器与槽位量宽共用的唯一出处,DESIGN.md 菜单栏特例)。
     static let valueFontSize: CGFloat = 11.5
+    /// 叠两行版式的字号(DESIGN.md 菜单栏特例):两行合高不超过「7pt 标签 + 11.5pt
+    /// 数字」的徽标高。
+    static let stackedFontSize: CGFloat = 9
 
     /// 文本估算渲染宽(点):菜单栏字体实测——同字同字号必同宽,宽度判定
     /// 因此确定可测;徽标实际绘制带 monospacedDigit,此处允许近似。
@@ -196,8 +213,8 @@ enum MenuBarBadgeComposer {
     /// 2pt 余量。不能用 estimatedWidth 量:等宽数字的 "1" 与其他数字同宽、
     /// 字重 medium,"100%" 比菜单栏常规字体宽 ~3pt——2026-10-19 前按常规字体
     /// 量,"100%" 溢出定宽槽被折成两行(用户反馈)。
-    static func slotWidth(for reference: String) -> CGFloat {
-        let font = NSFont.monospacedDigitSystemFont(ofSize: valueFontSize, weight: .medium)
+    static func slotWidth(for reference: String, fontSize: CGFloat = valueFontSize) -> CGFloat {
+        let font = NSFont.monospacedDigitSystemFont(ofSize: fontSize, weight: .medium)
         return ceil((reference as NSString).size(withAttributes: [.font: font]).width) + 2
     }
 }
@@ -262,13 +279,22 @@ enum MenuBarBadgeRenderer {
         let renderer = ImageRenderer(
             content: HStack(alignment: .center, spacing: 5) {
                 ForEach(Array(contents.enumerated()), id: \.offset) { _, content in
-                    badge(
-                        caption: content.caption,
-                        valueText: content.text,
-                        valueColor: color(for: content.emphasis, ink: ink),
-                        ink: ink,
-                        slotWidth: content.slotWidth
-                    )
+                    switch content.layout {
+                    case .captioned:
+                        badge(
+                            caption: content.caption,
+                            valueText: content.text,
+                            valueColor: color(for: content.emphasis, ink: ink),
+                            ink: ink,
+                            slotWidth: content.slotWidth
+                        )
+                    case .stacked:
+                        stackedBadge(
+                            lines: content.text.components(separatedBy: "\n"),
+                            color: color(for: content.emphasis, ink: ink),
+                            slotWidth: content.slotWidth
+                        )
+                    }
                 }
             }
         )
@@ -302,7 +328,7 @@ enum MenuBarBadgeRenderer {
     /// (顺序 = 数组序,caption/text/emphasis 逐枚进键)。
     static func cacheKey(for contents: [MenuBarBadgeContent], colorScheme: ColorScheme) -> String {
         let body = contents
-            .map { "\($0.caption)|\($0.text)|\($0.emphasis)" }
+            .map { "\($0.caption)|\($0.text)|\($0.emphasis)|\($0.layout)" }
             .joined(separator: ";")
         return "\(colorScheme == .dark ? "dark" : "light")|\(body)"
     }
@@ -329,6 +355,21 @@ enum MenuBarBadgeRenderer {
                 .foregroundStyle(valueColor)
                 .fixedSize()
                 .frame(minWidth: slotWidth, alignment: .leading)
+        }
+        .padding(.horizontal, 1)
+    }
+
+    /// 叠两行徽标(网络上下行):无小标签,两行同字号左对齐,定宽槽为下限、恒单行。
+    private static func stackedBadge(lines: [String], color: Color, slotWidth: CGFloat?) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                Text(line)
+                    .font(.system(size: MenuBarBadgeComposer.stackedFontSize, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(color)
+                    .fixedSize()
+                    .frame(minWidth: slotWidth, alignment: .leading)
+            }
         }
         .padding(.horizontal, 1)
     }

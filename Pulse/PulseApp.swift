@@ -137,7 +137,7 @@ struct MenuBarLoadLabel: View {
 
     var body: some View {
         // 用户拍板(2026-10-15):菜单栏双读数——CPU / RAM,小标签在数字上方。
-        // 工单 09 起读数清单可配置(1–3 槽四选一),默认 [CPU, RAM] 与该形态
+        // 工单 p1-history/09 起读数清单可配置(1–4 槽,四项可同时上屏),默认 [CPU, RAM] 与该形态
         // 逐像素一致;数据快照在此从 SystemMonitor 折叠,映射在纯函数层。
         let contents = MenuBarBadgeComposer.compose(
             MenuBarBadgeConfiguration(rawValue: badgeConfigRaw) ?? .default,
@@ -145,6 +145,7 @@ struct MenuBarLoadLabel: View {
                 cpuLoadPercent: monitor.systemCPULoad,
                 memory: monitor.memory,
                 diskAvailableBytes: monitor.disk.capacity?.availableForImportantUsageBytes,
+                diskTotalBytes: monitor.disk.capacity?.containerTotalBytes,
                 networkRate: monitor.network.reading?.rates
             )
         )
