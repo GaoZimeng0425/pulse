@@ -305,9 +305,31 @@ final class HistoryEngineTests: XCTestCase {
             at: minute0.addingTimeInterval(65), systemLoad: 1, groups: [], displayNames: [:], lineage: LineageRegistry()
         )
 
-        XCTAssertFalse(first)
-        XCTAssertFalse(sameMinute)
-        XCTAssertTrue(nextMinute, "跨分钟冲刷了上一分钟")
+        XCTAssertEqual(first, .buffered)
+        XCTAssertEqual(sameMinute, .buffered)
+        XCTAssertEqual(nextMinute, .wroteMinute, "跨分钟冲刷了上一分钟")
+    }
+
+    /// 时钟曾跑快、小时表里留下一行未来小时:补卷积下界只看当前小时之前,不被它卡住
+    /// (审查 HIGH:否则此后每次启动都补不进中间的小时,7 天后分钟行清理即永久缺失)。
+    func testFutureDatedHourRowDoesNotBlockStartupRollup() async throws {
+        let engineA = try makeFileEngine(now: minute0)
+        await ingest(engineA, at: minute0, load: 12, groups: [])
+        await ingest(engineA, at: minute0.addingTimeInterval(60), load: 0, groups: [])
+        let future = HistoryWindows.hourStartSeconds(of: minute0) + 10 * 365 * 24 * 3600
+        try await queue.write { db in
+            try db.execute(sql: "DELETE FROM system_hour")
+            try db.execute(sql: "INSERT INTO system_hour (ts, load_avg, load_max) VALUES (?, 1, 1)", arguments: [future])
+        }
+
+        let engineB = try makeFileEngine(now: minute0.addingTimeInterval(3600))
+        await ingest(engineB, at: minute0.addingTimeInterval(3600), load: 0, groups: [])
+
+        let rolled = try scalarInt(
+            "SELECT count(*) FROM system_hour WHERE ts = ?",
+            [HistoryWindows.hourStartSeconds(of: minute0)]
+        )
+        XCTAssertEqual(rolled, 1)
     }
 
     // MARK: 留存清理

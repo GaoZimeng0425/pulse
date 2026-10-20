@@ -59,10 +59,11 @@ final class HistoryFeature: MonitorFeature {
             for await write in writes {
                 switch write {
                 case .ingest(let round):
-                    // 累计只在分钟行落库时才变(当前分钟还在内存缓冲):写了分钟行、或
-                    // 尚无读数时才重查,弹窗 1s 节奏下每分钟一次而非每轮(乙7)。
-                    let wroteMinute = await engine.ingest(round)
-                    guard wroteMinute || self?.networkTotals == nil else { continue }
+                    // 累计只在分钟行落库时才变(当前分钟还在内存缓冲):写了分钟行、尚无
+                    // 读数、或落库失败(已发布的读数可能过时,如跨零点)才重查——弹窗 1s
+                    // 节奏下每分钟一次而非每轮(乙7)。
+                    let outcome = await engine.ingest(round)
+                    guard outcome != .buffered || self?.networkTotals == nil else { continue }
                     let totals = await engine.networkTotals(now: round.at)
                     self?.networkTotals = totals
                 case .reconcileProjectRoots(let roots):

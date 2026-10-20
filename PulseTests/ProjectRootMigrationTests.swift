@@ -86,6 +86,37 @@ final class ProjectRootMigrationTests: XCTestCase {
         XCTAssertEqual(root, "/Users/x/new/pulse")
     }
 
+    /// 改根发生在一分钟中途:内存缓冲里这一分钟的旧键也一并换掉,冲刷时不留旧键行
+    /// (审查 MEDIUM)。
+    func testReconcileMidMinuteRekeysTheBufferedMinute() async throws {
+        let queue = try HistoryDatabase.openInMemory()
+        let engine = HistoryEngine(database: queue, now: minute0)
+        let old = GroupIdentity.project(root: "/a/old/pulse", worktreeName: "feat")
+        await engine.reconcileProjectRoots(["/a/old/pulse"])
+        await engine.ingest(
+            at: minute0, systemLoad: 1,
+            groups: [GroupSample(id: old, cpuPercent: 4, memoryBytes: 1)],
+            displayNames: [old: "pulse @ feat"], lineage: LineageRegistry()
+        )
+
+        await engine.reconcileProjectRoots(["/a/new/pulse"])
+        let renamed = GroupIdentity.project(root: "/a/new/pulse", worktreeName: "feat")
+        await engine.ingest(
+            at: minute0.addingTimeInterval(30), systemLoad: 1,
+            groups: [GroupSample(id: renamed, cpuPercent: 8, memoryBytes: 1)],
+            displayNames: [renamed: "pulse @ feat"], lineage: LineageRegistry()
+        )
+        await engine.ingest(
+            at: minute0.addingTimeInterval(65), systemLoad: 1, groups: [], displayNames: [:], lineage: LineageRegistry()
+        )
+
+        XCTAssertEqual(try groupKeys("sample_min", in: queue), ["project:/a/new/pulse@feat"])
+        let average = try await queue.read { db in
+            try Double.fetchOne(db, sql: "SELECT cpu_avg FROM sample_min")
+        }
+        XCTAssertEqual(average ?? 0, 6, accuracy: 1e-9, "旧键与新键的两次采样合并成一行")
+    }
+
     /// 歧义的改根不动库;首启(库里没有上一版快照)只记快照不迁。
     func testAmbiguousChangeAndFirstRunLeaveRowsUntouched() async throws {
         let queue = try HistoryDatabase.openInMemory()

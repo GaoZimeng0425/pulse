@@ -76,6 +76,28 @@ struct MinuteRollupBuffer: Sendable, Equatable {
         var memoryPeak = UInt64(0)
         var processPeak = 0
         var count = 0
+
+        /// 两份同窗累计并成一份(改根换键撞上已有新键时)。
+        func merged(with other: GroupAccumulator) -> GroupAccumulator {
+            GroupAccumulator(
+                cpuSum: cpuSum + other.cpuSum,
+                cpuPeak: max(cpuPeak, other.cpuPeak),
+                memoryPeak: max(memoryPeak, other.memoryPeak),
+                processPeak: max(processPeak, other.processPeak),
+                count: count + other.count
+            )
+        }
+    }
+
+    /// 当前窗的组身份按映射换键(改项目根时,arch-review-2026-10-18/03 乙3):这一分钟
+    /// 冲刷时不再写出旧键行;换键后撞上同窗已有的新键则合并累计。
+    mutating func rekeyGroups(_ transform: (GroupIdentity) -> GroupIdentity) {
+        var rekeyed: [GroupIdentity: GroupAccumulator] = [:]
+        for (identity, accumulator) in groupAccumulators {
+            let key = transform(identity)
+            rekeyed[key] = rekeyed[key].map { $0.merged(with: accumulator) } ?? accumulator
+        }
+        groupAccumulators = rekeyed
     }
 
     /// 当前窗的分钟起点;无样本时为 nil。

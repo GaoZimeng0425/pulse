@@ -24,9 +24,9 @@ struct HistoryIngest: Equatable, Sendable {
 }
 
 extension HistoryEngine {
-    /// 一笔落库入参整包进引擎(参数逐一展开给既有入口);返回是否写了分钟行。
+    /// 一笔落库入参整包进引擎(参数逐一展开给既有入口);返回落库结果。
     @discardableResult
-    func ingest(_ round: HistoryIngest) -> Bool {
+    func ingest(_ round: HistoryIngest) -> HistoryIngestOutcome {
         ingest(
             at: round.at,
             systemLoad: round.systemLoad,

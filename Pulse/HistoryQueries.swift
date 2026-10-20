@@ -269,7 +269,7 @@ enum HistoryQuery {
 
 extension HistoryEngine {
     /// 历史页查询:引擎 actor 上执行 = 不占主线程(spec User Story 10);
-    /// 失败返回 nil(历史是旁路,查询失败也不打断页面),日志走与落库共用的健康状态沿
+    /// 失败返回 nil(历史是旁路,查询失败也不打断页面),日志走读路径健康状态沿
     /// (只在翻转时记,arch-review-2026-10-18/03 乙6)——页面每分钟重查,逐次记会刷屏。
     /// 库不可用同样返回 nil,页面按占位处理。
     func series(
@@ -284,10 +284,10 @@ extension HistoryEngine {
             let series = try await database.read { db in
                 try HistoryQuery.series(metric: metric, range: range, now: now, in: db)
             }
-            noteDatabaseSuccess()
+            noteReadSuccess()
             return series
         } catch {
-            noteDatabaseFailure("历史页查询失败", error)
+            noteReadFailure("历史页查询失败", error)
             return nil
         }
     }
