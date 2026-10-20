@@ -3,8 +3,9 @@ import Foundation
 // MARK: - stableKey 逆映射(工单 03,历史库读回侧)
 
 extension GroupIdentity {
-    /// 由规范字符串(`stableKey`)重建类型化组身份——历史六表的 group_id
-    /// 一律存 stableKey,消费端(历史页/回灌)由此拿回身份,不再拿字符串当 ID。
+    /// 由规范字符串(`stableKey`)重建类型化组身份——历史表的 group_id 一律存
+    /// stableKey,将来按组的历史视图由此拿回身份,不再拿字符串当 ID。**目前无产品
+    /// 调用方**(乙8 注释钉死:预留逆映射,往返一致性由 GroupIdentityKeyTests 钉住)。
     ///
     /// 字符串约定本身对含 "@" 的字符串有歧义(P0 前缀约定如此):此处取
     /// **第一个** "@" 拆 worktree——项目根是绝对路径而 worktree 名是短目录名,
