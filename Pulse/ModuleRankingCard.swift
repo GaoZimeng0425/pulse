@@ -1,12 +1,15 @@
 import SwiftUI
 import AppKit
 
-// MARK: - 模块排行共用卡(工单 01):电池/磁盘/网络三页各一张只读排行
+// MARK: - 模块排行共用卡(工单 module-rankings/01):电池/磁盘/网络三页各一张只读排行
 // 视觉配方对齐 RankingRowView 的 regular 档(图标 22、名称 13 medium、副文
 // 10.5、数值 13 semibold monospacedDigit、meter 110 宽榜首归一、行距 1/行内
 // 距 6×7),但**无悬停结束按钮、不可展开**——模块排行只读,处置入口不进
 // (工单拍板)。卡形态 = Surface.card + {rounded.card} 18 + {spacing.card-padding}
 // 16(DESIGN.md 令牌),标题走 {typography.card-title}(12.5 semibold 指标色)。
+// 紧凑档(弹窗,2026-10-20 起与主窗口同内容)对齐 RankingRowView 的 compact 档:
+// 图标 18、名称/数值 12.5、meter 52、数值列 48、行内距 5;卡 {rounded.card-compact} 12
+// + {spacing.card-padding-compact} 12。
 
 struct ModuleRankingCardView: View {
     let title: String
@@ -15,6 +18,8 @@ struct ModuleRankingCardView: View {
     let accent: Color
     /// 节拍注脚("5 秒一档" / "30 秒一档"):数据新鲜度的安静声明。
     let cadenceNote: String
+    /// 弹窗紧凑档。
+    var isCompact = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -26,7 +31,7 @@ struct ModuleRankingCardView: View {
                 emptyState
             } else {
                 ForEach(rows) { row in
-                    ModuleRankingRowView(row: row, accent: accent)
+                    ModuleRankingRowView(row: row, accent: accent, isCompact: isCompact)
                 }
             }
             Text(cadenceNote)
@@ -34,9 +39,9 @@ struct ModuleRankingCardView: View {
                 .foregroundStyle(.tertiary)
                 .padding(.top, 6)
         }
-        .padding(16)
+        .padding(isCompact ? 12 : 16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Surface.card, in: .rect(cornerRadius: 18))
+        .background(Surface.card, in: .rect(cornerRadius: isCompact ? 12 : 18))
     }
 
     /// 空态安静文案:基线轮(首见不出数)、门控清账、全零空闲都落这里,
@@ -55,14 +60,15 @@ struct ModuleRankingCardView: View {
 private struct ModuleRankingRowView: View {
     let row: ModuleRankingRow
     let accent: Color
+    let isCompact: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: isCompact ? 8 : 10) {
             icon
-                .frame(width: 22, height: 22)
+                .frame(width: iconSize, height: iconSize)
             VStack(alignment: .leading, spacing: 1) {
                 Text(row.name)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: isCompact ? 12.5 : 13, weight: .medium))
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Text(row.subtitle)
@@ -72,14 +78,14 @@ private struct ModuleRankingRowView: View {
             }
             Spacer(minLength: 8)
             MeterBar(fraction: row.meterFraction, tint: accent)
-                .frame(width: 110)
+                .frame(width: isCompact ? 52 : 110)
             Text(row.primaryText)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: isCompact ? 12.5 : 13, weight: .semibold))
                 .monospacedDigit()
-                .frame(minWidth: 64, alignment: .trailing)
+                .frame(minWidth: isCompact ? 48 : 64, alignment: .trailing)
         }
         .padding(.horizontal, 6)
-        .padding(.vertical, 7)
+        .padding(.vertical, isCompact ? 5 : 7)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(row.name),\(row.subtitle),\(row.primaryText)")
     }
@@ -96,10 +102,12 @@ private struct ModuleRankingRowView: View {
             CategoryIconTile(
                 symbolName: row.fallbackCategory?.cardStyle.symbolName ?? "app.dashed",
                 color: row.fallbackCategory?.cardStyle.tileColor ?? Surface.inkTertiary,
-                size: 22
+                size: iconSize
             )
         }
     }
+
+    private var iconSize: CGFloat { isCompact ? 18 : 22 }
 }
 
 // MARK: - 预览(spec 测试决策:排行卡外观走预览 + 手动验收)
@@ -140,6 +148,11 @@ private struct ModuleRankingRowView: View {
             title: "读写最多", rows: [],
             accent: Metric.disk.accentColor, cadenceNote: "30 秒一档"
         )
+        ModuleRankingCardView(
+            title: "能耗影响(紧凑)", rows: rows,
+            accent: Metric.battery.accentColor, cadenceNote: "5 秒一档", isCompact: true
+        )
+        .frame(width: 332)
     }
     .padding(24)
     .frame(width: 620)

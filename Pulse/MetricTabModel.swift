@@ -58,16 +58,11 @@ enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// 展示轴(工单 02):无内建电池的机器隐藏电池页——主窗口轴同时是药丸
-    /// tab 渲染序与键盘 ←/→ 的移动范围(两端夹紧的端点随之收缩)。
+    /// 展示轴(工单 p1-history/02):无内建电池的机器隐藏电池页——主窗口与弹窗
+    /// 同轴(2026-10-20 用户拍板:每个 tab 两处一致,弹窗也有历史页),同时是 tab
+    /// 渲染序与键盘 ←/→ 的移动范围(两端夹紧的端点随之收缩)。
     static func displayAxis(hasBattery: Bool) -> [MetricTab] {
         hasBattery ? allCases : allCases.filter { $0 != .battery }
-    }
-
-    /// 弹窗轴(工单 04 拍板:popover 不加历史):displayAxis 滤掉历史页,
-    /// 其余语义(电池可用性)不变。
-    static func popoverAxis(hasBattery: Bool) -> [MetricTab] {
-        displayAxis(hasBattery: hasBattery).filter { $0 != .history }
     }
 }
 

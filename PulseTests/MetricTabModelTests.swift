@@ -110,19 +110,6 @@ final class MetricTabModelTests: XCTestCase {
         )
     }
 
-    func testPopoverAxisAlwaysExcludesHistory() {
-        // 弹窗轴(工单 04 拍板:popover 不加历史):有无电池都不得出现历史页,
-        // 其余 tab 与 displayAxis 一致(网络页入弹窗,工单 06)。
-        XCTAssertEqual(
-            MetricTab.popoverAxis(hasBattery: true),
-            [.overview, .cpu, .memory, .disk, .network, .battery]
-        )
-        XCTAssertEqual(
-            MetricTab.popoverAxis(hasBattery: false),
-            [.overview, .cpu, .memory, .disk, .network]
-        )
-    }
-
     func testKeyboardMovesFollowAxisWithoutBattery() {
         // 无电池机器:轴不含电池页,→ 依次走到历史右端夹紧停下(不跳空)。
         var selection = MetricTabSelection(axis: MetricTab.displayAxis(hasBattery: false))

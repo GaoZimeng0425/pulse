@@ -195,90 +195,18 @@ struct MainWindowView: View {
         }
     }
 
-    @ViewBuilder
+    /// tab 内容:与弹窗共用一份(MetricTabStack),主窗口用全尺寸档;组排行卡
+    /// 带搜索过滤与可排序进程表。
     private var tabBody: some View {
-        switch tabSelection.current {
-        case .overview:
-            // 总览模块卡网格(用户拍板 2026-10-17:全部模块一屏可点,点卡跳对应
-            // tab——CPU/内存页排行即按本模块排序);电池卡随有无内建电池。
-            LazyVGrid(
-                columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible())],
-                spacing: 16
-            ) {
-                MetricCardView(model: model.cpuModel) { tabSelection.current = .cpu }
-                MetricCardView(model: model.memoryModel) { tabSelection.current = .memory }
-                MetricCardView(model: model.diskModel) { tabSelection.current = .disk }
-                MetricCardView(model: model.networkModel) { tabSelection.current = .network }
-                if monitor.battery.hasBattery {
-                    MetricCardView(model: model.batteryModel) { tabSelection.current = .battery }
-                }
-            }
-            SectionTitle(title: "此刻")
-                .padding(.top, 6)
-            HStack(alignment: .top, spacing: 16) {
-                RingCardView.memoryByType(monitor.memory)
-                RingCardView.memoryByApp(segments: content.memorySegments, totalBytes: content.memoryTotalBytes)
-            }
-            SectionTitle(title: "当前最忙")
-                .padding(.top, 6)
+        MetricTabStack(
+            tab: tabSelection.current,
+            isCompact: false,
+            monitor: monitor,
+            model: model,
+            content: content,
+            onSelectTab: { tabSelection.current = $0 }
+        ) {
             rankingCard
-            SectionTitle(title: "开发服务")
-                .padding(.top, 6)
-            // dev server 卡(工单 08):主窗口总览页专属(popover 不放,工单拍板);
-            // 全部停止只上抛请求,确认对话框(KillRequestFlow 关口)把关后才发信号。
-            DevServerCardView(servers: monitor.devServers.servers) {
-                model.requestStopAllDevServers(monitor.devServers.servers)
-            }
-        case .cpu:
-            MetricMainCardView(model: model.cpuModel)
-            rankingCard
-        case .memory:
-            MetricMainCardView(model: model.memoryModel)
-            HStack(alignment: .top, spacing: 16) {
-                RingCardView.memoryByType(monitor.memory)
-                RingCardView.memoryByApp(segments: content.memorySegments, totalBytes: content.memoryTotalBytes)
-            }
-            rankingCard
-        case .battery:
-            // 电池页(工单 02):六项读数主卡;组排行与电池无关,不放。
-            // 能耗影响排行(工单 module-rankings/01):主卡之下,rusage 差分按组聚合(RankingsFeature
-            // 与组同轮出行),只读。
-            MetricMainCardView(model: model.batteryModel)
-            ModuleRankingCardView(
-                title: "能耗影响",
-                rows: monitor.rankings.energyRows,
-                accent: Metric.battery.accentColor,
-                cadenceNote: "5 秒一档"
-            )
-        case .disk:
-            // 磁盘页(工单 05):主卡 + 各卷对账明细 + 快照列表(弹窗同构,紧凑)。
-            // 读写最多排行(工单 01):各卷明细/快照之下,每进程 rusage 速率归组。
-            MetricMainCardView(model: model.diskModel)
-            HStack(alignment: .top, spacing: 16) {
-                DiskVolumeBreakdownView(capacity: monitor.disk.capacity)
-                DiskSnapshotsCardView(listing: monitor.disk.capacity?.snapshots)
-            }
-            ModuleRankingCardView(
-                title: "读写最多",
-                rows: monitor.rankings.diskRows,
-                accent: Metric.disk.accentColor,
-                cadenceNote: "30 秒一档"
-            )
-        case .network:
-            // 网络页(工单 06):主卡 + 流量累计明细(弹窗同构,紧凑)。
-            // 每进程流量排行(工单 01):流量累计之下,nettop 速率归组,只读。
-            MetricMainCardView(model: model.networkModel)
-            NetworkTotalsCardView(totals: monitor.history.networkTotals)
-            ModuleRankingCardView(
-                title: "每进程流量",
-                rows: monitor.rankings.networkRows,
-                accent: Metric.network.accentColor,
-                cadenceNote: "5 秒一档"
-            )
-        case .history:
-            // 历史页(工单 04):指标 × 时间范围 Canvas 走势;查询走引擎 actor,
-            // 主窗口是它唯一的入口(弹窗轴滤掉了历史页)。
-            HistoryTabView(monitor: monitor)
         }
     }
 

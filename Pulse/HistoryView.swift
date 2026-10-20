@@ -10,6 +10,9 @@ import SwiftUI
 /// 磁盘的记录列要等工单 06 接入,此前如实显示"暂无数据"不伪造。
 struct HistoryTabView: View {
     let monitor: SystemMonitor
+    /// 弹窗紧凑档(2026-10-20 起弹窗也有历史页):小号分段控件、曲线 160 高、
+    /// 卡 {rounded.card-compact} 12 + {spacing.card-padding-compact} 12。
+    var isCompact = false
 
     /// 选择态:页面本地会话态,默认系统负载 × 近 1 小时(最常用的排障起点)。
     @State private var metric: HistoryMetricKey = .systemLoad
@@ -18,7 +21,7 @@ struct HistoryTabView: View {
     @State private var series: HistorySeries?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: isCompact ? 8 : 12) {
             Picker("指标", selection: $metric) {
                 ForEach(HistoryMetricKey.allCases) { key in
                     Text(key.title).tag(key)
@@ -41,6 +44,7 @@ struct HistoryTabView: View {
                 .font(.system(size: 11.5))
                 .foregroundStyle(.secondary)
         }
+        .controlSize(isCompact ? .small : .regular)
         // 换指标/换范围即重查;驻留本页期间每分钟补一轮(分钟表一分钟长一行,
         // "近 1 小时"要能往前走)。查询在引擎 actor,取消即停,离页不空转。
         .task(id: QueryKey(metric: metric, range: range)) {
@@ -73,14 +77,14 @@ struct HistoryTabView: View {
             }
             if let series, !series.isEmpty {
                 HistoryCurveView(series: series)
-                    .frame(height: 220)
+                    .frame(height: isCompact ? 160 : 220)
             } else {
                 emptyState
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Surface.card, in: .rect(cornerRadius: 18))
+        .padding(isCompact ? 12 : 16)
+        .background(Surface.card, in: .rect(cornerRadius: isCompact ? 12 : 18))
     }
 
     /// 统计点(与指标卡统计行同族:小标签 + 圆体数字)。
@@ -116,7 +120,7 @@ struct HistoryTabView: View {
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 64)
+        .padding(.vertical, isCompact ? 32 : 64)
     }
 
     private var emptyDetail: String {
