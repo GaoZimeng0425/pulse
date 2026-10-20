@@ -226,6 +226,82 @@ actor HistoryEngine {
         }
     }
 
+    // MARK: 改项目根的组身份迁移(arch-review-2026-10-18/03 乙3)
+
+    /// metadata 表里上一版项目根快照的键。
+    private static let projectRootsKey = "project_roots"
+
+    /// 对账项目根(启动时与每次改根各调一次):与库里上一版快照比对,按
+    /// ProjectRootMigration 的一对一配对把旧根的组键改写成新根(分钟表 / 小时表 /
+    /// 组元数据,worktree 后缀保留),再存下这一版快照。首启(无快照)只存快照。
+    /// 新键在同一时刻已有行时(PRIMARY KEY 冲突)保留新行、旧行原样留下(OR IGNORE)。
+    /// 失败只记日志——历史是旁路。
+    func reconcileProjectRoots(_ roots: [String]) {
+        guard let database else { return }
+        let normalized = roots.map(PathNormalization.normalize).sorted()
+        do {
+            let plan: ProjectRootMigration.Plan? = try database.write { db in
+                let stored = try String.fetchOne(
+                    db, sql: "SELECT value FROM metadata WHERE key = ?", arguments: [Self.projectRootsKey]
+                )
+                let previous = stored
+                    .flatMap { try? JSONDecoder().decode([String].self, from: Data($0.utf8)) }
+                var plan: ProjectRootMigration.Plan?
+                if let previous, previous != normalized {
+                    let computed = ProjectRootMigration.plan(previous: previous, current: normalized)
+                    for move in computed.moves {
+                        try Self.rewriteGroupKeys(move, in: db)
+                    }
+                    plan = computed
+                }
+                try db.execute(
+                    sql: "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
+                    arguments: [Self.projectRootsKey, LineageRow.argvJSON(normalized)]
+                )
+                return plan
+            }
+            guard let plan else { return }
+            for move in plan.moves {
+                LogService.info("项目根变更:历史从 \(move.from) 迁到 \(move.to)", category: "History")
+            }
+            for root in plan.skipped {
+                LogService.info("项目根变更:\(root) 的新去处有歧义,历史未迁移", category: "History")
+            }
+            if !plan.moves.isEmpty {
+                persistedGroupNames = try database.read { db in try Self.persistedGroupNames(in: db) }
+            }
+        } catch {
+            LogService.error("项目根对账失败:\(error)", category: "History")
+        }
+    }
+
+    /// 一处根迁移:旧键 "project:<from>" 与 "project:<from>@<wt>" 换成新根前缀。
+    /// 用 substr 比前缀而非 LIKE(路径里可能有 % 与 _);长度按 Unicode 码点数
+    /// (SQLite 对 TEXT 的 substr 以字符计)。
+    private static func rewriteGroupKeys(_ move: ProjectRootMigration.Move, in db: Database) throws {
+        let oldPrefix = ProjectRootMigration.keyPrefix(ofRoot: move.from)
+        let newPrefix = ProjectRootMigration.keyPrefix(ofRoot: move.to)
+        let worktreePrefix = oldPrefix + "@"
+        let tailStart = oldPrefix.unicodeScalars.count + 1
+        let arguments: StatementArguments = [
+            newPrefix, tailStart, oldPrefix, worktreePrefix.unicodeScalars.count, worktreePrefix,
+        ]
+        let match = "group_id = ? OR substr(group_id, 1, ?) = ?"
+        for table in ["sample_min", "sample_hour"] {
+            try db.execute(
+                sql: "UPDATE OR IGNORE \(table) SET group_id = ? || substr(group_id, ?) WHERE \(match)",
+                arguments: arguments
+            )
+        }
+        try db.execute(
+            sql: """
+                UPDATE OR IGNORE groups SET group_id = ? || substr(group_id, ?), project_root = ?
+                WHERE \(match)
+                """,
+            arguments: [newPrefix, tailStart, move.to, oldPrefix, worktreePrefix.unicodeScalars.count, worktreePrefix]
+        )
+    }
+
     // MARK: 出生登记回灌(重启保归因)
 
     /// 启动回灌:库中全部出生登记读回为内存登记表(此前见过的断链进程,

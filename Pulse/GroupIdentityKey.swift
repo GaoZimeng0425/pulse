@@ -45,3 +45,53 @@ extension GroupIdentity {
         return nil
     }
 }
+
+// MARK: - 改项目根的组身份迁移规则(arch-review-2026-10-18/03 乙3)
+
+/// 项目组身份 = "project:<项目根>[@<worktree>]",根是用户配置的路径——改根即换键,
+/// 历史曲线会无声断档(用户拍板 2026-10-19:自动迁移,不文档化断史)。本规则只决定
+/// 「哪个旧根的历史迁到哪个新根」;改写在 HistoryEngine.reconcileProjectRoots。
+///
+/// 只看被删的旧根与新加的新根:两者**相关** = 路径互为前缀(收窄 / 放宽)或末级目录
+/// 名相同(整个项目挪了位置)。只有一对一相关才迁;一个旧根对多个新根、或多个旧根
+/// 对同一新根都是歧义,保守跳过(只记日志)。无关的增删(换了个项目)不迁也不算歧义。
+enum ProjectRootMigration {
+    struct Move: Equatable {
+        let from: String
+        let to: String
+    }
+
+    struct Plan: Equatable {
+        var moves: [Move] = []
+        /// 有相关新根但配不成一对一的旧根(歧义跳过)。
+        var skipped: [String] = []
+    }
+
+    static func plan(previous: [String], current: [String]) -> Plan {
+        let previousRoots = Set(previous.map(PathNormalization.normalize))
+        let currentRoots = Set(current.map(PathNormalization.normalize))
+        let removed = previousRoots.subtracting(currentRoots).sorted()
+        let added = currentRoots.subtracting(previousRoots).sorted()
+        var plan = Plan()
+        for old in removed {
+            let candidates = added.filter { related(old, $0) }
+            guard !candidates.isEmpty else { continue }
+            if candidates.count == 1, removed.filter({ related($0, candidates[0]) }).count == 1 {
+                plan.moves.append(Move(from: old, to: candidates[0]))
+            } else {
+                plan.skipped.append(old)
+            }
+        }
+        return plan
+    }
+
+    private static func related(_ lhs: String, _ rhs: String) -> Bool {
+        lhs.hasPrefix(rhs + "/") || rhs.hasPrefix(lhs + "/")
+            || (lhs as NSString).lastPathComponent == (rhs as NSString).lastPathComponent
+    }
+
+    /// 组键前缀(不含 worktree 后缀)。
+    static func keyPrefix(ofRoot root: String) -> String {
+        GroupIdentity.project(root: root, worktreeName: nil).stableKey
+    }
+}

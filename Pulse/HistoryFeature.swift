@@ -26,8 +26,15 @@ final class HistoryFeature: MonitorFeature {
     private let engine: HistoryEngine?
     private let clock: @Sendable () -> Date
     @ObservationIgnored private var feed = HistoryFeed()
+    /// 串行写入流的一笔:轮次落库,或项目根对账(改根迁移组身份)——同一条流保证
+    /// 对账与落库按发生次序生效。
+    private enum HistoryWrite: Sendable {
+        case ingest(HistoryIngest)
+        case reconcileProjectRoots([String])
+    }
+
     /// 串行写入者的入口(start 之后、stop 之前非 nil)。
-    @ObservationIgnored private var writer: AsyncStream<HistoryIngest>.Continuation?
+    @ObservationIgnored private var writer: AsyncStream<HistoryWrite>.Continuation?
     @ObservationIgnored private var started = false
 
     /// `clock` = 每轮落库的采样时刻(MainActor 上现取,顺序即轮次顺序);单测注入。
@@ -44,15 +51,20 @@ final class HistoryFeature: MonitorFeature {
     func start(_ host: MonitorHost) {
         guard !started, let engine else { return }
         started = true
-        let (ingests, continuation) = AsyncStream.makeStream(of: HistoryIngest.self)
+        let (writes, continuation) = AsyncStream.makeStream(of: HistoryWrite.self)
         writer = continuation
         Task { [weak self] in
             let restored = await engine.importLineage()
             host.restoreBirths(restored)
-            for await round in ingests {
-                await engine.ingest(round)
-                let totals = await engine.networkTotals(now: round.at)
-                self?.networkTotals = totals
+            for await write in writes {
+                switch write {
+                case .ingest(let round):
+                    await engine.ingest(round)
+                    let totals = await engine.networkTotals(now: round.at)
+                    self?.networkTotals = totals
+                case .reconcileProjectRoots(let roots):
+                    await engine.reconcileProjectRoots(roots)
+                }
             }
         }
     }
@@ -61,7 +73,13 @@ final class HistoryFeature: MonitorFeature {
     /// 缺席 / 尚未 start / 已 stop)则整轮跳过,账本不动。
     func onRound(_ context: RoundContext) {
         guard let writer else { return }
-        writer.yield(feed.takeIngest(from: context, at: clock()))
+        writer.yield(.ingest(feed.takeIngest(from: context, at: clock())))
+    }
+
+    /// 项目根对账入串行写入流(排在此后的落库之前)。写入者未起则跳过——SystemMonitor
+    /// 在模块 start 之后才派发初值。
+    func projectRootsChanged(_ roots: [String]) {
+        writer?.yield(.reconcileProjectRoots(roots))
     }
 
     // MARK: - 输入与查询

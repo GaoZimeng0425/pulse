@@ -66,6 +66,8 @@ final class SystemMonitor {
     /// 窗口可见性的两个信号(工单 module-rankings/01):弹窗在场与主窗口模块页在场;
     /// 值真变化时派发给功能模块(排行闸门在 RankingsFeature)。
     private var visibility = MonitorVisibility()
+    /// 当前项目根(功能模块的 projectRootsChanged 派发源;归组配置在主干里另有一份)。
+    @ObservationIgnored private var projectRoots: [String]
     /// 排行门控消息的代号(单调递增):Sampler 侧丢弃迟到的旧消息。
     @ObservationIgnored private var rankingsGateGeneration: UInt64 = 0
     /// 主干纯内核:出生登记(扫描 / 回灌并入 + 采样轮兜底)、归组配置与下钻
@@ -100,6 +102,7 @@ final class SystemMonitor {
         )
         self.killService = sources.killService
         self.features = features
+        self.projectRoots = projectRoots
     }
 
     /// 启动采样循环(默认弹窗关闭节奏 5s)、独立出生扫描(~2s 节奏)与电池
@@ -113,6 +116,9 @@ final class SystemMonitor {
         let host = makeHost()
         for feature in features.registry {
             feature.start(host)
+        }
+        for feature in features.registry {
+            feature.projectRootsChanged(projectRoots)
         }
         observeWake()
         startBirthScan()
@@ -239,6 +245,11 @@ final class SystemMonitor {
     /// RoundSpineTests / GroupingPipelineTests"项目根热更新"用例单测,此处仅粘合。
     func setProjectRoots(_ roots: [String]) {
         spine.setProjectRoots(roots)
+        projectRoots = roots
+        guard started else { return }
+        for feature in features.registry {
+            feature.projectRootsChanged(roots)
+        }
     }
 
     /// 诊断报告取数(工单 11):按需向采样器要一份累计统计快照

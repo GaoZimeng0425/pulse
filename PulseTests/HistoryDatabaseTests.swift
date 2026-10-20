@@ -35,8 +35,8 @@ final class HistoryDatabaseTests: XCTestCase {
         XCTAssertEqual(journalMode, "wal")
     }
 
-    /// 六张表按 spec 落地(grdb_migrations 是迁移器自带的簿记表,不算)。
-    func testAllSixTablesExist() throws {
+    /// 六张 spec 表 + metadata(v2,项目根快照)落地(grdb_migrations 是迁移器自带的簿记表,不算)。
+    func testAllTablesExist() throws {
         let queue = try HistoryDatabase.openInMemory()
 
         let tables = try queue.read { db in
@@ -81,11 +81,11 @@ final class HistoryDatabaseTests: XCTestCase {
         let tables = try reopened.read { db in
             try Int.fetchOne(
                 db,
-                sql: "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name IN (?,?,?,?,?,?)",
+                sql: "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name IN (?,?,?,?,?,?,?)",
                 arguments: StatementArguments(HistoryDatabase.tableNames)
             )
         }
-        XCTAssertEqual(tables, 6)
+        XCTAssertEqual(tables, HistoryDatabase.tableNames.count)
     }
 
     /// 内存库:同一套迁移,零磁盘副作用。
@@ -98,6 +98,6 @@ final class HistoryDatabaseTests: XCTestCase {
                 sql: "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'grdb_migrations'"
             )
         }
-        XCTAssertEqual(tableCount, 6)
+        XCTAssertEqual(tableCount, HistoryDatabase.tableNames.count)
     }
 }
