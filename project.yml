@@ -23,8 +23,10 @@ targets:
     dependencies:
       - package: CocoaLumberjack
         product: CocoaLumberjackSwift
+      # 动态库,必须嵌进 Pulse.app/Contents/Frameworks(不嵌则 Release 启动即找不到库)。
       - package: PulseCore
         product: PulseCore
+        embed: true
     settings:
       base:
         PRODUCT_NAME: Pulse

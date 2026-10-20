@@ -42,6 +42,7 @@
 		49312765F08C6D8ECFCE1839 /* NetworkFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8557BE65F803225038296C20 /* NetworkFeature.swift */; };
 		4AF604E10575E744B5B119D2 /* MenuBarBadgeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67ED56AE0160E6477EBB484B /* MenuBarBadgeSettingsView.swift */; };
 		51A6E49B73921A3FC725B604 /* BundleDisplayNameReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFC9AB4EF78C90578BF978B2 /* BundleDisplayNameReader.swift */; };
+		549EC237B5E5F830B3C652A2 /* PulseCore in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 679FABC27E634B3FA90955FE /* PulseCore */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		59D37D46AB0A2072BA352F44 /* DiskCardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4BFCB03504BD8D4F7165238 /* DiskCardViews.swift */; };
 		5A0E5B74BDCCD77BA4B7DA54 /* DashboardModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32BE8BAC25214CEDFBA5AF6C /* DashboardModel.swift */; };
 		5E698B91C352218AEC7DF667 /* MetricAccentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD1902314E98C2C8F685D0D9 /* MetricAccentTests.swift */; };
@@ -116,6 +117,20 @@
 			remoteInfo = Pulse;
 		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		448D46EF7A1F32A6018DB8B6 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				549EC237B5E5F830B3C652A2 /* PulseCore in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		0010A24DFA788C83F331C464 /* NetworkSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkSensor.swift; sourceTree = "<group>"; };
@@ -405,6 +420,7 @@
 				D70CFAE236269B6E146109F4 /* Sources */,
 				606EBA1EB03BF3A2D7674713 /* Resources */,
 				1C9078D005D61D91A0E0C7F8 /* Frameworks */,
+				448D46EF7A1F32A6018DB8B6 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
