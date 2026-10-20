@@ -81,15 +81,6 @@ enum PulseFormat {
         return "\(oneDecimal(value)) \(unit)/s"
     }
 
-    /// 磁盘剩余徽标(工单 09 菜单栏槽位):字节 → 十进制 GB 整数("182 GB"),
-    /// 与磁盘卡同口径不同精度——菜单栏求窄,两位小数让位给一字宽度;
-    /// nil = 容量读数未到,占位 "—" 不伪造;负值(读数异常)按 0 夹紧。
-    static func diskRemainingBadge(_ bytes: Int64?) -> String {
-        guard let bytes else { return "—" }
-        let gb = Double(max(0, bytes)) / 1_000_000_000
-        return "\(Int(gb.rounded())) GB"
-    }
-
     /// 网络速率徽标(工单 09 菜单栏槽位):字节/秒 → "12.4 MB/s",口径与
     /// 磁盘速率同一套十进制三级一位小数;独立入口,工单 06 网络卡的卡片
     /// 展示格式落地时不与本徽标耦合。

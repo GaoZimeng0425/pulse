@@ -1,12 +1,9 @@
 import SwiftUI
 
-/// 菜单栏徽标设置(工单 09):1–3 个槽位,每槽从 CPU%/RAM%/磁盘剩余/网络速率
-/// 四选一,顺序可调(上移/下移);默认 CPU + RAM 与可配置前逐像素一致。
+/// 菜单栏徽标设置(工单 p1-history/09):1–4 个槽位,每槽从 CPU%/RAM%/磁盘剩余%/
+/// 网络上下行里选,四项可同时上屏,顺序可调(上移/下移);默认 CPU + RAM。
 /// 配置以逗号连接的 rawValue 存 @AppStorage——与菜单栏标签视图同键共享,
 /// 改动即时生效、重启保留;非法值由 MenuBarBadgeConfiguration 解码侧回默认。
-///
-/// 网络槽位本单只做壳:选项可选、菜单栏显示占位"—",数据由工单 06 的
-/// 网络卡填充(契约注在 SystemMonitor.network,徽标直取 rates)。
 struct MenuBarBadgeSettingsView: View {
     /// 槽位配置(与 MenuBarLoadLabel 同键共享,UserDefaults 即时广播)。
     @AppStorage("settings.menuBarBadge") private var configurationRaw = MenuBarBadgeConfiguration.default.rawValue
@@ -31,8 +28,8 @@ struct MenuBarBadgeSettingsView: View {
                 Text("徽标槽位")
             } footer: {
                 Text(
-                    "菜单栏从左到右依次显示各槽位(最多 3 个)。"
-                        + "网络速率数据随网络卡上线后自动有数,此前显示“—”。"
+                    "菜单栏从左到右依次显示各槽位,四项可同时显示。"
+                        + "磁盘显示剩余空间占总容量的百分比;网络上下两行分别是上行与下行速率。"
                 )
             }
         }

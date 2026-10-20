@@ -2,8 +2,8 @@ import XCTest
 @testable import Pulse
 
 /// 菜单栏徽标槽位配置 → 渲染输入的映射(spec 测试决策钉死的纯函数缝):
-/// 默认态与现状逐像素一致、四选一槽位、顺序可调、读数缺失占位不伪造、
-/// 网络紧凑上下行与"放不下只显示下载"降级、缓存键随配置变化。
+/// 默认态与现状逐像素一致、四项指标可同时上屏、顺序可调、读数缺失占位不伪造、
+/// 磁盘剩余百分比、网络上下行叠两行、缓存键随配置变化。
 final class MenuBarBadgeTests: XCTestCase {
     // MARK: - 槽位配置
 
@@ -13,20 +13,21 @@ final class MenuBarBadgeTests: XCTestCase {
         XCTAssertEqual(MenuBarBadgeConfiguration.default.rawValue, "cpu,ram")
     }
 
-    /// 1–3 槽边界:空与超 3 槽按"非法配置回落默认"处置。
-    func testInvalidSlotCountFallsBackToDefault() {
+    /// 槽位上限 = 指标总数(四项可同时上屏,2026-10-20 用户要求);空与超上限按
+    /// "非法配置回落默认"处置。
+    func testAllFourMetricsFitAtOnceAndBeyondFallsBackToDefault() {
+        let all: [MenuBarBadgeMetric] = [.cpu, .ram, .diskRemaining, .networkRate]
+        XCTAssertEqual(MenuBarBadgeConfiguration(slots: all).slots, all)
+        XCTAssertEqual(MenuBarBadgeConfiguration(rawValue: "cpu,ram,diskRemaining,networkRate")?.slots, all)
         XCTAssertEqual(MenuBarBadgeConfiguration(slots: []).slots, [.cpu, .ram])
-        XCTAssertEqual(
-            MenuBarBadgeConfiguration(slots: [.cpu, .ram, .diskRemaining, .networkRate]).slots,
-            [.cpu, .ram]
-        )
+        XCTAssertEqual(MenuBarBadgeConfiguration(slots: all + [.cpu]).slots, [.cpu, .ram])
     }
 
     /// rawValue 解码:未知指标 / 非法数量 → nil(调用方 `?? .default` 回默认)。
     func testInvalidRawValueDecodesToNil() {
         XCTAssertNil(MenuBarBadgeConfiguration(rawValue: "bogus"))
         XCTAssertNil(MenuBarBadgeConfiguration(rawValue: ""))
-        XCTAssertNil(MenuBarBadgeConfiguration(rawValue: "cpu,ram,cpu,ram"))
+        XCTAssertNil(MenuBarBadgeConfiguration(rawValue: "cpu,ram,cpu,ram,cpu"))
         XCTAssertNil(MenuBarBadgeConfiguration(rawValue: "cpu,network,foo"))
     }
 
@@ -107,53 +108,50 @@ final class MenuBarBadgeTests: XCTestCase {
 
     // MARK: - 磁盘剩余槽
 
-    /// 磁盘剩余 = 实际可用(important 口径),十进制 GB 整数——与
-    /// PulseFormat 磁盘卡同口径不同精度;二进制口径在此必须分得出
-    /// (1.0737e12 字节:十进制 1074 GB,二进制恰好 1000 GB)。
-    func testDiskRemainingUsesDecimalGB() {
-        XCTAssertEqual(MenuBarBadgeComposer.diskContent(availableBytes: 182_350_000_000).text, "182 GB")
-        XCTAssertEqual(MenuBarBadgeComposer.diskContent(availableBytes: 1_073_741_824_000).text, "1074 GB")
-        XCTAssertEqual(MenuBarBadgeComposer.diskContent(availableBytes: 0).text, "0 GB")
-        XCTAssertEqual(MenuBarBadgeComposer.diskContent(availableBytes: -5).text, "0 GB")
+    /// 磁盘剩余 = 实际可用(important 口径)占容器总容量的百分比(2026-10-20 用户
+    /// 拍板:剩余百分比,不再显示 GB):182.35 / 500 GB = 36.47% → "36%"。
+    func testDiskRemainingShowsPercentOfContainerTotal() {
+        XCTAssertEqual(
+            MenuBarBadgeComposer.diskContent(availableBytes: 182_350_000_000, totalBytes: 500_000_000_000).text,
+            "36%"
+        )
+        XCTAssertEqual(MenuBarBadgeComposer.diskContent(availableBytes: 0, totalBytes: 500_000_000_000).text, "0%")
+        XCTAssertEqual(MenuBarBadgeComposer.diskContent(availableBytes: -5, totalBytes: 500_000_000_000).text, "0%")
     }
 
-    /// 磁盘容量读数未到(首轮前 lastGood 为 nil):占位 "—" 不伪造。
-    func testDiskRemainingPlaceholderWhenNoReading() {
-        XCTAssertEqual(MenuBarBadgeComposer.diskContent(availableBytes: nil).text, "—")
+    /// 可用或总容量读不到(首轮前 / 非 APFS)、总容量为 0:占位 "—" 不伪造。
+    func testDiskRemainingPlaceholderWhenAnyPartIsMissing() {
+        XCTAssertEqual(MenuBarBadgeComposer.diskContent(availableBytes: nil, totalBytes: 500_000_000_000).text, "—")
+        XCTAssertEqual(MenuBarBadgeComposer.diskContent(availableBytes: 1, totalBytes: nil).text, "—")
+        XCTAssertEqual(MenuBarBadgeComposer.diskContent(availableBytes: 1, totalBytes: 0).text, "—")
     }
 
-    // MARK: - 网络速率槽(工单 09 只做壳,数据由工单 06 填充)
+    // MARK: - 网络速率槽:上下行叠两行(2026-10-20 用户拍板)
 
-    /// 网络徽标主形态:紧凑上下行 "↓下载 ↑上传",MB/s 口径与磁盘速率一致。
-    func testNetworkBadgeCompactDualFormat() {
+    /// 上行在上、下行在下,各占一行,不带小标签;口径与磁盘速率一致。
+    func testNetworkBadgeStacksUploadOverDownload() {
         let content = MenuBarBadgeComposer.networkContent(
             rate: NetworkRates(upBytesPerSecond: 1_200_000, downBytesPerSecond: 12_400_000)
         )
+        XCTAssertEqual(content.layout, .stacked)
         XCTAssertEqual(content.caption, "网络")
-        XCTAssertEqual(content.text, "↓12.4 MB/s ↑1.2 MB/s")
+        XCTAssertEqual(content.text, "↑1.2 MB/s\n↓12.4 MB/s")
         XCTAssertEqual(content.emphasis, .normal)
     }
 
-    /// 网络字段未填充(工单 06 之前恒 nil):占位 "—" 不伪造。
-    func testNetworkBadgePlaceholderWhenNoData() {
-        XCTAssertEqual(MenuBarBadgeComposer.networkContent(rate: nil).text, "—")
-    }
-
-    /// 放不下降级:紧凑双行超宽度预算 → 只显示下载。
-    func testNetworkBadgeDegradesToDownloadOnlyWhenTooWide() {
+    /// 不再降级:数字再长也两行都显示(以前超宽只显示下载)。
+    func testNetworkBadgeNeverDropsUpload() {
         let content = MenuBarBadgeComposer.networkContent(
             rate: NetworkRates(upBytesPerSecond: 888_800_000, downBytesPerSecond: 888_800_000)
         )
-        XCTAssertEqual(content.text, "↓888.8 MB/s")
+        XCTAssertEqual(content.text, "↑888.8 MB/s\n↓888.8 MB/s")
     }
 
-    /// 宽度预算策略锚点:典型双行装得下、超宽数字装不下——字号度量若随
-    /// 系统版本漂移,先在此暴露而不是默默翻转降级行为。
-    func testNetworkWidthBudgetSplitsRealisticAndPathological() {
-        let realistic = MenuBarBadgeComposer.estimatedWidth(of: "↓12.4 MB/s ↑1.2 MB/s")
-        let pathological = MenuBarBadgeComposer.estimatedWidth(of: "↓888.8 MB/s ↑888.8 MB/s")
-        XCTAssertLessThanOrEqual(realistic, MenuBarBadgeComposer.networkWidthBudget)
-        XCTAssertGreaterThan(pathological, MenuBarBadgeComposer.networkWidthBudget)
+    /// 读数未到:两行各占位 "—",版式不变(首轮前后不变形)。
+    func testNetworkBadgePlaceholderWhenNoData() {
+        let content = MenuBarBadgeComposer.networkContent(rate: nil)
+        XCTAssertEqual(content.layout, .stacked)
+        XCTAssertEqual(content.text, "↑—\n↓—")
     }
 
     // MARK: - 渲染缓存键(位图缓存只在内容/外观变化时失效)
@@ -235,21 +233,16 @@ final class MenuBarBadgeTests: XCTestCase {
 
     // MARK: - 槽位定宽(2026-10-17 用户反馈:数字位数变化带动状态项宽度抖动)
 
-    /// CPU/RAM/磁盘三槽给定宽(按各自最大现实读数量宽),网络槽不定宽——
-    /// 渲染端以 .frame(width:) 钉死位图宽,依赖此映射;占位读数同在定宽槽内。
-    func testSlotWidthPinnedForCPURAMAndDiskNotNetwork() {
-        for slot in [MenuBarBadgeMetric.cpu, .ram, .diskRemaining] {
+    /// 四种槽都定宽(网络按两行里最宽的现实读数 "999.9 KB/s" 量)——状态项宽度
+    /// 不随读数抖动;占位读数同在定宽槽内。
+    func testEverySlotIsPinnedToAFixedWidth() {
+        for slot in MenuBarBadgeMetric.allCases {
             let content = MenuBarBadgeComposer.compose(
                 MenuBarBadgeConfiguration(slots: [slot]),
                 data: Self.sampleData
             )[0]
             XCTAssertNotNil(content.slotWidth, "\(slot) 槽应定宽")
         }
-        let network = MenuBarBadgeComposer.compose(
-            MenuBarBadgeConfiguration(slots: [.networkRate]),
-            data: Self.sampleData
-        )[0]
-        XCTAssertNil(network.slotWidth, "网络槽不定宽(单位跨档文本长度本就跨档)")
     }
 
     /// 定宽覆盖最大现实读数:CPU/RAM 三位数 "100%"、磁盘三位数 GB 不得溢出
@@ -279,8 +272,14 @@ final class MenuBarBadgeTests: XCTestCase {
                 MenuBarBadgeComposer.ramContent(memory: Self.memory(total: 100, used: 100, pressure: .normal))
             ),
             (
-                MenuBarBadgeComposer.diskContent(availableBytes: 5_000_000_000),
-                MenuBarBadgeComposer.diskContent(availableBytes: 999_000_000_000)
+                MenuBarBadgeComposer.diskContent(availableBytes: 5_000_000_000, totalBytes: 500_000_000_000),
+                MenuBarBadgeComposer.diskContent(availableBytes: 500_000_000_000, totalBytes: 500_000_000_000)
+            ),
+            (
+                MenuBarBadgeComposer.networkContent(rate: NetworkRates(upBytesPerSecond: 0, downBytesPerSecond: 0)),
+                MenuBarBadgeComposer.networkContent(
+                    rate: NetworkRates(upBytesPerSecond: 999_900, downBytesPerSecond: 999_900)
+                )
             ),
         ]
         for (narrow, widest) in pairs {
@@ -291,6 +290,17 @@ final class MenuBarBadgeTests: XCTestCase {
         }
     }
 
+    /// 叠两行的网络徽标不比「小标签 + 数字」的徽标高:菜单栏高度装得下。
+    @MainActor
+    func testStackedNetworkBadgeIsNoTallerThanCaptionedBadges() {
+        let network = MenuBarBadgeRenderer.image(
+            for: [MenuBarBadgeComposer.networkContent(rate: NetworkRates(upBytesPerSecond: 1, downBytesPerSecond: 1))],
+            colorScheme: .light
+        )
+        let cpu = MenuBarBadgeRenderer.image(for: [MenuBarBadgeComposer.cpuContent(load: 5)], colorScheme: .light)
+        XCTAssertLessThanOrEqual(network.size.height, cpu.size.height)
+    }
+
     // MARK: - 夹具
 
     /// 合成数据(单测不制造真实负载):CPU 42.6% → "43%",RAM 恰好 50%。
@@ -298,6 +308,7 @@ final class MenuBarBadgeTests: XCTestCase {
         cpuLoadPercent: 42.6,
         memory: memory(total: 48_000_000_000, used: 24_000_000_000, pressure: .normal),
         diskAvailableBytes: 182_350_000_000,
+        diskTotalBytes: 500_000_000_000,
         networkRate: nil
     )
 
