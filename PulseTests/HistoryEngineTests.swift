@@ -491,6 +491,37 @@ final class HistoryEngineTests: XCTestCase {
         XCTAssertEqual(groups.map(\.id), [.app(bundlePath: "/Applications/Host.app")])
     }
 
+    /// 跨会话 pid 复用(arch-review-2026-10-18/03):上一会话 pid 100 是 cargo 下的 rustc,
+    /// 本会话 pid 100 被 zsh 复用、主干判活记录胜——库里那一行要换成 zsh,下一会话
+    /// 回灌才不会再把它当 rustc。复用后又被同一 zsh 记录重投不重复写。
+    func testRestoredLineageRowIsReplacedWhenThePidWasReusedThisSession() async throws {
+        let rustc = LineageRegistry.Entry(
+            parentPID: 12,
+            identity: ProcessIdentity(executablePath: "/usr/bin/rustc", cwd: "/w", argv: ["rustc"])
+        )
+        let zsh = LineageRegistry.Entry(
+            parentPID: 1,
+            identity: ProcessIdentity(executablePath: "/bin/zsh", cwd: "/Users/x", argv: ["-zsh"])
+        )
+        var previousSession = LineageRegistry()
+        previousSession.register(pid: 100, entry: rustc)
+        let engineA = try makeFileEngine(now: minute0)
+        await ingest(engineA, at: minute0, load: 1, groups: [], lineage: previousSession)
+
+        let engineB = try makeFileEngine(now: minute0.addingTimeInterval(120))
+        _ = await engineB.importLineage()
+        var reused = LineageRegistry()
+        reused.register(pid: 100, entry: zsh)
+        await ingest(engineB, at: minute0.addingTimeInterval(120), load: 1, groups: [], lineage: reused)
+        await ingest(engineB, at: minute0.addingTimeInterval(125), load: 1, groups: [], lineage: reused)
+
+        XCTAssertEqual(try scalarInt("SELECT count(*) FROM lineage"), 1)
+        XCTAssertEqual(try scalarString("SELECT executable_path FROM lineage WHERE pid = 100"), "/bin/zsh")
+        let engineC = try makeFileEngine(now: minute0.addingTimeInterval(240))
+        let restored = await engineC.importLineage()
+        XCTAssertEqual(restored.entries[100]?.parentPID, 1)
+    }
+
     // MARK: 组元数据
 
     /// 改名才重写:同会话内改名后 groups 表跟着更新。

@@ -77,6 +77,9 @@ actor HistoryEngine {
     private var lastRetentionDayStart: Date?
     /// 已确认在库的出生 pid:增量写,避免每轮全表重插。
     private var persistedLineagePIDs: Set<pid_t> = []
+    /// 本会话回灌读回的记录(pid → 库里那一份):登记表里该 pid 换成了别的记录 = 跨会话
+    /// pid 复用、主干判活记录胜,库里那行要覆盖(覆盖一次即移出)。
+    private var restoredLineage: [pid_t: LineageRegistry.Entry] = [:]
     /// 已持久化的组名(stableKey → name):改名才重写。
     private var persistedGroupNames: [String: String] = [:]
     /// 库健康状态沿(HistoryHealthEdge):落库、累计、历史页查询共用。
@@ -339,6 +342,7 @@ actor HistoryEngine {
             for row in rows {
                 persistedLineagePIDs.insert(pid_t(row.pid))
                 registry.register(pid: pid_t(row.pid), entry: row.entry)
+                restoredLineage[pid_t(row.pid)] = row.entry
             }
             return registry
         } catch {
@@ -349,10 +353,31 @@ actor HistoryEngine {
 
     /// 增量登记:只写未持久化过的 pid(INSERT OR IGNORE,首记为准——与
     /// 内存登记表同口径)。first_seen = 落库时刻(登记即落库,滞后 ≤1 轮)。
+    /// 例外:回灌读回的 pid 在本会话被复用、主干判活记录胜(登记表里换成了别的
+    /// 记录)→ 整行覆盖,first_seen 记覆盖时刻(arch-review-2026-10-18/03)。
     private func persistLineage(
         _ lineage: LineageRegistry, seenAt now: Date, in db: Database
     ) throws {
         let firstSeen = now.timeIntervalSince1970
+        for (pid, restored) in restoredLineage {
+            guard let current = lineage.entries[pid], current != restored else { continue }
+            try db.execute(
+                sql: """
+                    INSERT OR REPLACE INTO lineage
+                        (pid, parent_pid, executable_path, cwd, argv, first_seen)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                arguments: [
+                    pid,
+                    current.parentPID,
+                    current.executablePath,
+                    current.cwd,
+                    LineageRow.argvJSON(current.argv),
+                    firstSeen,
+                ]
+            )
+            restoredLineage.removeValue(forKey: pid)
+        }
         for (pid, entry) in lineage.entries where !persistedLineagePIDs.contains(pid) {
             try db.execute(
                 sql: """
