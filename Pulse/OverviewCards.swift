@@ -85,11 +85,6 @@ struct MetricCardModel {
     /// 走势归一上限:CPU 固定 0–100,内存 = 物理总量。
     let domainMax: Double
 
-    /// 总览卡底部走势形态:默认 44 柱 strip;CPU 用面积线(用户拍板 2026-10-17:
-    /// 与 CPU tab 主卡同观感,同一指标两处读数统一)。
-    enum TrendStyle { case strip, area }
-    var trendStyle: TrendStyle = .strip
-
     var tint: Color { metric.accentColor }
 }
 
@@ -119,8 +114,7 @@ extension MetricCardModel {
                 MetricCardStat(label: "峰值", value: statistics.map { PulseFormat.cpuPercent($0.peak) } ?? "—"),
             ],
             trend: trend,
-            domainMax: 100,
-            trendStyle: .area
+            domainMax: 100
         )
     }
 
@@ -332,7 +326,7 @@ extension BatteryChargeStatus {
 }
 
 /// 指标卡:full = 总览模块卡网格(徽章 + 名称 + chevron / 34pt 大数字 / 三列小统计 /
-/// 36pt 高走势——形态随 model.trendStyle,CPU 面积线、其余 44 柱 strip);
+/// 36pt 高 44 柱 strip 走势——五张卡同形态,CPU 不特殊化(用户拍板 2026-10-20));
 /// compact = 弹窗双列小卡(名称 / 大数字 + 一句补充 / 36pt 走势,与 full 同组件)。
 /// 整卡可点,跳到对应指标 tab(Vitals `data-goto`)。
 struct MetricCardView: View {
@@ -407,24 +401,16 @@ struct MetricCardView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            // 走势形态按模型走(model.trendStyle):CPU 面积线,其余 44 柱 strip。
             trendChart
         }
         .padding(16)
     }
 
     /// 底部走势(full / compact 共用同一组件,用户拍板 2026-10-17:弹窗与主窗口
-    /// 同一指标必须同观感,不再分叉):CPU 面积线,其余 44 柱 strip。
-    @ViewBuilder
+    /// 同一指标必须同观感):五张卡一律 44 柱 strip(2026-10-20 撤 CPU 面积线特例)。
     private var trendChart: some View {
-        switch model.trendStyle {
-        case .area:
-            AreaTrendChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
-                .frame(height: 36)
-        case .strip:
-            StripChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
-                .frame(height: 36)
-        }
+        StripChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
+            .frame(height: 36)
     }
 
     private var compactBody: some View {
@@ -445,7 +431,7 @@ struct MetricCardView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            // 底部走势与 full 同一组件(model.trendStyle 随行,用户拍板 2026-10-17)。
+            // 底部走势与 full 同一组件(用户拍板 2026-10-17)。
             trendChart
         }
         .padding(12)
