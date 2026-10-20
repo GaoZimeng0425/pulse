@@ -3,7 +3,7 @@ import XCTest
 @testable import PulseCore
 
 /// 接缝:LiveBatterySource 冒烟(spec 测试决策:OS 边界只证明真实可用,
-/// 不深测——纯逻辑已在 BatterySensorTests 钉死)。只读观察,真机走查用;
+/// 不深测——纯逻辑已在核心包 BatteryModelTests 钉死)。只读观察,真机走查用;
 /// 无内建电池的环境(台式机)整页跳过,不断言。
 final class LiveBatterySourceSmokeTests: XCTestCase {
     private let source = LiveBatterySource()

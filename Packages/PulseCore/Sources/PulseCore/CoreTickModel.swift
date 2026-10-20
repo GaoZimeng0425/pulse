@@ -1,6 +1,6 @@
 import Foundation
 
-// 每核 tick 的纯值层:样本 / 负载拆分 / 差分器与源接缝。host_processor_info 适配器在 app target(CoreTickDiffer.swift)。
+// 每核 tick 的纯值层:样本 / 负载拆分 / 差分器与源接缝。host_processor_info 适配器在 app target(LiveCoreTickSource.swift)。
 
 /// 一次每核 tick 计数样本:`host_processor_info(HOST_CPU_LOAD_INFO)` 的读数。
 /// 系统 CPU 负载 = 相邻两样本的忙 tick 差 ÷ 总 tick 差(总含 idle)——

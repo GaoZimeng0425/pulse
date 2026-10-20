@@ -53,6 +53,9 @@ targets:
     platform: macOS
     sources:
       - path: PulseTests
+      # 与包内测试共用的合成夹具:直接编进测试包。不走 PulseCoreTestSupport 产品链接——
+      # Xcode 会把它连同 PulseCore 静态链进测试包,与动态库 PulseCore 冲突(05 记过的双份元数据坑)。
+      - path: Packages/PulseCore/Sources/PulseCoreTestSupport
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

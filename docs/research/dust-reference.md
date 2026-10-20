@@ -15,7 +15,7 @@ dust 是 `du` 的替代品:从给定路径并行遍历目录树,逐文件取元�
 快照、IO 计数中的任何一件——不调 statvfs/挂载表(唯一例外见 §2.4 的 `-x`,
 且那里用的也是 `metadata().dev()` 而非挂载表)。
 
-我们的 `Pulse/DiskSensor.swift` 反过来全程不进目录树:`statfs("/")` 定容器 →
+我们的 `Pulse/Live/DiskSensor.swift`(对账等纯逻辑现在核心层 `DiskModel.swift`)反过来全程不进目录树:`statfs("/")` 定容器 →
 `getmntinfo` 全表 → 每卷 `getattrlist` 精确已用 → CFURL 两 key 差值 →
 `fs_snapshot_list` → IORegistry 吞吐差分。两边唯一的共同底层动作是"取元数据
 /statfs"这一族系统调用,用途完全不同。**对现有 DiskSensor:没有可替换、可移植
@@ -120,7 +120,7 @@ iCloud dataless 目录跳过绝不触发回源、`ATTR_CMNEXT_PRIVATESIZE` 单�
 
 ## 4. 结论
 
-- 现有 `Pulse/DiskSensor.swift` 监控路径:**零改动**,dust 不碰我们赖以为生的
+- 现有 `Pulse/Live/DiskSensor.swift` 监控路径:**零改动**,dust 不碰我们赖以为生的
   任何口径(Finder 可用、purgeable、快照、内核 IO 账)。
 - 空间分析功能(§8.1 可回收产物扫描 / per-app 占用)动工时再翻本文:主路径照
   petal,护栏抄 dust(§3 表),优先级:st_dev 剪枝 > 硬链接去重(已有 petal)>

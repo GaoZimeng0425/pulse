@@ -64,7 +64,7 @@ components:
 > [google-labs-code/design.md](https://github.com/google-labs-code/design.md) v1 规范
 > (YAML 令牌 + 叙述层)。任何代理(或人)写/改 SwiftUI 视图前先读这里;
 > 与本文件冲突的旧代码按 §已知偏差 清单在重构时收编,不得新增偏差。
-> 令牌的**代码出处**永远优先于本文件的数值快照:颜色在 `Pulse/MetricAccent.swift`,
+> 令牌的**代码出处**永远优先于本文件的数值快照:颜色在 `Pulse/Views/MetricAccent.swift`,
 > 数值漂移以代码评审 + 本文件 §已知偏差 追踪。
 
 ## Overview
@@ -97,8 +97,8 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   图标)/ 项目 = CPU 蓝 / 系统 中性灰 / 后台服务 = Network 绿 / **孤儿 橙**,唯一出处
   `GroupCategory.identityColor`(与 `Metric` 同级,在 MetricAccent.swift)。孤儿橙是
   **身份**不是强调级,有意不与 `{colors.state-warning}` 琥珀合并(GLOSSARY:橙色高亮)。
-- 强调级(正常/偏高/紧张)→ 色的映射只允许集中在三处:`StatusBadgeRules.chip`(系统 /
-  组负载)、`MetricCardModel` 的 chip 构造(内存压力、电池充电状态,OverviewCards.swift)
+- 强调级(正常/偏高/紧张)→ 色的映射只允许集中在三处:`StatusBadge.chip`(系统 /
+  组负载)、`MetricCardModel` 的 chip 构造(内存压力、电池充电状态;两者都在 MetricCardModel.swift)
   与 `MenuBarBadgeRenderer.color(for:ink:)`;色值一律取语义令牌(菜单栏例外见 §已知偏差)。
 - 菜单栏位图颜色只能经 ImageRenderer 预绘(`.renderingMode(.original)`);
   NSStatusItem 会剥掉 SwiftUI 前景色,这是实测结论不是风格偏好。
@@ -166,7 +166,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 
 ## Components
 
-- **卡片家族零件**(arch-review-2026-10-18/02 中4,`Pulse/CardFamily.swift`):卡壳
+- **卡片家族零件**(arch-review-2026-10-18/02 中4,`Pulse/Views/CardFamily.swift`):卡壳
   `cardShell(compact:)`(底色 + 圆角 + 内距,两档;`padded: false` 只给内距随版式
   变化、自己排内距的卡用——总览卡 16/12、指标主卡 20/12)、主卡头 `CardHeader`(22pt 徽章 +
   card-title 指标色)、副卡头 `CardSubHeader`(10pt 指标色符号 + 11 medium 次级标题 +

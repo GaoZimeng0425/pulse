@@ -4,41 +4,9 @@ import XCTest
 
 /// 菜单栏徽标槽位配置 → 渲染输入的映射(spec 测试决策钉死的纯函数缝):
 /// 默认态与现状逐像素一致、四项指标可同时上屏、顺序可调、读数缺失占位不伪造、
-/// 磁盘剩余百分比、网络上下行叠两行、缓存键随配置变化。
+/// 磁盘剩余百分比、网络上下行叠两行、缓存键随配置变化。配置本身的合法化与 LRU
+/// 在核心包 MenuBarBadgeConfigurationTests / LRUBoundedCacheTests。
 final class MenuBarBadgeTests: XCTestCase {
-    // MARK: - 槽位配置
-
-    /// 默认配置 = CPU + RAM(Round-2 共识:默认不变)。
-    func testDefaultConfigurationIsCPURAM() {
-        XCTAssertEqual(MenuBarBadgeConfiguration.default.slots, [.cpu, .ram])
-        XCTAssertEqual(MenuBarBadgeConfiguration.default.rawValue, "cpu,ram")
-    }
-
-    /// 槽位上限 = 指标总数(四项可同时上屏,2026-10-20 用户要求);空与超上限按
-    /// "非法配置回落默认"处置。
-    func testAllFourMetricsFitAtOnceAndBeyondFallsBackToDefault() {
-        let all: [MenuBarBadgeMetric] = [.cpu, .ram, .diskRemaining, .networkRate]
-        XCTAssertEqual(MenuBarBadgeConfiguration(slots: all).slots, all)
-        XCTAssertEqual(MenuBarBadgeConfiguration(rawValue: "cpu,ram,diskRemaining,networkRate")?.slots, all)
-        XCTAssertEqual(MenuBarBadgeConfiguration(slots: []).slots, [.cpu, .ram])
-        XCTAssertEqual(MenuBarBadgeConfiguration(slots: all + [.cpu]).slots, [.cpu, .ram])
-    }
-
-    /// rawValue 解码:未知指标 / 非法数量 → nil(调用方 `?? .default` 回默认)。
-    func testInvalidRawValueDecodesToNil() {
-        XCTAssertNil(MenuBarBadgeConfiguration(rawValue: "bogus"))
-        XCTAssertNil(MenuBarBadgeConfiguration(rawValue: ""))
-        XCTAssertNil(MenuBarBadgeConfiguration(rawValue: "cpu,ram,cpu,ram,cpu"))
-        XCTAssertNil(MenuBarBadgeConfiguration(rawValue: "cpu,network,foo"))
-    }
-
-    /// 合法配置 rawValue 往返:设置页写什么,重启读回就是什么。
-    func testRawValueRoundTrip() {
-        let configuration = MenuBarBadgeConfiguration(slots: [.ram, .diskRemaining, .networkRate])
-        XCTAssertEqual(MenuBarBadgeConfiguration(rawValue: configuration.rawValue)?.slots,
-                       [.ram, .diskRemaining, .networkRate])
-    }
-
     // MARK: - 配置 → 渲染输入(顺序 = 菜单栏从左到右)
 
     /// 顺序可调:RAM 在前 CPU 在后,输出顺序跟随槽位。
@@ -186,43 +154,6 @@ final class MenuBarBadgeTests: XCTestCase {
                 colorScheme: .dark
             )
         )
-    }
-
-    // MARK: - 渲染缓存 LRU(评审修复:徽标文案逐轮变新键,缓存必须有界)
-
-    /// 容量上界:插入超过容量,最旧键被淘汰,条数不再增长。
-    func testLRUCacheEvictsOldestBeyondCapacity() {
-        var cache = LRUBoundedCache<String, Int>(capacity: 3)
-        for (index, key) in ["a", "b", "c", "d"].enumerated() {
-            cache.insert(index, forKey: key)
-        }
-        XCTAssertEqual(cache.order, ["b", "c", "d"], "容量 3 时最旧的 a 被挤出")
-        XCTAssertNil(cache.hit("a"))
-        XCTAssertEqual(cache.hit("d"), 3)
-    }
-
-    /// 命中即续命:被访问的键挪到最新,淘汰顺位让给真正最旧的键。
-    func testLRUCacheHitRefreshesRecency() {
-        var cache = LRUBoundedCache<String, Int>(capacity: 3)
-        for (index, key) in ["a", "b", "c"].enumerated() {
-            cache.insert(index, forKey: key)
-        }
-        XCTAssertEqual(cache.hit("a"), 0, "命中返回值")
-        cache.insert(9, forKey: "d")
-        XCTAssertEqual(cache.order, ["c", "a", "d"], "a 因命中续命,b 成为最旧被挤出")
-        XCTAssertNil(cache.hit("b"))
-        XCTAssertEqual(cache.hit("a"), 0)
-        XCTAssertEqual(cache.hit("c"), 2, "c 未被命中过但仍未到淘汰顺位")
-    }
-
-    /// 重复插入同键:更新值且不产生重复序位。
-    func testLRUCacheReinsertUpdatesWithoutDuplicates() {
-        var cache = LRUBoundedCache<String, Int>(capacity: 2)
-        cache.insert(1, forKey: "a")
-        cache.insert(2, forKey: "b")
-        cache.insert(3, forKey: "a")
-        XCTAssertEqual(cache.order, ["b", "a"])
-        XCTAssertEqual(cache.hit("a"), 3, "同键再插更新值")
     }
 
     /// 渲染器容量锚点:策略常量(~20)与"网络速率几秒窗内来回切换仍命中"

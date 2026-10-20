@@ -16,6 +16,9 @@ let package = Package(
             name: "PulseCore",
             dependencies: [.product(name: "GRDB", package: "GRDB.swift")]
         ),
-        .testTarget(name: "PulseCoreTests", dependencies: ["PulseCore"]),
+        // 两套测试共用的合成夹具:包内测试按 target 依赖;app 的 PulseTests 由 project.yml
+        // 把同一目录的源直接编进测试包(不作产品链接,避免 PulseCore 被静态链第二份)。
+        .target(name: "PulseCoreTestSupport", dependencies: ["PulseCore"]),
+        .testTarget(name: "PulseCoreTests", dependencies: ["PulseCore", "PulseCoreTestSupport"]),
     ]
 )

@@ -1,6 +1,6 @@
-// 工单 06 真机探针:用 app 自己的 NetworkSensor 代码路径(NetworkInterfaceSelector
-// + NetworkCountersReader + NetworkRateDiffer)采样,观察速率是否 sane。
-// 用法:swiftc 06-network-rate.swift ../../Pulse/NetworkSensor.swift -o /tmp/probe06 && /tmp/probe06 <轮数> [下载URL]
+// p1-history/06 真机探针:用 app 自己的网络代码路径(核心层 NetworkInterfaceSelector
+// + NetworkRateDiffer,app 侧 NetworkCountersReader)采样,观察速率是否 sane。
+// 用法:sh docs/probes/06-network-rate.sh <轮数> [下载URL](源码跨两层,编译步骤在脚本里)
 // 输出逐轮:选定接口 / 累计计数 / 差分速率;下载 URL 非空时第 1 轮后启动 curl 造流量。
 
 import Foundation
