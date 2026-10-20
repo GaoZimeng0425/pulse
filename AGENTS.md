@@ -30,6 +30,11 @@ UI 的唯一视觉宪法是根目录 `DESIGN.md`(google-labs-code/design.md 格�
 
 实施子代理的 prompt 应按其任务带上下述默认:涉及重命名/改签名/迁移类型 → ripwire 查影响面;涉及多点同构修改 → ast-grep。
 
+## 分支
+
+- 集成分支是 `develop`(2026-10-20 起):功能分支 / 集成分支 / 子代理 worktree 一律合回 `develop`,不再合进 `p1-implementation`(已冻结,保留作历史)。`main` 只在用户明确要求时才动。
+- 合入前先把 `develop` 的新提交合进来、`xcodegen generate`、跑 `sh scripts/check.sh` 全绿;推送与 `sh scripts/build.sh` 安装先问用户。
+
 ## 构建与检查
 
 - Xcode 工程由 `project.yml` 生成:加/移文件后先 `xcodegen generate`,绝不手改 `project.pbxproj`。
