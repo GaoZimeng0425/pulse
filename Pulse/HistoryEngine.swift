@@ -68,25 +68,26 @@ actor HistoryEngine {
     /// 第一处记进入边,其余静默;先恢复者记恢复边。
     private var databaseHealthy = true
 
-    /// 构造:打开方负责给库(文件或内存);`now` 用于启动时的存量小时补卷积
-    /// (上一会话收尾未及卷积的分钟行在此补齐,不悬空)。
+    /// 构造:打开方负责给库(文件或内存)。只读回组名缓存(一张小表);存量小时补卷积
+    /// 不在这里做——构造跑在调用方线程(app 启动时是主线程),补卷积由本会话首笔落库
+    /// 在 actor 上完成,且只从小时表已有的最后一小时起卷(arch-review-2026-10-18/03 乙5)。
+    /// `now` 保留给调用方兼容。
     /// init 是非隔离上下文:闭包内只动局部量,actor 状态在闭包外赋值。
     init(database: DatabaseQueue?, now: Date = Date(), calendar: Calendar = .current) {
         self.database = database
         self.calendar = calendar
         guard let database else { return }
         do {
-            let boundary = HistoryWindows.hourStartSeconds(of: now)
-            var names: [String: String] = [:]
-            try database.write { db in
-                try Self.rollupHours(from: 0, through: boundary, in: db)
-                names = try Self.persistedGroupNames(in: db)
-            }
-            hourRollupBoundary = boundary
-            persistedGroupNames = names
+            persistedGroupNames = try database.read { db in try Self.persistedGroupNames(in: db) }
         } catch {
             LogService.error("历史库启动初始化失败:\(error)", category: "History")
         }
+    }
+
+    /// 小时表已有的最后一小时(无行为 0 = 从头卷;重卷它幂等):首笔落库补卷积的下界,
+    /// 成本不随留存窗增长。
+    private static func lastRolledHour(in db: Database) throws -> Int {
+        try Int.fetchOne(db, sql: "SELECT MAX(ts) FROM system_hour") ?? 0
     }
 
     /// 默认引擎:打开应用库;失败返回 nil(SystemMonitor 降级为无历史)。
@@ -135,7 +136,8 @@ actor HistoryEngine {
 
                 let boundary = HistoryWindows.hourStartSeconds(of: now)
                 if boundary > (hourRollupBoundary ?? Int.min) {
-                    try Self.rollupHours(from: hourRollupBoundary ?? 0, through: boundary, in: db)
+                    let lower = try hourRollupBoundary ?? Self.lastRolledHour(in: db)
+                    try Self.rollupHours(from: lower, through: boundary, in: db)
                     hourRollupBoundary = boundary
                 }
 

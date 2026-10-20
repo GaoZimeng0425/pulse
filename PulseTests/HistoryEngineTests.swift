@@ -271,7 +271,8 @@ final class HistoryEngineTests: XCTestCase {
         XCTAssertEqual(try scalarInt("SELECT count(*) FROM sample_min"), 2)
     }
 
-    /// 启动恢复:上一会话遗留的分钟行(未及小时卷积)在新引擎打开时补齐。
+    /// 启动恢复:上一会话遗留的分钟行(未及小时卷积)由新会话首笔落库补齐;构造本身
+    /// 不碰小时表(不在调用方线程上补卷积,乙5)。
     func testStartupRecoversUnrolledHours() async throws {
         let engineA = try makeFileEngine(now: minute0)
         await ingest(engineA, at: minute0, load: 12, groups: [GroupSample(id: .orphan, cpuPercent: 8, memoryBytes: 10)])
@@ -282,9 +283,11 @@ final class HistoryEngineTests: XCTestCase {
             try db.execute(sql: "DELETE FROM system_hour")
         }
 
-        // "重启"(且已跨入下一小时):新引擎打开同一文件 → 启动补卷积
+        // "重启"(且已跨入下一小时):新引擎打开同一文件,构造后小时表仍空;首笔落库
         // 把上一会话的完整小时补齐。
-        _ = try makeFileEngine(now: minute0.addingTimeInterval(3600))
+        let engineB = try makeFileEngine(now: minute0.addingTimeInterval(3600))
+        XCTAssertEqual(try scalarInt("SELECT count(*) FROM sample_hour"), 0, "构造不补卷积")
+        await ingest(engineB, at: minute0.addingTimeInterval(3600), load: 0, groups: [])
 
         XCTAssertEqual(try scalarInt("SELECT count(*) FROM sample_hour"), 1)
         XCTAssertEqual(try scalarDouble("SELECT load_avg FROM system_hour"), 12, accuracy: 0.0001)
