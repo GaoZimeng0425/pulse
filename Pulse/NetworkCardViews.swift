@@ -21,43 +21,30 @@ struct NetworkTotalsCardView: View {
                 row("7 天下行", bytes: totals.weekDownBytes)
                 row("7 天上行", bytes: totals.weekUpBytes)
             } else {
-                Text("累计暂不可用")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.tertiary)
+                CardEmptyState(title: "累计暂不可用")
             }
         }
-        .padding(isCompact ? 12 : 16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Surface.card, in: .rect(cornerRadius: isCompact ? 12 : 18))
+        .cardShell(compact: isCompact)
         .accessibilityElement(children: .combine)
     }
 
     private var header: some View {
-        HStack(spacing: 5) {
-            Image(systemName: "network")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Metric.network.accentColor)
-            Text("流量累计")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-            Spacer()
-            if let totals {
-                Text("7 天合计 \(PulseFormat.networkTotal(totals.weekDownBytes + totals.weekUpBytes))")
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.tertiary)
-                    .monospacedDigit()
-            }
-        }
+        CardSubHeader(
+            symbolName: "network",
+            title: "流量累计",
+            tint: Metric.network.accentColor,
+            note: totals.map { "7 天合计 \(PulseFormat.networkTotal($0.weekDownBytes + $0.weekUpBytes))" }
+        )
     }
 
     private func row(_ label: String, bytes: UInt64, prominent: Bool = false) -> some View {
         HStack {
             Text(label)
-                .font(.system(size: 11.5))
+                .font(.system(size: 12))
                 .foregroundStyle(prominent ? .primary : .secondary)
             Spacer()
             Text(PulseFormat.networkTotal(bytes))
-                .font(.system(size: 12, weight: prominent ? .semibold : .regular, design: .rounded))
+                .font(.system(size: 12, weight: prominent ? .semibold : .regular))
                 .monospacedDigit()
         }
         .padding(.vertical, 2)

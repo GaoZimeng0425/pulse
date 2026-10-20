@@ -79,21 +79,11 @@ struct RingCardView: View {
     var isCompact = false
 
     var body: some View {
+        // 两档都画卡头:弹窗里两张环上下排(2026-10-20 起与主窗口同内容),没有标题分不清。
         VStack(alignment: .leading, spacing: 12) {
-            if !isCompact {
-                HStack(spacing: 7) {
-                    MetricBadge(symbolName: symbolName, tint: tint)
-                    Text(title)
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundStyle(tint)
-                }
-            }
+            CardHeader(symbolName: symbolName, title: title, tint: tint)
             if slices.isEmpty {
-                Text("暂无内存数据")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 28)
+                CardEmptyState(title: "暂无内存数据")
             } else {
                 HStack(spacing: isCompact ? 14 : 20) {
                     ring
@@ -101,9 +91,7 @@ struct RingCardView: View {
                 }
             }
         }
-        .padding(isCompact ? 12 : 16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Surface.card, in: .rect(cornerRadius: isCompact ? 12 : 18))
+        .cardShell(compact: isCompact)
     }
 
     private var ring: some View {
@@ -146,7 +134,7 @@ struct RingCardView: View {
                         .foregroundStyle(.secondary)
                         .frame(minWidth: 30, alignment: .trailing)
                 }
-                .font(.system(size: 11.5))
+                .font(.system(size: 12))
             }
         }
     }

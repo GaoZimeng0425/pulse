@@ -350,8 +350,7 @@ struct MetricCardView: View {
                 case .compact: compactBody
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Surface.card, in: .rect(cornerRadius: style == .full ? 18 : 12))
+            .cardShell(compact: style == .compact, padded: false)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -361,12 +360,7 @@ struct MetricCardView: View {
 
     private var fullBody: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 7) {
-                MetricBadge(symbolName: model.symbolName, tint: model.tint)
-                Text(model.title)
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundStyle(model.tint)
-                Spacer()
+            CardHeader(symbolName: model.symbolName, title: model.title, tint: model.tint) {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.tertiary)
@@ -385,20 +379,8 @@ struct MetricCardView: View {
             }
             HStack(alignment: .top, spacing: 8) {
                 ForEach(model.stats.prefix(Self.overviewStatCount)) { stat in
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 4) {
-                            if let dot = stat.dot {
-                                Circle().fill(dot).frame(width: 6, height: 6)
-                            }
-                            Text(stat.label)
-                        }
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
-                        Text(stat.value)
-                            .font(.system(size: 12, weight: .semibold))
-                            .monospacedDigit()
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    StatValue(label: stat.label, value: stat.value, dot: stat.dot)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             trendChart
@@ -415,14 +397,7 @@ struct MetricCardView: View {
 
     private var compactBody: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 5) {
-                Image(systemName: model.symbolName)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(model.tint)
-                Text(model.title)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
+            CardSubHeader(symbolName: model.symbolName, title: model.title, tint: model.tint)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 FigureText(value: model.figureValue, unit: model.figureUnit, size: 22)
                 Spacer(minLength: 4)

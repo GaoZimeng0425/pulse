@@ -116,6 +116,7 @@ struct MainWindowView: View {
                     Image(systemName: "gearshape")
                 }
                 .help("设置项目根目录")
+                .accessibilityLabel("设置")
             }
         }
         // 工具栏不展示窗口标题(Window 场景名"Pulse")——标题文字占掉左侧一截,
@@ -281,6 +282,7 @@ private struct MainSearchField: View {
                 }
                 .buttonStyle(.plain)
                 .help("清空搜索")
+                .accessibilityLabel("清空搜索")
             }
         }
         .padding(.horizontal, 8)

@@ -224,8 +224,7 @@ struct MetricMainCardView: View {
                 regularBody
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Surface.card, in: .rect(cornerRadius: isCompact ? 12 : 18))
+        .cardShell(compact: isCompact, padded: false)
         .accessibilityElement(children: .combine)
     }
 
@@ -233,7 +232,7 @@ struct MetricMainCardView: View {
         HStack(alignment: .top, spacing: 24) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(model.caption)
-                    .font(.system(size: 11.5))
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 FigureText(value: model.figureValue, unit: model.figureUnit, size: 44)
                 if let chip = model.chip {
@@ -286,20 +285,7 @@ struct MetricMainCardView: View {
     }
 
     private func statCell(_ stat: MetricCardStat) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 4) {
-                if let dot = stat.dot {
-                    Circle().fill(dot).frame(width: 6, height: 6)
-                }
-                Text(stat.label)
-            }
-            .font(.system(size: 10.5))
-            .foregroundStyle(.secondary)
-            Text(stat.value)
-                .font(.system(size: isCompact ? 12 : 15, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .lineLimit(1)
-        }
+        StatValue(label: stat.label, value: stat.value, dot: stat.dot)
     }
 }
 

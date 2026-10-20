@@ -89,9 +89,10 @@ struct DashboardView: View {
                     PulseFormat.systemUptime(seconds: ProcessInfo.processInfo.systemUptime),
                     systemImage: "clock"
                 )
+                .monospacedDigit()
             }
         }
-        .font(.system(size: 11.5))
+        .font(.system(size: 11))
         .foregroundStyle(.secondary)
         .padding(.horizontal, 4)
     }

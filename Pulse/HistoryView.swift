@@ -41,7 +41,7 @@ struct HistoryTabView: View {
 
             // 口径脚注(GLOSSARY 双口径 / 占位语义的展示出口,工单 04 票面既定)。
             Text(metric.caption)
-                .font(.system(size: 11.5))
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }
         .controlSize(isCompact ? .small : .regular)
@@ -82,9 +82,7 @@ struct HistoryTabView: View {
                 emptyState
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(isCompact ? 12 : 16)
-        .background(Surface.card, in: .rect(cornerRadius: isCompact ? 12 : 18))
+        .cardShell(compact: isCompact)
     }
 
     /// 统计点(与指标卡统计行同族:小标签 + 圆体数字)。
@@ -95,6 +93,7 @@ struct HistoryTabView: View {
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .monospacedDigit()
         }
     }
 
