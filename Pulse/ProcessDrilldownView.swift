@@ -132,7 +132,7 @@ struct ProcessDetailView: View {
                     .font(.caption.weight(.semibold))
             }
             .buttonStyle(.bordered)
-            .tint(.red)
+            .tint(Surface.negative)
             .controlSize(.small)
             .help("结束该进程(需确认)")
         }

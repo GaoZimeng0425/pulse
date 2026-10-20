@@ -152,7 +152,7 @@ extension MetricCardModel {
         case .normal:
             MetricCardChip(title: pressure.title, systemImage: "checkmark.circle.fill", tint: Surface.positive)
         case .warning:
-            MetricCardChip(title: pressure.title, systemImage: "exclamationmark.circle.fill", tint: Metric.disk.accentColor)
+            MetricCardChip(title: pressure.title, systemImage: "exclamationmark.circle.fill", tint: Surface.warning)
         case .critical:
             MetricCardChip(title: pressure.title, systemImage: "exclamationmark.triangle.fill", tint: Surface.negative)
         }
@@ -318,7 +318,7 @@ extension BatteryChargeStatus {
         case .charged:
             MetricCardChip(title: title, systemImage: "checkmark", tint: Surface.positive)
         case .optimizedCharging:
-            MetricCardChip(title: title, systemImage: "clock.badge.checkmark", tint: Metric.disk.accentColor)
+            MetricCardChip(title: title, systemImage: "clock.badge.checkmark", tint: Surface.warning)
         case .discharging:
             MetricCardChip(title: title, systemImage: "battery.50percent", tint: Surface.inkTertiary)
         }
@@ -370,7 +370,7 @@ struct MetricCardView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    FigureText(value: model.figureValue, unit: model.figureUnit, size: 34)
+                    FigureText(value: model.figureValue, unit: model.figureUnit, size: FigureSize.overview)
                     Spacer(minLength: 8)
                     if let chip = model.chip {
                         MetricChipView(chip: chip)
@@ -399,7 +399,7 @@ struct MetricCardView: View {
         VStack(alignment: .leading, spacing: 6) {
             CardSubHeader(symbolName: model.symbolName, title: model.title, tint: model.tint)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
-                FigureText(value: model.figureValue, unit: model.figureUnit, size: 22)
+                FigureText(value: model.figureValue, unit: model.figureUnit, size: FigureSize.overviewCompact)
                 Spacer(minLength: 4)
                 Text(model.note)
                     .font(.system(size: 10.5))
@@ -413,7 +413,24 @@ struct MetricCardView: View {
     }
 }
 
+/// 大数字的字号令牌(DESIGN.md §Typography figure-*):每处大数字只许取这里的档位。
+enum FigureSize {
+    /// `{typography.figure-main}`:指标 tab 主卡。
+    static let main: CGFloat = 44
+    /// `{typography.figure-main-compact}`:弹窗主卡。
+    static let mainCompact: CGFloat = 30
+    /// `{typography.figure-overview}`:总览卡。
+    static let overview: CGFloat = 34
+    /// `{typography.figure-overview-compact}`:弹窗总览卡。
+    static let overviewCompact: CGFloat = 22
+    /// `{typography.figure-ring}`:环心数字。
+    static let ring: CGFloat = 19
+    /// `{typography.figure-ring-compact}`:弹窗环心数字。
+    static let ringCompact: CGFloat = 16
+}
+
 /// 大数字(§1.2 figure):圆体加粗 + tabular + 负字距,单位约半号、基线对齐。
+/// 字号只取 FigureSize 令牌。
 struct FigureText: View {
     let value: String
     let unit: String

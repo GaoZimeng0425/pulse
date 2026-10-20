@@ -143,3 +143,12 @@ private struct SidebarIconView: View {
             .accessibilityHidden(true)
     }
 }
+
+// MARK: - 预览(arch-review-2026-10-18/02:预览缺口补齐;项目根不落盘)
+
+#Preview("设置窗") {
+    SettingsView(
+        rootsStore: ProjectRootsStore(load: { ["~/Documents/Learn"] }, persist: { _ in }),
+        monitor: .preview()
+    )
+}

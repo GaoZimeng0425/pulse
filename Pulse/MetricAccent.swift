@@ -67,6 +67,31 @@ enum Surface {
     /// 结束整组图标等"值得注意的负面偏差"的唯一出处(深色补系统红暗色变体,
     /// 参考文档未给暗色值)。
     static let negative = Color.dynamic(light: 0xe0352b, dark: 0xff453a)
+    /// 警示色(`{colors.state-warning}`,琥珀):内存压力"偏高"、优化充电介入、触发中
+    /// 告警横幅等"值得留意但未到危险"的唯一出处——取 Disk 指标色的别名,不抄第二份 hex。
+    static let warning = Metric.disk.accentColor
+}
+
+// MARK: - 类别身份色(arch-review-2026-10-18/02 中8)
+
+extension GroupCategory {
+    /// 类别身份色(非 App 组的图标瓦片底色;孤儿另作组行强调色)的唯一出处,
+    /// 与 Metric 指标色同级。孤儿 = 橙(GLOSSARY:"UI 中橙色高亮——它往往正是问题所在"),
+    /// 有意不与 `{colors.state-warning}` 琥珀合并:孤儿是身份,不是强调级。
+    var identityColor: Color {
+        switch self {
+        case .app: Self.appIdentity
+        case .project: Metric.cpu.accentColor
+        case .system: Self.systemIdentity
+        case .backgroundService: Metric.network.accentColor
+        case .orphan: Self.orphanIdentity
+        }
+    }
+
+    /// app 组渲染走真实应用图标,此色仅样式表完备性的理论兜底。
+    private static let appIdentity = Color.dynamic(light: 0xa2845e, dark: 0xac8e68)
+    private static let systemIdentity = Color.dynamic(light: 0x8e8e93, dark: 0x98989d)
+    private static let orphanIdentity = Color.dynamic(light: 0xff9500, dark: 0xff9f0a)
 }
 
 // MARK: - 内存构成单表(工单 P0.6-05,评审 F5 去重)

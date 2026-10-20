@@ -234,7 +234,7 @@ struct MetricMainCardView: View {
                 Text(model.caption)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-                FigureText(value: model.figureValue, unit: model.figureUnit, size: 44)
+                FigureText(value: model.figureValue, unit: model.figureUnit, size: FigureSize.main)
                 if let chip = model.chip {
                     MetricChipView(chip: chip)
                 }
@@ -265,7 +265,7 @@ struct MetricMainCardView: View {
                     Text(model.caption)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
-                    FigureText(value: model.figureValue, unit: model.figureUnit, size: 30)
+                    FigureText(value: model.figureValue, unit: model.figureUnit, size: FigureSize.mainCompact)
                 }
                 Spacer()
                 if let chip = model.chip {

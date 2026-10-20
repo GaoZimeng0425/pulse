@@ -14,11 +14,20 @@ colors:
   accent-battery: "#008300 / #2fa83a"
   state-positive: = {accent-battery}
   state-negative: "#e0352b / #ff453a"
-  state-warning: "#eda100 / #c98500"
+  state-warning: = {accent-disk}
+  category-app: "#a2845e / #ac8e68"
+  category-project: = {accent-cpu}
+  category-system: "#8e8e93 / #98989d"
+  category-background-service: = {accent-network}
+  category-orphan: "#ff9500 / #ff9f0a"
 typography:
   font: "SF Pro(系统默认,不引第三方字体)"
   figure-overview: "34pt bold rounded, tabular"
   figure-main: "44pt bold rounded, tabular"
+  figure-main-compact: "30pt bold rounded, tabular"
+  figure-overview-compact: "22pt bold rounded, tabular"
+  figure-ring: "19pt bold rounded, tabular"
+  figure-ring-compact: "16pt bold rounded, tabular"
   page-title: "26pt bold"
   section-title: "17pt bold"
   figure-mini: "17pt semibold rounded, tabular"
@@ -77,12 +86,17 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{colors.ink-tertiary}` | `Surface.inkTertiary` | 三级墨色(缓存段、最弱文字) |
 | `{colors.accent-cpu}` … `{colors.accent-battery}` | `Metric.accentColor` | 每指标一色:tab、图表、徽章、大数字 |
 | `{colors.state-positive}` | `Surface.positive` | ✓正常、充电中 |
-| `{colors.state-warning}` | `Surface.projectsAccent` 口径 | 压力偏高、优化充电介入(琥珀语义) |
+| `{colors.state-warning}` | `Surface.warning`(= Disk 指标色别名) | 压力偏高、优化充电介入、触发中告警横幅(琥珀语义) |
+| `{colors.category-*}` | `GroupCategory.identityColor` | 非 App 组的图标瓦片底色;孤儿另作组行强调色(见下) |
 | `{colors.state-negative}` | `Surface.negative` | 高负载、紧张、结束进程等负面偏差 |
 
 规则:
 - 文字层级用系统语义(`.primary/.secondary/.tertiary`),不自定义灰。
 - 指标色只允许从 `Metric` 枚举取——新增指标先入表(浅深互异、指标互异有单测钉死)。
+- **类别身份色**(arch-review-2026-10-18/02 立节):App 棕(理论兜底,App 组实际画真实
+  图标)/ 项目 = CPU 蓝 / 系统 中性灰 / 后台服务 = Network 绿 / **孤儿 橙**,唯一出处
+  `GroupCategory.identityColor`(与 `Metric` 同级,在 MetricAccent.swift)。孤儿橙是
+  **身份**不是强调级,有意不与 `{colors.state-warning}` 琥珀合并(GLOSSARY:橙色高亮)。
 - 强调级(正常/偏高/紧张)→ 色的映射只允许集中在两处:
   `StatusBadgeRules.chip` 与 `MenuBarBadgeRenderer.color(for:ink:)`。
 - 菜单栏位图颜色只能经 ImageRenderer 预绘(`.renderingMode(.original)`);
@@ -94,6 +108,9 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 |---|---|---|
 | `{typography.figure-main}` | 44pt bold `.rounded` + `monospacedDigit` | 指标 tab 主卡大数字 |
 | `{typography.figure-overview}` | 34pt bold `.rounded` + `monospacedDigit` | 总览卡大数字(单位半号 48%) |
+| `{typography.figure-main-compact}` | 30pt(同族) | 弹窗主卡大数字 |
+| `{typography.figure-overview-compact}` | 22pt(同族) | 弹窗总览卡大数字 |
+| `{typography.figure-ring}` / `-compact` | 19 / 16pt(同族) | 环心数字(全尺寸 / 弹窗) |
 | `{typography.page-title}` | 26pt bold | 主窗口页名 |
 | `{typography.section-title}` | 17pt bold | 节标题("此刻"/"当前最忙") |
 | `{typography.figure-mini}` | 17pt semibold `.rounded` + `monospacedDigit` | 历史页均值/峰值等次级数字 |
@@ -104,7 +121,9 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 
 规则:
 - **一切数字**读数(百分比、字节、速率、PID)必须 `monospacedDigit()`;
-  大数字另加 `.rounded` 设计族与负字距(`FigureText` 是唯一实现,不要复刻)。
+  大数字另加 `.rounded` 设计族与负字距(`FigureText` 是唯一实现,不要复刻;字号只取
+  `FigureSize` 令牌)。统计值(标签 + 数字)不是大数字:`{typography.body}` 12 semibold
+  等宽,不走圆体(`StatValue` 是唯一实现)。
 - 菜单栏徽标字号(11.5 / 7pt;网络上下行叠两行版式 9pt)是 NSStatusItem 尺寸约束下的特例,不外溢到窗口 UI。
 - 不引第三方字体;中英文混排依赖系统默认,不手动调字距。
 
@@ -145,6 +164,12 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 圆角不随尺寸缩放(小元素不自动变小圆角)——形状由容器语义决定,由本表查得。
 
 ## Components
+
+- **卡片家族零件**(arch-review-2026-10-18/02 中4,`Pulse/CardFamily.swift`):卡壳
+  `cardShell(compact:)`(底色 + 圆角 + 内距,两档)、主卡头 `CardHeader`(22pt 徽章 +
+  card-title 指标色)、副卡头 `CardSubHeader`(10pt 指标色符号 + 11 medium 次级标题 +
+  10.5 注记)、统计值 `StatValue`、卡内空态 `CardEmptyState`(12.5 medium secondary 一句 +
+  10.5 tertiary 说明,居中)。**新卡一律组装这些零件,不再手写卡壳 / 卡头 / 空态。**
 
 - **MetricCardView(full)**:徽章 22×22 + 标题 + chevron / 34pt 大数字 + 状态 chip /
   三列统计 / 36pt 高 44 柱 strip 走势——五张卡同形态(用户拍板 2026-10-20:撤 CPU
@@ -215,10 +240,19 @@ chip 图标 9.5pt → micro 10.5;排行行 chevron 9pt → 10。
 13pt/16pt 出现在 **图标与容器尺寸**(图标 tab、设置图标砖、图标砖边长),不受文字角色约束;
 17pt 已立为 `{typography.section-title}` / `{typography.figure-mini}` 两角色。
 
-仍挂账:
-- **11.5pt 文字散点**(DiskCardViews ×6、NetworkCardViews、DevServerViews、
-  HistoryView、DashboardView、FooterButtonStyle 等 20+ 处)——量太大不盲扫,
-  待专项一轮逐处归 `{typography.caption}` 11 或 `{typography.body}` 12(动到对应
-  文件时顺带,或单开收编票)。
-- `padding(.vertical, 28)`(RingCardView 空态)不在令牌表,但是 4pt 网格倍数且
-  单点使用,暂视为合法;第二次出现时立令牌。
+2026-10-20 第二轮收编已完成(arch-review-2026-10-18/02):11.5pt 文字 13 处 → 说明类
+`{typography.caption}` 11、行标签 / 数值 / 按钮 `{typography.body}` 12;卡壳 / 卡头 / 统计值 /
+空态收进卡片家族零件(环形卡空态的 28pt 竖向内距随之消失);告警横幅裸橙 + 描边 →
+`Surface.warning` 淡底、无描边;类别色 `.brown/.gray/.orange` → 类别身份色;进程表结束
+按钮 `.red` → `Surface.negative`;大数字字号 → `FigureSize` 令牌。
+
+登记的有意例外(不是偏差):
+- **设置窗侧栏的彩色渐变图标砖**:仿系统设置风格(SettingsView),属系统外观对齐,不走
+  指标色 / 类别色。
+- **环形图用 Apple Charts(`SectorMark`),走势图自绘 Canvas**:环形的扇区几何与图例
+  交给 Charts 最省;走势是高频重绘的 44 柱 / 56 点,自绘可控成本——有意分工,不统一。
+- **菜单栏徽标强调色直写 `.orange/.red`**:位图经 ImageRenderer 预绘,本轮没有验证动态色
+  在离屏渲染里能否按外观正确解析,暂留系统色、集中在 `MenuBarBadgeRenderer.color` 一处;
+  要换成语义令牌须先实机验证深浅两种外观。
+
+仍挂账:无。

@@ -33,11 +33,11 @@ extension RingSlice {
             let icon: Icon = if let bundlePath = segment.bundlePath {
                 .app(bundlePath)
             } else if segment.isOther {
-                .symbol("ellipsis", .gray)
+                .symbol("ellipsis", Surface.inkTertiary)
             } else {
                 .symbol(
                     segment.category?.cardStyle.symbolName ?? "shippingbox",
-                    segment.category?.cardStyle.tileColor ?? .gray
+                    segment.category?.identityColor ?? Surface.inkTertiary
                 )
             }
             let color = segment.isOther || index >= opacities.count
@@ -107,7 +107,7 @@ struct RingCardView: View {
         .frame(width: isCompact ? 104 : 124, height: isCompact ? 104 : 124)
         .overlay {
             VStack(spacing: 2) {
-                FigureText(value: centerValue, unit: centerUnit, size: isCompact ? 16 : 19)
+                FigureText(value: centerValue, unit: centerUnit, size: isCompact ? FigureSize.ringCompact : FigureSize.ring)
                 Text(centerCaption)
                     .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
@@ -186,4 +186,24 @@ extension RingCardView {
             isCompact: isCompact
         )
     }
+}
+
+// MARK: - 预览(arch-review-2026-10-18/02:预览缺口补齐)
+
+#Preview("环形卡") {
+    let memory = MemoryBreakdown(
+        totalBytes: 51_539_607_552, appBytes: 21_000_000_000, wiredBytes: 6_000_000_000,
+        compressedBytes: 9_000_000_000, cachedBytes: 8_000_000_000, pressure: .normal
+    )
+    VStack(spacing: 16) {
+        HStack(alignment: .top, spacing: 16) {
+            RingCardView.memoryByType(memory)
+            RingCardView.memoryByType(nil)
+        }
+        RingCardView.memoryByType(memory, isCompact: true)
+            .frame(width: 332)
+    }
+    .padding(24)
+    .frame(width: 720)
+    .background(Surface.window)
 }
