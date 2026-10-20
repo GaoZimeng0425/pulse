@@ -64,7 +64,7 @@ components:
 > [google-labs-code/design.md](https://github.com/google-labs-code/design.md) v1 规范
 > (YAML 令牌 + 叙述层)。任何代理(或人)写/改 SwiftUI 视图前先读这里;
 > 与本文件冲突的旧代码按 §已知偏差 清单在重构时收编,不得新增偏差。
-> 令牌的**代码出处**永远优先于本文件的数值快照:颜色在 `Pulse/MetricAccent.swift`,
+> 令牌的**代码出处**永远优先于本文件的数值快照:颜色在 `Pulse/Views/MetricAccent.swift`,
 > 数值漂移以代码评审 + 本文件 §已知偏差 追踪。
 
 ## Overview
@@ -166,7 +166,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 
 ## Components
 
-- **卡片家族零件**(arch-review-2026-10-18/02 中4,`Pulse/CardFamily.swift`):卡壳
+- **卡片家族零件**(arch-review-2026-10-18/02 中4,`Pulse/Views/CardFamily.swift`):卡壳
   `cardShell(compact:)`(底色 + 圆角 + 内距,两档;`padded: false` 只给内距随版式
   变化、自己排内距的卡用——总览卡 16/12、指标主卡 20/12)、主卡头 `CardHeader`(22pt 徽章 +
   card-title 指标色)、副卡头 `CardSubHeader`(10pt 指标色符号 + 11 medium 次级标题 +

@@ -1,10 +1,9 @@
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 状态徽章阈值规则(工单 P0.6-04 语义,评审 F1 并入 05 的 chip 实现):
-/// ✓正常 / 高负载 的判定边界。规则纯逻辑在此钉死;chip 外观(全圆 pill、
-/// tint 14% 底)走 05 的 MetricCardView 家族,属预览 + 手动验收接缝。
+/// ✓正常 / 高负载 的判定边界。规则纯逻辑在此钉死;chip 映射与菜单栏红线
+/// 同口径断言要用 app 类型,在 PulseTests/StatusBadgeChipTests。
 final class StatusBadgeTests: XCTestCase {
     // MARK: 组卡高负载线(组 CPU% > 100%)
 
@@ -38,24 +37,5 @@ final class StatusBadgeTests: XCTestCase {
         XCTAssertEqual(StatusBadgeRules.systemBadge(load: 70.1), .high)
         XCTAssertEqual(StatusBadgeRules.systemBadge(load: 100), .high)
         XCTAssertNil(StatusBadgeRules.systemBadge(load: 70))
-    }
-
-    /// 高负载线字面量与菜单栏变红线保持同一出处语义:两处必须相等
-    /// (字面量直写是为绕开 redThreshold 的 MainActor 隔离,漂移由本断言拦截)。
-    @MainActor
-    func testSystemHighLoadThresholdMatchesMenuBarRedLine() {
-        XCTAssertEqual(StatusBadgeRules.systemHighLoadThreshold, SystemMonitor.redThreshold)
-    }
-
-    // MARK: chip 映射(外观 = 05 的 MetricCardChip,唯一实现)
-
-    func testBadgeChipsUseChineseTitles() {
-        XCTAssertEqual(StatusBadge.normal.chip.title, "正常")
-        XCTAssertEqual(StatusBadge.high.chip.title, "高负载")
-    }
-
-    func testBadgeChipSymbolsAreDistinct() {
-        // ✓ 与警示三角互异,chip 才可辨。
-        XCTAssertNotEqual(StatusBadge.normal.chip.systemImage, StatusBadge.high.chip.systemImage)
     }
 }
