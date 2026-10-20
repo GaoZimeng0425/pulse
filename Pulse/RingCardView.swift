@@ -33,11 +33,11 @@ extension RingSlice {
             let icon: Icon = if let bundlePath = segment.bundlePath {
                 .app(bundlePath)
             } else if segment.isOther {
-                .symbol("ellipsis", Surface.inkTertiary)
+                .symbol("ellipsis", GroupCategory.system.identityColor)
             } else {
                 .symbol(
                     segment.category?.cardStyle.symbolName ?? "shippingbox",
-                    segment.category?.identityColor ?? Surface.inkTertiary
+                    segment.category?.identityColor ?? GroupCategory.system.identityColor
                 )
             }
             let color = segment.isOther || index >= opacities.count

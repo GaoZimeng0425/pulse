@@ -37,7 +37,7 @@ struct CardHeader<Accessory: View>: View {
             Text(title)
                 .font(.system(size: 12.5, weight: .semibold))
                 .foregroundStyle(tint)
-            Spacer(minLength: 0)
+            Spacer(minLength: 8)
             accessory()
         }
     }

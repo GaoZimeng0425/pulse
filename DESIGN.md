@@ -97,8 +97,9 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   图标)/ 项目 = CPU 蓝 / 系统 中性灰 / 后台服务 = Network 绿 / **孤儿 橙**,唯一出处
   `GroupCategory.identityColor`(与 `Metric` 同级,在 MetricAccent.swift)。孤儿橙是
   **身份**不是强调级,有意不与 `{colors.state-warning}` 琥珀合并(GLOSSARY:橙色高亮)。
-- 强调级(正常/偏高/紧张)→ 色的映射只允许集中在两处:
-  `StatusBadgeRules.chip` 与 `MenuBarBadgeRenderer.color(for:ink:)`。
+- 强调级(正常/偏高/紧张)→ 色的映射只允许集中在三处:`StatusBadgeRules.chip`(系统 /
+  组负载)、`MetricCardModel` 的 chip 构造(内存压力、电池充电状态,OverviewCards.swift)
+  与 `MenuBarBadgeRenderer.color(for:ink:)`;色值一律取语义令牌(菜单栏例外见 §已知偏差)。
 - 菜单栏位图颜色只能经 ImageRenderer 预绘(`.renderingMode(.original)`);
   NSStatusItem 会剥掉 SwiftUI 前景色,这是实测结论不是风格偏好。
 
@@ -166,7 +167,8 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 ## Components
 
 - **卡片家族零件**(arch-review-2026-10-18/02 中4,`Pulse/CardFamily.swift`):卡壳
-  `cardShell(compact:)`(底色 + 圆角 + 内距,两档)、主卡头 `CardHeader`(22pt 徽章 +
+  `cardShell(compact:)`(底色 + 圆角 + 内距,两档;`padded: false` 只给内距随版式
+  变化、自己排内距的卡用——总览卡 16/12、指标主卡 20/12)、主卡头 `CardHeader`(22pt 徽章 +
   card-title 指标色)、副卡头 `CardSubHeader`(10pt 指标色符号 + 11 medium 次级标题 +
   10.5 注记)、统计值 `StatValue`、卡内空态 `CardEmptyState`(12.5 medium secondary 一句 +
   10.5 tertiary 说明,居中)。**新卡一律组装这些零件,不再手写卡壳 / 卡头 / 空态。**
@@ -255,4 +257,7 @@ chip 图标 9.5pt → micro 10.5;排行行 chevron 9pt → 10。
   在离屏渲染里能否按外观正确解析,暂留系统色、集中在 `MenuBarBadgeRenderer.color` 一处;
   要换成语义令牌须先实机验证深浅两种外观。
 
-仍挂账:无。
+仍挂账(动到对应文件时顺带收编):
+- 指标主卡全尺寸内距 `.padding(20)`(MetricTabViews)与 2×2 统计 `horizontalSpacing: 18`
+  不在令牌表,18 也不在 4pt 网格上;弹窗外框 `.padding(14)`(DashboardView)同。
+  三者改动都可见,需与用户确认后再动。
