@@ -7,26 +7,6 @@ import XCTest
 final class NetworkSensorTests: XCTestCase {
     // MARK: - 回退编排夹具(注入假链路状态 + 假读数)
 
-    private func counters(
-        _ interface: String = "en0",
-        up: UInt64,
-        down: UInt64,
-        upPackets: UInt64 = 1_000,
-        downPackets: UInt64 = 1_000,
-        baud: UInt64? = 1_000_000_000,
-        at: UInt64
-    ) -> NetworkCounters {
-        NetworkCounters(
-            interface: interface,
-            upBytes: up,
-            downBytes: down,
-            upPackets: upPackets,
-            downPackets: downPackets,
-            linkBaudrateBitsPerSecond: baud,
-            atUptimeNanos: at
-        )
-    }
-
     /// 假主接口 / 假候选列表(钉死 LiveNetworkCountersSource 的回退编排)。
     private struct FixedPrimarySource: NetworkPrimaryInterfaceSource {
         let name: String?
@@ -62,8 +42,8 @@ final class NetworkSensorTests: XCTestCase {
             primary: "en0",
             candidates: [state("en0"), state("utun4")],
             table: [
-                "en0": counters("en0", up: 9_000, down: 0, upPackets: 44_000, downPackets: 0, at: 1),
-                "utun4": counters("utun4", up: 500, down: 4_000, upPackets: 700, downPackets: 2_100, at: 1),
+                "en0": NetworkFixture.counters("en0", up: 9_000, down: 0, upPackets: 44_000, downPackets: 0, at: 1),
+                "utun4": NetworkFixture.counters("utun4", up: 500, down: 4_000, upPackets: 700, downPackets: 2_100, at: 1),
             ]
         )
         let sampled = source.sample()
@@ -77,9 +57,9 @@ final class NetworkSensorTests: XCTestCase {
             primary: "en0",
             candidates: [state("en0"), state("utun0"), state("utun4")],
             table: [
-                "en0": counters("en0", up: 9_000, down: 0, upPackets: 44_000, downPackets: 0, at: 1),
-                "utun0": counters("utun0", up: 0, down: 300, upPackets: 2, downPackets: 3, at: 1),
-                "utun4": counters("utun4", up: 500, down: 1_900_000_000, upPackets: 700, downPackets: 2_100_000, at: 1),
+                "en0": NetworkFixture.counters("en0", up: 9_000, down: 0, upPackets: 44_000, downPackets: 0, at: 1),
+                "utun0": NetworkFixture.counters("utun0", up: 0, down: 300, upPackets: 2, downPackets: 3, at: 1),
+                "utun4": NetworkFixture.counters("utun4", up: 500, down: 1_900_000_000, upPackets: 700, downPackets: 2_100_000, at: 1),
             ]
         )
         XCTAssertEqual(source.sample()?.interface, "utun4")
@@ -92,7 +72,7 @@ final class NetworkSensorTests: XCTestCase {
             primary: "en0",
             candidates: [state("en0"), state("lo0", running: true)],
             table: [
-                "en0": counters("en0", up: 9_000, down: 0, upPackets: 44_000, downPackets: 0, at: 1),
+                "en0": NetworkFixture.counters("en0", up: 9_000, down: 0, upPackets: 44_000, downPackets: 0, at: 1),
             ]
         )
         let sampled = source.sample()
@@ -106,8 +86,8 @@ final class NetworkSensorTests: XCTestCase {
             primary: "en0",
             candidates: [state("en0"), state("utun4")],
             table: [
-                "en0": counters("en0", up: 100, down: 200, upPackets: 10, downPackets: 20, at: 1),
-                "utun4": counters("utun4", up: 0, down: 9_999, upPackets: 0, downPackets: 99, at: 1),
+                "en0": NetworkFixture.counters("en0", up: 100, down: 200, upPackets: 10, downPackets: 20, at: 1),
+                "utun4": NetworkFixture.counters("utun4", up: 0, down: 9_999, upPackets: 0, downPackets: 99, at: 1),
             ]
         )
         let sampled = source.sample()

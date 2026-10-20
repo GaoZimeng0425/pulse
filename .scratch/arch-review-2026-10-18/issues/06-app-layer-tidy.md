@@ -53,6 +53,10 @@
 - 2026-10-20 落地(分支 refactor/app-layer-tidy):
   - **偏离票面**:`MetricCardModel` / `KillRequestFlow` 原拟进包,实际依赖 SwiftUI `Color` / NSAlert / `SystemMonitor`,改为 app 内独立文件(`Pulse/Views/MetricCardModel.swift`、`Pulse/Features/KillRequestFlow.swift`)。
   - 票外顺手:设置页的配置编辑动作(`replacingSlot` 等四个,原在 `MenuBarBadgeSettingsView.swift`)随 `MenuBarBadgeConfiguration` 进包;进包类型补 `Sendable`(Swift 6 静态属性要求,编译期约束);DESIGN.md / ADR-0003 / `CoreTickModel.swift` / `PulseApp.swift` 里的过时路径与出处一并修正。
-  - 测试:`func test` 598 个前后一致,核心 300 + app 298 全绿。`scripts/test.sh` 摘要把 `Test Suite ... passed` 也计入(670 → 676 是新增 6 个套件),脚本口径问题未在本票修。
-  - 已知取舍:拆分后 `raw` / `counters` / `state` 夹具在包测试与 PulseTests 各一份(两个测试 target 不共享夹具);`docs/probes/06-network-rate.swift` 的编译命令自 05 起就已失效(还需核心层源),属历史探针,未改。
+  - 测试:`func test` 598 个前后一致,核心 300 + app 298 全绿。
   - 两轴评审(Standards + Spec)意见已收:新写注释的裸工单号改全名、过时引用、`NetworkSensorTests` 死夹具已清。
+- 2026-10-20 收尾(用户要求把遗留问题一并修掉):
+  - `scripts/test.sh` 计数剔除 `Test Suite '...' passed/failed` 套件行(此前每多一个套件虚高一,拆分后显示 676);现与实际用例数一致(598)。
+  - 拆分产生的重复夹具(Disk `raw` / `counters`、Network `counters`、Battery `raw`)收进包内新 target `PulseCoreTestSupport`(`DiskFixture` / `NetworkFixture` / `BatteryFixture`),调用点经 ast-grep 改写。包内测试按 target 依赖;PulseTests 由 project.yml 直接编译同一目录源码——作为产品链接时 Xcode 会把 PulseCore 静态链进测试包,与动态库冲突(05 的双份元数据坑,实测构建即报错)。
+  - `NetworkModelTests` 里拆分后无人调用的 `state(_:running:)` 重载删除(删后编译通过即证)。
+  - `docs/probes/06-network-rate.swift` 补运行脚本 `docs/probes/06-network-rate.sh`(两层源去 `import PulseCore` 同模块编译),本机实跑通过;`docs/research/dust-reference.md` 路径更新。

@@ -7,48 +7,11 @@ import XCTest
 final class BatterySensorTests: XCTestCase {
     // MARK: - 夹具
 
-    /// 原始读数夹具:缺省一台健康电池,测试只覆写关注的字段。
-    private func raw(
-        capacity: Int = 80,
-        isCharging: Bool = false,
-        isCharged: Bool = false,
-        timeToEmpty: Int? = nil,
-        timeToFull: Int? = nil,
-        design: Int? = 5_000,
-        rawMax: Int? = nil,
-        nominal: Int? = nil,
-        batteryDataDesign: Int? = nil,
-        batteryDataNominal: Int? = nil,
-        fullCharge: Int? = 4_500,
-        cycles: Int? = 312,
-        amperage: Int? = nil,
-        voltage: Int? = nil,
-        notChargingReason: Int? = 0
-    ) -> BatteryRawReading {
-        BatteryRawReading(
-            capacityPercent: capacity,
-            isCharging: isCharging,
-            isCharged: isCharged,
-            timeToEmptyMinutes: timeToEmpty,
-            timeToFullMinutes: timeToFull,
-            designCapacity: design,
-            appleRawMaxCapacity: rawMax,
-            nominalChargeCapacity: nominal,
-            batteryDataDesignCapacity: batteryDataDesign,
-            batteryDataNominalChargeCapacity: batteryDataNominal,
-            fullChargeCapacity: fullCharge,
-            cycleCount: cycles,
-            amperageMilliamps: amperage,
-            voltageMillivolts: voltage,
-            notChargingReasonRaw: notChargingReason
-        )
-    }
-
     // MARK: - provider:lastGood(ADR-0004)
 
     func testProviderStoresLastGoodOnSuccess() async {
         let provider = BatterySensorProvider(
-            source: ScriptedBatterySource([raw(capacity: 50), raw(capacity: 60)]),
+            source: ScriptedBatterySource([BatteryFixture.raw(capacity: 50), BatteryFixture.raw(capacity: 60)]),
             wakeups: { nil }
         )
         let first = await provider.snapshot()
@@ -61,7 +24,7 @@ final class BatterySensorTests: XCTestCase {
     func testReadFailureKeepsLastGoodInsteadOfBlanking() async {
         // 读失败:返回 nil,但 lastGood 保留上次好值——UI 显示它,不白屏(ADR-0004)。
         let provider = BatterySensorProvider(
-            source: ScriptedBatterySource([raw(capacity: 50), nil]),
+            source: ScriptedBatterySource([BatteryFixture.raw(capacity: 50), nil]),
             wakeups: { nil }
         )
         _ = await provider.snapshot()
@@ -75,7 +38,7 @@ final class BatterySensorTests: XCTestCase {
     func testDriverDeliversReadingThenLastGoodOnFailure() async {
         // 交付口径:成功交付读数;失败交付 lastGood(同值重画,不白屏)。
         let provider = BatterySensorProvider(
-            source: ScriptedBatterySource([raw(capacity: 50), nil, nil]),
+            source: ScriptedBatterySource([BatteryFixture.raw(capacity: 50), nil, nil]),
             wakeups: { nil }
         )
         let box = ReadingBox()
@@ -100,7 +63,7 @@ final class BatterySensorTests: XCTestCase {
         // 电源状态变化 → 唤醒 → 读一次并交付:事件驱动档的冒烟验证。
         let (stream, continuation) = AsyncStream.makeStream(of: Void.self)
         let provider = BatterySensorProvider(
-            source: ScriptedBatterySource([raw(capacity: 40), raw(capacity: 90, isCharging: true)]),
+            source: ScriptedBatterySource([BatteryFixture.raw(capacity: 40), BatteryFixture.raw(capacity: 90, isCharging: true)]),
             wakeups: { stream }
         )
         let box = ReadingBox()

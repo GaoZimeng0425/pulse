@@ -40,8 +40,8 @@ run_core() {
   # shellcheck disable=SC2086
   (cd "$core_dir" && swift test $filter_flag) > "$core_log" 2>&1
   core_status=$?
-  core_passed=$(grep -c "' passed" "$core_log" || true)
-  core_failed=$(grep -c "' failed" "$core_log" || true)
+  core_passed=$(grep "' passed" "$core_log" | grep -vc "Test Suite '" || true)
+  core_failed=$(grep "' failed" "$core_log" | grep -vc "Test Suite '" || true)
   echo "   核心包:通过 ${core_passed:-0} · 失败 ${core_failed:-0}"
   if [ "$core_status" != 0 ]; then
     echo "❌ 核心包测试失败(退出码 $core_status)— 失败用例:"
@@ -87,9 +87,10 @@ status=$?
 
 echo "── 摘要 ──────────────────────────────"
 # Swift Testing 输出 "Test 'x()' passed on ...",XCTest 输出
-# "Test Case '-[...]' passed (...)"——"' passed" 锚点两者通吃。
-passed=$(grep -c "' passed" "$log" || true)
-failed=$(grep -c "' failed" "$log" || true)
+# "Test Case '-[...]' passed (...)"——"' passed" 锚点两者通吃。套件汇总行
+# "Test Suite '...' passed at ..." 同样命中,要剔掉,否则每多一个套件计数就虚高一。
+passed=$(grep "' passed" "$log" | grep -vc "Test Suite '" || true)
+failed=$(grep "' failed" "$log" | grep -vc "Test Suite '" || true)
 echo "   app 侧:通过 ${passed:-0} · 失败 ${failed:-0}"
 [ -z "$only" ] && echo "   用例:通过 $(( ${passed:-0} + ${core_passed:-0} )) · 失败 ${failed:-0}(核心包 + app)"
 if [ "$status" != 0 ]; then

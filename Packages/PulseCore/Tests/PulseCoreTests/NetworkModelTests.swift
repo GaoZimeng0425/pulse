@@ -1,6 +1,7 @@
 import Darwin
 import XCTest
 @testable import PulseCore
+import PulseCoreTestSupport
 
 /// p1-history/06 网络卡:核心层 NetworkModel 的合成夹具单测(spec 测试决策,调研 §2.2 逐条钉死)。
 /// 三组断言:①接口选择与降级链(虚拟前缀降级 → UP+RUNNING 回退,注入假链路状态);
@@ -189,31 +190,11 @@ final class NetworkModelTests: XCTestCase {
 
     // MARK: - 差分三件套(合成计数序列)
 
-    private func counters(
-        _ interface: String = "en0",
-        up: UInt64,
-        down: UInt64,
-        upPackets: UInt64 = 1_000,
-        downPackets: UInt64 = 1_000,
-        baud: UInt64? = 1_000_000_000,
-        at: UInt64
-    ) -> NetworkCounters {
-        NetworkCounters(
-            interface: interface,
-            upBytes: up,
-            downBytes: down,
-            upPackets: upPackets,
-            downPackets: downPackets,
-            linkBaudrateBitsPerSecond: baud,
-            atUptimeNanos: at
-        )
-    }
-
     /// 防护一(首读置零):无前值只立基线,不把开机以来的累计量当成本轮速率。
     func testFirstReadYieldsZeroRatesAndNoDelta() {
         let result = NetworkRateDiffer.result(
             previous: nil,
-            current: counters(up: 100_000_000, down: 200_000_000, at: 5_000_000_000)
+            current: NetworkFixture.counters(up: 100_000_000, down: 200_000_000, at: 5_000_000_000)
         )
         XCTAssertEqual(result.rates, .zero)
         XCTAssertEqual(result.upBytesDelta, 0)
@@ -224,8 +205,8 @@ final class NetworkModelTests: XCTestCase {
     /// 正常差分:Δ/elapsed;记账增量 = 整段净增(与速率同源)。
     func testRatesDivideDeltaByElapsed() {
         let result = NetworkRateDiffer.result(
-            previous: counters(up: 1_000, down: 2_000, at: 0),
-            current: counters(up: 6_000, down: 7_000, at: 5_000_000_000)
+            previous: NetworkFixture.counters(up: 1_000, down: 2_000, at: 0),
+            current: NetworkFixture.counters(up: 6_000, down: 7_000, at: 5_000_000_000)
         )
         XCTAssertEqual(result.rates.upBytesPerSecond, 1_000, accuracy: 0.0001)
         XCTAssertEqual(result.rates.downBytesPerSecond, 1_000, accuracy: 0.0001)
@@ -236,8 +217,8 @@ final class NetworkModelTests: XCTestCase {
     /// 防护二(负值钳零):接口重置令计数回退 → 本轮 0(基线由调用方以本轮重立)。
     func testCounterRollbackYieldsZero() {
         let result = NetworkRateDiffer.result(
-            previous: counters(up: 6_000, down: 7_000, at: 0),
-            current: counters(up: 1_000, down: 7_000, at: 5_000_000_000)
+            previous: NetworkFixture.counters(up: 6_000, down: 7_000, at: 0),
+            current: NetworkFixture.counters(up: 1_000, down: 7_000, at: 5_000_000_000)
         )
         XCTAssertEqual(result.rates, .zero)
         XCTAssertEqual(result.upBytesDelta, 0)
@@ -247,8 +228,8 @@ final class NetworkModelTests: XCTestCase {
     /// 接口切换:基线属于旧口,直接作废本轮,不出跨口假速率。
     func testInterfaceSwitchYieldsZero() {
         let result = NetworkRateDiffer.result(
-            previous: counters("en0", up: 1_000, down: 1_000, at: 0),
-            current: counters("en1", up: 2_000, down: 2_000, at: 5_000_000_000)
+            previous: NetworkFixture.counters("en0", up: 1_000, down: 1_000, at: 0),
+            current: NetworkFixture.counters("en1", up: 2_000, down: 2_000, at: 5_000_000_000)
         )
         XCTAssertEqual(result.rates, .zero)
         XCTAssertEqual(result.upBytesDelta, 0)
@@ -258,32 +239,32 @@ final class NetworkModelTests: XCTestCase {
     /// 防护三(重连跳变):Δ 超过协商线速 ×1.5 ×窗口 → 丢弃本轮。
     /// 1 Gbps 链路 5 秒窗上限 = 1e9/8 × 1.5 × 5 = 937.5 MB。
     func testJumpBeyondNegotiatedLinkRateIsDropped() {
-        let previous = counters(up: 0, down: 0, at: 0)
+        let previous = NetworkFixture.counters(up: 0, down: 0, at: 0)
         let over = NetworkRateDiffer.result(
             previous: previous,
-            current: counters(up: 937_500_001, down: 0, at: 5_000_000_000)
+            current: NetworkFixture.counters(up: 937_500_001, down: 0, at: 5_000_000_000)
         )
         XCTAssertEqual(over.rates, .zero, "超线速 1.5 倍的跳变必须丢弃")
 
         let under = NetworkRateDiffer.result(
             previous: previous,
-            current: counters(up: 937_500_000, down: 0, at: 5_000_000_000)
+            current: NetworkFixture.counters(up: 937_500_000, down: 0, at: 5_000_000_000)
         )
         XCTAssertEqual(under.rates.upBytesPerSecond, 187_500_000, accuracy: 0.0001, "线速内的合法猛传不误杀")
     }
 
     /// 未知链路(线速读不到):按 100 Gbps 兜底上限(12.5 GB/s ×窗口)。
     func testUnknownLinkUsesHundredGigabitCap() {
-        let previous = counters(up: 0, down: 0, baud: nil, at: 0)
+        let previous = NetworkFixture.counters(up: 0, down: 0, baud: nil, at: 0)
         let over = NetworkRateDiffer.result(
             previous: previous,
-            current: counters(up: 62_500_000_001, down: 0, baud: nil, at: 5_000_000_000)
+            current: NetworkFixture.counters(up: 62_500_000_001, down: 0, baud: nil, at: 5_000_000_000)
         )
         XCTAssertEqual(over.rates, .zero)
 
         let under = NetworkRateDiffer.result(
             previous: previous,
-            current: counters(up: 62_500_000_000, down: 0, baud: nil, at: 5_000_000_000)
+            current: NetworkFixture.counters(up: 62_500_000_000, down: 0, baud: nil, at: 5_000_000_000)
         )
         XCTAssertEqual(under.rates.upBytesPerSecond, 12_500_000_000, accuracy: 0.0001)
     }
@@ -291,10 +272,10 @@ final class NetworkModelTests: XCTestCase {
     /// 线速 0(隧道口 ifi_baudrate 恒 0,2026-10-16 实测)同未知:走 100 Gbps
     /// 兜底,不能按"已知 0 速链路"把每一轮都打死。
     func testZeroBaudrateIsTreatedAsUnknown() {
-        let previous = counters(up: 0, down: 0, baud: 0, at: 0)
+        let previous = NetworkFixture.counters(up: 0, down: 0, baud: 0, at: 0)
         let result = NetworkRateDiffer.result(
             previous: previous,
-            current: counters(up: 100_000_000, down: 0, baud: 0, at: 5_000_000_000)
+            current: NetworkFixture.counters(up: 100_000_000, down: 0, baud: 0, at: 5_000_000_000)
         )
         XCTAssertEqual(result.rates.upBytesPerSecond, 20_000_000, accuracy: 0.0001, "正常流量不被零线速打死")
         XCTAssertEqual(result.upBytesDelta, 100_000_000)
@@ -303,8 +284,8 @@ final class NetworkModelTests: XCTestCase {
     /// elapsed 非正(时钟异常/同刻):本轮 0。
     func testNonPositiveElapsedYieldsZero() {
         let result = NetworkRateDiffer.result(
-            previous: counters(up: 1_000, down: 1_000, at: 5_000_000_000),
-            current: counters(up: 2_000, down: 2_000, at: 5_000_000_000)
+            previous: NetworkFixture.counters(up: 1_000, down: 1_000, at: 5_000_000_000),
+            current: NetworkFixture.counters(up: 2_000, down: 2_000, at: 5_000_000_000)
         )
         XCTAssertEqual(result.rates, .zero)
     }
@@ -315,28 +296,22 @@ final class NetworkModelTests: XCTestCase {
     func testInboundDeadPredicate() {
         XCTAssertTrue(
             NetworkInterfaceSelector.isInboundDead(
-                counters(up: 18_617_101_300, down: 0, upPackets: 44_367_146, downPackets: 0, at: 1)
+                NetworkFixture.counters(up: 18_617_101_300, down: 0, upPackets: 44_367_146, downPackets: 0, at: 1)
             ),
             "opackets 在走而 ipackets 恒 0 = 入向死表"
         )
         XCTAssertFalse(
             NetworkInterfaceSelector.isInboundDead(
-                counters(up: 100, down: 200, upPackets: 10, downPackets: 20, at: 1)
+                NetworkFixture.counters(up: 100, down: 200, upPackets: 10, downPackets: 20, at: 1)
             ),
             "双向都在走 = 健康口"
         )
         XCTAssertFalse(
             NetworkInterfaceSelector.isInboundDead(
-                counters(up: 0, down: 0, upPackets: 0, downPackets: 0, at: 1)
+                NetworkFixture.counters(up: 0, down: 0, upPackets: 0, downPackets: 0, at: 1)
             ),
             "双零 = 闲置链路,不是死表"
         )
-    }
-
-    private func state(_ name: String, running: Bool = true) -> NetworkInterfaceState {
-        var flags: Int32 = NetworkInterfaceSelector.iffUp
-        if running { flags |= NetworkInterfaceSelector.iffRunning }
-        return NetworkInterfaceState(name: name, flags: flags, addressFamily: 2)
     }
 
     // MARK: - 走势环(纯逻辑)
