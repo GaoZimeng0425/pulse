@@ -13,12 +13,7 @@ struct DevServerCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 7) {
-                MetricBadge(symbolName: "terminal", tint: Metric.cpu.accentColor)
-                Text("Dev server")
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundStyle(Metric.cpu.accentColor)
-                Spacer()
+            CardHeader(symbolName: "terminal", title: "Dev server", tint: Metric.cpu.accentColor) {
                 if !servers.isEmpty {
                     Text("\(servers.count)")
                         .font(.system(size: 11, weight: .semibold))
@@ -27,7 +22,10 @@ struct DevServerCardView: View {
                 }
             }
             if servers.isEmpty {
-                emptyState
+                CardEmptyState(
+                    title: "没有在跑的 dev server",
+                    detail: "vite、next dev、vitest watch 等开发服务出现时,会在这里列出闲置时长与监听端口"
+                )
             } else {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(servers) { server in
@@ -37,7 +35,7 @@ struct DevServerCardView: View {
                 HStack(spacing: 6) {
                     Button(action: onStopAll) {
                         Text(KillCopy.stopAllActionTitle)
-                            .font(.system(size: 11.5, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(Surface.negative)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
@@ -51,21 +49,7 @@ struct DevServerCardView: View {
                 }
             }
         }
-        .padding(isCompact ? 12 : 16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Surface.card, in: .rect(cornerRadius: isCompact ? 12 : 18))
-    }
-
-    /// 空态:与"暂无活动组"同族的安静两行。
-    private var emptyState: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("没有在跑的 dev server")
-                .font(.system(size: 12.5, weight: .medium))
-                .foregroundStyle(.secondary)
-            Text("vite、next dev、vitest watch 等开发服务出现时,会在这里列出闲置时长与监听端口")
-                .font(.system(size: 10.5))
-                .foregroundStyle(.tertiary)
-        }
+        .cardShell(compact: isCompact)
     }
 
     /// 一行 server:名(pid)/ 闲置 / 内存 / 端口。

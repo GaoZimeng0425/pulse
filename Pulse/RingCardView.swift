@@ -33,11 +33,11 @@ extension RingSlice {
             let icon: Icon = if let bundlePath = segment.bundlePath {
                 .app(bundlePath)
             } else if segment.isOther {
-                .symbol("ellipsis", .gray)
+                .symbol("ellipsis", Surface.inkTertiary)
             } else {
                 .symbol(
                     segment.category?.cardStyle.symbolName ?? "shippingbox",
-                    segment.category?.cardStyle.tileColor ?? .gray
+                    segment.category?.identityColor ?? Surface.inkTertiary
                 )
             }
             let color = segment.isOther || index >= opacities.count
@@ -79,21 +79,11 @@ struct RingCardView: View {
     var isCompact = false
 
     var body: some View {
+        // 两档都画卡头:弹窗里两张环上下排(2026-10-20 起与主窗口同内容),没有标题分不清。
         VStack(alignment: .leading, spacing: 12) {
-            if !isCompact {
-                HStack(spacing: 7) {
-                    MetricBadge(symbolName: symbolName, tint: tint)
-                    Text(title)
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundStyle(tint)
-                }
-            }
+            CardHeader(symbolName: symbolName, title: title, tint: tint)
             if slices.isEmpty {
-                Text("暂无内存数据")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 28)
+                CardEmptyState(title: "暂无内存数据")
             } else {
                 HStack(spacing: isCompact ? 14 : 20) {
                     ring
@@ -101,9 +91,7 @@ struct RingCardView: View {
                 }
             }
         }
-        .padding(isCompact ? 12 : 16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Surface.card, in: .rect(cornerRadius: isCompact ? 12 : 18))
+        .cardShell(compact: isCompact)
     }
 
     private var ring: some View {
@@ -119,7 +107,7 @@ struct RingCardView: View {
         .frame(width: isCompact ? 104 : 124, height: isCompact ? 104 : 124)
         .overlay {
             VStack(spacing: 2) {
-                FigureText(value: centerValue, unit: centerUnit, size: isCompact ? 16 : 19)
+                FigureText(value: centerValue, unit: centerUnit, size: isCompact ? FigureSize.ringCompact : FigureSize.ring)
                 Text(centerCaption)
                     .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
@@ -146,7 +134,7 @@ struct RingCardView: View {
                         .foregroundStyle(.secondary)
                         .frame(minWidth: 30, alignment: .trailing)
                 }
-                .font(.system(size: 11.5))
+                .font(.system(size: 12))
             }
         }
     }
@@ -198,4 +186,24 @@ extension RingCardView {
             isCompact: isCompact
         )
     }
+}
+
+// MARK: - 预览(arch-review-2026-10-18/02:预览缺口补齐)
+
+#Preview("环形卡") {
+    let memory = MemoryBreakdown(
+        totalBytes: 51_539_607_552, appBytes: 21_000_000_000, wiredBytes: 6_000_000_000,
+        compressedBytes: 9_000_000_000, cachedBytes: 8_000_000_000, pressure: .normal
+    )
+    VStack(spacing: 16) {
+        HStack(alignment: .top, spacing: 16) {
+            RingCardView.memoryByType(memory)
+            RingCardView.memoryByType(nil)
+        }
+        RingCardView.memoryByType(memory, isCompact: true)
+            .frame(width: 332)
+    }
+    .padding(24)
+    .frame(width: 720)
+    .background(Surface.window)
 }

@@ -167,3 +167,10 @@ struct GeneralSettingsView: View {
         "\(bundleValue("CFBundleShortVersionString")) (\(bundleValue("CFBundleVersion")))"
     }
 }
+
+// MARK: - 预览(arch-review-2026-10-18/02:预览缺口补齐;登录项只读不写)
+
+#Preview("通用设置") {
+    GeneralSettingsView(monitor: .preview())
+        .frame(width: 480, height: 420)
+}

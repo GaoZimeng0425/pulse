@@ -146,3 +146,10 @@ extension MenuBarBadgeConfiguration {
         case down
     }
 }
+
+// MARK: - 预览(arch-review-2026-10-18/02:预览缺口补齐)
+
+#Preview("菜单栏徽标设置") {
+    MenuBarBadgeSettingsView()
+        .frame(width: 480, height: 360)
+}

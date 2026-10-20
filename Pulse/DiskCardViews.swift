@@ -29,33 +29,20 @@ struct DiskVolumeBreakdownView: View {
                     row(unaccounted.label, usedBytes: unaccounted.usedBytes, totalBytes: capacity.containerUsedBytes)
                 }
             } else {
-                Text("容量对账暂不可用")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.tertiary)
+                CardEmptyState(title: "容量对账暂不可用")
             }
         }
-        .padding(isCompact ? 12 : 16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Surface.card, in: .rect(cornerRadius: isCompact ? 12 : 18))
+        .cardShell(compact: isCompact)
         .accessibilityElement(children: .combine)
     }
 
     private var header: some View {
-        HStack(spacing: 5) {
-            Image(systemName: "externaldrive")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Metric.disk.accentColor)
-            Text("各卷明细")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-            Spacer()
-            if let capacity {
-                Text("合计 \(PulseFormat.diskCapacity(capacity.containerUsedBytes))")
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.tertiary)
-                    .monospacedDigit()
-            }
-        }
+        CardSubHeader(
+            symbolName: "externaldrive",
+            title: "各卷明细",
+            tint: Metric.disk.accentColor,
+            note: capacity.map { "合计 \(PulseFormat.diskCapacity($0.containerUsedBytes))" }
+        )
     }
 
     private func row(_ label: String, usedBytes: UInt64, totalBytes: UInt64, prominent: Bool = false)
@@ -63,12 +50,12 @@ struct DiskVolumeBreakdownView: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline) {
                 Text(label)
-                    .font(.system(size: 11.5, weight: prominent ? .medium : .regular))
+                    .font(.system(size: 12, weight: prominent ? .medium : .regular))
                     .foregroundStyle(prominent ? .primary : .secondary)
                     .lineLimit(1)
                 Spacer(minLength: 8)
                 Text(PulseFormat.diskCapacity(usedBytes))
-                    .font(.system(size: 11.5, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .monospacedDigit()
             }
             GeometryReader { proxy in
@@ -102,19 +89,10 @@ struct DiskSnapshotsCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 5) {
-                Image(systemName: "clock.arrow.circlepath")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Metric.disk.accentColor)
-                Text("本地快照")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
+            CardSubHeader(symbolName: "clock.arrow.circlepath", title: "本地快照", tint: Metric.disk.accentColor)
             content
         }
-        .padding(isCompact ? 12 : 16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Surface.card, in: .rect(cornerRadius: isCompact ? 12 : 18))
+        .cardShell(compact: isCompact)
         .accessibilityElement(children: .combine)
     }
 
@@ -131,14 +109,10 @@ struct DiskSnapshotsCardView: View {
                     .foregroundStyle(.tertiary)
             }
         case .listing:
-            Text("暂无本地快照")
-                .font(.system(size: 11.5))
-                .foregroundStyle(.tertiary)
+            CardEmptyState(title: "暂无本地快照")
         case .unavailable, nil:
             // 快照读不到(rc<0/非 APFS 卷):占位,不伪造(petal/探针②口径)。
-            Text("快照信息不可用")
-                .font(.system(size: 11.5))
-                .foregroundStyle(.tertiary)
+            CardEmptyState(title: "快照信息不可用")
         }
     }
 
@@ -146,7 +120,7 @@ struct DiskSnapshotsCardView: View {
         VStack(alignment: .leading, spacing: 1) {
             HStack(alignment: .firstTextBaseline) {
                 Text(snapshot.kindTitle)
-                    .font(.system(size: 11.5, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(snapshot.isTimeMachine ? Metric.disk.accentColor : .secondary)
                 Spacer(minLength: 8)
                 Text(Self.dateFormatter.string(from: snapshot.createdAt))

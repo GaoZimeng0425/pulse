@@ -21,6 +21,7 @@
 		0E7CC3EE21A1321E89D78BFC /* ProjectRootsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF43629A17EF4D982135C6DC /* ProjectRootsStoreTests.swift */; };
 		147F6F94C76480C6FE76BCF0 /* ProcessDrilldownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC06CE2AAADC2E6B644F4619 /* ProcessDrilldownView.swift */; };
 		154454A04341DB4CA585E4B9 /* DrilldownStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 135674B4363F7A3923D5D6C1 /* DrilldownStateTests.swift */; };
+		1607A90DCC8682F54E796270 /* CardFamily.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC3BB24EDC24156661D55801 /* CardFamily.swift */; };
 		1A6FBBAA8FFC5AB748E47788 /* BundleDisplayNameReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B5633EC929F85A22B2BB45E /* BundleDisplayNameReaderTests.swift */; };
 		1B1B65FF8F2A32DB169FF186 /* SamplerRankingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D2D1DE8B4B520342AB6887D /* SamplerRankingTests.swift */; };
 		1C5A865136AB22A28BB0D947 /* NettopProcessRateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A98A79159A39E317CC43DA0 /* NettopProcessRateTests.swift */; };
@@ -309,6 +310,7 @@
 		E30515FE2C8F758EA2E76A9B /* RankingBoardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingBoardTests.swift; sourceTree = "<group>"; };
 		E96FC92EB2F8E76A96DC5AE5 /* MonitorAssembly.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorAssembly.swift; sourceTree = "<group>"; };
 		EA32BC4006AFA168EE6CF9B5 /* RoundSpineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoundSpineTests.swift; sourceTree = "<group>"; };
+		EC3BB24EDC24156661D55801 /* CardFamily.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardFamily.swift; sourceTree = "<group>"; };
 		EEBC94632BC0F748A5375D1C /* SettingsWindowChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowChrome.swift; sourceTree = "<group>"; };
 		EF2E7BDD9FC935868908BF6C /* ProcessSearchFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessSearchFilterTests.swift; sourceTree = "<group>"; };
 		F000A4648F89E746459DC38B /* MenuBarBadgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarBadgeTests.swift; sourceTree = "<group>"; };
@@ -351,6 +353,7 @@
 				6EBE418CA66BE407AD92BB9C /* BatterySensor.swift */,
 				C63C1ECC09721E8533BE5DAA /* BirthScanner.swift */,
 				AFC9AB4EF78C90578BF978B2 /* BundleDisplayNameReader.swift */,
+				EC3BB24EDC24156661D55801 /* CardFamily.swift */,
 				B2DC9EA24953F94BEA87B826 /* CoreTickDiffer.swift */,
 				3876B006CE48D758E7238556 /* CPUDiffer.swift */,
 				32BE8BAC25214CEDFBA5AF6C /* DashboardModel.swift */,
@@ -697,6 +700,7 @@
 				976E0BE556A60E169ABD2609 /* BirthScanner.swift in Sources */,
 				51A6E49B73921A3FC725B604 /* BundleDisplayNameReader.swift in Sources */,
 				CE6715B1906E190F4170C1F5 /* CPUDiffer.swift in Sources */,
+				1607A90DCC8682F54E796270 /* CardFamily.swift in Sources */,
 				D01C022CE4904C8972600CED /* CoreTickDiffer.swift in Sources */,
 				5A0E5B74BDCCD77BA4B7DA54 /* DashboardModel.swift in Sources */,
 				68820A72998494281B77A725 /* DashboardView.swift in Sources */,

@@ -48,11 +48,8 @@ struct AlertBannerView: View {
             .padding(.horizontal, isCompact ? 10 : 12)
             .padding(.vertical, isCompact ? 6 : 8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.orange.opacity(0.12), in: .rect(cornerRadius: 10))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(Color.orange.opacity(0.35), lineWidth: 0.5)
-            )
+            // 语义警示色淡底({colors.state-warning}),{rounded.inner} 10;无描边(DESIGN.md)。
+            .background(Surface.warning.opacity(0.12), in: .rect(cornerRadius: 10))
         }
     }
 
@@ -61,7 +58,7 @@ struct AlertBannerView: View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: "bell.badge.fill")
                 .font(.system(size: isCompact ? 9 : 10, weight: .semibold))
-                .foregroundStyle(.orange)
+                .foregroundStyle(Surface.warning)
             VStack(alignment: .leading, spacing: 1) {
                 Text(AlertNotificationContent.title(for: occurrence))
                     .font(.system(size: isCompact ? 11 : 12.5, weight: .semibold))

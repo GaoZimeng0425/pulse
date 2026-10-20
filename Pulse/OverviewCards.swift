@@ -85,11 +85,6 @@ struct MetricCardModel {
     /// 走势归一上限:CPU 固定 0–100,内存 = 物理总量。
     let domainMax: Double
 
-    /// 总览卡底部走势形态:默认 44 柱 strip;CPU 用面积线(用户拍板 2026-10-17:
-    /// 与 CPU tab 主卡同观感,同一指标两处读数统一)。
-    enum TrendStyle { case strip, area }
-    var trendStyle: TrendStyle = .strip
-
     var tint: Color { metric.accentColor }
 }
 
@@ -119,8 +114,7 @@ extension MetricCardModel {
                 MetricCardStat(label: "峰值", value: statistics.map { PulseFormat.cpuPercent($0.peak) } ?? "—"),
             ],
             trend: trend,
-            domainMax: 100,
-            trendStyle: .area
+            domainMax: 100
         )
     }
 
@@ -158,7 +152,7 @@ extension MetricCardModel {
         case .normal:
             MetricCardChip(title: pressure.title, systemImage: "checkmark.circle.fill", tint: Surface.positive)
         case .warning:
-            MetricCardChip(title: pressure.title, systemImage: "exclamationmark.circle.fill", tint: Metric.disk.accentColor)
+            MetricCardChip(title: pressure.title, systemImage: "exclamationmark.circle.fill", tint: Surface.warning)
         case .critical:
             MetricCardChip(title: pressure.title, systemImage: "exclamationmark.triangle.fill", tint: Surface.negative)
         }
@@ -324,7 +318,7 @@ extension BatteryChargeStatus {
         case .charged:
             MetricCardChip(title: title, systemImage: "checkmark", tint: Surface.positive)
         case .optimizedCharging:
-            MetricCardChip(title: title, systemImage: "clock.badge.checkmark", tint: Metric.disk.accentColor)
+            MetricCardChip(title: title, systemImage: "clock.badge.checkmark", tint: Surface.warning)
         case .discharging:
             MetricCardChip(title: title, systemImage: "battery.50percent", tint: Surface.inkTertiary)
         }
@@ -332,7 +326,7 @@ extension BatteryChargeStatus {
 }
 
 /// 指标卡:full = 总览模块卡网格(徽章 + 名称 + chevron / 34pt 大数字 / 三列小统计 /
-/// 36pt 高走势——形态随 model.trendStyle,CPU 面积线、其余 44 柱 strip);
+/// 36pt 高 44 柱 strip 走势——五张卡同形态,CPU 不特殊化(用户拍板 2026-10-20));
 /// compact = 弹窗双列小卡(名称 / 大数字 + 一句补充 / 36pt 走势,与 full 同组件)。
 /// 整卡可点,跳到对应指标 tab(Vitals `data-goto`)。
 struct MetricCardView: View {
@@ -356,8 +350,7 @@ struct MetricCardView: View {
                 case .compact: compactBody
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Surface.card, in: .rect(cornerRadius: style == .full ? 18 : 12))
+            .cardShell(compact: style == .compact, padded: false)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -367,12 +360,7 @@ struct MetricCardView: View {
 
     private var fullBody: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 7) {
-                MetricBadge(symbolName: model.symbolName, tint: model.tint)
-                Text(model.title)
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundStyle(model.tint)
-                Spacer()
+            CardHeader(symbolName: model.symbolName, title: model.title, tint: model.tint) {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.tertiary)
@@ -382,7 +370,7 @@ struct MetricCardView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    FigureText(value: model.figureValue, unit: model.figureUnit, size: 34)
+                    FigureText(value: model.figureValue, unit: model.figureUnit, size: FigureSize.overview)
                     Spacer(minLength: 8)
                     if let chip = model.chip {
                         MetricChipView(chip: chip)
@@ -391,68 +379,58 @@ struct MetricCardView: View {
             }
             HStack(alignment: .top, spacing: 8) {
                 ForEach(model.stats.prefix(Self.overviewStatCount)) { stat in
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 4) {
-                            if let dot = stat.dot {
-                                Circle().fill(dot).frame(width: 6, height: 6)
-                            }
-                            Text(stat.label)
-                        }
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
-                        Text(stat.value)
-                            .font(.system(size: 12, weight: .semibold))
-                            .monospacedDigit()
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    StatValue(label: stat.label, value: stat.value, dot: stat.dot)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            // 走势形态按模型走(model.trendStyle):CPU 面积线,其余 44 柱 strip。
             trendChart
         }
         .padding(16)
     }
 
     /// 底部走势(full / compact 共用同一组件,用户拍板 2026-10-17:弹窗与主窗口
-    /// 同一指标必须同观感,不再分叉):CPU 面积线,其余 44 柱 strip。
-    @ViewBuilder
+    /// 同一指标必须同观感):五张卡一律 44 柱 strip(2026-10-20 撤 CPU 面积线特例)。
     private var trendChart: some View {
-        switch model.trendStyle {
-        case .area:
-            AreaTrendChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
-                .frame(height: 36)
-        case .strip:
-            StripChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
-                .frame(height: 36)
-        }
+        StripChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
+            .frame(height: 36)
     }
 
     private var compactBody: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 5) {
-                Image(systemName: model.symbolName)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(model.tint)
-                Text(model.title)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
+            CardSubHeader(symbolName: model.symbolName, title: model.title, tint: model.tint)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
-                FigureText(value: model.figureValue, unit: model.figureUnit, size: 22)
+                FigureText(value: model.figureValue, unit: model.figureUnit, size: FigureSize.overviewCompact)
                 Spacer(minLength: 4)
                 Text(model.note)
                     .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            // 底部走势与 full 同一组件(model.trendStyle 随行,用户拍板 2026-10-17)。
+            // 底部走势与 full 同一组件(用户拍板 2026-10-17)。
             trendChart
         }
         .padding(12)
     }
 }
 
+/// 大数字的字号令牌(DESIGN.md §Typography figure-*):每处大数字只许取这里的档位。
+enum FigureSize {
+    /// `{typography.figure-main}`:指标 tab 主卡。
+    static let main: CGFloat = 44
+    /// `{typography.figure-main-compact}`:弹窗主卡。
+    static let mainCompact: CGFloat = 30
+    /// `{typography.figure-overview}`:总览卡。
+    static let overview: CGFloat = 34
+    /// `{typography.figure-overview-compact}`:弹窗总览卡。
+    static let overviewCompact: CGFloat = 22
+    /// `{typography.figure-ring}`:环心数字。
+    static let ring: CGFloat = 19
+    /// `{typography.figure-ring-compact}`:弹窗环心数字。
+    static let ringCompact: CGFloat = 16
+}
+
 /// 大数字(§1.2 figure):圆体加粗 + tabular + 负字距,单位约半号、基线对齐。
+/// 字号只取 FigureSize 令牌。
 struct FigureText: View {
     let value: String
     let unit: String

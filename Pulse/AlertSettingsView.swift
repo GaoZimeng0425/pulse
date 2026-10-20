@@ -83,6 +83,7 @@ struct AlertSettingsView: View {
                     format: .number.precision(.fractionLength(0...1))
                 )
                 .multilineTextAlignment(.trailing)
+                .monospacedDigit()
                 .frame(width: 80)
                 Text("%")
             }
@@ -94,6 +95,7 @@ struct AlertSettingsView: View {
                     format: .number.precision(.fractionLength(0...1))
                 )
                 .multilineTextAlignment(.trailing)
+                .monospacedDigit()
                 .frame(width: 80)
                 Text(kind == .devServerIdle ? "小时" : "GB")
             }

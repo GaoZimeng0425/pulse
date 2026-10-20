@@ -89,9 +89,10 @@ struct DashboardView: View {
                     PulseFormat.systemUptime(seconds: ProcessInfo.processInfo.systemUptime),
                     systemImage: "clock"
                 )
+                .monospacedDigit()
             }
         }
-        .font(.system(size: 11.5))
+        .font(.system(size: 11))
         .foregroundStyle(.secondary)
         .padding(.horizontal, 4)
     }
@@ -170,14 +171,13 @@ struct FooterButtonStyle: ButtonStyle {
 }
 
 /// 组卡样式表(工单 05/09,评审 T6):每个类别一份完整样式
-/// (SF Symbol + 图标色 + 卡片底色 + 指标强调色)。孤儿进程的橙色高亮(GLOSSARY:
+/// (SF Symbol + 瓦片色 + 指标强调色)。孤儿进程的橙色高亮(GLOSSARY:
 /// 它往往正是问题所在)是表中的一行,而非散落在视图里的 `.orphan` 特判。
 struct GroupCardStyle {
     let symbolName: String
     /// 外壳底色(2026-10-16 用户反馈):非 bundle 组没有真实应用图标,裸 SF Symbol
     /// 夹在真 App 图标之间显得突兀——改为实心圆角方块 + 白符号,形态对齐 app logo。
     let tileColor: Color
-    let cardBackground: AnyShapeStyle
     /// 指标强调色:CPU 口径下驱动卡内 meter(孤儿橙)。工单 03 tab 化后
     /// 内存口径由 RankingRowView 按当前 tab 的指标另行覆盖(孤儿仍橙,语义不变)。
     let accentColor: Color
@@ -205,41 +205,21 @@ struct CategoryIconTile: View {
 extension GroupCategory {
     /// 组卡的类别样式:bundle 组由 UI 直接取应用图标,此表服务项目与兜底类别
     /// (spec:符号图 + 孤儿橙色);各类别符号互不相同——"可辨识的类别标记"。
+    /// 颜色一律取类别身份色(`identityColor`,MetricAccent.swift 唯一出处)。
     var cardStyle: GroupCardStyle {
         switch self {
         case .app:
-            GroupCardStyle(
-                // app 组渲染走真实应用图标,此瓦片仅样式表完备性的理论兜底。
-                symbolName: "shippingbox", tileColor: .brown,
-                cardBackground: AnyShapeStyle(.quaternary),
-                accentColor: Metric.cpu.accentColor
-            )
+            GroupCardStyle(symbolName: "shippingbox", tileColor: identityColor, accentColor: Metric.cpu.accentColor)
         case .project:
-            GroupCardStyle(
-                // 项目组统一图标:folder(目录 = 项目的自然隐喻,与 Vitals 的
-                // Projects 概念一致;旧 hammer 读作"构建工具",用户反馈怪)。
-                symbolName: "folder", tileColor: Metric.cpu.accentColor,
-                cardBackground: AnyShapeStyle(.quaternary),
-                accentColor: Metric.cpu.accentColor
-            )
+            // 项目组统一图标:folder(目录 = 项目的自然隐喻,与 Vitals 的 Projects 概念
+            // 一致;旧 hammer 读作"构建工具",用户反馈怪)。
+            GroupCardStyle(symbolName: "folder", tileColor: identityColor, accentColor: Metric.cpu.accentColor)
         case .system:
-            GroupCardStyle(
-                symbolName: "cpu", tileColor: .gray,
-                cardBackground: AnyShapeStyle(.quaternary),
-                accentColor: Metric.cpu.accentColor
-            )
+            GroupCardStyle(symbolName: "cpu", tileColor: identityColor, accentColor: Metric.cpu.accentColor)
         case .backgroundService:
-            GroupCardStyle(
-                symbolName: "gearshape", tileColor: Metric.network.accentColor,
-                cardBackground: AnyShapeStyle(.quaternary),
-                accentColor: Metric.cpu.accentColor
-            )
+            GroupCardStyle(symbolName: "gearshape", tileColor: identityColor, accentColor: Metric.cpu.accentColor)
         case .orphan:
-            GroupCardStyle(
-                symbolName: "exclamationmark.triangle", tileColor: .orange,
-                cardBackground: AnyShapeStyle(Color.orange.opacity(0.15)),
-                accentColor: .orange
-            )
+            GroupCardStyle(symbolName: "exclamationmark.triangle", tileColor: identityColor, accentColor: identityColor)
         }
     }
 

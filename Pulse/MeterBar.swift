@@ -65,7 +65,7 @@ struct MeterBar: View {
         MeterBar(fraction: MeterNormalization.fraction(89, leader: 445), tint: tint)
         MeterBar(fraction: MeterNormalization.fraction(12, leader: 445), tint: tint)
         MeterBar(fraction: MeterNormalization.fraction(0, leader: 445), tint: tint)
-        MeterBar(fraction: MeterNormalization.fraction(30, leader: 0), tint: .orange)
+        MeterBar(fraction: MeterNormalization.fraction(30, leader: 0), tint: Surface.warning)
     }
     .padding(16)
     .frame(width: 280)

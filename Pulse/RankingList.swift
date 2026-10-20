@@ -38,7 +38,7 @@ enum RankingListMetrics {
     }
 }
 
-/// 空态文案:标题一句 + 可选说明(与 dev server 卡空态同族的安静两行)。
+/// 空态文案:标题一句 + 可选说明(卡内由 CardEmptyState 绘制)。
 struct RankingEmptyMessage {
     let title: String
     var detail: String?
@@ -65,7 +65,7 @@ struct RankingListCard<Rows: View>: View {
                 .foregroundStyle(accent)
                 .padding(.bottom, 6)
             if isEmpty {
-                emptyState
+                CardEmptyState(title: emptyMessage.title, detail: emptyMessage.detail)
             } else {
                 columnHeader
                 rows()
@@ -77,9 +77,7 @@ struct RankingListCard<Rows: View>: View {
                     .padding(.top, 6)
             }
         }
-        .padding(isCompact ? 12 : 16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Surface.card, in: .rect(cornerRadius: isCompact ? 12 : 18))
+        .cardShell(compact: isCompact)
     }
 
     /// 表头右列对齐数值列右缘(越过行尾列)。
@@ -98,22 +96,6 @@ struct RankingListCard<Rows: View>: View {
                 + RankingListMetrics.trailingWidth
         )
         .padding(.bottom, 2)
-    }
-
-    private var emptyState: some View {
-        VStack(spacing: 2) {
-            Text(emptyMessage.title)
-                .font(.system(size: 12.5, weight: .medium))
-                .foregroundStyle(.secondary)
-            if let detail = emptyMessage.detail {
-                Text(detail)
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.tertiary)
-            }
-        }
-        .multilineTextAlignment(.center)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
     }
 }
 
