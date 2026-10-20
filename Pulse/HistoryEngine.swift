@@ -85,9 +85,12 @@ actor HistoryEngine {
     private var lastRetentionDayStart: Date?
     /// 已确认在库的出生 pid:增量写,避免每轮全表重插。
     private var persistedLineagePIDs: Set<pid_t> = []
-    /// 本会话回灌读回的记录(pid → 库里那一份):登记表里该 pid 换成了别的记录 = 跨会话
-    /// pid 复用、主干判活记录胜,库里那行要覆盖(覆盖一次即移出)。
+    /// 本会话回灌读回的记录(pid → 库里那一份):登记表里该 pid 换成了**另一个进程**的
+    /// 记录 = 跨会话 pid 复用、主干判活记录胜,库里那行要覆盖(覆盖一次即移出)。
     private var restoredLineage: [pid_t: LineageRegistry.Entry] = [:]
+    /// 库表修剪的节拍(轮):每这么多轮按内存登记表删一次已不在表里的 pid。
+    static let lineagePruneInterval = 60
+    private var roundsSinceLineagePrune = 0
     /// 已持久化的组名(stableKey → name):改名才重写。
     private var persistedGroupNames: [String: String] = [:]
     /// 库健康状态沿(HistoryHealthEdge),写与读各一面:磁盘写满 / 库只读时读仍成功,
@@ -181,6 +184,11 @@ actor HistoryEngine {
                 }
 
                 try persistLineage(lineage, seenAt: now, in: db)
+                roundsSinceLineagePrune += 1
+                if roundsSinceLineagePrune >= Self.lineagePruneInterval {
+                    try pruneLineage(keeping: lineage, in: db)
+                    roundsSinceLineagePrune = 0
+                }
                 try persistGroupMetadata(displayNames, in: db)
             }
             noteWriteSuccess()
@@ -387,8 +395,11 @@ actor HistoryEngine {
         _ lineage: LineageRegistry, seenAt now: Date, in db: Database
     ) throws {
         let firstSeen = now.timeIntervalSince1970
-        for (pid, restored) in restoredLineage {
-            guard let current = lineage.entries[pid], current != restored else { continue }
+        // 遍历登记表(主干每轮修剪到活进程 + 祖先,约千条)而非回灌集合(库表修剪前可达
+        // 十万条)。同一进程(回灌还没并进主干时,活记录的父进程可能已被重挂)不覆盖——
+        // 判定与主干一致(Entry.isSameProcess)。
+        for (pid, current) in lineage.entries where !restoredLineage.isEmpty {
+            guard let restored = restoredLineage[pid], !current.isSameProcess(as: restored) else { continue }
             try db.execute(
                 sql: """
                     INSERT OR REPLACE INTO lineage
@@ -424,6 +435,20 @@ actor HistoryEngine {
             )
             persistedLineagePIDs.insert(pid)
         }
+    }
+
+    /// 库表修剪(arch-review-2026-10-18/04):删掉内存登记表(主干每轮已修剪到活进程 +
+    /// 祖先)里没有的 pid——此前只增不删,4 天涨到近 10 万行,启动全量回灌。被删的 pid
+    /// 同步移出已落库 / 回灌集合:万一删早了,它还在登记表里就会在下一轮重新写回。
+    private func pruneLineage(keeping lineage: LineageRegistry, in db: Database) throws {
+        let keys = lineage.entries.keys.map { Int($0) }
+        let json = String(data: (try? JSONEncoder().encode(keys)) ?? Data("[]".utf8), encoding: .utf8) ?? "[]"
+        try db.execute(
+            sql: "DELETE FROM lineage WHERE pid NOT IN (SELECT value FROM json_each(?))",
+            arguments: [json]
+        )
+        persistedLineagePIDs.formIntersection(lineage.entries.keys)
+        restoredLineage = restoredLineage.filter { lineage.entries[$0.key] != nil }
     }
 
     // MARK: 组展示元数据缓存

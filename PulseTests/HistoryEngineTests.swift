@@ -544,6 +544,50 @@ final class HistoryEngineTests: XCTestCase {
         XCTAssertEqual(restored.entries[100]?.parentPID, 1)
     }
 
+    /// 回灌刚读回、主干还没并入时,同一进程的活记录(父进程已被重挂成 1)与库里的回灌
+    /// 记录不同但**是同一进程**:不能当成 pid 复用去覆盖——那会丢掉断链归组要的父链。
+    func testSameProcessLiveRecordDoesNotOverwriteTheRestoredRow() async throws {
+        let restoredRustc = LineageRegistry.Entry(
+            parentPID: 12,
+            identity: ProcessIdentity(executablePath: "/usr/bin/rustc", cwd: "/w", argv: ["rustc"])
+        )
+        let liveRustc = LineageRegistry.Entry(
+            parentPID: 1,
+            identity: ProcessIdentity(executablePath: "/usr/bin/rustc", cwd: nil, argv: ["rustc"])
+        )
+        var previousSession = LineageRegistry()
+        previousSession.register(pid: 100, entry: restoredRustc)
+        let engineA = try makeFileEngine(now: minute0)
+        await ingest(engineA, at: minute0, load: 1, groups: [], lineage: previousSession)
+
+        let engineB = try makeFileEngine(now: minute0.addingTimeInterval(120))
+        _ = await engineB.importLineage()
+        var live = LineageRegistry()
+        live.register(pid: 100, entry: liveRustc)
+        await ingest(engineB, at: minute0.addingTimeInterval(120), load: 1, groups: [], lineage: live)
+
+        XCTAssertEqual(try scalarInt("SELECT parent_pid FROM lineage WHERE pid = 100"), 12)
+    }
+
+    /// 库里的出生登记随内存登记表修剪(arch-review-2026-10-18/04):每 60 轮删掉登记表里
+    /// 已经没有的 pid,下次启动不再回灌成千上万条死进程记录。
+    func testLineageRowsAbsentFromTheRegistryArePrunedPeriodically() async throws {
+        let engine = try makeMemoryEngine(now: minute0)
+        var everything = LineageRegistry()
+        for pid in pid_t(1)...pid_t(50) {
+            everything.register(pid: pid, entry: LineageRegistry.Entry(
+                parentPID: 1, identity: ProcessIdentity(executablePath: "/bin/p\(pid)")
+            ))
+        }
+        await ingest(engine, at: minute0, load: 1, groups: [], lineage: everything)
+        let survivors = everything.pruned(keeping: [7, 8])
+        for round in 1...HistoryEngine.lineagePruneInterval {
+            await ingest(engine, at: minute0.addingTimeInterval(Double(round)), load: 1, groups: [], lineage: survivors)
+        }
+
+        XCTAssertEqual(try scalarInt("SELECT count(*) FROM lineage"), 3, "只剩 7、8 与它们的祖先 1")
+    }
+
     // MARK: 组元数据
 
     /// 改名才重写:同会话内改名后 groups 表跟着更新。

@@ -62,8 +62,8 @@ actor BirthScanner {
     private let clock: Clock
     private let sleep: Sleeping
 
-    private var registry = LineageRegistry()
-    /// 任何一轮 pid 枚举里见过的 pid(含查询失败的):同一 pid 不重复探测。
+    /// 上一轮枚举到的 pid(含查询失败的):仍在的 pid 不重复探测;消失后又出现 = 被新
+    /// 进程复用,重新探测登记。只记上一轮,不终身累计(arch-review-2026-10-18/04)。
     private var knownPIDs: Set<pid_t> = []
     private(set) var scanCount = 0
     private(set) var lastScanAt: Date?
@@ -80,12 +80,13 @@ actor BirthScanner {
         self.sleep = sleep
     }
 
-    /// 扫描主循环:启动即扫一轮,此后每隔 interval 扫一轮、交付最新登记表,
-    /// 直至任务取消或 sleep 抛错。deliver 从 actor 上下文同步调用。
+    /// 扫描主循环:启动即扫一轮,此后每隔 interval 扫一轮、交付**本轮新登记的出生**
+    /// (增量;此前交付终身累计表,只增不删,4 天涨到近 10 万条,每轮整表并入——
+    /// arch-review-2026-10-18/04),直至任务取消或 sleep 抛错。deliver 从 actor
+    /// 上下文同步调用。
     func run(deliver: @escaping @Sendable (LineageRegistry) -> Void) async {
         while !Task.isCancelled {
-            scan()
-            deliver(registry)
+            deliver(scan())
             do {
                 try await sleep(interval)
             } catch {
@@ -94,14 +95,18 @@ actor BirthScanner {
         }
     }
 
-    /// 单轮扫描:枚举 pid → diff 出新面孔 → 逐个取出生信息登记(幂等,首记为准)。
-    private func scan() {
+    /// 单轮扫描:枚举 pid → diff 出新面孔 → 逐个取出生信息登记,返回本轮新登记。
+    /// 查询失败的 pid 也记作已知、不逐轮重试(采样轮兜底会补登记)。
+    private func scan() -> LineageRegistry {
         scanCount += 1
         lastScanAt = clock()
-        for pid in Self.newlyAppeared(pids: source.pids(), known: knownPIDs) {
-            knownPIDs.insert(pid) // 查询失败的 pid 也不重试:采样轮兜底会补登记
-            registry.register(pid: pid, entry: source.birthInfo(for: pid))
+        let pids = source.pids()
+        var births = LineageRegistry()
+        for pid in Self.newlyAppeared(pids: pids, known: knownPIDs) {
+            births.register(pid: pid, entry: source.birthInfo(for: pid))
         }
+        knownPIDs = Set(pids)
+        return births
     }
 
     /// 新 pid 判定(纯逻辑,评审 S1 单测直测):pid 列表中不在已知集合内者,

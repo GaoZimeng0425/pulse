@@ -20,6 +20,8 @@ struct GroupingPipeline {
     private(set) var lineage = LineageRegistry()
     /// 记录取自回灌、尚未遇到本会话活记录对质的 pid:活记录到来时裁决一次即移出。
     private var unsettledRestoredPIDs: Set<pid_t> = []
+    /// 上次 update 以来出生扫描并入的 pid:当轮修剪时保留(它们可能还没进快照)。
+    private var recentScannerBirths: Set<pid_t> = []
     /// 全部组(工单 P0.5-01):最近一轮 update 截取**之前**的完整榜单,
     /// 与 Top 组同序同源——主窗口读这里,弹窗读 update 的返回值。
     private(set) var allGroups: [ProcessGroup] = []
@@ -47,6 +49,7 @@ struct GroupingPipeline {
     mutating func mergeBirths(_ external: LineageRegistry) {
         for (pid, entry) in external.entries {
             adoptLive(pid: pid, entry: entry)
+            recentScannerBirths.insert(pid)
         }
     }
 
@@ -91,6 +94,16 @@ struct GroupingPipeline {
                 identity: process.identity
             ))
         }
+        // 修剪(arch-review-2026-10-18/04):只留在场进程、刚由扫描并入的新出生,以及
+        // 它们父链上的祖先;死进程的其余记录丢掉——登记表规模随活进程数,不随运行时长
+        // (此前只增不删,回灌 + 扫描 4 天累到近 10 万条,每轮归组 / 并入 / 落库都要过一遍)。
+        var keep = recentScannerBirths
+        for process in snapshot.processes {
+            keep.insert(process.pid)
+        }
+        lineage = lineage.pruned(keeping: keep)
+        unsettledRestoredPIDs.formIntersection(lineage.entries.keys)
+        recentScannerBirths = []
 
         let groups = GroupingEngine.groups(
             from: snapshot,

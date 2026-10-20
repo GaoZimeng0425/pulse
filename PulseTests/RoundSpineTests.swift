@@ -136,8 +136,8 @@ final class RoundSpineTests: XCTestCase {
     }
 
     /// pid 复用:回灌说 pid 100 是 cargo 下的 rustc,现场 pid 100 却是另一个程序
-    /// (zsh)→ 活记录胜,zsh 不被回灌的旧记录拉进项目组;无活记录的 cargo(12)照常
-    /// 取回灌记录。回灌先到、活记录后到亦然。
+    /// (zsh)→ 活记录胜,zsh 不被回灌的旧记录拉进项目组;旧记录里的 cargo(12)不再是
+    /// 任何活进程的祖先,随每轮修剪丢掉。
     func testLiveRecordWinsOverRestoredBirthWhenThePidWasReused() {
         let reused = ProcessSnapshot(takenAt: base, processes: [
             RawProcess(pid: 100, parentPID: 1, executablePath: "/bin/zsh", argv: ["-zsh"]),
@@ -150,7 +150,7 @@ final class RoundSpineTests: XCTestCase {
         XCTAssertNotEqual(categoryOfRustc(in: context), .project)
         XCTAssertEqual(context.lineage.entries[100]?.executablePath, "/bin/zsh")
         XCTAssertEqual(context.lineage.entries[100]?.parentPID, 1)
-        XCTAssertEqual(context.lineage.entries[12]?.parentPID, 11, "无活记录的 pid 仍取回灌记录")
+        XCTAssertNil(context.lineage.entries[12], "旧 rustc 的父进程不再是任何活进程的祖先,随修剪丢掉")
     }
 
     /// 路径读不到(受限进程)无从判别是否同一进程:按 pid 复用论,活记录胜——
@@ -166,6 +166,35 @@ final class RoundSpineTests: XCTestCase {
         ])))
 
         XCTAssertEqual(context.lineage.entries[812]?.parentPID, 1)
+    }
+
+    /// 每轮修剪登记表(arch-review-2026-10-18/04):回灌来一大批早已死掉的进程,一轮之后
+    /// 只剩活进程与它们的祖先——断链 rustc 的已死父进程 cargo(12)作为祖先留下,归组
+    /// 照旧;无关的死进程记录被丢掉。
+    func testEachAdvancePrunesTheRegistryToLiveProcessesAndTheirAncestors() {
+        var restored = brokenChainBirths
+        for pid in pid_t(5_000)..<pid_t(5_200) {
+            restored.register(pid: pid, entry: LineageRegistry.Entry(
+                parentPID: 1, identity: ProcessIdentity(executablePath: "/usr/bin/dead\(pid)")
+            ))
+        }
+        var spine = makeSpine(projectRoots: [octokRoot])
+        spine.restoreBirths(restored)
+
+        let first = spine.advance(round(brokenChainLive(at: base)))
+        let second = spine.advance(round(brokenChainLive(at: base.addingTimeInterval(5)), after: brokenChainLive(at: base)))
+
+        XCTAssertEqual(first.lineage.entries.keys.sorted(), [11, 12, 100])
+        XCTAssertEqual(categoryOfRustc(in: second), .project, "已死祖先 cargo 留在表里,断链归组不受修剪影响")
+    }
+
+    /// 扫描刚交付、还没进快照的新出生不在当轮被修掉(它们下一轮才出现在快照里)。
+    func testFreshScannerBirthsSurviveTheRoundTheyArrive() {
+        var spine = makeSpine(projectRoots: [octokRoot])
+        spine.stageScannerBirths(brokenChainBirths)
+        let context = spine.advance(round(ProcessSnapshot(takenAt: base, processes: [])))
+
+        XCTAssertEqual(context.lineage.entries.keys.sorted(), [12, 100])
     }
 
     // MARK: 下钻与组同轮同源

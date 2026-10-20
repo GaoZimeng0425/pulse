@@ -73,6 +73,21 @@ struct LineageRegistry: Equatable, Sendable {
         return merged
     }
 
+    /// 修剪(arch-review-2026-10-18/04):只留 `keeping` 里的 pid 及其沿父链的全部祖先
+    /// (断链归组靠的正是已死祖先的记录),其余丢掉——登记表规模随活进程数而不是随运行
+    /// 时长增长。走链遇到已访问的 pid 即停(损坏的环)。纯函数。
+    func pruned(keeping roots: Set<pid_t>) -> LineageRegistry {
+        var kept = LineageRegistry()
+        for root in roots {
+            var pid = root
+            while kept.entries[pid] == nil, let entry = entries[pid] {
+                kept.entries[pid] = entry
+                pid = entry.parentPID
+            }
+        }
+        return kept
+    }
+
     /// 写入 / 覆盖一条记录(GroupingPipeline 裁决回灌与活记录冲突时用;常规登记
     /// 一律走只补缺的 register / registeringBirths / merging)。
     mutating func replace(pid: pid_t, with entry: Entry) {

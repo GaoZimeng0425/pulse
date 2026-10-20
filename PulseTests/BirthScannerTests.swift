@@ -153,9 +153,11 @@ final class BirthScannerTests: XCTestCase {
 
         let delivered = await drain(makeScanner(source: source, timeline: timeline), timeline: timeline)
 
-        // 预算 2 次睡眠 → 3 轮扫描,每轮交付一次最新登记表。
+        // 预算 2 次睡眠 → 3 轮扫描,每轮交付本轮新登记的出生(增量,不是累计表——
+        // 累计表只增不删,4 天能涨到近 10 万条,票 arch-review-2026-10-18/04)。
         XCTAssertEqual(delivered.count, 3)
-        let registry = delivered.last!
+        XCTAssertEqual(delivered.map { $0.entries.keys.sorted() }, [[1], [42], []])
+        let registry = delivered[1]
         XCTAssertEqual(
             registry.entries[42],
             LineageRegistry.Entry(
@@ -164,7 +166,7 @@ final class BirthScannerTests: XCTestCase {
             ),
             "新 pid 的出生信息应完整登记(父 pid / 路径 / cwd / argv)"
         )
-        XCTAssertEqual(registry.entries[1]?.parentPID, 0)
+        XCTAssertEqual(delivered[0].entries[1]?.parentPID, 0)
         // 每个新 pid 只查询一次:第二轮起 [1,42] 都是已知面孔。
         XCTAssertEqual(source.birthQueries, [1, 42])
     }
@@ -196,13 +198,23 @@ final class BirthScannerTests: XCTestCase {
         let delivered = await drain(makeScanner(source: source, timeline: timeline), timeline: timeline)
 
         XCTAssertEqual(delivered.count, 3)
-        for (index, registry) in delivered.enumerated() {
-            XCTAssertEqual(
-                registry.entries[42]?.parentPID, 1,
-                "第 \(index) 轮交付都应保留首次登记(parentPID = 1),不随后续查询翻新"
-            )
-        }
+        XCTAssertEqual(delivered[0].entries[42]?.parentPID, 1, "首轮登记首次查询结果")
+        XCTAssertTrue(delivered[1].entries.isEmpty && delivered[2].entries.isEmpty, "仍在的 pid 不重复交付")
         XCTAssertEqual(source.birthQueries, [42], "同一 pid 只应被查询一次")
+    }
+
+    /// pid 消失后又出现 = 被新进程复用:重新探测、重新交付出生(已知集合只记上一轮
+    /// 还在的 pid,不再终身累计)。
+    func testReappearingPIDIsProbedAgainAsANewBirth() async {
+        let source = ScriptedBirthScanSource(pidLists: [[42], [], [42]]) { _ in
+            LineageRegistry.Entry(parentPID: 1, identity: ProcessIdentity(executablePath: "/bin/foo"))
+        }
+        let timeline = FakeTimeline(start: base, sleepBudget: 2)
+
+        let delivered = await drain(makeScanner(source: source, timeline: timeline), timeline: timeline)
+
+        XCTAssertEqual(delivered.map { $0.entries.keys.sorted() }, [[42], [], [42]])
+        XCTAssertEqual(source.birthQueries, [42, 42])
     }
 
     func testProcessVanishingBetweenListAndQueryIsSkippedSilently() async {
