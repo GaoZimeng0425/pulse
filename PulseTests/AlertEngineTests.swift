@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 接缝:告警规则状态机(spec 纯逻辑测试清单:阈值/持续/迟滞/冷却,注入时钟)。
 /// 全合成序列 + 注入 Date,零真实等待、零真实负载(工单纪律:真负载属工单 12

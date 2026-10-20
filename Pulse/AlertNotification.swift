@@ -1,6 +1,7 @@
 import Foundation
 import UserNotifications
 import AppKit
+import PulseCore
 
 // MARK: - 通知发送缝(spec 六缝之「通知发送」)
 //

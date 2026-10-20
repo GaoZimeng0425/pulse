@@ -1,4 +1,5 @@
 import SwiftUI
+import PulseCore
 
 // MARK: - 应用内告警提示(工单 P1-07)
 //

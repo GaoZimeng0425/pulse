@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import PulseCore
 
 /// 电池功能模块(工单 p1-history/02;ADR-0003 MonitorFeature):事件驱动的电池
 /// 传感器(IOPS 通知,ADR-0004 第一个真 provider)经 sensorDrivers 登记;弹窗与

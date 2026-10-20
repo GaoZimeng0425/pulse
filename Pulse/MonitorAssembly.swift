@@ -1,4 +1,5 @@
 import Foundation
+import PulseCore
 
 // MARK: - 装配(SystemMonitor 的构造入参与真实装配工厂)
 //

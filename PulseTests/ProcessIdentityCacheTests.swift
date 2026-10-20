@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 身份缓存决策单测(工单 10):命中 / exec·pid 复用失配 / cwd 低频校正 /
 /// 消失裁剪四条策略边界,全部合成注入、零真实系统调用。

@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 接缝:每核 tick 差分器(评审 S6,纯逻辑)。系统 CPU 负载 =
 /// 相邻两样本的忙 tick 差 ÷ 总 tick 差(总含 idle),与活动监视器 / Stats

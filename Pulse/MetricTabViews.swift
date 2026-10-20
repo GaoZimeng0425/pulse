@@ -1,4 +1,5 @@
 import SwiftUI
+import PulseCore
 
 // MARK: - 指标 tab 视图族(工单 P0.6-03)
 // 内容模型(tab 展示什么)在 MetricTabModel(纯逻辑,单测覆盖);本文件只做

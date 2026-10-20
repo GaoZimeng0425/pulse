@@ -1,4 +1,5 @@
 import AppKit
+import PulseCore
 
 /// 设置窗窗口修饰(参考 NemoNotch 同名 Helpers,实测结论原样保留):
 /// SwiftUI Settings 场景的窗口默认**不可缩放**,双栏形态需要可缩放;

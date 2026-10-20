@@ -1,6 +1,7 @@
 import XCTest
 import UserNotifications
 @testable import Pulse
+@testable import PulseCore
 
 /// 接缝:通知发送薄封装(spec 测试决策:OS 边界只冒烟,不深测——文案拼装与
 /// 路由解析是纯逻辑在此钉死;真实授权弹窗、系统投递与点开横幅属真机走查,

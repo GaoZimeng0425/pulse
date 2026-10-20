@@ -1,6 +1,7 @@
 import XCTest
 import Darwin
 @testable import Pulse
+@testable import PulseCore
 
 /// 接缝:KillService(工单 08)——处置的 OS 边界适配器(LiveKillService → kill(2))。
 /// errno → 可读失败原因的映射用真实内核结果验证:刚 reap 的 pid = ESRCH、

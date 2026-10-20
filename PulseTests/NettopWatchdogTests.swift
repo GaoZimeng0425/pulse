@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 架构审查票 A 中6:nettop 子进程健壮性。
 /// ①看门狗升级链(真实子进程,/bin/sh 扮 nettop):超时 SIGTERM → 宽限期后仍在跑

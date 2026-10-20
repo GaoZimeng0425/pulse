@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 接缝:指标 tab 内容模型(工单 P0.6-03,纯逻辑)。
 /// 弹窗图标 tab / 主窗口药丸 tab 共用的"哪个 tab 展示什么"在此钉死:

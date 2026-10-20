@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 工单 01 模块排行·网络每进程(nettop)数据层:CSV 解析器用合成夹具覆盖
 /// 正常行 / 缺列 / 非数字 / 怪名称(含点)/ 空输出 / 只有表头 / 负数——

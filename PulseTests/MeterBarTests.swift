@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// meter 归一化(工单 P0.6-02,纯逻辑):占比条"按当前榜单榜首归一"的取值口径。
 /// 像素渲染属预览 + 手动验收;这里钉死边界数学(榜首满条、空载不除零、越界夹紧)。

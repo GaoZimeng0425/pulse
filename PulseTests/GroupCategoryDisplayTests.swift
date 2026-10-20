@@ -1,6 +1,7 @@
 import XCTest
 import SwiftUI
 @testable import Pulse
+@testable import PulseCore
 
 /// 组卡类别样式表(工单 05;评审 T6 收敛为每类别一份完整样式)。
 /// 像素层面工单 09 手动验收;这里保障映射全且互不相同——

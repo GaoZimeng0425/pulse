@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 接缝:LiveDisk 两源冒烟(spec 测试决策:OS 边界只证明真实可用,不深测——
 /// 纯逻辑已在 DiskSensorTests 钉死)。只读观察,真机走查/对照用;print 出的

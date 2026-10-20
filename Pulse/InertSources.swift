@@ -1,5 +1,6 @@
 import Foundation
 import Darwin
+import PulseCore
 
 // MARK: - 惰性源(预览与单测共用)
 //

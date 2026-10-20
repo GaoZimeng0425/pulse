@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import PulseCore
 
 // MARK: - 主窗口(工单 P0.5-01):全部组列表 + 三层下钻
 // P0.6-05 对齐 SHOT1:药丸 tab 进标题栏工具栏、齿轮在右;内容头 = 页名大标题 +

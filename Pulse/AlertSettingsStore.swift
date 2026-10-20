@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import PulseCore
 
 /// 告警规则配置的持久层与唯一事实来源(工单 P1-07):UserDefaults 存
 /// [kind: {开关, 阈值}] JSON;持续时长/冷却期/方向随种类预设定型,不进设置。

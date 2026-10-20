@@ -1,4 +1,5 @@
 import Foundation
+import PulseCore
 
 /// bundle 显示名读取器(GroupingConfiguration.bundleDisplayName 的 UI 层注入实现):
 /// 读 `<bundle>/Contents/Info.plist` 的 `CFBundleName`(spec 实现决策);

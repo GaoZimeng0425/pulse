@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 历史喂料纯内核(HistoryFeed):每轮主干上下文 + 两轮之间交付的磁盘吞吐读数 →
 /// 一笔落库入参(HistoryIngest)。上下文经真主干(RoundSpine)从合成快照推进得到;

@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 分钟卷积与留存计划(工单 03,纯逻辑 + 注入时间):聚合口径、跨窗冲刷、
 /// 空窗不产出(不补零)、时钟回拨防护、按当地日的留存触发。

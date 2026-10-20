@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import PulseCore
 
 // MARK: - 组内下钻(工单 06)
 

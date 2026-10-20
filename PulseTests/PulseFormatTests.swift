@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 接缝:PulseFormat 纯显示格式化(本工单唯一可单测的纯逻辑,UI 不写单元测试)。
 /// 期望值是独立约定的显示文案字面量,不经过实现同源计算。

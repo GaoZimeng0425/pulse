@@ -1,16 +1,7 @@
 import SwiftUI
+import PulseCore
 
 // MARK: - 占比 meter 条(工单 P0.6-02,参考文档 §3-3)
-
-/// meter 归一化(纯逻辑):占比条"按当前榜单榜首归一"的取值口径。
-/// 榜首(最大值)= 满条;榜首 ≤ 0(空载/空榜/首轮采样前)一律 0,
-/// 不画填充也不除零;越界值夹紧到 0…1。单测见 MeterBarTests。
-enum MeterNormalization {
-    static func fraction(_ value: Double, leader: Double) -> Double {
-        guard leader > 0 else { return 0 }
-        return min(max(value / leader, 0), 1)
-    }
-}
 
 /// 占比 meter 条:6pt 圆头胶囊,轨道 = 强调色 14% 底、填充 = 强调色纯色,
 /// 宽度 = 榜首归一占比;宽度过渡用 Vitals 同款缓动

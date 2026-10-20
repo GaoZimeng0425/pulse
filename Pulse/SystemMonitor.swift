@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import AppKit
 import Darwin
+import PulseCore
 
 /// 呈现层模型(spec 命名 SystemMonitor):持有采样管线,把每轮采样变成可观察状态。
 /// 菜单栏数字 = 系统 CPU 负载(GLOSSARY:0–100%,每核 tick 口径,评审 S6);

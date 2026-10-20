@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import PulseCore
 
 /// 网络功能模块(工单 p1-history/06;ADR-0003 MonitorFeature):网络吞吐是心跳型
 /// 读数(住 Sampler,ADR-0004),经 onRound 的 `context.update.network` 送达;本模块

@@ -1,6 +1,7 @@
 import Darwin
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 工单 06 网络卡:缝上纯逻辑合成夹具单测(spec 测试决策,调研 §2.2 逐条钉死)。
 /// 三组断言:①接口选择与降级链(SCDynamicStore 主接口 → 虚拟前缀降级 →

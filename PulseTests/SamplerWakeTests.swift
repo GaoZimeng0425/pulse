@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 唤醒处理(工单 03,spec 唤醒处理):睡眠唤醒后第一轮差分作废。
 /// 门闩时间轴让测试在采样轮之间插入 `invalidateDeltas()`——交付序列
@@ -110,6 +111,8 @@ final class SamplerWakeTests: XCTestCase {
         let sampler = Sampler(
             source: SyntheticProcessSource(snapshots: snapshots),
             coreTicks: SyntheticCoreTickSource(samples: ticks),
+            memoryStats: SyntheticMemoryStatsSource(),
+            networkCounters: ScriptedNetworkCountersSource(samples: [nil]),
             clock: timeline.clock,
             sleep: timeline.sleeper,
             maxSleepSlice: .infinity
@@ -151,6 +154,7 @@ final class SamplerWakeTests: XCTestCase {
             coreTicks: SyntheticCoreTickSource(samples: [
                 CoreTickSample(busyTicks: [0], totalTicks: [100], takenAt: base),
             ]),
+            memoryStats: SyntheticMemoryStatsSource(),
             networkCounters: ScriptedNetworkCountersSource(samples: [
                 counters(up: 1_000, down: 2_000, at: 0),                    // 首读:立基线
                 counters(up: 6_000, down: 7_000, at: 5_000_000_000),        // 5s 差分
@@ -198,6 +202,7 @@ final class SamplerWakeTests: XCTestCase {
             coreTicks: SyntheticCoreTickSource(samples: [
                 CoreTickSample(busyTicks: [0], totalTicks: [100], takenAt: base),
             ]),
+            memoryStats: SyntheticMemoryStatsSource(),
             networkCounters: ScriptedNetworkCountersSource(samples: [
                 unknownLink(up: 1_000, down: 1_000, at: 0),                 // 首读
                 nil,                                                        // 读缺失

@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import Darwin
+import PulseCore
 
 /// 模块排行功能模块(工单 module-rankings/01;ADR-0003 MonitorFeature):电池 / 磁盘 / 网络三页的
 /// 「能耗影响 / 读写最多 / 每进程流量」三张只读榜。@Observable 薄壳 + 纯值核

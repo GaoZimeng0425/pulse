@@ -1,6 +1,7 @@
 import XCTest
 import Darwin
 @testable import Pulse
+@testable import PulseCore
 
 /// P0 验收锚点端到端(工单 09):spec 锚点是"某项目门禁(rustc×N ← cargo ← node ←
 /// 拉起会话)"——本机不可召唤那条确切链,用**同构的真实负载**做可复现代理:

@@ -1,6 +1,7 @@
 import Darwin
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 工单 01 模块排行(数据层)+ 架构审查票 A 高2(rusage 采集通道合一):
 /// 能耗影响 / 磁盘每进程两本差分账本直接吃心跳快照(全进程 rusage 循环只剩

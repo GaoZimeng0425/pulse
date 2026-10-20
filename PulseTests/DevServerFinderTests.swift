@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 工单 08:argv 分类器(模式 + 误报负例)、闲置环(注入时刻)、盘点编排
 /// (端口扫描只对候选——成本约束)、闲置 24h 告警规则经合成快照真实触发。

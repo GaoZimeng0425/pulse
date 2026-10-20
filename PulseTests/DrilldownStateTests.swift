@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 接缝:DrilldownState(工单 06)——最近一轮采样留下的下钻视图输入(纯值)。
 /// 覆盖:进程行的字段映射与既定顺序、新出生 CPU% 按 0 计、详情组装(原始记录 + 面包屑)。

@@ -1,6 +1,7 @@
 import AppKit
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 排行列表数值列定宽(2026-10-20 用户反馈:网络排行各行名称区长短不一,CPU 排行却齐)。
 /// 数值列曾是最小宽度,速率文案(53–70pt)撑宽了列、把 meter 推得每行不同;改为按最宽

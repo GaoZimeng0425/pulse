@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 接缝:Sampler 采样 actor——驱动 ProcessSource(进程明细)与
 /// CoreTickSource(每核 tick,评审 S6 的系统负载口径)、按节奏等待、产出差分。
@@ -104,6 +105,8 @@ final class SamplerTests: XCTestCase {
         Sampler(
             source: SyntheticProcessSource(snapshots: snapshotSequence),
             coreTicks: SyntheticCoreTickSource(samples: tickSequence),
+            memoryStats: SyntheticMemoryStatsSource(),
+            networkCounters: ScriptedNetworkCountersSource(samples: [nil]),
             clock: timeline.clock,
             sleep: timeline.sleeper,
             maxSleepSlice: maxSleepSlice

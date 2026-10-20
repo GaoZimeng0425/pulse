@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import PulseCore
 
 /// 历史功能模块(工单 p1-history/03、04、06 的历史管线,ADR-0003 功能模块):@Observable 薄壳 +
 /// 纯值内核 HistoryFeed(AlertCenter + AlertEngine 同款样板)。经 SystemMonitor

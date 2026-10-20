@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 项目根列表的持久层(工单 07):增删即落盘(UserDefaults 注入独立 suite 隔离),
 /// 重启(新 store 读同一 defaults)后列表保留。归组的热更新传播

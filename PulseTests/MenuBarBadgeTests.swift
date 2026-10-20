@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 菜单栏徽标槽位配置 → 渲染输入的映射(spec 测试决策钉死的纯函数缝):
 /// 默认态与现状逐像素一致、四项指标可同时上屏、顺序可调、读数缺失占位不伪造、

@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 接缝:采样历史环形缓冲(工单 P0.6-01,纯逻辑)。
 /// 固定容量、随采样轮推进、时间序读取、avg/peak/min 按需折叠——

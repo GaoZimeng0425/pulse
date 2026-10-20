@@ -1,6 +1,7 @@
 import XCTest
 import Darwin
 @testable import Pulse
+@testable import PulseCore
 
 /// 接缝:KillAction(工单 08)——确认后的处置编排(纯逻辑,注入假 KillService)。
 /// 覆盖 spec 的三条硬约束:SIGTERM(优雅优先)/ 永不信号自身 pid(防自杀,

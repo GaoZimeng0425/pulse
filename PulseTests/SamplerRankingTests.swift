@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 架构审查票 A 高2:模块排行两本账本住心跳循环(Sampler),可见性门控降级为
 /// 「推进 / 暂停差分」——门关不推进、关即清账,唤醒清基线同轨;每轮快照发布到
@@ -46,6 +47,8 @@ final class SamplerRankingTests: XCTestCase {
             coreTicks: SyntheticCoreTickSource(samples: [
                 CoreTickSample(busyTicks: [0], totalTicks: [100], takenAt: base),
             ]),
+            memoryStats: SyntheticMemoryStatsSource(),
+            networkCounters: ScriptedNetworkCountersSource(samples: [nil]),
             heartbeatRelay: relay,
             clock: timeline.clock,
             sleep: timeline.sleeper,

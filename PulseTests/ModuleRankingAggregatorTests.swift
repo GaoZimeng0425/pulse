@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 模块排行聚合(工单 01,纯逻辑):每 pid 读数字典 → 按组聚合的排行行。
 /// 钉死六件事:组行 = 成员之和、按主值降序次键稳定、未知 pid 入"其他进程"

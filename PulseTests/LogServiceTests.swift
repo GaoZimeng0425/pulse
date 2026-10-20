@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 // 测试进程文件日志隔离(2026-10-19 误报事故的回归钉):
 // 单元测试托管在 app 内(TEST_HOST),夹具告警会走真实 LogService 路径;

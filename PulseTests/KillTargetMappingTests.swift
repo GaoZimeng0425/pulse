@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 接缝:处置目标映射(工单 08)——下钻数据(RawProcess / ProcessGroup)
 /// → KillTarget 清单。名称口径与下钻行一致(可执行 basename → argv[0] → "pid N"),

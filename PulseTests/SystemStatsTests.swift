@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 接缝(工单 P0.6-05):总览指标卡新增的系统级实时口径——CPU 用户/系统拆分、
 /// 内存构成与压力等级、内存已用历史序列、主机信息与运行时长文案。

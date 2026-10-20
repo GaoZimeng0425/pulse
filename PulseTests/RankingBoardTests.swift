@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 模块排行纯值内核(RankingBoard):最新一轮的组 + 三份最新读数 → 按组聚合的排行行。
 /// 钉的是「同轮出行」的接线口径(聚合本身的口径由 ModuleRankingAggregatorTests 钉):

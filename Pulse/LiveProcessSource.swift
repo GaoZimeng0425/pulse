@@ -1,5 +1,6 @@
 import Foundation
 import Darwin
+import PulseCore
 
 /// Live 采集源:Darwin 薄适配器,API 全集与 docs/probe.swift 一一对应。
 ///

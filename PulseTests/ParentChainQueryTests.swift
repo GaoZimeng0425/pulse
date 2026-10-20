@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 接缝:ParentChainQuery 父链面包屑(工单 06)。合成进程树驱动的纯查询:
 /// 从进程自身沿活链追溯到有归属的祖先(App 归属的 bundle 祖先 / launchd),

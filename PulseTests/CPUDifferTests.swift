@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 接缝:CPU 差分器(纯逻辑)。spec 实现决策——与活动监视器同算法:
 /// 相邻两次快照的累计 CPU 时间差 ÷ 墙钟 = 进程 CPU%(单核 100%)。

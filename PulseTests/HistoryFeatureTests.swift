@@ -1,6 +1,7 @@
 import GRDB
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 历史功能模块薄壳(HistoryFeature)唯一的壳层测试:真 SQLite 内存库(绝不开生产库)
 /// + 注入时钟,钉住逐轮落库经单一串行写入者、严格按轮次顺序生效,累计在每笔落库之后

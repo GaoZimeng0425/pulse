@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 指标强调色令牌表(工单 P0.6-02):色值唯一出处是
 /// docs/ui/vitals-style-reference.md §1.1(Vitals 官网 CSS :root)。

@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import PulseCore
 
 /// 告警编排(工单 P1-07,MainActor 粘合层):喂食 → 引擎评估 → 三路出口——
 /// ①系统通知(已授权才发);②应用内提示(activeAlerts,授权被拒时的降级出口,

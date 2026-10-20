@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 采样 → 组卡呈现的粘合逻辑(工单 05):合成快照序列按采样循环的组法
 /// (source → CPUDiffer → pipeline.update)驱动,断言 Top 组的外部行为。

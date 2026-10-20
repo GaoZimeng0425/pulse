@@ -1,6 +1,7 @@
 import GRDB
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 历史页查询层(工单 04):真 SQLite(内存库)+ 显式注入时间(spec 测试
 /// 决策:历史库不设缝,聚合查询打真 SQLite)。缝 = HistoryQuery.series——

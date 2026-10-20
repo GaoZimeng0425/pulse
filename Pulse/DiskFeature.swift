@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import PulseCore
 
 /// 磁盘功能模块(工单 p1-history/05;ADR-0003 MonitorFeature):容量与吞吐两个
 /// 自有传感器(ADR-0004)经 sensorDrivers 登记进 SystemMonitor 的调度器;视图直读

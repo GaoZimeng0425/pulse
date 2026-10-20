@@ -1,5 +1,6 @@
 import Foundation
 import Darwin
+import PulseCore
 
 /// KERN_PROCARGS2 缓冲解析(纯逻辑,可单测)。
 ///

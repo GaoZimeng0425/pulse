@@ -11,9 +11,9 @@ packages:
   CocoaLumberjack:
     url: https://github.com/CocoaLumberjack/CocoaLumberjack
     from: 3.8.0
-  GRDB:
-    url: https://github.com/groue/GRDB.swift
-    from: 7.0.0
+  # 纯逻辑层(arch-review-2026-10-18/05):只依赖 Foundation / GRDB,`swift test` 不起宿主可跑。
+  PulseCore:
+    path: Packages/PulseCore
 targets:
   Pulse:
     type: application
@@ -23,8 +23,8 @@ targets:
     dependencies:
       - package: CocoaLumberjack
         product: CocoaLumberjackSwift
-      - package: GRDB
-        product: GRDB
+      - package: PulseCore
+        product: PulseCore
     settings:
       base:
         PRODUCT_NAME: Pulse
@@ -57,6 +57,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.gaozimeng.pulse.tests
     dependencies:
       - target: Pulse
+      - package: PulseCore
+        product: PulseCore
 schemes:
   Pulse:
     build:

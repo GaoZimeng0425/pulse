@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import PulseCore
 
 // MARK: - 模块排行卡(工单 module-rankings/01):电池/磁盘/网络三页各一张只读排行
 // 排行列表通用组件(RankingListCard / RankingListRow)上的只读排行:无悬停、不可展开、

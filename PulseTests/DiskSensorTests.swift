@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 工单 05 磁盘卡:缝上纯逻辑合成夹具单测(spec 测试决策)。核心断言四组:
 /// ①容器对账不变式——各卷已用之和 + 其他卷 == 容器总量(petal 同款断言);
