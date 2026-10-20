@@ -211,6 +211,10 @@ struct DevServerStatus: Identifiable, Equatable, Sendable {
 struct DevServerFinder: Sendable {
     let portScanner: any DevServerPortScanning
     private var tracker = DevServerIdleTracker()
+    /// 跨轮分类缓存(arch-review-2026-10-18/04):pid → (argv, 分类结果)。argv 终身不变
+    /// (采集层出生时读一次),同 pid 同 argv 直接复用;argv 变了(pid 复用)重新分类。
+    /// 每轮只带走在场进程。
+    private var classifications: [pid_t: (argv: [String], match: DevServerMatch?)] = [:]
 
     /// 推进一轮:返回本轮 dev server 状态(快照序)。
     mutating func update(
@@ -219,11 +223,21 @@ struct DevServerFinder: Sendable {
         now: Date
     ) -> [DevServerStatus] {
         var candidates: [(process: RawProcess, match: DevServerMatch)] = []
+        var nextClassifications: [pid_t: (argv: [String], match: DevServerMatch?)] = [:]
+        nextClassifications.reserveCapacity(snapshot.processes.count)
         for process in snapshot.processes {
-            if let match = DevServerClassifier.classify(argv: process.argv) {
+            let match: DevServerMatch?
+            if let cached = classifications[process.pid], cached.argv == process.argv {
+                match = cached.match
+            } else {
+                match = DevServerClassifier.classify(argv: process.argv)
+            }
+            nextClassifications[process.pid] = (process.argv, match)
+            if let match {
                 candidates.append((process, match))
             }
         }
+        classifications = nextClassifications
         // 闲置环只喂候选:非候选没有展示闲置的场合,不积累状态。
         for candidate in candidates {
             tracker.observe(

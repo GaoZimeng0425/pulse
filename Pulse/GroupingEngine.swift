@@ -151,9 +151,13 @@ enum GroupingEngine {
         from snapshot: ProcessSnapshot,
         lineage: LineageRegistry = LineageRegistry(),
         configuration: GroupingConfiguration = GroupingConfiguration(),
-        cpuPercentByPID: [pid_t: Double] = [:]
+        cpuPercentByPID: [pid_t: Double] = [:],
+        selfAttributionCache: SelfAttributionCache? = nil
     ) -> [ProcessGroup] {
-        let resolver = Resolver(snapshot: snapshot, lineage: lineage, configuration: configuration)
+        let resolver = Resolver(
+            snapshot: snapshot, lineage: lineage, configuration: configuration, cache: selfAttributionCache
+        )
+        defer { selfAttributionCache?.commitRound() }
 
         // 兜底三分类保证每个进程都有归属——榜单完整,没有漏网之鱼(用户故事 18)。
         var attributionByPID: [pid_t: Attribution] = [:]
@@ -264,14 +268,61 @@ extension Attribution {
     static let orphanGroup = Attribution(id: .orphan, name: "孤儿进程")
 }
 
+/// 跨轮的「自身归属」缓存(arch-review-2026-10-18/04):自身归属(App 归属 / 项目归因)
+/// 只取决于进程身份三元组与项目根,绝大多数进程跨轮不变,却每轮都要拆路径、逐个 argv
+/// 匹配项目根(实测占归组约七成)。按 pid 存「身份 + 结果」,下一轮身份相同即复用;身份
+/// 变了(pid 复用 / exec)或项目根变了就重算。每轮只带走本轮查过的 pid,自然随在场进程
+/// 收缩。由 GroupingPipeline 跨轮持有;不传则逐轮从头算(引擎仍是纯函数)。
+final class SelfAttributionCache {
+    fileprivate struct Slot {
+        let identity: ProcessIdentity
+        let attribution: Attribution?
+    }
+
+    private var previous: [pid_t: Slot] = [:]
+    private var current: [pid_t: Slot] = [:]
+    private var roots: [String]?
+
+    /// 本轮开始:项目根变了则整表作废。
+    fileprivate func prepare(roots: [String]) {
+        guard roots != self.roots else { return }
+        self.roots = roots
+        previous = [:]
+        current = [:]
+    }
+
+    fileprivate func attribution(
+        for pid: pid_t,
+        identity: ProcessIdentity,
+        compute: () -> Attribution?
+    ) -> Attribution? {
+        if let slot = current[pid], slot.identity == identity { return slot.attribution }
+        let slot: Slot
+        if let cached = previous[pid], cached.identity == identity {
+            slot = cached
+        } else {
+            slot = Slot(identity: identity, attribution: compute())
+        }
+        current[pid] = slot
+        return slot.attribution
+    }
+
+    /// 本轮结束:只留本轮查过的 pid。
+    fileprivate func commitRound() {
+        previous = current
+        current = [:]
+    }
+}
+
 /// 一次 `groups` 调用私有的判定器:持有快照 / 登记表 / 配置与逐 pid 记忆化缓存。
-/// 生命周期限于单次调用,引擎整体仍是纯函数。
+/// 生命周期限于单次调用;跨轮的自身归属缓存由调用方可选传入。
 private final class Resolver {
     private let configuration: GroupingConfiguration
     /// 归一化并按长度降序的项目根:多根命中取最长(最具体)根。
     private let normalizedRoots: [String]
     private let processesByPID: [pid_t: RawProcess]
     private let lineage: LineageRegistry
+    private let cache: SelfAttributionCache?
     /// pid → 三层归属解析结果(nil = 无三层归属)。缓存含"经继承得到的归属"。
     private var layerMemo: [pid_t: LayerResolution] = [:]
 
@@ -281,13 +332,20 @@ private final class Resolver {
         let reachedLiveLaunchd: Bool
     }
 
-    init(snapshot: ProcessSnapshot, lineage: LineageRegistry, configuration: GroupingConfiguration) {
+    init(
+        snapshot: ProcessSnapshot,
+        lineage: LineageRegistry,
+        configuration: GroupingConfiguration,
+        cache: SelfAttributionCache?
+    ) {
         self.configuration = configuration
         self.normalizedRoots = configuration.projectRoots
             .map(PathNormalization.normalize)
             .sorted { $0.count > $1.count }
         self.processesByPID = snapshot.processesByPID
         self.lineage = lineage
+        self.cache = cache
+        cache?.prepare(roots: normalizedRoots)
     }
 
     // MARK: 最终归属(三层 + 兜底)
@@ -385,8 +443,12 @@ private final class Resolver {
         )
     }
 
+    /// 在场进程的自身归属:有跨轮缓存时按 pid + 身份复用。
     private func layerSelf(_ process: RawProcess) -> Attribution? {
-        layerSelf(process.identity)
+        guard let cache else { return layerSelf(process.identity) }
+        return cache.attribution(for: process.pid, identity: process.identity) {
+            layerSelf(process.identity)
+        }
     }
 
     /// 出生登记回查(GLOSSARY 活链断裂后的归属来源):沿出生父链找有归属的祖先,

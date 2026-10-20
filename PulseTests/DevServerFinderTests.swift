@@ -221,6 +221,24 @@ final class DevServerFinderTests: XCTestCase {
         XCTAssertEqual(servers.first?.kind, .vite)
     }
 
+    /// 跨轮分类缓存(arch-review-2026-10-18/04):同一 pid 下一轮 argv 变了(被复用)要重新
+    /// 分类——上一轮是 vite,这一轮是普通 node 脚本,就不再是候选。
+    func testReusedPIDWithDifferentArgvIsReclassified() {
+        var finder = DevServerFinder(portScanner: RecordingScanner(portsByPID: [:]))
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let vite = RawProcess(pid: 300, parentPID: 1, executablePath: "/x/node", argv: ["node", "/x/node_modules/.bin/vite"])
+        let script = RawProcess(pid: 300, parentPID: 1, executablePath: "/x/node", argv: ["node", "/x/build.js"])
+
+        let first = finder.update(snapshot: ProcessSnapshot(takenAt: now, processes: [vite]), processCPU: [:], now: now)
+        let second = finder.update(
+            snapshot: ProcessSnapshot(takenAt: now.addingTimeInterval(5), processes: [script]),
+            processCPU: [:], now: now.addingTimeInterval(5)
+        )
+
+        XCTAssertEqual(first.map(\.pid), [300])
+        XCTAssertEqual(second, [])
+    }
+
     /// 闲置时长经编排层合成:候选进程 0% 观察 25h → 状态携带闲置秒数与"闲置"标签。
     func testFinderComposesIdleDurationAcrossRounds() {
         let scanner = RecordingScanner()
