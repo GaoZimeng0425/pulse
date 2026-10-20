@@ -143,7 +143,7 @@ struct RingCardView: View {
     private func legendIcon(_ slice: RingSlice) -> some View {
         switch slice.icon {
         case .app(let path):
-            Image(nsImage: NSWorkspace.shared.icon(forFile: path))
+            Image(nsImage: AppIconCache.icon(forBundle: path))
                 .resizable()
                 .aspectRatio(contentMode: .fit)
         case .symbol(let name, let color):

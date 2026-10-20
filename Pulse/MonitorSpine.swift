@@ -26,13 +26,13 @@ struct RoundContext: Sendable {
 /// 快照、同一登记表、同一差分构建下钻输入。值类型,由 SystemMonitor(MainActor)
 /// 持有;单测见 RoundSpineTests。
 ///
-/// 出生登记三个来源:出生扫描的累计表经 `stageScannerBirths` 暂存、每次 advance
+/// 出生登记三个来源:出生扫描交付的新出生经 `stageScannerBirths` 暂存、每次 advance
 /// 开头并入,其后本轮快照兜底——这两个是本会话活记录,只补缺、先进者为准;历史
 /// 回灌经 `restoreBirths` 即时叠加,与活记录同 pid 时按身份判别:同一进程取回灌
 /// (重启保归因),pid 复用则活记录胜——与到达先后无关(规则钉在 RoundSpineTests)。
 struct RoundSpine {
     private var pipeline: GroupingPipeline
-    /// 出生扫描最近交付的累计登记表(整表替换):每次 advance 归组之前并入。
+    /// 出生扫描两次 advance 之间交付的新出生(增量累积):advance 归组之前并入后清空。
     private var scannerBirths = LineageRegistry()
 
     init(configuration: GroupingConfiguration) {
@@ -44,11 +44,11 @@ struct RoundSpine {
         pipeline.restoreBirths(restored)
     }
 
-    /// 暂存出生扫描最近交付的累计登记表(BirthScanner 每 ~2s 交付一份整表,只增
-    /// 不删):整表替换,下一次 advance 归组之前并入(只补缺)——扫描间隙出生的
-    /// 短命父进程由此参与该轮归组。
-    mutating func stageScannerBirths(_ latest: LineageRegistry) {
-        scannerBirths = latest
+    /// 暂存出生扫描交付的新出生(BirthScanner 每 ~2s 交付本轮增量):两次 advance 之间
+    /// 累积,下一次 advance 归组之前并入(只补缺)后清空——扫描间隙出生的短命父进程
+    /// 由此参与该轮归组。
+    mutating func stageScannerBirths(_ births: LineageRegistry) {
+        scannerBirths = scannerBirths.merging(births)
     }
 
     /// 更新项目根(设置窗,工单 p0/07):立即写入归组配置,下一次 advance 即以新根
@@ -61,6 +61,7 @@ struct RoundSpine {
     /// → 同轮构建下钻。
     mutating func advance(_ update: SamplingUpdate) -> RoundContext {
         pipeline.mergeBirths(scannerBirths)
+        scannerBirths = LineageRegistry()
         let processCPU = update.diff.processCPU
         // 管线的返回值是弹窗 Top-N 截取;主干只要截取前的全部组。
         _ = pipeline.update(snapshot: update.snapshot, processCPU: processCPU)

@@ -154,7 +154,7 @@ struct RankingListRow<Badge: View, Trailing: View>: View {
     @ViewBuilder
     private var icon: some View {
         if let bundlePath {
-            Image(nsImage: NSWorkspace.shared.icon(forFile: bundlePath))
+            Image(nsImage: AppIconCache.icon(forBundle: bundlePath))
                 .resizable()
                 .aspectRatio(contentMode: .fit)
         } else {
@@ -184,5 +184,22 @@ extension RankingListRow where Badge == EmptyView, Trailing == EmptyView {
             badge: { EmptyView() },
             trailing: { EmptyView() }
         )
+    }
+}
+
+// MARK: - 应用图标缓存(arch-review-2026-10-18/04)
+
+/// 应用图标按 bundle 路径缓存:排行行与环形图例每次重绘都要图标,`NSWorkspace.icon`
+/// 每次都走 LaunchServices 查询(主窗口开着时是采样里的显眼热点)。图标在进程生命期内
+/// 几乎不变;NSCache 在内存吃紧时自行回收。
+@MainActor
+enum AppIconCache {
+    private static let cache = NSCache<NSString, NSImage>()
+
+    static func icon(forBundle path: String) -> NSImage {
+        if let cached = cache.object(forKey: path as NSString) { return cached }
+        let icon = NSWorkspace.shared.icon(forFile: path)
+        cache.setObject(icon, forKey: path as NSString)
+        return icon
     }
 }
