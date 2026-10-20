@@ -166,8 +166,8 @@ final class SystemMonitor {
     }
 
     /// 非心跳型传感器(ADR-0004):单一调度器 actor 按 cadence 驱动功能模块自有的
-    /// 登记项(电池事件档、磁盘容量 30s、磁盘吞吐 5s/30s、nettop 5s);心跳型仍住
-    /// Sampler 不登记。
+    /// 登记项(电池事件档、磁盘容量 30s、磁盘吞吐 5s/30s、nettop 5s、launchd 服务清单 60s);
+    /// 心跳型仍住 Sampler 不登记。
     private func startSensors() {
         let drivers = features.registry.flatMap { $0.sensorDrivers() }
         let scheduler = SensorScheduler()
@@ -176,13 +176,16 @@ final class SystemMonitor {
         }
     }
 
-    /// 功能模块回调主干 / 心跳的宿主接口(MonitorHost):回灌叠加进主干;排行门控
-    /// 编代号后转给 Sampler;广播同步派发给全部模块。weak self:模块持有宿主,不构成
-    /// 保留环。
+    /// 功能模块回调主干 / 心跳的宿主接口(MonitorHost):回灌叠加进主干;launchd 服务清单
+    /// 整份替换进主干归组配置;排行门控编代号后转给 Sampler;广播同步派发给全部模块。
+    /// weak self:模块持有宿主,不构成保留环。
     private func makeHost() -> MonitorHost {
         MonitorHost(
             restoreBirths: { [weak self] restored in
                 self?.spine.restoreBirths(restored)
+            },
+            setLaunchdServiceExecutablePaths: { [weak self] paths in
+                self?.spine.setLaunchdServiceExecutablePaths(paths)
             },
             setRankingsActive: { [weak self] active in
                 guard let self else { return }

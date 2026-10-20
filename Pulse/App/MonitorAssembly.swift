@@ -38,7 +38,8 @@ struct MonitorSources {
 
 /// 功能模块注册列表(ADR-0003 扩展点):视图要直读的模块以具名字段持有,派发一律
 /// 按 `registry` 顺序。顺序有意义:网络先落地(徽标与历史同轮);告警先喂本轮采样、
-/// dev server 再盘点并广播(与迁移前的喂食次序一致);排行与历史随后。
+/// dev server 再盘点并广播(与迁移前的喂食次序一致);排行与历史随后。launchd 服务
+/// 清单模块没有 onRound,放末尾、顺序无意义。
 @MainActor
 struct MonitorFeatures {
     let network: NetworkFeature
@@ -48,10 +49,11 @@ struct MonitorFeatures {
     let history: HistoryFeature
     let disk: DiskFeature
     let battery: BatteryFeature
+    let launchdManifest: LaunchdManifestFeature
 
     /// 派发顺序:onRound / 广播 / 可见性 / 传感器登记 / 启停都按它走。
     var registry: [any MonitorFeature] {
-        [network, alerts, devServers, rankings, history, disk, battery]
+        [network, alerts, devServers, rankings, history, disk, battery, launchdManifest]
     }
 }
 
@@ -76,7 +78,8 @@ extension SystemMonitor {
                     capacitySource: LiveDiskCapacitySource(),
                     throughputSource: LiveDiskThroughputSource.adoptingBestPath(fallbackHeartbeat: relay)
                 ),
-                battery: BatteryFeature(source: LiveBatterySource())
+                battery: BatteryFeature(source: LiveBatterySource()),
+                launchdManifest: LaunchdManifestFeature(provider: LaunchdManifestProvider())
             )
         )
     }

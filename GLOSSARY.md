@@ -41,10 +41,14 @@ _Avoid_: 项目归属、仓库匹配
 _Avoid_: 工作区、workspace
 
 **后台服务 (Background service)**:
-挂在 launchd 之下、可执行位于 launchd 域的兜底归属。域 = /Library/LaunchAgents|LaunchDaemons、/System/Library、/Library/SystemExtensions、/Library/PrivilegedHelperTools、/Library/Developer、/usr/sbin、/usr/libexec、~/Library/LaunchAgents(2026-10-16 扩充:/usr/{sbin,libexec} 的 ~200 个 Apple 系统守护此前被误成孤儿);/usr/bin、/usr/local、/opt/homebrew 刻意不在域内。
+挂在 launchd 之下、可执行位于 launchd 域或命中 launchd 服务清单的兜底归属。launchd 域 = 系统 / 厂商守护的惯例驻地;自装常驻(/usr/local、/opt/homebrew)与一次性用户命令(/usr/bin)的驻地刻意不算域。
+
+**launchd 服务清单 (launchd service manifest)**:
+本机 launchd 各标准 plist 目录所声明的服务程序路径集合。它是磁盘上的声明,不是 launchd 运行时实际加载的状态,也不区分服务启用与否。
+_Avoid_: 真实清单(它不是运行时真相)、launchd 登记(与"出生登记"撞词)
 
 **孤儿进程 (Orphan)**:
-父链断到 launchd 且无 App 归属、无项目归因的进程;可执行不在 launchd 域者(即便父是 launchd)也归此类。UI 中橙色高亮——它往往正是问题所在。
+父链断到 launchd 且无 App 归属、无项目归因的进程;可执行既不在 launchd 域、也不在 launchd 服务清单者(即便父是 launchd)也归此类。UI 中橙色高亮——它往往正是问题所在。
 
 **组 CPU% (Group CPU)**:
 组内全部进程 CPU 之和,单核为 100%,可超过 100%(如 445% = 约 4.5 个核满载)。与活动监视器同口径。

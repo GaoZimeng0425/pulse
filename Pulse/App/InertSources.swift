@@ -43,6 +43,11 @@ struct InertNettopCSVSource: NettopCSVSource {
     func read() async -> String? { nil }
 }
 
+/// launchd plist 目录:一律缺席(不碰磁盘;清单恒为空集,后台服务只剩静态域)。
+struct InertLaunchdPlistSource: LaunchdPlistSource {
+    func read(directory: String) -> LaunchdPlistDirectoryRead { .absent }
+}
+
 /// dev server 端口扫描:不扫,无监听端口。
 struct InertDevServerPortScanner: DevServerPortScanning {
     func listeningPorts(pid: pid_t) -> [UInt16] { [] }
@@ -116,7 +121,10 @@ extension SystemMonitor {
                     capacitySource: InertDiskCapacitySource(),
                     throughputSource: InertDiskThroughputSource()
                 ),
-                battery: BatteryFeature(source: InertBatterySource())
+                battery: BatteryFeature(source: InertBatterySource()),
+                launchdManifest: LaunchdManifestFeature(
+                    provider: LaunchdManifestProvider(source: InertLaunchdPlistSource())
+                )
             )
         )
     }

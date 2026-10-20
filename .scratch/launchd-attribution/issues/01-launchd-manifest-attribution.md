@@ -2,7 +2,7 @@
 
 **What to build:** 把归组引擎"后台服务"判定的 launchd 域推断升级(或补强)为真实 launchd 服务清单:进程经三层归属落空、且(出生或现挂)父为 launchd 时,若其可执行路径命中本机 launchd 实际注册的服务程序路径,则归"后台服务"而非"孤儿进程"。现状是纯静态路径前缀名单(`/usr/sbin`、`/usr/libexec`、`/Library/LaunchDaemons` 等,`GroupingEngine.swift` `isLaunchdDomainExecutablePath`),自装在 `/usr/local`、`/opt` 等处的第三方 LaunchDaemon 全部落孤儿。
 
-**Status:** ready-for-agent
+**Status:** done
 **Category:** enhancement
 
 ## 为什么现在开(现场证据,2026-10-20)
@@ -22,10 +22,10 @@
 
 ## 验收
 
-- [ ] `corplink-service`(或任一 `/usr/local`、`/Library/<厂商>/` 下的第三方 LaunchDaemon)在真机上归"后台服务",孤儿行不再被 VPN 隧道流量顶榜
-- [ ] S3 语义回归:launchd 拉起但不在清单里的一次性命令(如 `/usr/bin/ssh`)仍不归后台服务
-- [ ] 既有归组测试全绿;新增清单命中 / 未命中 / 清单不可用(读取失败退回现静态前缀名单)三档单测
-- [ ] 清单读取有低频缓存,采样热路径零新增子进程
+- [ ] `corplink-service`(或任一 `/usr/local`、`/Library/<厂商>/` 下的第三方 LaunchDaemon)在真机上归"后台服务",孤儿行不再被 VPN 隧道流量顶榜(留维护者目验)
+- [x] S3 语义回归:launchd 拉起但不在清单里的一次性命令(如 `/usr/bin/ssh`)仍不归后台服务
+- [x] 既有归组测试全绿;新增清单命中 / 未命中 / 清单不可用(读取失败退回现静态前缀名单)三档单测
+- [x] 清单读取有低频缓存,采样热路径零新增子进程
 
 ## Comments
 
@@ -39,6 +39,19 @@
 - **票身过时修正:** 票身引用的 `GroupingEngine.swift:231-233` 等行号写于引擎尚在 app target 时;引擎已随 `7f7499f` 迁入 PulseCore 包,原路径不存在。下方 brief 按行为契约与类型名重写,**以 brief 为准**。
 - **拍板(维护者,2026-10-20):不扩票。** BDLDaemon 类(路径含 `.app` 被 App 归属第一层抢先)不并入本票;严格 `.app` 全盘口径与 launchd 清单的判定顺序维持现状,落地后观感仍差再另立票。
 - 类别 enhancement(现行孤儿落点是评审 S3 的设计结果,非断裂),状态维持 ready-for-agent。
+
+**2026-10-20 落地(分支 feat/launchd-manifest;grill-with-docs 三轮拍板后实施)**
+
+- **选型**:plist 扫描,不读 launchctl(ADR-0005 记探针数字:`launchctl print system` 近零成本但 services 表只有 pid / 状态 / label 不给程序路径,拿路径要逐 label 447 次子进程或解析 8MB `dumpstate`;plist 纯文件读、零子进程,子进程看门狗义务随之消失)。被否的 launchctl pid 集合方案也记在 ADR(守护重启后一分钟内会抖动)。
+- **两层缓存**:密封层 `/System/Library/LaunchDaemons|LaunchAgents`(911 个 plist,冷扫 ~340ms)在密封系统卷上,进程内只扫一次、两目录都读出内容才冻结;可变层五目录(`/Library/LaunchDaemons|LaunchAgents`、`/Library/Apple/System/Library/LaunchDaemons|LaunchAgents`、`~/Library/LaunchAgents`,本机 41 个文件)60 秒重扫。
+- **匹配口径**:字面 ∪ 扫描时 realpath 的全等匹配,realpath 只做在清单侧。真机实证 Cryptexes 代理的 `proc_pidpath` 是 `/System/Volumes/Preboot/Cryptexes/App/…` 真路径,与 plist 字面 `/System/Cryptexes/App/…` 只经 realpath 相等;Foundation `resolvingSymlinksInPath()` 与 `readlink -f` 结果逐字一致。
+- **真机覆盖差异**(354 个在跑的 launchd 服务按真实可执行路径分类):静态域 310、`.app` 归属先收 26、清单救回 8(corplink-service、Bitdefender ×5、fleetdm orbit、brew ollama);密封层另救 `/usr/bin/ssh-agent` 与两个 Cryptexes 代理。
+- **代码**:PulseCore `GroupingConfiguration.launchdServiceExecutablePaths`(缺省空集 ⇒ 逐位不变)+ 兜底判定"静态域 ∨ 清单"(单一判定点 `isLaunchdServiceExecutable`,静态谓词 `isLaunchdDomainExecutablePath` 原样保留)+ 新文件 `LaunchdManifestModel.swift`(薄源协议 `LaunchdPlistSource` / 解析 `LaunchdServiceManifest` / 两层组装器 `LaunchdManifestAssembler`,realpath 经注入闭包 / 健康三态 + 状态沿日志 `LaunchdManifestHealthLog`)+ `GroupingPipeline` / `RoundSpine` / `MonitorHost` 同名 `setLaunchdServiceExecutablePaths`;app `Live/LaunchdManifestSensor.swift`(`LiveLaunchdPlistSource` + `LaunchdManifestProvider` 60s,category "Launchd")+ `Features/LaunchdManifestFeature.swift`(只实现 `sensorDrivers`,交付进宿主回调)+ `InertLaunchdPlistSource` 给 preview。GLOSSARY 增"launchd 服务清单",改"后台服务"(域 ∨ 清单;顺带把路径枚举与日期注记移出,只留概念边界)与"孤儿进程";新 ADR-0005。
+- **测试**:核心包 +27(`GroupingLaunchdManifestTests` 引擎四态 / S3 夹具 / 全等非前缀 / 静态域不受影响 / 管线热更新;`LaunchdManifestTests` 解析四态 / 密封层只读一次可变层每轮重读 / 补缺重试 / realpath / 健康三态 / 状态沿日志),app 侧 +5(`LaunchdManifestFeatureTests` 节奏钉子 ≥60s / lastGood 交付 / 日志只记切换 / Feature→Host 接线 / 首读失败不触宿主);`sh scripts/check.sh` 全绿 630 例(核心 327 + app 303)。
+- **偏离票面(三条,grill 时已拍板)**:① 读取失败**保留上次好清单**(ADR-0004 lastGood),不按 brief 字面"空清单处理"——一次瞬时读错不该把 corplink 打回孤儿一分钟;首轮即失败时 lastGood 为 nil,行为与票面一致。② **密封层 `/System/Library` 纳入扫描**属扩范围(票面只提第三方目录),一次性 ~340ms 换 ssh-agent 与 Cryptexes 代理归位。③ "刷新间隔内重复取用不触发读取"按 ADR-0004 分工落地:节奏归 `SensorScheduler`,provider **不自带时间节流**;由 cadence ≥60s 钉子 + 密封层"两次 snapshot 只读一次"的计数测试 + 既有 `SensorSchedulerTests` 守住意图。
+- **留给维护者目验**:corplink-service 在真机归"后台服务";网络每进程排行的"孤儿进程"行不再被 VPN 隧道流量顶榜。
+- **已知局限**(ADR-0005,接受不加启发式):brew 升级未重启的符号链接守护(ollama 0.40.2 在跑、链接已指 0.40.6)重启前仍落孤儿;解释器程序(`/bin/bash` 等进清单)双向口子;非标准路径 bootstrap 的服务与禁用状态不可见(清单是磁盘声明);BDLDaemon 类不动。
+- 首轮归组可能早于首次清单送达一轮(冷扫 ~340ms),corplink 会有一轮显示为孤儿再翻正,有意不让首轮等清单。
 
 ## Agent Brief
 
@@ -62,13 +75,13 @@
 - app 侧新增 launchd 清单源:薄源协议 + Live 实现 + 测试用合成 / inert 实现,沿 SensorProvider 与薄源协议(ADR-0004)惯例,cadence 低频;装配处(现为 MonitorAssembly 一类的组装点)把清单接入 GroupingConfiguration。
 
 **Acceptance criteria:**
-- [ ] 单测:清单命中 ∧ 父为 launchd → 后台服务;清单命中 ∧ 父非 launchd ∧ 无三层归属 → 与改前结果一致(清单不单独改判);清单未命中 → 与改前逐位一致;清单为空集 → 全部既有归组测试原样通过。
-- [ ] 单测:清单读取失败 / 空 → 退回静态名单,无崩溃;状态沿日志只在失败态变化时记录。
-- [ ] 真机:corplink-service(或任一 `/usr/local`、`/Library/<厂商>/` 下的 launchd 注册守护)归"后台服务";网络每进程排行里"孤儿进程"行不再被 VPN 隧道流量顶榜。
-- [ ] S3 回归:launchd 之下但不在清单的一次性命令仍不归后台服务(以 /usr/bin/ssh 形态的合成夹具钉死)。
-- [ ] 成本:采样热路径零新增子进程;清单刷新间隔 ≥ 60s 或事件驱动,有测试钉住"刷新间隔内重复取用不触发读取"。
-- [ ] 清单来源选型与匹配口径写进 docs/adr/(新 ADR 或 ADR-0004 附录);GLOSSARY 增补"launchd 服务清单"词条。
-- [ ] `sh scripts/check.sh` 全绿。
+- [x] 单测:清单命中 ∧ 父为 launchd → 后台服务;清单命中 ∧ 父非 launchd ∧ 无三层归属 → 与改前结果一致(清单不单独改判);清单未命中 → 与改前逐位一致;清单为空集 → 全部既有归组测试原样通过。
+- [x] 单测:清单读取失败 / 空 → 退回静态名单,无崩溃;状态沿日志只在失败态变化时记录。
+- [ ] 真机:corplink-service(或任一 `/usr/local`、`/Library/<厂商>/` 下的 launchd 注册守护)归"后台服务";网络每进程排行里"孤儿进程"行不再被 VPN 隧道流量顶榜。(留维护者目验)
+- [x] S3 回归:launchd 之下但不在清单的一次性命令仍不归后台服务(以 /usr/bin/ssh 形态的合成夹具钉死)。
+- [x] 成本:采样热路径零新增子进程;清单刷新间隔 ≥ 60s 或事件驱动,有测试钉住"刷新间隔内重复取用不触发读取"。(落法见下方 comment 偏离③)
+- [x] 清单来源选型与匹配口径写进 docs/adr/(新 ADR 或 ADR-0004 附录);GLOSSARY 增补"launchd 服务清单"词条。
+- [x] `sh scripts/check.sh` 全绿。
 
 **Out of scope:**
 - 改变 App 归属与后台服务的判定顺序(BDLDaemon 类路径含 `.app` 被 App 归属抢先——2026-10-20 triage 拍板维持现状)。
