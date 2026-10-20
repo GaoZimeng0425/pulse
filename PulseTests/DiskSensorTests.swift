@@ -280,6 +280,35 @@ final class DiskSensorTests: XCTestCase {
         XCTAssertEqual(rates, .zero)
     }
 
+    func testThroughputJumpBeyondPhysicalCapIsDroppedNotCounted() {
+        // 求和回退档:某进程上轮计数缺席、本轮带着终身累计进账,和值一轮跳上百 GB——
+        // 超过单轮上限(20 GB/s × 实际间隔)整轮作废为 0,不出尖峰、不进记账
+        // (arch-review-2026-10-18/03 甲8,参照网络差分的跳变防护)。
+        let jump = DiskThroughputDiffer.rates(
+            previous: counters(read: 0, write: 0, uptime: 1_000_000_000),
+            current: counters(read: 900_000_000_000, write: 0, uptime: 31_000_000_000)
+        )
+        XCTAssertEqual(jump, .zero)
+
+        // 上限以内的大流量照常出数:30s 里读 150 GB = 5 GB/s。
+        let heavy = DiskThroughputDiffer.rates(
+            previous: counters(read: 0, write: 0, uptime: 1_000_000_000),
+            current: counters(read: 150_000_000_000, write: 0, uptime: 31_000_000_000)
+        )
+        XCTAssertEqual(heavy.readBytesPerSecond, 5_000_000_000, accuracy: 1)
+    }
+
+    func testAccumulatorBooksNoIncrementForADroppedJump() {
+        // 作废轮的记账增量同为 0(速率与增量同真同零),基线照常推进到本轮。
+        let accumulator = DiskThroughputAccumulator()
+        _ = accumulator.record(counters(read: 0, write: 0, uptime: 1_000_000_000))
+        let dropped = accumulator.record(counters(read: 900_000_000_000, write: 0, uptime: 31_000_000_000))
+        let next = accumulator.record(counters(read: 900_000_003_000, write: 0, uptime: 32_000_000_000))
+
+        XCTAssertEqual(dropped.readBytesDelta, 0)
+        XCTAssertEqual(next.readBytesDelta, 3_000, "基线已推进到跳变后的计数")
+    }
+
     // MARK: - 吞吐 Accumulator(基线推进 + 走势环形窗)
 
     func testAccumulatorRecoversRatesAfterRollback() {
