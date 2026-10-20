@@ -1,5 +1,4 @@
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 接缝:SensorScheduler 单一调度器 actor(ADR-0004)——按各 provider 的

@@ -10,10 +10,6 @@ import PulseCore
 // 由调用方注入,单测合成时间轴,与 Sampler/AlertEngine 同款纪律)。
 // 词汇表:dev server / 闲置(Idle)——处置永远由人确认,这里只盘点不杀。
 
-// MARK: - 闲置判定(注入时刻)
-
-// MARK: - 盘点状态与编排
-
 // MARK: - 端口扫描缝
 
 /// libproc 薄适配器:列 fd → 逐 socket fd 查 TCP 监听状态与本地端口。

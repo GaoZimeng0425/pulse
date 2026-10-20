@@ -2,8 +2,6 @@ import Foundation
 import Darwin
 import PulseCore
 
-// MARK: - 系统内存构成(工单 P0.6-05:总览内存卡的实时口径)
-
 // MARK: - 采集源
 
 /// Darwin 薄适配器:host_statistics64 + 物理内存 + 内存压力 sysctl。

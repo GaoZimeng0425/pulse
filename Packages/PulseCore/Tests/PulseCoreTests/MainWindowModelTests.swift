@@ -1,5 +1,4 @@
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 主窗口模型(工单 P0.5-01):窗口与弹窗共用同一条采样管线,

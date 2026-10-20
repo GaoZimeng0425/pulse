@@ -1,5 +1,4 @@
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 接缝:告警规则状态机(spec 纯逻辑测试清单:阈值/持续/迟滞/冷却,注入时钟)。

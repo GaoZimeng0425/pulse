@@ -1,5 +1,4 @@
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 接缝:处置目标映射(工单 08)——下钻数据(RawProcess / ProcessGroup)

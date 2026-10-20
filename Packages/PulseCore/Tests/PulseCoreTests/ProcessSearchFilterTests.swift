@@ -1,5 +1,4 @@
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 主窗口搜索过滤(纯逻辑):名字包含 + 纯数字查询的 pid 前缀,组级与行级口径。

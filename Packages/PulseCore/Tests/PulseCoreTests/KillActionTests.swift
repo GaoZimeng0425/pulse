@@ -1,6 +1,5 @@
 import XCTest
 import Darwin
-@testable import Pulse
 @testable import PulseCore
 
 /// 接缝:KillAction(工单 08)——确认后的处置编排(纯逻辑,注入假 KillService)。

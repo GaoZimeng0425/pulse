@@ -3,10 +3,13 @@
 # 完整输出落日志产物,结尾打印退出码 + 日志路径;报告测试结果时引用本
 # 脚本的退出码与日志,不要转述。
 #
+# 两套测试(arch-review-2026-10-18/05):核心包 PulseCore 的测试用 `swift test` 跑,不起
+# app 宿主;app 侧(Live 冒烟 / SwiftUI / 功能模块薄壳)用 xcodebuild 宿主测试。
+#
 # Usage:
-#   sh scripts/test.sh                              # 全量单元测试
-#   sh scripts/test.sh --only FooTests              # 只跑 FooTests
-#   sh scripts/test.sh --only PulseTests/Foo/testBar  # 完整路径原样透传
+#   sh scripts/test.sh                              # 全量:核心包 + app 两套
+#   sh scripts/test.sh --only FooTests              # 只跑 FooTests(在核心包就走 swift test)
+#   sh scripts/test.sh --only PulseTests/Foo/testBar  # 完整路径原样透传(app 侧)
 set -u
 
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -24,6 +27,41 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+core_dir="$root/Packages/PulseCore"
+mkdir -p build
+core_log="$root/build/test-core.log"
+core_passed=0
+
+# 核心包测试:全量时必跑;--only 指向核心包里的套件时只跑它,并且不再跑 app 侧。
+run_core() {
+  filter_flag=""
+  [ -n "${1:-}" ] && filter_flag="--filter $1"
+  echo "🧪 swift test(PulseCore)${1:+ --filter $1} — 完整日志: $core_log"
+  # shellcheck disable=SC2086
+  (cd "$core_dir" && swift test $filter_flag) > "$core_log" 2>&1
+  core_status=$?
+  core_passed=$(grep -c "' passed" "$core_log" || true)
+  core_failed=$(grep -c "' failed" "$core_log" || true)
+  echo "   核心包:通过 ${core_passed:-0} · 失败 ${core_failed:-0}"
+  if [ "$core_status" != 0 ]; then
+    echo "❌ 核心包测试失败(退出码 $core_status)— 失败用例:"
+    grep -E "' failed|error:" "$core_log" | head -20
+    echo "   完整日志: $core_log"
+    exit "$core_status"
+  fi
+}
+
+if [ -n "$only" ] && [ "${only#*/}" = "$only" ] && [ -f "$core_dir/Tests/PulseCoreTests/$only.swift" ]; then
+  run_core "$only"
+  if [ "${core_passed:-0}" -eq 0 ]; then
+    echo "❌ 退出码 0 但没有任何用例被执行 — --only 过滤器无匹配" >&2
+    exit 1
+  fi
+  echo "✅ 测试通过(退出码 0)"
+  exit 0
+fi
+[ -z "$only" ] && run_core ""
+
 only_flag=
 if [ -n "$only" ]; then
   case "$only" in
@@ -32,7 +70,6 @@ if [ -n "$only" ]; then
   esac
 fi
 
-mkdir -p build
 log="$root/build/test.log"
 
 echo "🧪 xcodebuild test ${only_flag:-(全部)} — 完整日志: $log"
@@ -53,7 +90,8 @@ echo "── 摘要 ────────────────────
 # "Test Case '-[...]' passed (...)"——"' passed" 锚点两者通吃。
 passed=$(grep -c "' passed" "$log" || true)
 failed=$(grep -c "' failed" "$log" || true)
-echo "   用例:通过 ${passed:-0} · 失败 ${failed:-0}"
+echo "   app 侧:通过 ${passed:-0} · 失败 ${failed:-0}"
+[ -z "$only" ] && echo "   用例:通过 $(( ${passed:-0} + ${core_passed:-0} )) · 失败 ${failed:-0}(核心包 + app)"
 if [ "$status" != 0 ]; then
   echo ""
   echo "❌ 测试失败(退出码 $status)— 失败用例:"

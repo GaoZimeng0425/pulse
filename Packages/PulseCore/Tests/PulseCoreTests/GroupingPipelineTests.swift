@@ -1,5 +1,4 @@
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 采样 → 组卡呈现的粘合逻辑(工单 05):合成快照序列按采样循环的组法

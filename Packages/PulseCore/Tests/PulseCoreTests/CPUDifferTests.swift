@@ -1,5 +1,4 @@
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 接缝:CPU 差分器(纯逻辑)。spec 实现决策——与活动监视器同算法:

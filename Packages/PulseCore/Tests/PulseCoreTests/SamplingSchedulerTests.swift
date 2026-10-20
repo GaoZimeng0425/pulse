@@ -1,5 +1,4 @@
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 接缝:采样节奏决策(纯逻辑)。GLOSSARY:采样节奏 = 弹窗关闭 5s / 打开 1s。

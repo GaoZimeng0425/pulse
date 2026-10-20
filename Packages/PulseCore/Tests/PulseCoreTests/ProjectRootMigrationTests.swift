@@ -1,6 +1,5 @@
 import GRDB
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 改项目根后的历史迁移(arch-review-2026-10-18/03 乙3,用户拍板 2026-10-19:自动迁移,

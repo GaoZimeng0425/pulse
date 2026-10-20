@@ -1,5 +1,4 @@
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 架构审查票 A 高2:模块排行两本账本住心跳循环(Sampler),可见性门控降级为

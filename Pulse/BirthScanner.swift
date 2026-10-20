@@ -28,5 +28,3 @@ struct LiveBirthScanSource: BirthScanSource {
     }
 }
 
-// MARK: - 出生扫描 actor
-

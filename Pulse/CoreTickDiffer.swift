@@ -2,8 +2,6 @@ import Foundation
 import Darwin
 import PulseCore
 
-// MARK: - 每核 tick 统计(评审 S6:系统 CPU 负载的口径修正)
-
 // MARK: - 采集源
 
 /// Darwin 薄适配器:host_processor_info(PROCESSOR_CPU_LOAD_INFO)——每核

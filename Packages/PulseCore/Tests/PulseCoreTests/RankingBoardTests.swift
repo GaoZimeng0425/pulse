@@ -1,5 +1,4 @@
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 模块排行纯值内核(RankingBoard):最新一轮的组 + 三份最新读数 → 按组聚合的排行行。

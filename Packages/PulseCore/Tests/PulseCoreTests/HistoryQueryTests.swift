@@ -1,6 +1,5 @@
 import GRDB
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 历史页查询层(工单 04):真 SQLite(内存库)+ 显式注入时间(spec 测试

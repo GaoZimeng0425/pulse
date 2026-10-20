@@ -58,4 +58,17 @@ if [ "$status" != 0 ]; then
   exit "$status"
 fi
 echo "✅ 构建通过"
+
+# ── 3. 核心包测试编译(arch-review-2026-10-18/05)──
+# app 构建只编核心包的源码,不编它的测试;核心包有改动时补一遍测试编译,免得测试编译不过也能提交。
+if git diff --cached --name-only --diff-filter=ACM -- 'Packages/PulseCore/*.swift' | grep -q .; then
+  core_log="$root/build/precommit-core.log"
+  if ! (cd "$root/Packages/PulseCore" && swift build --build-tests) > "$core_log" 2>&1; then
+    echo "❌ PulseCore 测试编译失败 — 拒绝提交。日志尾 30 行:"
+    tail -30 "$core_log"
+    echo "   完整日志: $core_log"
+    exit 1
+  fi
+  echo "✅ PulseCore 测试编译通过"
+fi
 exit 0

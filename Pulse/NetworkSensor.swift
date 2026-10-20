@@ -30,18 +30,6 @@ import PulseCore
 // 无活口(如 corplink 关 + 本机 en0 死表)保持物理口,down 显示 0 是内核
 // 真相,不伪造。
 
-// MARK: - 计数与读数(纯值)
-
-// MARK: - 速率走势环(纯逻辑)
-
-// MARK: - 接口选择与降级(纯逻辑)
-
-// MARK: - 回包解包(纯逻辑)
-
-// MARK: - 差分三件套(纯逻辑)
-
-// MARK: - 源缝协议(OS 边界,spec 六缝之网络计数源)
-
 // MARK: - Live 源
 
 /// SCDynamicStore 主接口(stats readers.swift:112-117):State:/Network/Global/IPv4

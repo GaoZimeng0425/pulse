@@ -1,6 +1,5 @@
 import GRDB
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 历史库层(工单 03):真 SQLite 断言——文件库 WAL、六张表、迁移幂等、

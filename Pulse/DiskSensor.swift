@@ -14,15 +14,6 @@ import PulseCore
 //   吞吐主路径 = IORegistry 内核账差分,键名 "Bytes (Read)"/"Bytes (Write)",
 //   回退 = rusage 求和 + 30s 低频档(探针③)。
 
-// MARK: - 容量对账(纯逻辑)
-
-
-// MARK: - 本地快照(纯逻辑)
-
-// MARK: - 吞吐差分(纯逻辑)
-
-// MARK: - 源缝协议(OS 边界,spec 六缝之磁盘两源)
-
 // MARK: - sys/attr.h 常量(C 宏不进 Swift,照 SDK 头手抄,探针②同款)
 
 private let ATTR_BIT_MAP_COUNT = 5

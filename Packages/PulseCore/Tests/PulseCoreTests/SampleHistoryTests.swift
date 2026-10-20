@@ -1,5 +1,4 @@
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 接缝:采样历史环形缓冲(工单 P0.6-01,纯逻辑)。

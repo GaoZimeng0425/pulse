@@ -1,5 +1,4 @@
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 榜单内核(架构审查高3,纯函数):组卡榜单 / 模块排行 / 进程表 meter / 归组引擎

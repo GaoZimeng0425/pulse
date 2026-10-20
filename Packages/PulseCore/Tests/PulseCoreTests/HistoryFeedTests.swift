@@ -1,5 +1,4 @@
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 历史喂料纯内核(HistoryFeed):每轮主干上下文 + 两轮之间交付的磁盘吞吐读数 →

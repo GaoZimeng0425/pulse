@@ -1,5 +1,4 @@
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 接缝:Sampler 采样 actor——驱动 ProcessSource(进程明细)与

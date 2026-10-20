@@ -7,16 +7,6 @@ import PulseCore
 // stats(MIT)Modules/Battery/readers.swift(调研 docs/research/
 // sensor-impl-comparison.md §2.3 逐条钉死;依 spec 移植代码纪律注明来源)。
 
-// MARK: - 充电状态(纯逻辑)
-
-// MARK: - 原始读数(OS 边界形状)
-
-// MARK: - 健康度(纯逻辑)
-
-// MARK: - 展示读数(纯逻辑折叠)
-
-// MARK: - 电池源接缝(OS 边界,spec 六缝之电池源)
-
 // MARK: - Live 电池源
 
 /// Darwin 薄适配器:IOPS 三连(IOPSCopyPowerSourcesInfo → List → Description)

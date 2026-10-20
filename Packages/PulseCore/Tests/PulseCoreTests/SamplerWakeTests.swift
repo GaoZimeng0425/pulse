@@ -1,5 +1,4 @@
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 唤醒处理(工单 03,spec 唤醒处理):睡眠唤醒后第一轮差分作废。

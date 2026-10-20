@@ -27,7 +27,3 @@ struct LiveKillService: KillService {
     }
 }
 
-// MARK: - 处置编排(工单 08)
-
-// MARK: - 处置文案(工单 08,纯函数可单测)
-

@@ -1,5 +1,4 @@
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 历史库健康状态沿(arch-review-2026-10-18/03 乙6):落库 / 累计 / 历史页查询共用一面旗,

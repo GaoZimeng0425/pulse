@@ -1,5 +1,4 @@
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// meter 归一化(工单 P0.6-02,纯逻辑):占比条"按当前榜单榜首归一"的取值口径。

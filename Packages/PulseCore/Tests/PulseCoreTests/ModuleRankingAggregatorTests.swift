@@ -1,5 +1,4 @@
 import XCTest
-@testable import Pulse
 @testable import PulseCore
 
 /// 模块排行聚合(工单 01,纯逻辑):每 pid 读数字典 → 按组聚合的排行行。

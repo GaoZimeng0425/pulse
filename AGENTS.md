@@ -38,4 +38,5 @@ UI 的唯一视觉宪法是根目录 `DESIGN.md`(google-labs-code/design.md 格�
 ## 构建与检查
 
 - Xcode 工程由 `project.yml` 生成:加/移文件后先 `xcodegen generate`,绝不手改 `project.pbxproj`。
-- 提交闸门 `.githooks/pre-commit`(staged 含 .swift 即增量构建,失败拦截;改钩子后重跑 `sh .githooks/install.sh`)。全量检查 `sh scripts/check.sh`;只跑测试 `sh scripts/test.sh [--only 套件]`;Release 安装到 /Applications 并换新拉起 `sh scripts/build.sh`。
+- 纯逻辑层在本地 Swift 包 `Packages/PulseCore`(只依赖 Foundation / GRDB,不碰 AppKit / SwiftUI / Darwin 采集调用);Live 适配器、`@Observable` 功能模块与 SwiftUI 在 app target。新纯逻辑写进包里,新测试跟着被测代码走:核心测试放 `Packages/PulseCore/Tests/PulseCoreTests`(`swift test` 不起宿主),Live 冒烟 / SwiftUI / 功能模块薄壳测试放 `PulseTests`。
+- 提交闸门 `.githooks/pre-commit`(staged 含 .swift 即增量构建,核心包有改动再编一遍包测试,失败拦截;改钩子后重跑 `sh .githooks/install.sh`)。全量检查 `sh scripts/check.sh`;只跑测试 `sh scripts/test.sh [--only 套件]`(核心包与 app 两套;套件在核心包就走 `swift test`);Release 安装到 /Applications 并换新拉起 `sh scripts/build.sh`。
