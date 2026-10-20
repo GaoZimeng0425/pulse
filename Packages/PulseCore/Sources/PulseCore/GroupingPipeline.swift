@@ -27,7 +27,8 @@ public struct GroupingPipeline {
     /// 全部组(工单 P0.5-01):最近一轮 update 截取**之前**的完整榜单,
     /// 与 Top 组同序同源——主窗口读这里,弹窗读 update 的返回值。
     public private(set) var allGroups: [ProcessGroup] = []
-    /// 归组配置:`projectRoots` 允许热更新(setProjectRoots,工单 07),其余构造时定型。
+    /// 归组配置:`projectRoots`(setProjectRoots,工单 07)与 `launchdServiceExecutablePaths`
+    /// (setLaunchdServiceExecutablePaths,launchd-attribution/01)允许热更新,其余构造时定型。
     public private(set) var configuration: GroupingConfiguration
     public let displayLimit: Int
 
@@ -44,6 +45,12 @@ public struct GroupingPipeline {
     /// 热更新行为单测见 GroupingPipelineTests"项目根热更新"用例。
     public mutating func setProjectRoots(_ roots: [String]) {
         configuration.projectRoots = roots
+    }
+
+    /// 更新 launchd 服务清单(launchd-attribution/01):低频传感器每次交付整份替换,
+    /// 下一轮 update 即以新清单判定后台服务;空集 = 只剩静态 launchd 域。
+    public mutating func setLaunchdServiceExecutablePaths(_ paths: Set<String>) {
+        configuration.launchdServiceExecutablePaths = paths
     }
 
     /// 并入出生扫描器(BirthScanner)在外部登记的出生(评审 S1):只补缺,

@@ -69,6 +69,12 @@ public struct RoundSpine {
         pipeline.setProjectRoots(roots)
     }
 
+    /// 更新 launchd 服务清单(launchd-attribution/01):清单模块每次交付整份替换,下一次
+    /// advance 即以新清单判定后台服务;空集 = 只剩静态 launchd 域。
+    public mutating func setLaunchdServiceExecutablePaths(_ paths: Set<String>) {
+        pipeline.setLaunchdServiceExecutablePaths(paths)
+    }
+
     /// 推进一轮:并入暂存的扫描登记 → 本轮快照兜底登记出生 → 归组(全部组)
     /// → 同轮构建下钻。
     public mutating func advance(_ update: SamplingUpdate) -> RoundContext {
@@ -115,6 +121,9 @@ public struct MonitorVisibility: Equatable, Sendable {
 public struct MonitorHost {
     /// 叠加历史库回灌的出生登记进主干(RoundSpine.restoreBirths)。
     public let restoreBirths: (LineageRegistry) -> Void
+    /// 整份替换主干归组配置里的 launchd 服务清单(RoundSpine.setLaunchdServiceExecutablePaths,
+    /// launchd-attribution/01):清单模块低频交付,下一轮归组生效。
+    public let setLaunchdServiceExecutablePaths: (Set<String>) -> Void
     /// 心跳排行账本门控(Sampler.setRankingsActive):宿主给每条消息编代号,
     /// 迟到的旧消息在 Sampler 侧丢弃。
     public let setRankingsActive: (Bool) -> Void
@@ -124,16 +133,19 @@ public struct MonitorHost {
     /// 全不接线的宿主(单测直驱模块用)。
     public static let inert = MonitorHost(
         restoreBirths: { _ in },
+        setLaunchdServiceExecutablePaths: { _ in },
         setRankingsActive: { _ in },
         broadcast: { _ in }
     )
 
     public init(
         restoreBirths: @escaping (LineageRegistry) -> Void,
+        setLaunchdServiceExecutablePaths: @escaping (Set<String>) -> Void,
         setRankingsActive: @escaping (Bool) -> Void,
         broadcast: @escaping (FeatureEvent) -> Void
     ) {
         self.restoreBirths = restoreBirths
+        self.setLaunchdServiceExecutablePaths = setLaunchdServiceExecutablePaths
         self.setRankingsActive = setRankingsActive
         self.broadcast = broadcast
     }

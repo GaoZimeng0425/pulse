@@ -102,9 +102,10 @@ public struct ProcessGroup: Identifiable, Equatable, Sendable {
 
 // MARK: - 配置
 
-/// 归组配置:项目根列表 + 系统可执行文件名单 + bundle 显示名解析。
+/// 归组配置:项目根列表 + 系统可执行文件名单 + launchd 服务清单 + bundle 显示名解析。
 /// 全部为调用方注入的纯数据/纯函数——引擎不读磁盘:
-/// CFBundleName 由 UI 层注入读取器(工单 05),缺省退化为 bundle 目录名去掉 .app 后缀。
+/// CFBundleName 由 UI 层注入读取器(工单 05),缺省退化为 bundle 目录名去掉 .app 后缀;
+/// launchd 服务清单由 app 侧低频传感器扫 plist 后整份注入(launchd-attribution/01)。
 ///
 /// 项目归因不设可执行名门槛(评审 S4):到达项目归因层(未先被 App 归属)
 /// 的进程,只要 cwd / argv 路径命中项目根即归项目——zig / bazel 等"名单外"
@@ -116,16 +117,22 @@ public struct GroupingConfiguration: Sendable {
     /// 优先于 App 归属判定(WindowServer 自身路径就在 .app bundle 里),
     /// 且系统归属不可被子进程继承——launchd 的孩子们仍按自己的链路归组。
     public var systemExecutableNames: Set<String>
+    /// launchd 服务清单(GLOSSARY,launchd-attribution/01 / ADR-0005):本机 launchd 各标准
+    /// plist 目录声明的服务程序路径集合(字面路径与其 realpath 并存),兜底分类时与静态
+    /// launchd 域并列判定后台服务。缺省空集 ⇒ 行为与引入前逐位一致(只剩静态域)。
+    public var launchdServiceExecutablePaths: Set<String>
     /// bundle 显示名解析器:输入 .app 目录路径,返回 CFBundleName;返回 nil 则用目录名推导。
     public var bundleDisplayName: @Sendable (_ bundleDirectory: String) -> String?
 
     public init(
         projectRoots: [String] = [],
         systemExecutableNames: Set<String> = GroupingConfiguration.defaultSystemExecutableNames,
+        launchdServiceExecutablePaths: Set<String> = [],
         bundleDisplayName: @escaping @Sendable (String) -> String? = { _ in nil }
     ) {
         self.projectRoots = projectRoots
         self.systemExecutableNames = systemExecutableNames
+        self.launchdServiceExecutablePaths = launchdServiceExecutablePaths
         self.bundleDisplayName = bundleDisplayName
     }
 
@@ -153,9 +160,10 @@ public struct GroupingConfiguration: Sendable {
 /// 3. 父链上溯——非 bundle、无项目归因的进程沿活 ppid 链向上找有归属的祖先;
 ///    断链(中间父进程已死 / 被重挂到 launchd)时回查出生登记的父链;
 /// 4. 兜底三分类——系统(知名系统进程,优先于第 1 步)/ 后台服务(launchd 域
-///    推断:出生或现挂在 launchd 之下,且可执行位于 launchd 域,
-///    见 `isLaunchdDomainExecutablePath`)/ 孤儿进程(其余断链者——含
-///    父为 launchd 但可执行不在域内、且无归属可继承的进程,评审 S3)。
+///    推断:出生或现挂在 launchd 之下,且可执行位于 launchd 域——见
+///    `isLaunchdDomainExecutablePath`——或命中配置注入的 launchd 服务清单,
+///    launchd-attribution/01)/ 孤儿进程(其余断链者——含父为 launchd 但可执行
+///    既不在域内也不在清单里、且无归属可继承的进程,评审 S3)。
 ///
 /// CPU 接缝:进程 CPU% 由工单 04 的差分器从相邻快照算出后按 pid 传入;
 /// 引擎只做求和,不接触时间。缺失条目按 0 计。
@@ -248,7 +256,9 @@ public enum GroupingEngine {
     /// 守护(logd/configd/securityd…)全被误成孤儿进程,孤儿桶因此虚胖。
     /// 仍不算域:/usr/bin(用户一次性命令 ssh/python3 不该读成后台服务)、
     /// /usr/local、/opt/homebrew(自装常驻——S3 的本意就是不并它们)。
-    /// 判定只有这一份;P1 可升级为真实读取 launchd 任务清单。
+    /// 本谓词保持纯静态前缀,判定只有这一份;驻地非标准但确实在 launchd 注册的
+    /// 第三方守护由 launchd 服务清单(`GroupingConfiguration.launchdServiceExecutablePaths`,
+    /// launchd-attribution/01 / ADR-0005)在兜底分类处与本谓词并列兜住,不并进这里。
     public static func isLaunchdDomainExecutablePath(_ executablePath: String?) -> Bool {
         guard let path = executablePath, !path.isEmpty else { return false }
         if path.hasPrefix("/Library/LaunchAgents/")
@@ -378,8 +388,9 @@ private final class Resolver {
             return attribution
         }
         // 三层全部落空 → 兜底三分类(评审 S3):后台服务 = 挂在 launchd 之下
-        // (出生时或现在)且可执行位于 launchd 域;其余——含父为 launchd 但
-        // 可执行不在域内的重启后无名者——一律孤儿进程。
+        // (出生时或现在)且可执行位于 launchd 域或命中 launchd 服务清单
+        // (launchd-attribution/01);其余——含父为 launchd 但可执行既不在域内也不在
+        // 清单里的重启后无名者——一律孤儿进程。
         let birth = lineage.entries[process.pid]
         let underLaunchd: Bool
         let domainCandidatePath: String?
@@ -392,9 +403,18 @@ private final class Resolver {
             underLaunchd = resolution.reachedLiveLaunchd
             domainCandidatePath = process.executablePath
         }
-        return underLaunchd && GroupingEngine.isLaunchdDomainExecutablePath(domainCandidatePath)
+        return underLaunchd && isLaunchdServiceExecutable(domainCandidatePath)
             ? .backgroundServiceGroup
             : .orphanGroup
+    }
+
+    /// 后台服务的可执行判据(兜底分类的条件 b):静态 launchd 域,或命中注入的
+    /// launchd 服务清单(全等匹配;字面与 realpath 两种形态都已在清单里,引擎不解
+    /// 符号链接——那是 IO,ADR-0005)。清单为空集时与引入前逐位一致。
+    private func isLaunchdServiceExecutable(_ executablePath: String?) -> Bool {
+        if GroupingEngine.isLaunchdDomainExecutablePath(executablePath) { return true }
+        guard let executablePath else { return false }
+        return configuration.launchdServiceExecutablePaths.contains(executablePath)
     }
 
     // MARK: 三层归属:自身 → 活链 → 登记链
