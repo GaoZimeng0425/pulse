@@ -122,6 +122,7 @@
 		D4C390E861801BEB0B50B02A /* SampleHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30D9403FA7D11E59957A5230 /* SampleHistory.swift */; };
 		D59097C6CBF4D30B09091C87 /* SamplerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CB6B4D9A1C6B08A03143AD4 /* SamplerTests.swift */; };
 		D5AA794883DCD0EC21D3F304 /* LogService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643570A1AA82643F686AB57B /* LogService.swift */; };
+		D89BE77424B91E56B9FF1441 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0EEF346D1A5F99B6D75474EC /* Assets.xcassets */; };
 		D9434C4C35D7823C01826B81 /* GroupingPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5770D8A3B1DB2980B7B412C /* GroupingPipeline.swift */; };
 		DD3ED5175C10C598BB5E5025 /* RankingsFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EBD25E93A82EAAC47EE079E /* RankingsFeature.swift */; };
 		DE7D6CED82B14BE22E71050D /* HostInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9545FA1A4A41049807AFF603 /* HostInfo.swift */; };
@@ -176,6 +177,7 @@
 		0C824BEE522DE5FC8ACD3DC2 /* GroupIdentityKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupIdentityKey.swift; sourceTree = "<group>"; };
 		0E0B00C3A04A033EC99B74ED /* NettopSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NettopSource.swift; sourceTree = "<group>"; };
 		0EEBE923D7AD04F0AA114D2F /* KillService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KillService.swift; sourceTree = "<group>"; };
+		0EEF346D1A5F99B6D75474EC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		135674B4363F7A3923D5D6C1 /* DrilldownStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrilldownStateTests.swift; sourceTree = "<group>"; };
 		13FEF2D2118D74C3572DF349 /* Pulse.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Pulse.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		157B382FB4BC0949D81F02BD /* CoreTickDifferTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreTickDifferTests.swift; sourceTree = "<group>"; };
@@ -330,6 +332,7 @@
 				6D856FCC0E38180520B7A65E /* AlertSettingsStore.swift */,
 				3B54C03EEBCD8FC451ACA5DE /* AlertSettingsView.swift */,
 				0B8459DB0A39033C489E0785 /* AlertViews.swift */,
+				0EEF346D1A5F99B6D75474EC /* Assets.xcassets */,
 				6EBE418CA66BE407AD92BB9C /* BatterySensor.swift */,
 				C63C1ECC09721E8533BE5DAA /* BirthScanner.swift */,
 				AFC9AB4EF78C90578BF978B2 /* BundleDisplayNameReader.swift */,
@@ -520,6 +523,7 @@
 			buildConfigurationList = 9608D96881FD5C17BB380FA0 /* Build configuration list for PBXNativeTarget "Pulse" */;
 			buildPhases = (
 				D70CFAE236269B6E146109F4 /* Sources */,
+				606EBA1EB03BF3A2D7674713 /* Resources */,
 				1C9078D005D61D91A0E0C7F8 /* Frameworks */,
 			);
 			buildRules = (
@@ -573,6 +577,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		606EBA1EB03BF3A2D7674713 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D89BE77424B91E56B9FF1441 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		8B00C375CD98515701D2325C /* Sources */ = {

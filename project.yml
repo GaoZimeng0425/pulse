@@ -29,6 +29,9 @@ targets:
       base:
         PRODUCT_NAME: Pulse
         PRODUCT_BUNDLE_IDENTIFIER: com.gaozimeng.pulse
+        # 图标源 = Pulse/Assets.xcassets/AppIcon.appiconset,由 scripts/render-app-icon.swift
+        # 生成;改图标改脚本重跑,不手工替换 png。
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSUIElement: YES
         ENABLE_APP_SANDBOX: NO
