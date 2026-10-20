@@ -46,21 +46,15 @@ extension HistoryEngine {
 /// 交付的磁盘吞吐读数进账本;每轮主干上下文到来时,连同账本整笔折成一份落库入参
 /// 并清账。网络增量随心跳同轮到达(`context.update.network`),不进账本。
 ///
-/// 磁盘记账恰好一次(arch-review-2026-10-18 甲5):吞吐 driver 读失败时重投**上次好值**——同一个
-/// 读数值(`snapshot() ?? lastGood`)。内核记住最近记过的读数,与之相等即视为重投、
-/// 不再记账;不相等即新数据,增量累加。契约在此显式成立并有单测钉住,不再依赖
-/// 展示层的去重。已知边界:两份新读数逐字段全等(速率、走势窗、增量都相同)会被
-/// 当作重投——真 driver 每份新读数都追加走势点,实际不会发生。
+/// 磁盘记账恰好一次(arch-review-2026-10-18 甲5):吞吐 driver 读失败时重投**上次
+/// 好值**,交付带新鲜度标记(SensorDelivery)——只记 `.fresh`,`.stale` 跳过。新鲜度
+/// 看标记不看值:两份逐字段全等的新读数也各记一次。
 struct HistoryFeed: Sendable {
     private var pendingDiskReadBytes: UInt64 = 0
     private var pendingDiskWriteBytes: UInt64 = 0
-    /// 最近记过账的读数(清账后保留:清账之后的重投同样不再记)。
-    private var lastDiskReading: DiskThroughputReading?
-
-    /// 磁盘吞吐读数进账本:新读数的增量逐笔 &+ 累计;重投的同一读数跳过。
-    mutating func recordDiskThroughput(_ reading: DiskThroughputReading) {
-        guard reading != lastDiskReading else { return }
-        lastDiskReading = reading
+    /// 磁盘吞吐交付进账本:新读数的增量逐笔 &+ 累计;重投的上次好值跳过。
+    mutating func recordDiskThroughput(_ delivery: SensorDelivery<DiskThroughputReading>) {
+        guard case .fresh(let reading) = delivery else { return }
         pendingDiskReadBytes &+= reading.readBytesDelta
         pendingDiskWriteBytes &+= reading.writeBytesDelta
     }

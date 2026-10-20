@@ -100,14 +100,43 @@ struct SensorDriver: Sendable {
     let wakeups: (@Sendable () -> AsyncStream<Void>?)?
 }
 
+/// 一次交付的新鲜度:读成功的新读数,或读失败时重投的上次好值。只显示的消费方
+/// 不必区分(`driver`);记账类消费方据此只记新读数(`markedDriver`)。
+enum SensorDelivery<Reading: Sendable>: Sendable {
+    case fresh(Reading)
+    case stale(Reading)
+
+    var reading: Reading {
+        switch self {
+        case .fresh(let reading), .stale(let reading): reading
+        }
+    }
+
+    var isFresh: Bool {
+        if case .fresh = self { return true }
+        return false
+    }
+}
+
+extension SensorDelivery: Equatable where Reading: Equatable {}
+
 extension SensorProvider {
     /// 把 provider 折叠成调度登记项;deliver 在调度上下文被调用,
     /// 消费方自行跳回 MainActor(SystemMonitor 同款粘合)。
     func driver(deliver: @escaping @Sendable (Reading?) -> Void) -> SensorDriver {
+        markedDriver { deliver($0?.reading) }
+    }
+
+    /// 同 `driver`,但交付带新鲜度标记:读成功 = `.fresh`,读失败重投上次好值 =
+    /// `.stale`,两者皆无 = nil。
+    func markedDriver(deliver: @escaping @Sendable (SensorDelivery<Reading>?) -> Void) -> SensorDriver {
         let provider = self
         let tick: @Sendable () async -> Void = {
-            let reading = await provider.snapshot() ?? provider.lastGood
-            await deliver(reading)
+            if let reading = await provider.snapshot() {
+                deliver(.fresh(reading))
+            } else {
+                deliver(provider.lastGood.map(SensorDelivery.stale))
+            }
         }
         var wakeups: (@Sendable () -> AsyncStream<Void>?)? = nil
         if cadence == .onEvent {

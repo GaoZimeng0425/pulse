@@ -38,7 +38,7 @@ struct MainWindowView: View {
         // 窗口新建/重建时先取路由落点(点通知时窗口可能还没开)。
         _tabSelection = State(initialValue: MetricTabSelection(
             current: alertRouter?.pendingTab ?? initialTab,
-            axis: MetricTab.displayAxis(hasBattery: monitor.hasBattery)
+            axis: MetricTab.displayAxis(hasBattery: monitor.battery.hasBattery)
         ))
     }
 
@@ -55,7 +55,7 @@ struct MainWindowView: View {
             .padding(.bottom, 24)
         }
         // 首次电池读数落地 → 电池页入轴(工单 02);被隐藏的当前 tab 回落总览。
-        .onChange(of: monitor.hasBattery) { _, hasBattery in
+        .onChange(of: monitor.battery.hasBattery) { _, hasBattery in
             tabSelection.setAxis(MetricTab.displayAxis(hasBattery: hasBattery))
         }
         // 模块排行采样闸(工单 01):主窗口停在电池/磁盘/网络页才开闸,切走或
@@ -209,7 +209,7 @@ struct MainWindowView: View {
                 MetricCardView(model: model.memoryModel) { tabSelection.current = .memory }
                 MetricCardView(model: model.diskModel) { tabSelection.current = .disk }
                 MetricCardView(model: model.networkModel) { tabSelection.current = .network }
-                if monitor.hasBattery {
+                if monitor.battery.hasBattery {
                     MetricCardView(model: model.batteryModel) { tabSelection.current = .battery }
                 }
             }
@@ -226,8 +226,8 @@ struct MainWindowView: View {
                 .padding(.top, 6)
             // dev server 卡(工单 08):主窗口总览页专属(popover 不放,工单拍板);
             // 全部停止只上抛请求,确认对话框(KillRequestFlow 关口)把关后才发信号。
-            DevServerCardView(servers: monitor.devServers) {
-                model.requestStopAllDevServers(monitor.devServers)
+            DevServerCardView(servers: monitor.devServers.servers) {
+                model.requestStopAllDevServers(monitor.devServers.servers)
             }
         case .cpu:
             MetricMainCardView(model: model.cpuModel)
@@ -255,8 +255,8 @@ struct MainWindowView: View {
             // 读写最多排行(工单 01):各卷明细/快照之下,每进程 rusage 速率归组。
             MetricMainCardView(model: model.diskModel)
             HStack(alignment: .top, spacing: 16) {
-                DiskVolumeBreakdownView(capacity: monitor.diskCapacity)
-                DiskSnapshotsCardView(listing: monitor.diskCapacity?.snapshots)
+                DiskVolumeBreakdownView(capacity: monitor.disk.capacity)
+                DiskSnapshotsCardView(listing: monitor.disk.capacity?.snapshots)
             }
             ModuleRankingCardView(
                 title: "读写最多",

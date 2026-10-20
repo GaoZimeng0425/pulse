@@ -373,6 +373,34 @@ final class DiskSensorTests: XCTestCase {
         XCTAssertNotNil(provider.lastGood)
     }
 
+    func testMarkedDriverTellsFreshReadingsFromLastGoodRedelivery() async {
+        // 读成功 → 新读数(fresh);读失败 → 重投上次好值并标 stale——磁盘记账据此
+        // 只记 fresh,恰好一次不再靠读数逐字段比较(arch-review-2026-10-18 甲5)。
+        let provider = DiskThroughputProvider(source: ScriptedThroughputSource([
+            counters(read: 0, write: 0, uptime: 1_000_000_000),
+            counters(read: 900, write: 300, uptime: 2_000_000_000),
+            nil,
+        ]))
+        let box = MarkedDeliveryBox()
+        let driver = provider.markedDriver { box.append($0) }
+        await driver.tick()
+        await driver.tick()
+        await driver.tick()
+
+        let deliveries = box.deliveries
+        XCTAssertEqual(deliveries.map { $0?.isFresh }, [true, true, false])
+        XCTAssertEqual(deliveries[2]?.reading, deliveries[1]?.reading, "stale = 上次好值原样")
+    }
+
+    func testMarkedDriverDeliversNilWhenThereWasNeverAGoodReading() async {
+        let provider = DiskThroughputProvider(source: NilThroughputSource(cadenceSeconds: 5))
+        let box = MarkedDeliveryBox()
+        await provider.markedDriver { box.append($0) }.tick()
+
+        XCTAssertEqual(box.deliveries.count, 1)
+        XCTAssertNil(box.deliveries[0])
+    }
+
     // MARK: - 格式化(Finder 同刻对照的口径基础)
 
     func testDiskCapacityFormatsDecimalGigabytes() {
@@ -405,6 +433,22 @@ final class DiskSensorTests: XCTestCase {
 }
 
 // MARK: - 测试替身
+
+/// 标记交付收件箱(调度上下文写、测试读)。
+private final class MarkedDeliveryBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: [SensorDelivery<DiskThroughputReading>?] = []
+
+    func append(_ delivery: SensorDelivery<DiskThroughputReading>?) {
+        lock.lock(); defer { lock.unlock() }
+        stored.append(delivery)
+    }
+
+    var deliveries: [SensorDelivery<DiskThroughputReading>?] {
+        lock.lock(); defer { lock.unlock() }
+        return stored
+    }
+}
 
 /// 恒 nil 容量源(节奏断言用)。
 private struct NilCapacitySource: DiskCapacitySource {

@@ -52,7 +52,7 @@ final class AlertCenter {
         }
     }
 
-    // MARK: - 喂食(SystemMonitor 每轮调用)
+    // MARK: - 喂食(功能模块钩子调用,见文末 MonitorFeature 扩展)
 
     func ingestSampling(systemCPULoad: Double, groups: [AlertGroupSnapshot]) {
         let events = engine.record(
@@ -192,6 +192,53 @@ final class AlertCenter {
             let status = await self.recordStatus(resendingExcept: Set(batch.map(\.identifier)))
             guard status == .authorized else { return }
             for payload in batch { await sender.send(payload) }
+        }
+    }
+}
+
+// MARK: - 功能模块(ADR-0003 MonitorFeature)
+
+/// 告警模块(工单 p1-history/07):AlertCenter 即薄壳、AlertEngine 即纯内核(其余
+/// 功能模块照此样板)。喂食全部经扩展点到达——每轮心跳喂系统负载与全部组;磁盘容量
+/// 与 dev server 盘点经其他模块的广播喂进来。引擎只读聚合口径,不持快照。
+extension AlertCenter: MonitorFeature {
+    func onRound(_ context: RoundContext) {
+        ingestSampling(
+            systemCPULoad: context.update.systemCPULoad,
+            groups: context.groups.map { group in
+                AlertGroupSnapshot(
+                    id: group.id,
+                    name: group.name,
+                    cpuPercent: group.cpuPercent,
+                    memoryBytes: group.memoryBytes
+                )
+            }
+        )
+    }
+
+    /// 磁盘剩余规则吃 Finder「可用」口径(读不到不喂,不伪造);dev server 只喂已
+    /// 闲置的(未闲置 = idleSeconds 为 nil)。
+    func onEvent(_ event: FeatureEvent) {
+        switch event {
+        case .diskCapacity(let reading):
+            if let available = reading.availableForImportantUsageBytes {
+                ingestDisk(availableBytes: available)
+            }
+        case .devServers(let servers):
+            ingestDevServers(servers.compactMap { server in
+                server.idleSeconds.map {
+                    AlertDevServerSnapshot(pid: server.pid, name: server.displayName, idleSeconds: $0)
+                }
+            })
+        case .diskThroughput:
+            break
+        }
+    }
+
+    /// 通知授权:启动现查;规则开着而系统还没问过则补一次请求。
+    func start(_ host: MonitorHost) {
+        Task { [weak self] in
+            await self?.refreshAuthorization()
         }
     }
 }

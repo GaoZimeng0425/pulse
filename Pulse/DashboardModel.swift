@@ -48,23 +48,23 @@ final class DashboardModel {
     /// 电池卡(工单 02):六项读数读 monitor.battery(lastGood 语义——读失败
     /// 不回退为 nil);未首读/无电池机器的占位模型只在轴内不会出现,仍给全占位兜底。
     var batteryModel: MetricCardModel {
-        .battery(monitor.battery)
+        .battery(monitor.battery.reading)
     }
 
     /// 磁盘卡(工单 05):容量对账 + 可清除 + 各卷 + 快照读容量 provider,
     /// 读写速率与走势读吞吐 provider——两个 provider 两条节奏,卡模型在此合流;
     /// 容量未首读时全占位(MetricCardModel.disk 兜底)。
     var diskModel: MetricCardModel {
-        .disk(capacity: monitor.diskCapacity, throughput: monitor.diskThroughput)
+        .disk(capacity: monitor.disk.capacity, throughput: monitor.disk.throughput)
     }
 
-    /// 网络卡(工单 06):实时速率读心跳差分(monitor.network,LastGood),
+    /// 网络卡(工单 06):实时速率读心跳差分(monitor.network.reading,LastGood),
     /// Today/7 天累计读历史库聚合(monitor.history.networkTotals),走势 = 速率环;
     /// 未首读时全占位(MetricCardModel.network 兜底)。
     var networkModel: MetricCardModel {
         .network(
-            reading: monitor.network,
-            trend: monitor.networkTrend.totalBytesPerSecond,
+            reading: monitor.network.reading,
+            trend: monitor.network.trend.totalBytesPerSecond,
             totals: monitor.history.networkTotals
         )
     }

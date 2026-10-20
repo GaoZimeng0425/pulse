@@ -3,8 +3,8 @@ import Observation
 
 /// 历史功能模块(工单 p1-history/03、04、06 的历史管线,ADR-0003 功能模块):@Observable 薄壳 +
 /// 纯值内核 HistoryFeed(AlertCenter + AlertEngine 同款样板)。经 SystemMonitor
-/// 注册表组装:每轮 onRound 折一笔落库入参;磁盘吞吐读数经 diskThroughputDelivered
-/// 钩子送达;视图直读本模块的 `networkTotals` 与 `series`。
+/// 注册表组装:每轮 onRound 折一笔落库入参;磁盘吞吐交付经磁盘模块的广播
+/// (FeatureEvent.diskThroughput)送达;视图直读本模块的 `networkTotals` 与 `series`。
 ///
 /// - 串行写入(arch-review-2026-10-18 乙7):start 建一条 AsyncStream + 唯一的长寿消费者;每轮
 ///   入参按轮次顺序入流,消费者逐笔 await 落库、再读回累计发布——落库严格按轮次
@@ -66,11 +66,11 @@ final class HistoryFeature: MonitorFeature {
 
     // MARK: - 输入与查询
 
-    /// 磁盘吞吐读数(每份交付都送达,含重投的上次好值):恰好一次记账由内核负责
-    /// ——driver 重投的同一读数不再记。引擎缺席不记账。
-    func diskThroughputDelivered(_ reading: DiskThroughputReading) {
-        guard engine != nil else { return }
-        feed.recordDiskThroughput(reading)
+    /// 磁盘吞吐交付(磁盘模块广播,含标 stale 的重投):恰好一次记账由内核负责
+    /// ——只记 fresh。引擎缺席不记账。
+    func onEvent(_ event: FeatureEvent) {
+        guard engine != nil, case .diskThroughput(let delivery) = event else { return }
+        feed.recordDiskThroughput(delivery)
     }
 
     /// 历史页查询(工单 p1-history/04):SQL 全在引擎 actor 上执行(后台队列不掉帧,spec User

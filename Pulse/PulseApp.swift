@@ -144,8 +144,8 @@ struct MenuBarLoadLabel: View {
             data: MenuBarBadgeData(
                 cpuLoadPercent: monitor.systemCPULoad,
                 memory: monitor.memory,
-                diskAvailableBytes: monitor.diskCapacity?.availableForImportantUsageBytes,
-                networkRate: monitor.network?.rates
+                diskAvailableBytes: monitor.disk.capacity?.availableForImportantUsageBytes,
+                networkRate: monitor.network.reading?.rates
             )
         )
         Image(
