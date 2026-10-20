@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import PulseCore
 
 // MARK: - 排行列表通用组件(2026-10-20 用户拍板:各 tab 的排序列表一个样)
 //

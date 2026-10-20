@@ -1,6 +1,7 @@
 import GRDB
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 历史引擎(工单 03):真 SQLite(内存/临时目录库)+ 显式注入时间,
 /// 断言分钟卷积行数与数值、小时二级卷积、按日留存、出生登记持久化与

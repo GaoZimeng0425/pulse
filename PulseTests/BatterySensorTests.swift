@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 工单 02 电池卡:缝上纯逻辑(健康度回退链 / NotChargingReason 映射 /
 /// 除零防护 / 功率)合成夹具单测,事件挂接与通知只做冒烟(spec 测试决策)。

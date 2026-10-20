@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 接缝:出生扫描(评审 S1,spec"每 2s 扫描新出现的 pid")——
 /// 独立于采样节奏的登记来源。时钟与睡眠注入假实现(与 SamplerTests 同法),

@@ -1,4 +1,5 @@
 import SwiftUI
+import PulseCore
 
 /// 设置窗外壳(2026-10-16,形态参考 NemoNotch 的 SettingsView / 系统设置):
 /// `NavigationSplitView` 双栏——左侧分组列表 + 系统设置风格彩色渐变图标,

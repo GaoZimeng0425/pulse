@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 接缝(工单 11:诊断报告一键复制):
 /// - `SamplingStats` 采样累计统计(纯值类型, Sampler 每轮推进);

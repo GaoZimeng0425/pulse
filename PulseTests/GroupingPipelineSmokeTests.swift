@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 真机冒烟(工单 05):两轮 Live 采集 → 差分 → 归组,弹窗首屏数据路径的
 /// 真实可用性。与 LiveProcessSourceSmokeTests 同一决策口径:证明可用,不深测。

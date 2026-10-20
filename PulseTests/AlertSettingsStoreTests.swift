@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 接缝:告警规则配置持久层(UserDefaults 注入独立 suite,ProjectRootsStore 同款)。
 /// 钉死:预设默认值、编解码往返、缺项/坏数据回落预设、改动即写即生效、

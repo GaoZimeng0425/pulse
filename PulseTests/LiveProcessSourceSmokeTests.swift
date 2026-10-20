@@ -1,6 +1,7 @@
 import XCTest
 import Darwin
 @testable import Pulse
+@testable import PulseCore
 
 /// 接缝:LiveProcessSource 冒烟测试(spec 测试决策:探针已验证的部分不重复深测,
 /// 只证明采集在本机真实可用、降级路径安全、耗时毫秒级)。

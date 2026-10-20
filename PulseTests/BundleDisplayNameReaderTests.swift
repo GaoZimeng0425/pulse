@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// bundle 显示名读取器(工单 05 注入归组配置的 CFBundleName 读取实现):
 /// 读 `<bundle>/Contents/Info.plist`,按路径缓存,读不到退化为 nil

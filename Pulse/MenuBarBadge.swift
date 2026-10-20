@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import PulseCore
 
 // 菜单栏徽标可配置(工单 09):槽位配置、配置 → 渲染输入的纯函数映射、
 // 参数化位图渲染器。渲染先例的血泪教训沿用——MenuBarExtra 的 label 里

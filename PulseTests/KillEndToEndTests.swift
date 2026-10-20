@@ -1,6 +1,7 @@
 import XCTest
 import Darwin
 @testable import Pulse
+@testable import PulseCore
 
 /// 端到端(工单 08 验收锚点):自造一个真实 sleep 进程组(一个 zsh 宿主 +
 /// 3 个 sleep 300 子进程),走**完全真实的代码路径**——LiveProcessSource 采样

@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import PulseCore
 
 // MARK: - 应用排行卡(工单 P0.6-05,参考文档 §2.3 应用排行卡 / OG "Busiest Right Now")
 

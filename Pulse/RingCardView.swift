@@ -1,6 +1,7 @@
 import SwiftUI
 import Charts
 import AppKit
+import PulseCore
 
 // MARK: - 环形卡(工单 P0.6-05,参考文档 §2.2 "Right Now" / §3-4 donut)
 

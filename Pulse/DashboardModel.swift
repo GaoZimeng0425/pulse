@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import PulseCore
 
 // MARK: - 弹窗与主窗口共用呈现模型(工单 P0.6-05,评审 F4 去重)
 

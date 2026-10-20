@@ -1,4 +1,5 @@
 import SwiftUI
+import PulseCore
 
 /// 告警设置页(工单 P1-07):五条预设规则逐条开关、阈值可改,改动即时生效
 /// 并持久(AlertSettingsStore 直写;引擎下轮喂食即按新配置评估)。授权时序

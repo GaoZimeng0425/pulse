@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import PulseCore
 
 /// 弹窗主页(工单 P0.6-05 对齐 OG 左图):图标 tab → "页名 / 已运行时长" 头 →
 /// 各 tab 内容(与主窗口同一份 MetricTabStack,紧凑档)→ 底部操作排(打开主窗口 +

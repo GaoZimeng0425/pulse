@@ -1,6 +1,7 @@
 import AppKit
 import CocoaLumberjackSwift
 import Foundation
+import PulseCore
 
 /// 日志门面(2026-10-16,流程参考 NemoNotch):CocoaLumberjack 双通道——
 /// 控制台(桥系统统一日志)+ 文件(`~/.Pulse/logs/`)。用法与 NemoNotch 同形:
@@ -69,6 +70,16 @@ final class LogService {
             queue: nil
         ) { _ in
             LogService.info("Pulse 退出", category: "App")
+        }
+
+        // 核心层(PulseCore)的日志出口接到这里:历史库、传感器调度器等的日志照常进同一份
+        // 文件日志(arch-review-2026-10-18/05)。
+        CoreLog.install { level, message, category in
+            switch level {
+            case .info: LogService.info(message, category: category)
+            case .warn: LogService.warn(message, category: category)
+            case .error: LogService.error(message, category: category)
+            }
         }
     }
 }

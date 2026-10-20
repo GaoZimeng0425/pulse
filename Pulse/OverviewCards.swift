@@ -1,4 +1,5 @@
 import SwiftUI
+import PulseCore
 
 // MARK: - 总览指标卡(工单 P0.6-05,参考文档 §2.2 / OG 左图)
 

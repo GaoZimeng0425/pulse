@@ -1,4 +1,5 @@
 import SwiftUI
+import PulseCore
 
 // MARK: - 卡片家族共用零件(arch-review-2026-10-18/02 中4)
 //

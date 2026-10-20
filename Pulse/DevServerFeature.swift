@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import PulseCore
 
 /// dev server 功能模块(工单 p1-history/08;ADR-0003 MonitorFeature):薄壳 + 纯值
 /// 内核 DevServerFinder(argv 分类 + 闲置环 + 端口扫描走缝,单测见

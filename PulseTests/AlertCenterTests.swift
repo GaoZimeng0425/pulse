@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 接缝:AlertCenter 编排(注入假 sender 与时钟)。钉死工单的授权时序与降级:
 /// 授权以系统三态为准(没问过 / 已拒绝 / 已授权)——有规则开着而系统没问过

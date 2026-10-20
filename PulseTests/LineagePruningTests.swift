@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 出生登记修剪(arch-review-2026-10-18/04):登记表只留「还在的进程 + 它们父链上的
 /// 全部祖先」——断链归组靠的正是已死祖先(cargo)的记录;其余死进程的记录丢掉,登记表

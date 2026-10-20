@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 归组引擎(工单 03):三层归属 + 兜底三分类,全部以合成进程树为夹具(spec 测试决策)。
 /// 断言只看外部行为——"这棵树归出这些组";期望值全部为独立字面量,不经实现同源计算。

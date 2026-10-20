@@ -1,4 +1,5 @@
 import SwiftUI
+import PulseCore
 
 // MARK: - strip 微柱走势图(工单 P0.6-01)
 

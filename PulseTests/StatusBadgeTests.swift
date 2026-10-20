@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 状态徽章阈值规则(工单 P0.6-04 语义,评审 F1 并入 05 的 chip 实现):
 /// ✓正常 / 高负载 的判定边界。规则纯逻辑在此钉死;chip 外观(全圆 pill、

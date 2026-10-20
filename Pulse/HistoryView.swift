@@ -1,4 +1,5 @@
 import SwiftUI
+import PulseCore
 
 // MARK: - 历史页(工单 04):指标 × 时间范围 Canvas 走势
 // 取数口径(表档/列/聚合/空段)全在 HistoryQueries.swift,本文件只消费

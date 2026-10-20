@@ -1,4 +1,5 @@
 import SwiftUI
+import PulseCore
 
 // MARK: - 每个 tab 的内容栈(主窗口与弹窗共用,2026-10-20 用户拍板:每个 tab 两处一致)
 

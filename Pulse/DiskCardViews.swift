@@ -1,4 +1,5 @@
 import SwiftUI
+import PulseCore
 
 // MARK: - 磁盘卡明细视图(工单 05):各卷对账明细 + 本地快照列表
 // 内容模型(容器对账/快照识别)在 DiskSensor(纯逻辑,单测覆盖);本文件只做

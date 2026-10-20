@@ -1,5 +1,6 @@
 import XCTest
 @testable import Pulse
+@testable import PulseCore
 
 /// 主干纯内核(RoundSpine,ADR-0003 扩展点兑现):每轮心跳「并入出生登记 → 归组 →
 /// 下钻」,产出全部功能模块同轮共读的一份 RoundContext。合成快照按 Sampler 的组法

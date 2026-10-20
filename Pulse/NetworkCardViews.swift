@@ -1,4 +1,5 @@
 import SwiftUI
+import PulseCore
 
 // MARK: - 网络卡明细视图(工单 06):Today/7 天累计的分方向明细
 // 数据形状(差分/接口选择/累计聚合)在 NetworkSensor 与 HistoryEngine(纯逻辑,

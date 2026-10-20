@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import PulseCore
 
 /// 项目根(GLOSSARY)列表的持久层与唯一事实来源(工单 07 设置窗)。
 /// UserDefaults 存纯路径字符串数组——无沙盒(ADR-0002),不需要安全作用域书签。
