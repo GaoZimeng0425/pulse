@@ -52,7 +52,7 @@ final class SamplerRankingTests: XCTestCase {
             maxSleepSlice: .infinity
         )
         if rankingsActive {
-            await sampler.setRankingsActive(true)
+            await sampler.setRankingsActive(true, generation: 1)
         }
         let box = SamplerTests.DeliveryBox()
         let task = Task { await sampler.run { box.append($0) } }
@@ -107,9 +107,9 @@ final class SamplerRankingTests: XCTestCase {
         let firstReady = await waitFor(harness.box, count: 1)
         XCTAssertTrue(firstReady)
         await nextRound(harness, expecting: 2)                 // 5s:出数
-        await harness.sampler.setRankingsActive(false)
+        await harness.sampler.setRankingsActive(false, generation: 2)
         await nextRound(harness, expecting: 3)                 // 10s:门关
-        await harness.sampler.setRankingsActive(true)
+        await harness.sampler.setRankingsActive(true, generation: 3)
         await nextRound(harness, expecting: 4)                 // 15s:重开基线
         await nextRound(harness, expecting: 5)                 // 20s:恢复
 
@@ -118,6 +118,20 @@ final class SamplerRankingTests: XCTestCase {
         XCTAssertEqual(rankings[2], .empty, "门关不推进")
         XCTAssertEqual(rankings[3], .empty, "重开首轮只记基线")
         XCTAssertEqual(rankings[4].energyImpacts?[10]?.cpuNanosDelta, 500_000_000, "按 15→20s 窗差分")
+    }
+
+    func testStaleGateMessageIsDroppedByGeneration() async {
+        // 门控消息各走各的 Task,到达次序不保证:代号旧于已生效者即丢弃——
+        // 先到的「开(代号 2)」不被迟到的「关(代号 1)」盖掉(arch-review-2026-10-18/01 L3)。
+        let harness = await start(rankingsActive: true)
+        defer { harness.stop() }
+        await harness.sampler.setRankingsActive(true, generation: 3)
+        await harness.sampler.setRankingsActive(false, generation: 2)
+        let firstReady = await waitFor(harness.box, count: 1)
+        XCTAssertTrue(firstReady)
+        await nextRound(harness, expecting: 2)
+
+        XCTAssertNotNil(harness.box.delivered[1].rankings.energyImpacts, "迟到的旧关门消息不生效")
     }
 
     func testInvalidateDeltasResetsRankingLedgers() async {

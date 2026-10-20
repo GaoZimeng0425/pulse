@@ -11,6 +11,7 @@
 - [ ] 乙6 series() 绕过 databaseHealthy 边沿日志纪律(对齐 ingest 的 transition-not-tick)
 - [ ] 乙7 落库 fire-and-forget 无序(批次化/串行化)+ totals 每轮 3×SUM(缓存或单查)
 - [ ] 乙8 groups 表与 stableKey 逆映射「写而不读」:接消费或注释钉死仅缓存(二选一,实施时看 HistoryQueries 是否真需要)
+- [ ] **跨会话 pid 复用后库中出生登记不更新**(2026-10-19 集成分支 code review 发现,存量限制):主干已按身份裁决「pid 复用活记录胜」(`GroupingPipeline.restoreBirths`/`adoptLive`),但 `HistoryEngine.importLineage` 把回灌 pid 全部预热进 `persistedLineagePIDs`、落库又是 `INSERT OR IGNORE`——胜出的活记录永不落库,下一会话复用进程已退出而其子进程仍在时,父链经旧记录归错。修法:活记录覆盖回灌时 upsert(`INSERT OR REPLACE` + 同步已持久化表),需定 first_seen 语义
 - [ ] 甲7 .onEvent 流结束静默死亡(电池等事件源加终态日志,沿 transition-not-tick)
 - [ ] 甲8 磁盘求和回退档缺单轮增量上限钳制(异常跳变不整块进账,参照网络差分三防护)
 

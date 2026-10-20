@@ -112,6 +112,16 @@ struct GroupSample: Equatable, Sendable {
         self.memoryBytes = memoryBytes
         self.processCount = processCount
     }
+
+    /// 组的本轮采样值:内存环(SystemMonitor)与历史落库(HistoryFeed)共用这一个折算。
+    init(group: ProcessGroup) {
+        self.init(
+            id: group.id,
+            cpuPercent: group.cpuPercent,
+            memoryBytes: group.memoryBytes,
+            processCount: group.processes.count
+        )
+    }
 }
 
 /// 单个组的两条历史序列(CPU% 与内存)。

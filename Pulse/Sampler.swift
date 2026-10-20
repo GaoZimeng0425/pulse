@@ -123,6 +123,8 @@ actor Sampler {
     private var rankings = ProcessRankingLedgers()
     /// 排行门控(任一窗口可见):关 = 不推进差分;关的翻转即清账。
     private var rankingsActive = false
+    /// 最近生效的门控消息代号:更旧的消息(各走各的 Task,迟到)丢弃。
+    private var rankingsGateGeneration: UInt64 = 0
 
     init(
         source: any ProcessSource,
@@ -151,8 +153,11 @@ actor Sampler {
 
     /// 排行门控(票 A 高2,工单 01 预算口径"任何窗口可见才跑"):开 = 账本随
     /// 心跳推进;翻转为关即清账——重开首轮只记基线,不出横跨隐藏期的巨差。
-    /// 同值重复调用是 no-op。
-    func setRankingsActive(_ active: Bool) {
+    /// 同值重复调用是 no-op。`generation` = 发送方单调递增的代号:门控消息各走各的
+    /// Task、到达次序不保证,不新于已生效者的消息丢弃(arch-review-2026-10-18/01 L3)。
+    func setRankingsActive(_ active: Bool, generation: UInt64) {
+        guard generation > rankingsGateGeneration else { return }
+        rankingsGateGeneration = generation
         guard active != rankingsActive else { return }
         rankingsActive = active
         if !active {

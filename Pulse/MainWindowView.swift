@@ -241,14 +241,12 @@ struct MainWindowView: View {
             rankingCard
         case .battery:
             // 电池页(工单 02):六项读数主卡;组排行与电池无关,不放。
-            // 能耗影响排行(工单 01):主卡之下,rusage 差分按组聚合,只读。
+            // 能耗影响排行(工单 module-rankings/01):主卡之下,rusage 差分按组聚合(RankingsFeature
+            // 与组同轮出行),只读。
             MetricMainCardView(model: model.batteryModel)
             ModuleRankingCardView(
                 title: "能耗影响",
-                rows: ModuleRankingAggregator.energyRows(
-                    impacts: monitor.energyImpacts,
-                    groups: monitor.allGroups
-                ),
+                rows: monitor.rankings.energyRows,
                 accent: Metric.battery.accentColor,
                 cadenceNote: "5 秒一档"
             )
@@ -262,10 +260,7 @@ struct MainWindowView: View {
             }
             ModuleRankingCardView(
                 title: "读写最多",
-                rows: ModuleRankingAggregator.diskRows(
-                    rates: monitor.diskProcessRates,
-                    groups: monitor.allGroups
-                ),
+                rows: monitor.rankings.diskRows,
                 accent: Metric.disk.accentColor,
                 cadenceNote: "30 秒一档"
             )
@@ -273,13 +268,10 @@ struct MainWindowView: View {
             // 网络页(工单 06):主卡 + 流量累计明细(弹窗同构,紧凑)。
             // 每进程流量排行(工单 01):流量累计之下,nettop 速率归组,只读。
             MetricMainCardView(model: model.networkModel)
-            NetworkTotalsCardView(totals: monitor.networkTotals)
+            NetworkTotalsCardView(totals: monitor.history.networkTotals)
             ModuleRankingCardView(
                 title: "每进程流量",
-                rows: ModuleRankingAggregator.networkRows(
-                    rates: monitor.networkProcessRates,
-                    groups: monitor.allGroups
-                ),
+                rows: monitor.rankings.networkRows,
                 accent: Metric.network.accentColor,
                 cadenceNote: "5 秒一档"
             )
@@ -437,7 +429,7 @@ struct SortableProcessTableView: View {
         // 进程行 meter 榜首(工单 P0.6-02):当前表内 CPU% 最大者——
         // 无论按哪列排序,meter 恒以 CPU 占比取值(CPU 指标驱动 meter),
         // 换列排序只换行序,不换条的口径。
-        let cpuLeader = rows.map(\.cpuPercent).max() ?? 0
+        let cpuLeader = Leaderboard.leader(rows, by: \.cpuPercent)
         VStack(spacing: 0) {
             tableHeader
             LazyVStack(spacing: 0) {
@@ -523,7 +515,7 @@ struct SortableProcessTableView: View {
         parentPID: 0,
         executablePath: "/System/Library/CoreServices/WindowServer.app/Contents/MacOS/WindowServer"
     )
-    let monitor = SystemMonitor(
+    let monitor = SystemMonitor.preview(
         source: SyntheticProcessSource(snapshots: [
             ProcessSnapshot(takenAt: now, processes: apps + [windowServer]),
             ProcessSnapshot(

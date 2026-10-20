@@ -7,8 +7,11 @@ import Darwin
 /// 菜单栏数字 = 系统 CPU 负载(GLOSSARY:0–100%,每核 tick 口径,评审 S6);
 /// 弹窗 = Top-5 组(组 CPU% 降序,系统组参榜)。
 ///
-/// UI 粘合层,按 spec 测试决策不写单元测试;采样 / 差分 / 归组 / 截取逻辑分别在
-/// Sampler / CPUDiffer+CoreTickDiffer / GroupingEngine / GroupingPipeline 里被单测覆盖。
+/// 主干(RoundSpine):每轮心跳并入出生登记 → 归组 → 下钻,产出一份 RoundContext,
+/// 既有扇出与已注册的功能模块(MonitorFeature,ADR-0003 扩展点)同轮读同一份。
+/// 采样 / 差分 / 归组 / 主干逻辑分别在 Sampler / CPUDiffer+CoreTickDiffer /
+/// GroupingEngine / RoundSpine 里被单测覆盖;本类只做 MainActor 粘合与派发。
+/// 装配(采集源 + 功能模块的构造)在工厂里(MonitorAssembly:`live` / `preview`)。
 @Observable
 @MainActor
 final class SystemMonitor {
@@ -27,7 +30,8 @@ final class SystemMonitor {
     /// 采样历史(工单 P0.6-01):系统负载 + 每组 CPU%/内存的近期窗口
     /// (~60 点),随每轮 apply 推进;走势图与 avg/peak 统计读这里。
     /// 纯逻辑在 SampleHistoryStore(单测见 SampleHistoryTests),此处仅粘合。
-    private(set) var history = SampleHistoryStore()
+    /// (落库的历史管线是另一回事:功能模块 `history`。)
+    private(set) var sampleHistory = SampleHistoryStore()
     /// 最近一轮采样留下的下钻输入(工单 06):组卡展开 / 进程详情从这里只读取数,
     /// 下钻不触发额外采集;首轮采样前为 nil。
     private(set) var drilldown: DrilldownState?
@@ -49,38 +53,21 @@ final class SystemMonitor {
     private(set) var network: NetworkRatesReading?
     /// 网络速率走势(工单 06):心跳轮逐轮推进的纯逻辑环,面积图数据源。
     private(set) var networkTrend = NetworkTrendBuffer()
-    /// 网络 Today/7 天累计(工单 06):历史库 SQL 聚合,随每轮采样在落库后
-    /// 读回;库缺席/查询失败为 nil → 累计列占位。
-    private(set) var networkTotals: NetworkTotalsReading?
     /// dev server 盘点(工单 08):每轮采样对 argv 命中的候选进程合成状态
     /// (闲置时长/内存/监听端口);无候选为空数组。主窗口总览页卡片读这里。
     private(set) var devServers: [DevServerStatus] = []
-    /// 模块排行·能耗影响(工单 01):每 pid 一窗差分 {CPU 增量, 唤醒增量,
-    /// 复合分}。仅窗口可见时随心跳推进、满 5s 窗出数(票 A 高2:吃心跳快照,
-    /// 不另起扫描);隐藏即清账,重开首轮记基线不出数,首轮前为空。
-    /// 电池页排行卡读这里。
-    private(set) var energyImpacts: [pid_t: ProcessEnergyImpact] = [:]
-    /// 能耗影响排行最近一次数据变化时刻(数据未变化的轮不推进)。
-    private(set) var energyImpactsUpdatedAt: Date?
-    /// 模块排行·磁盘每进程(工单 01):每 pid 读写速率。满 30s 窗出数,
-    /// 门控语义同上;首轮前为空。磁盘页排行卡读这里。
-    private(set) var diskProcessRates: [pid_t: ProcessDiskRates] = [:]
-    /// 磁盘每进程排行最近一次数据变化时刻。
-    private(set) var diskProcessRatesUpdatedAt: Date?
-    /// 模块排行·网络每进程(工单 01):每 pid 上下行速率(nettop 子进程
-    /// 差分)。仅窗口可见时 5s 采样,门控语义同上;首轮前为空。
-    /// 网络页排行卡读这里。
-    private(set) var networkProcessRates: [pid_t: ProcessNetworkRates] = [:]
-    /// 网络每进程排行最近一次数据变化时刻。
-    private(set) var networkProcessRatesUpdatedAt: Date?
     /// 告警编排(工单 P1-07):每轮采样与磁盘容量读数喂进来,触发/恢复的
     /// 系统通知与应用内提示都由它出。设置页也读它(alerts.store)。
     let alerts: AlertCenter
+    /// 模块排行(工单 module-rankings/01,MonitorFeature):电池/磁盘/网络三页的排行行
+    /// 与主干同轮出,自带 nettop 传感器与采样成本闸门。主窗口排行卡直读这里。
+    var rankings: RankingsFeature { features.rankings }
+    /// 历史功能模块(工单 p1-history/03、04、06,ADR-0003):每轮落库(串行写入)、出生
+    /// 登记回灌、网络 Today/7 天累计与历史页查询都在它那里。库打开失败(引擎缺席)
+    /// 时整体降级,实时页不受影响。
+    var history: HistoryFeature { features.history }
 
     private let sampler: Sampler
-    /// 历史引擎(工单 03):5s 采样经它卷积落库 + 出生登记持久化 + 唤醒清基线。
-    /// 库打开失败时为 nil(已记日志),历史降级缺席,实时页不受影响。
-    private let historyEngine: HistoryEngine?
     /// 唤醒通知观察者(与 app 同寿命,start 建立一次;monitor 是 app 唯一的
     /// @State 管线持有者,观察者随进程结束——闭包 weak self,无保留环,
     /// deinit 属非隔离上下文,不做摘除)。
@@ -94,69 +81,60 @@ final class SystemMonitor {
     /// 磁盘吞吐传感器(工单 05,ADR-0004):短档 5s(IORegistry 主路径)或
     /// 低频档 30s(rusage 回退),节奏随源路径在构造期钉死。
     private let diskThroughputProvider: DiskThroughputProvider
-    /// 模块排行·网络每进程(工单 01,ADR-0004):nettop 子进程 5s,仅窗口
-    /// 可见时跑(SensorVisibilityGate)。能耗与磁盘两本排行账本住 Sampler
-    /// 心跳循环(票 A 高2),门控经 setRankingsActive 下发。
-    private let networkProcessRateProvider: ProcessNetworkRateProvider
-    /// 排行门控的两个可见性信号(工单 01):弹窗在场(既有信号)与主窗口
-    /// 模块页在场(新信号),任一为真即开闸——见 updateRankingGates。
-    private var popoverVisible = false
-    private var moduleRankingsVisible = false
-    /// 出生扫描最近交付的登记表:每轮采样落地时并入管线(只补缺)。
-    private var birthLineage = LineageRegistry()
-    /// 磁盘吞吐落库账本(评审接线):读数交付轮的增量逐笔 &+ 累计,采样轮
-    /// ingest 时整笔带走并清零——与网络增量同口径(丢弃/首读轮为 0,不伪造)。
-    private var pendingDiskReadBytes: UInt64 = 0
-    private var pendingDiskWriteBytes: UInt64 = 0
-    private var pipeline: GroupingPipeline
+    /// 窗口可见性的两个信号(工单 module-rankings/01):弹窗在场与主窗口模块页在场;
+    /// 值真变化时派发给功能模块(排行闸门在 RankingsFeature)。
+    private var visibility = MonitorVisibility()
+    /// 排行门控消息的代号(单调递增):Sampler 侧丢弃迟到的旧消息。
+    @ObservationIgnored private var rankingsGateGeneration: UInt64 = 0
+    /// 主干纯内核:出生登记(扫描 / 回灌并入 + 采样轮兜底)、归组配置与下钻
+    /// 构建;每轮 apply 产出 RoundContext。
+    private var spine: RoundSpine
+    /// 功能模块(ADR-0003 扩展点):工厂构造后整份传入;每轮 onRound、可见性变化、
+    /// 磁盘读数、传感器登记与启停都按 `registry` 顺序派发。组装接线,不参与观察。
+    @ObservationIgnored private let features: MonitorFeatures
     /// dev server 盘点器(工单 08):闲置环状态随采样轮推进,端口扫描走缝。
     private var devServerFinder: DevServerFinder
     private let killService: any KillService
     private var samplingTask: Task<Void, Never>?
+    private var scanTask: Task<Void, Never>?
     private var sensorTask: Task<Void, Never>?
     private var started = false
 
+    /// 依赖全部显式注入,无 Live 默认值(默认 `HistoryEngine.openDefault()` 曾让
+    /// 测试 / 预览误连生产库,见 0c892c1)。真实装配 = `live(projectRoots:)`,
+    /// 预览 = `preview(...)`(MonitorAssembly / InertSources)。
+    /// 心跳中继在此构造:磁盘求和回退源经它取心跳那一趟 rusage
+    /// (arch-review-2026-10-18/01 高2),中继与 Sampler 必须是同一个。
     init(
-        source: any ProcessSource = LiveProcessSource(),
-        coreTicks: any CoreTickSource = LiveCoreTickSource(),
-        memoryStats: any MemoryStatsSource = LiveMemoryStatsSource(),
-        projectRoots: [String] = [],
-        killService: any KillService = LiveKillService(),
-        birthScanSource: any BirthScanSource = LiveBirthScanSource(),
-        historyEngine: HistoryEngine? = HistoryEngine.openDefault(),
-        batterySource: any BatterySource = LiveBatterySource(),
-        diskCapacitySource: any DiskCapacitySource = LiveDiskCapacitySource(),
-        diskThroughputSource: (any DiskThroughputSource)? = nil,
-        nettopSource: any NettopCSVSource = LiveNettopCSVSource(),
-        devServerPortScanner: any DevServerPortScanning = LiveDevServerPortScanner(),
-        alertCenter: AlertCenter = AlertCenter()
+        sources: MonitorSources,
+        projectRoots: [String],
+        alerts: AlertCenter,
+        features: MonitorFeatures
     ) {
-        // 心跳中继(票 A 高2):磁盘求和回退源经它取心跳那一趟 rusage,不另起扫描。
         let heartbeatRelay = HeartbeatRusageRelay()
         self.sampler = Sampler(
-            source: source,
-            coreTicks: coreTicks,
-            memoryStats: memoryStats,
+            source: sources.process,
+            coreTicks: sources.coreTicks,
+            memoryStats: sources.memoryStats,
+            networkCounters: sources.networkCounters,
             heartbeatRelay: heartbeatRelay
         )
-        self.historyEngine = historyEngine
-        self.birthScanner = BirthScanner(source: birthScanSource)
-        self.batteryProvider = BatterySensorProvider(source: batterySource)
-        self.diskCapacityProvider = DiskCapacityProvider(source: diskCapacitySource)
+        self.birthScanner = BirthScanner(source: sources.birthScan)
+        self.batteryProvider = BatterySensorProvider(source: sources.battery)
+        self.diskCapacityProvider = DiskCapacityProvider(source: sources.diskCapacity)
         self.diskThroughputProvider = DiskThroughputProvider(
-            source: diskThroughputSource
-                ?? LiveDiskThroughputSource.adoptingBestPath(fallbackHeartbeat: heartbeatRelay)
+            source: sources.diskThroughput(heartbeatRelay)
         )
-        self.networkProcessRateProvider = ProcessNetworkRateProvider(source: nettopSource)
-        self.alerts = alertCenter
-        self.pipeline = GroupingPipeline(
+        self.spine = RoundSpine(
             configuration: GroupingConfiguration(
                 projectRoots: projectRoots,
                 bundleDisplayName: BundleDisplayNameReader.shared.displayName
             )
         )
-        self.killService = killService
-        self.devServerFinder = DevServerFinder(portScanner: devServerPortScanner)
+        self.killService = sources.killService
+        self.devServerFinder = DevServerFinder(portScanner: sources.devServerPortScanner)
+        self.alerts = alerts
+        self.features = features
     }
 
     /// 启动采样循环(默认弹窗关闭节奏 5s)、独立出生扫描(~2s 节奏)与电池
@@ -166,19 +144,23 @@ final class SystemMonitor {
     func start() {
         guard !started else { return }
         started = true
-        // 出生登记回灌(工单 03):库中既往登记并入管线——重启后,此前归到
-        // 宿主的断链进程仍归原宿主(验收锚点①先半)。合并只补缺,与扫描
-        // /采样轮的登记互不覆盖;身份字段进程终身不变,先后无差。
-        if let historyEngine {
-            let engine = historyEngine
-            Task { [weak self] in
-                let restored = await engine.importLineage()
-                guard let self else { return }
-                self.pipeline.mergeBirths(restored)
-            }
+        observeWake()
+        startBirthScan()
+        startSampling()
+        startSensors()
+        // 通知授权:启动现查;规则开着而系统还没问过则补一次请求(AlertCenter)。
+        Task { [weak self] in
+            await self?.alerts.refreshAuthorization()
         }
-        // 唤醒处理(spec):差分基线清零——唤醒后第一轮作废,无巨大尖刺。
-        // 观察者与 app 同寿命,随 monitor 释放移除。
+        let host = makeHost()
+        for feature in features.registry {
+            feature.start(host)
+        }
+    }
+
+    /// 唤醒处理(spec):差分基线清零——唤醒后第一轮作废,无巨大尖刺。
+    /// 观察者与 app 同寿命,stop 时摘除。
+    private func observeWake() {
         wakeObserver = NotificationCenter.default.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
         ) { [weak self] _ in
@@ -186,15 +168,23 @@ final class SystemMonitor {
             let sampler = self.sampler
             Task { await sampler.invalidateDeltas() }
         }
+    }
+
+    /// 出生扫描交付的累计登记表暂存进主干(整表替换),每轮采样落地时先并入
+    /// (只补缺)——扫描间隙出生的短命父进程由此参与该轮归组。
+    private func startBirthScan() {
         let scanner = birthScanner
-        Task { [weak self] in
+        scanTask = Task { [weak self] in
             await scanner.run { [weak self] lineage in
                 guard let self else { return }
                 Task { @MainActor in
-                    self.birthLineage = lineage
+                    self.spine.stageScannerBirths(lineage)
                 }
             }
         }
+    }
+
+    private func startSampling() {
         let sampler = self.sampler
         samplingTask = Task { [weak self] in
             await sampler.run { [weak self] update in
@@ -204,57 +194,70 @@ final class SystemMonitor {
                 }
             }
         }
-        // 非心跳型传感器(ADR-0004):单一调度器 actor 按 cadence 驱动——电池
-        // 事件档、磁盘容量 30s 低频档、磁盘吞吐 5s/30s 分档(工单 05"调度器
-        // 体现分档"),心跳型仍住 Sampler 不登记。
-        let capacityProvider = diskCapacityProvider
-        let throughputProvider = diskThroughputProvider
-        let provider = batteryProvider
-        let networkProcessProvider = networkProcessRateProvider
+    }
+
+    /// 非心跳型传感器(ADR-0004):单一调度器 actor 按 cadence 驱动——电池
+    /// 事件档、磁盘容量 30s 低频档、磁盘吞吐 5s/30s 分档(工单 p1-history/05"调度器
+    /// 体现分档"),心跳型仍住 Sampler 不登记;功能模块自有的传感器排在其后。
+    private func startSensors() {
+        let drivers = [
+            batteryProvider.driver { [weak self] reading in
+                guard let self else { return }
+                Task { @MainActor in self.applyBattery(reading) }
+            },
+            diskCapacityProvider.driver { [weak self] reading in
+                guard let self else { return }
+                Task { @MainActor in self.applyDiskCapacity(reading) }
+            },
+            diskThroughputProvider.driver { [weak self] reading in
+                guard let self else { return }
+                Task { @MainActor in self.applyDiskThroughput(reading) }
+            },
+        ] + features.registry.flatMap { $0.sensorDrivers() }
         let scheduler = SensorScheduler()
-        // 通知授权:启动现查;规则开着而系统还没问过则补一次请求(AlertCenter)。
-        Task { [weak self] in
-            await self?.alerts.refreshAuthorization()
+        sensorTask = Task {
+            await scheduler.run(drivers)
         }
-        sensorTask = Task { [weak self] in
-            await scheduler.run([
-                provider.driver { [weak self] reading in
-                    guard let self else { return }
-                    Task { @MainActor in
-                        self.applyBattery(reading)
-                    }
-                },
-                capacityProvider.driver { [weak self] reading in
-                    guard let self else { return }
-                    Task { @MainActor in
-                        self.applyDiskCapacity(reading)
-                    }
-                },
-                throughputProvider.driver { [weak self] reading in
-                    guard let self else { return }
-                    Task { @MainActor in
-                        self.applyDiskThroughput(reading)
-                    }
-                },
-                // 模块排行·网络每进程(工单 01):调度器按 cadence 驱动;可见性
-                // 门控在 provider 内部(updateRankingGates 折算下发),门关时
-                // tick 在门口空转,不起 nettop 子进程。能耗/磁盘两本排行住心跳。
-                networkProcessProvider.driver { [weak self] reading in
-                    guard let self else { return }
-                    Task { @MainActor in
-                        self.applyNetworkProcessRates(reading)
-                    }
-                },
-            ])
+    }
+
+    /// 功能模块回调主干 / 心跳的宿主接口(MonitorHost):回灌叠加进主干;排行门控
+    /// 编代号后转给 Sampler。weak self:模块持有宿主,不构成保留环。
+    private func makeHost() -> MonitorHost {
+        MonitorHost(
+            restoreBirths: { [weak self] restored in
+                self?.spine.restoreBirths(restored)
+            },
+            setRankingsActive: { [weak self] active in
+                guard let self else { return }
+                rankingsGateGeneration &+= 1
+                let generation = rankingsGateGeneration
+                let sampler = self.sampler
+                Task { await sampler.setRankingsActive(active, generation: generation) }
+            }
+        )
+    }
+
+    /// 停机(单测收尾用):取消采样 / 出生扫描 / 传感器调度三条循环(电池事件流
+    /// 随之摘除 RunLoop source),停功能模块(历史收串行写入流),摘除唤醒观察者。产品运行期
+    /// monitor 与 app 同寿命,从不调用;停机后不再重启(start 的幂等标记保持)。
+    func stop() {
+        samplingTask?.cancel()
+        scanTask?.cancel()
+        sensorTask?.cancel()
+        for feature in features.registry {
+            feature.stop()
         }
+        if let wakeObserver {
+            NotificationCenter.default.removeObserver(wakeObserver)
+        }
+        wakeObserver = nil
     }
 
     /// 弹窗可见性变化:采样节奏在 5s/1s 间切换(合盖省电,spec)。
     /// 出生扫描不受弹窗影响:登记的完整性不依赖观看。弹窗也是模块排行
-    /// (工单 01)的可见性信号之一:弹窗在场即开闸(见 updateRankingGates)。
+    /// (工单 module-rankings/01)的可见性信号之一:弹窗在场即开闸(RankingsFeature.visibilityChanged)。
     func setPopoverVisible(_ visible: Bool) {
-        popoverVisible = visible
-        updateRankingGates()
+        updateVisibility(MonitorVisibility(popover: visible, moduleRankings: visibility.moduleRankings))
         let sampler = self.sampler
         Task { await sampler.setPopoverVisible(visible) }
     }
@@ -262,26 +265,24 @@ final class SystemMonitor {
     /// 模块排行可见性变化(工单 01):主窗口模块页在场时由 UI 调用。与弹窗
     /// 信号合并门控——任一窗口可见即开闸,全关才停采(采样成本闸门)。
     func setModuleRankingsVisible(_ visible: Bool) {
-        moduleRankingsVisible = visible
-        updateRankingGates()
+        updateVisibility(MonitorVisibility(popover: visibility.popover, moduleRankings: visible))
     }
 
-    /// 折算两个可见性信号为排行门控(工单 01 约定:任何窗口可见才推进):
-    /// 翻转为全关时清差分账本,重开首轮记基线不出数,不出横跨隐藏期的巨差;
-    /// 重复同值调用是 no-op。能耗/磁盘账本在 Sampler(推进/暂停差分),
-    /// 网络每进程在 nettop provider(门关不起子进程)。
-    private func updateRankingGates() {
-        let anyWindowVisible = popoverVisible || moduleRankingsVisible
-        let sampler = self.sampler
-        Task { await sampler.setRankingsActive(anyWindowVisible) }
-        networkProcessRateProvider.setVisible(anyWindowVisible)
+    /// 可见性落地:值真变化才派发给功能模块(MonitorFeature.visibilityChanged);
+    /// 排行门控由 RankingsFeature 折算下发。
+    private func updateVisibility(_ next: MonitorVisibility) {
+        guard next != visibility else { return }
+        visibility = next
+        for feature in features.registry {
+            feature.visibilityChanged(next)
+        }
     }
 
-    /// 项目根变更(工单 07 设置窗):立即写入管线配置,**下一轮采样即以新根归组**
-    /// (增删 ≤1 轮生效);清空列表 = 回到 03 的降级路径。传播逻辑在
-    /// GroupingPipelineTests"项目根热更新"用例单测,此处仅 MainActor 粘合。
+    /// 项目根变更(工单 p0/07 设置窗):立即写入主干的归组配置,**下一轮采样即以
+    /// 新根归组**(增删 ≤1 轮生效);清空列表 = 回到 03 的降级路径。传播逻辑在
+    /// RoundSpineTests / GroupingPipelineTests"项目根热更新"用例单测,此处仅粘合。
     func setProjectRoots(_ roots: [String]) {
-        pipeline.setProjectRoots(roots)
+        spine.setProjectRoots(roots)
     }
 
     /// 诊断报告取数(工单 11):按需向采样器要一份累计统计快照
@@ -289,18 +290,6 @@ final class SystemMonitor {
     func samplingStats() async -> SamplingStats {
         let sampler = self.sampler
         return await sampler.samplingStats()
-    }
-
-    /// 历史页查询(工单 04):引擎保持私有,UI 只拿曲线——SQL 全在引擎 actor
-    /// 上执行(后台队列不掉帧,spec User Story 10)。引擎缺席(库打开失败,
-    /// 03 的降级路径)→ nil,页面按"暂无数据"占位处理,不打断页面。
-    func historySeries(
-        metric: HistoryMetricKey,
-        range: HistoryRange,
-        now: Date = Date()
-    ) async -> HistorySeries? {
-        guard let historyEngine else { return nil }
-        return await historyEngine.series(metric: metric, range: range, now: now)
     }
 
     /// 结束进程(工单 08):UI 确认后调用——SIGTERM 逐目标投递,
@@ -325,91 +314,27 @@ final class SystemMonitor {
         return terminate(group.killTargets)
     }
 
-    /// 一轮采样落地:菜单栏负载 + 出生登记、归组(纯逻辑在 GroupingPipeline),
-    /// 同时构建下钻输入(快照 + 累计登记表 + 进程差分,同轮一致)。
-    /// 出生扫描的登记表先并入——扫描间隙出生的短命父进程由此参与本轮归组。
+    /// 一轮采样落地:菜单栏负载 + 主干推进(出生登记 → 归组 → 下钻,纯逻辑在
+    /// RoundSpine,同轮一致),再按既有扇出落地各项状态;最后把同一份上下文
+    /// 派发给已注册的功能模块。外部登记(出生扫描 / 历史回灌)已随到随并入主干。
     private func apply(_ update: SamplingUpdate) {
         systemCPULoad = update.systemCPULoad
         cpuBreakdown = update.cpu
         memory = update.memory
-        pipeline.mergeBirths(birthLineage)
-        pipeline.update(
-            snapshot: update.snapshot,
-            processCPU: update.diff.processCPU
-        )
-        allGroups = pipeline.allGroups
-        // 组采样快照:内存环形缓冲(工单 P0.6-01)与历史落库(工单 03)同一份形状。
-        let groupSamples = allGroups.map { group in
-            GroupSample(
-                id: group.id,
-                cpuPercent: group.cpuPercent,
-                memoryBytes: group.memoryBytes,
-                processCount: group.processes.count
-            )
-        }
-        // 采样历史随同一轮推进:在场组追加,消失组逐出。
-        history.advance(
+        let context = spine.advance(update)
+        allGroups = context.groups
+        // 采样历史随同一轮推进:在场组追加,消失组逐出。组采样与历史落库同一个
+        // 折算(GroupSample(group:),落库在历史模块的 onRound)。
+        sampleHistory.advance(
             systemCPULoad: update.systemCPULoad,
             memoryUsedBytes: update.memory?.usedBytes,
-            groups: groupSamples
+            groups: allGroups.map(GroupSample.init(group:))
         )
-        drilldown = DrilldownState(
-            snapshot: update.snapshot,
-            lineage: pipeline.lineage,
-            processCPU: update.diff.processCPU
-        )
-        // 网络心跳轮(工单 06):速率/徽标/走势在 UI 粘合层落地,增量随后
-        // 随落库 Task 进历史引擎(见下方 historyEngine 分支)。
+        drilldown = context.drilldown
+        // 网络心跳轮(工单 p1-history/06):速率/徽标/走势在 UI 粘合层落地;记账增量随同轮
+        // 上下文由历史模块落库(HistoryFeature.onRound)。
         if let network = update.network {
             applyNetwork(network)
-        }
-        // 模块排行(票 A 高2):两本账本随心跳同轮推进,满窗才出数;nil = 本轮
-        // 该窗未满,保留上次读数。
-        if let impacts = update.rankings.energyImpacts {
-            applyEnergyImpacts(impacts)
-        }
-        if let rates = update.rankings.diskRates {
-            applyDiskProcessRates(rates)
-        }
-        // 历史管线(工单 03):5s 原始值只进引擎的内存缓冲,分钟卷积 / 小时卷积 /
-        // 留存清理 / 出生登记与组元数据落库都在引擎侧一个事务完成;旁路失败只记日志。
-        // 采样时刻在 MainActor 上现取(Task 外),顺序即 apply 顺序。
-        if let historyEngine {
-            let engine = historyEngine
-            let now = Date()
-            let displayNames = Dictionary(
-                allGroups.map { ($0.id, $0.name) },
-                uniquingKeysWith: { _, rhs in rhs }
-            )
-            let lineage = pipeline.lineage
-            // 网络记账增量(工单 06):丢弃轮为 0,读缺失轮 0——不伪造。
-            let netRx = update.network?.downBytesDelta ?? 0
-            let netTx = update.network?.upBytesDelta ?? 0
-            // 磁盘吞吐记账增量(接线):自上轮 ingest 以来交付读数的增量合计,
-            // 带走即清零(读缺失/丢弃轮差分给 0,同网络口径)。
-            let diskRead = pendingDiskReadBytes
-            let diskWrite = pendingDiskWriteBytes
-            pendingDiskReadBytes = 0
-            pendingDiskWriteBytes = 0
-            Task {
-                await engine.ingest(
-                    at: now,
-                    systemLoad: update.systemCPULoad,
-                    groups: groupSamples,
-                    displayNames: displayNames,
-                    lineage: lineage,
-                    netRxBytes: netRx,
-                    netTxBytes: netTx,
-                    diskReadBytes: diskRead,
-                    diskWriteBytes: diskWrite
-                )
-                // 累计在落库后读回(同一 actor,顺序即本轮写入先见);
-                // 引擎侧的 nil 只发生在库缺席,UI 保持占位。
-                let totals = await engine.networkTotals(now: now)
-                Task { @MainActor in
-                    self.networkTotals = totals
-                }
-            }
         }
         // 告警喂食(工单 P1-07):系统负载 + 全部组(引擎只读聚合口径,不持快照)。
         alerts.ingestSampling(
@@ -437,6 +362,10 @@ final class SystemMonitor {
                 AlertDevServerSnapshot(pid: server.pid, name: server.displayName, idleSeconds: $0)
             }
         })
+        // 功能模块(ADR-0003 扩展点):既有发布状态落定之后,同一份上下文按登记顺序派发。
+        for feature in features.registry {
+            feature.onRound(context)
+        }
     }
 
     /// 电池读数落地(工单 02):nil = 从未有过读数(无内建电池)→ 页面保持
@@ -459,14 +388,16 @@ final class SystemMonitor {
         }
     }
 
-    /// 磁盘吞吐读数落地(工单 05):nil 首轮前保持占位,此后 lastGood 口径同上。
-    /// 记账增量随读数累计进落库账本(接线);lastGood 读失败重投的是**已应用过**
-    /// 的同一读数,Equatable 去重防增量重复记账(重投 = 无新数据)。
+    /// 磁盘吞吐读数落地(工单 p1-history/05):nil 首轮前保持占位,此后 lastGood 口径同上。
+    /// 每份交付都派发给功能模块(历史记账的恰好一次由它的内核负责——HistoryFeed:
+    /// 重投的同一读数不再记);展示侧同值不重画。
     private func applyDiskThroughput(_ reading: DiskThroughputReading?) {
-        guard let reading, reading != diskThroughput else { return }
+        guard let reading else { return }
+        for feature in features.registry {
+            feature.diskThroughputDelivered(reading)
+        }
+        guard reading != diskThroughput else { return }
         diskThroughput = reading
-        pendingDiskReadBytes = pendingDiskReadBytes &+ reading.readBytesDelta
-        pendingDiskWriteBytes = pendingDiskWriteBytes &+ reading.writeBytesDelta
     }
 
     /// 网络心跳轮落地(工单 06):速率读数 + 走势环推进。徽标直取
@@ -476,26 +407,5 @@ final class SystemMonitor {
     private func applyNetwork(_ result: NetworkRoundResult) {
         network = NetworkRatesReading(rates: result.rates, interfaceName: result.interface)
         networkTrend.append(result.rates)
-    }
-
-    /// 模块排行落地三件(工单 01):字典按 pid。与上轮同值时 Equatable 去重
-    /// 跳过(不空转刷新,更新时间戳只在数据真变化时推进);网络每进程走
-    /// driver 语义,nil = 基线轮 / 读失败 → lastGood 重投,同样去重。
-    private func applyEnergyImpacts(_ reading: [pid_t: ProcessEnergyImpact]) {
-        guard reading != energyImpacts else { return }
-        energyImpacts = reading
-        energyImpactsUpdatedAt = Date()
-    }
-
-    private func applyDiskProcessRates(_ reading: [pid_t: ProcessDiskRates]) {
-        guard reading != diskProcessRates else { return }
-        diskProcessRates = reading
-        diskProcessRatesUpdatedAt = Date()
-    }
-
-    private func applyNetworkProcessRates(_ reading: [pid_t: ProcessNetworkRates]?) {
-        guard let reading, reading != networkProcessRates else { return }
-        networkProcessRates = reading
-        networkProcessRatesUpdatedAt = Date()
     }
 }

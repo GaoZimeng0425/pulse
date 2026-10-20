@@ -185,20 +185,15 @@ struct MetricTabContent: Equatable, Sendable {
     /// 分段基于全部组(与榜单口径无关,内存 tab 之外的 tab 也可渲染)。
     /// 历史 tab(工单 04)不渲染排行,走 CPU 序穷举兜底(轴外的弹窗根本切不到)。
     static func build(groups: [ProcessGroup], tab: MetricTab) -> MetricTabContent {
+        // 榜单与两个 meter 榜首走 Leaderboard 内核;零值组照常上榜是组 tab 的站点口径(有意不过滤)。
         let ranked: [ProcessGroup]
         let metric: GroupCardMetric
         switch tab {
         case .overview, .cpu, .disk, .network, .battery, .history:
-            ranked = groups.sorted { lhs, rhs in
-                if lhs.cpuPercent != rhs.cpuPercent { return lhs.cpuPercent > rhs.cpuPercent }
-                return lhs.id < rhs.id
-            }
+            ranked = Leaderboard.ranked(groups, by: \.cpuPercent, id: \.id)
             metric = .cpu
         case .memory:
-            ranked = groups.sorted { lhs, rhs in
-                if lhs.memoryBytes != rhs.memoryBytes { return lhs.memoryBytes > rhs.memoryBytes }
-                return lhs.id < rhs.id
-            }
+            ranked = Leaderboard.ranked(groups, by: \.memoryBytes, id: \.id)
             metric = .memory
         }
 
@@ -210,8 +205,8 @@ struct MetricTabContent: Equatable, Sendable {
             metric: metric,
             memorySegments: segments(for: groups, totalBytes: totalBytes),
             memoryTotalBytes: totalBytes,
-            memoryLeaderBytes: groups.map(\.memoryBytes).max() ?? 0,
-            cpuLeader: groups.map(\.cpuPercent).max() ?? 0
+            memoryLeaderBytes: Leaderboard.leader(groups, by: \.memoryBytes),
+            cpuLeader: Leaderboard.leader(groups, by: \.cpuPercent)
         )
     }
 
@@ -220,12 +215,9 @@ struct MetricTabContent: Equatable, Sendable {
     private static func segments(for groups: [ProcessGroup], totalBytes: UInt64) -> [MemoryRingSegment] {
         guard totalBytes > 0 else { return [] }
 
-        let rankedByMemory = groups
-            .filter { $0.memoryBytes > 0 }
-            .sorted { lhs, rhs in
-                if lhs.memoryBytes != rhs.memoryBytes { return lhs.memoryBytes > rhs.memoryBytes }
-                return lhs.id < rhs.id
-            }
+        // 零字节组剔除是分段的站点口径,有意不收进 Leaderboard 内核(组 tab 榜单保留零值组)。
+        let nonZero = groups.filter { $0.memoryBytes > 0 }
+        let rankedByMemory = Leaderboard.ranked(nonZero, by: \.memoryBytes, id: \.id)
         let top = rankedByMemory.prefix(memorySegmentLimit)
 
         var segments = top.map { group in

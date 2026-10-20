@@ -171,13 +171,10 @@ enum GroupingEngine {
             attributionByID[attribution.id] = attribution
         }
 
-        return membersByID.map { id, members -> ProcessGroup in
+        // 组内进程序与组序同走 Leaderboard 内核:CPU% 降序,同值次键 pid / 组身份升序。
+        let unranked = membersByID.map { id, members -> ProcessGroup in
             let attribution = attributionByID[id]!
-            let sortedMembers = members.sorted { lhs, rhs in
-                let lhsCPU = cpuPercentByPID[lhs.pid] ?? 0
-                let rhsCPU = cpuPercentByPID[rhs.pid] ?? 0
-                return lhsCPU == rhsCPU ? lhs.pid < rhs.pid : lhsCPU > rhsCPU
-            }
+            let sortedMembers = Leaderboard.ranked(members, by: { cpuPercentByPID[$0.pid] ?? 0 }, id: \.pid)
             let cpu = members.reduce(0.0) { $0 + (cpuPercentByPID[$1.pid] ?? 0) }
             let memory = members.reduce(UInt64(0)) { $0 + $1.physicalFootprintBytes }
             return ProcessGroup(
@@ -188,7 +185,7 @@ enum GroupingEngine {
                 memoryBytes: memory
             )
         }
-        .sorted { $0.cpuPercent == $1.cpuPercent ? $0.id < $1.id : $0.cpuPercent > $1.cpuPercent }
+        return Leaderboard.ranked(unranked, by: \.cpuPercent, id: \.id)
     }
 
     /// App 归属判定的路径谓词:`.app` 容器内的进程。父链面包屑(工单 06)复用

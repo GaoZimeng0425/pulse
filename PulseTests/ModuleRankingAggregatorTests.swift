@@ -33,7 +33,7 @@ final class ModuleRankingAggregatorTests: XCTestCase {
             11: ProcessEnergyImpact(cpuNanosDelta: 1_000_000_000, wakeupsDelta: 20, impact: 3_000_000_000),
             20: ProcessEnergyImpact(cpuNanosDelta: 2_000_000_000, wakeupsDelta: 0, impact: 2_000_000_000),
         ]
-        let rows = ModuleRankingAggregator.energyRows(impacts: impacts, groups: sampleGroups())
+        let rows = ModuleRankingAggregator.energyRows(impacts: impacts, windowSeconds: 5, groups: sampleGroups())
 
         // 组行 = 成员之和:Xcode 两个 pid 合成一行,复合分 8+3=110 亿居首。
         XCTAssertEqual(rows.map(\.id), ["bundle:/Applications/Xcode.app", "project:/Users/x/work/demo@main"])
@@ -48,13 +48,24 @@ final class ModuleRankingAggregatorTests: XCTestCase {
         XCTAssertEqual(rows[0].primaryText, PulseFormat.cpuSeconds(4.0))
     }
 
+    /// 唤醒/秒按实际窗长折算(不是标称 5s):8s 窗里 Xcode 共唤醒 30 次 → 3.75 次/秒。
+    func testEnergyWakeupsPerSecondUseTheActualWindowLength() {
+        let impacts: [pid_t: ProcessEnergyImpact] = [
+            10: ProcessEnergyImpact(cpuNanosDelta: 3_000_000_000, wakeupsDelta: 10, impact: 8_000_000_000),
+            11: ProcessEnergyImpact(cpuNanosDelta: 1_000_000_000, wakeupsDelta: 20, impact: 3_000_000_000),
+        ]
+        let rows = ModuleRankingAggregator.energyRows(impacts: impacts, windowSeconds: 8, groups: sampleGroups())
+
+        XCTAssertEqual(rows.first?.subtitle, "唤醒 \(PulseFormat.wakeupsPerSecond(3.75))")
+    }
+
     /// 排序口径:能耗榜按复合分(impact),不是裸 CPU——唤醒堆权重的进程名次不亏。
     func testEnergyBoardRanksByCompositeImpact() {
         let impacts: [pid_t: ProcessEnergyImpact] = [
             10: ProcessEnergyImpact(cpuNanosDelta: 2_000_000_000, wakeupsDelta: 0, impact: 2_000_000_000),
             20: ProcessEnergyImpact(cpuNanosDelta: 500_000_000, wakeupsDelta: 40, impact: 2_500_000_000),
         ]
-        let rows = ModuleRankingAggregator.energyRows(impacts: impacts, groups: sampleGroups())
+        let rows = ModuleRankingAggregator.energyRows(impacts: impacts, windowSeconds: 5, groups: sampleGroups())
 
         // CPU 赢家(pid 10)复合分 20 亿 < pid 20 的 25 亿(50ms/唤醒 × 40)。
         XCTAssertEqual(rows.first?.id, "project:/Users/x/work/demo@main")
@@ -66,7 +77,7 @@ final class ModuleRankingAggregatorTests: XCTestCase {
         let impacts: [pid_t: ProcessEnergyImpact] = [
             99: ProcessEnergyImpact(cpuNanosDelta: 500_000_000, wakeupsDelta: 0, impact: 500_000_000),
         ]
-        let rows = ModuleRankingAggregator.energyRows(impacts: impacts, groups: sampleGroups())
+        let rows = ModuleRankingAggregator.energyRows(impacts: impacts, windowSeconds: 5, groups: sampleGroups())
 
         XCTAssertEqual(rows.count, 1)
         XCTAssertEqual(rows[0].id, ModuleRankingAggregator.otherProcessesKey)
@@ -80,7 +91,7 @@ final class ModuleRankingAggregatorTests: XCTestCase {
     // MARK: 空字典 / 零值
 
     func testEmptyDictionariesYieldEmptyBoards() {
-        XCTAssertTrue(ModuleRankingAggregator.energyRows(impacts: [:], groups: sampleGroups()).isEmpty)
+        XCTAssertTrue(ModuleRankingAggregator.energyRows(impacts: [:], windowSeconds: 5, groups: sampleGroups()).isEmpty)
         XCTAssertTrue(ModuleRankingAggregator.diskRows(rates: [:], groups: sampleGroups()).isEmpty)
         XCTAssertTrue(ModuleRankingAggregator.networkRows(rates: [:], groups: []).isEmpty)
     }
@@ -91,7 +102,7 @@ final class ModuleRankingAggregatorTests: XCTestCase {
             10: ProcessEnergyImpact(cpuNanosDelta: 0, wakeupsDelta: 0, impact: 0),
             20: ProcessEnergyImpact(cpuNanosDelta: 1_000_000_000, wakeupsDelta: 0, impact: 1_000_000_000),
         ]
-        let rows = ModuleRankingAggregator.energyRows(impacts: impacts, groups: sampleGroups())
+        let rows = ModuleRankingAggregator.energyRows(impacts: impacts, windowSeconds: 5, groups: sampleGroups())
         XCTAssertEqual(rows.map(\.id), ["project:/Users/x/work/demo@main"])
     }
 
