@@ -109,14 +109,15 @@ final class SystemMonitor {
     func start() {
         guard !started else { return }
         started = true
-        observeWake()
-        startBirthScan()
-        startSampling()
-        startSensors()
+        // 模块先拿到宿主,再起会交付读数的循环:交付即可能广播,不能早于宿主就位。
         let host = makeHost()
         for feature in features.registry {
             feature.start(host)
         }
+        observeWake()
+        startBirthScan()
+        startSampling()
+        startSensors()
     }
 
     /// 唤醒处理(spec):差分基线清零——唤醒后第一轮作废,无巨大尖刺。
