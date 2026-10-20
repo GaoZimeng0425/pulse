@@ -15,7 +15,12 @@ import GRDB
 ///   uniqid 列暂缺:登记表按 pid 键、ProcessIdentity 不携带唯一号
 ///   ("pid 复用不做区分"为既知限制,与 P0 内存版同口径);
 /// - `groups`:组展示元数据缓存(group_id = stableKey,读回可重建身份,
-///   见 GroupIdentity(stableKey:))。
+///   见 GroupIdentity(stableKey:))。**目前只写不读**(arch-review-2026-10-18/03 乙8
+///   拍成「注释钉死」):历史页只有全组合计曲线,没有按组视图,唯一的读方是引擎启动
+///   时预热改名缓存;表留给将来按组的历史视图(组名 / 类别 / 项目根不必再从键里猜),
+///   改项目根迁移会同步改写它,保持与样本表同键;
+/// - `metadata`(v2):键值杂项——现存上一版项目根快照(改根时据此迁移组身份,
+///   arch-review-2026-10-18/03 乙3)。
 ///
 /// 测试不设缝(Testing Decisions):内存库 / 临时目录库直接对真 SQLite 断言。
 enum HistoryDatabase {
@@ -120,12 +125,20 @@ enum HistoryDatabase {
                 )
                 """)
         }
+        migrator.registerMigration("p1-history-v2-metadata") { db in
+            try db.execute(sql: """
+                CREATE TABLE metadata (
+                    key   TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+                """)
+        }
         return migrator
     }
 
-    // MARK: 六表名单(测试与自检共用)
+    // MARK: 表名单(测试与自检共用)
 
     static let tableNames = [
-        "sample_min", "sample_hour", "system_min", "system_hour", "lineage", "groups",
+        "sample_min", "sample_hour", "system_min", "system_hour", "lineage", "groups", "metadata",
     ]
 }

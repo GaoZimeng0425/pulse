@@ -269,7 +269,8 @@ enum HistoryQuery {
 
 extension HistoryEngine {
     /// 历史页查询:引擎 actor 上执行 = 不占主线程(spec User Story 10);
-    /// 失败记一条日志并返回 nil(历史是旁路,查询失败也不打断页面)。
+    /// 失败返回 nil(历史是旁路,查询失败也不打断页面),日志走读路径健康状态沿
+    /// (只在翻转时记,arch-review-2026-10-18/03 乙6)——页面每分钟重查,逐次记会刷屏。
     /// 库不可用同样返回 nil,页面按占位处理。
     func series(
         metric: HistoryMetricKey,
@@ -280,11 +281,13 @@ extension HistoryEngine {
         do {
             // GRDB 的 read 在 async 上下文走 async 重载:闭包照旧同步跑在
             // 库队列上,await 只挂起本 actor 任务(查询在后台队列,工单 04 验收)。
-            return try await database.read { db in
+            let series = try await database.read { db in
                 try HistoryQuery.series(metric: metric, range: range, now: now, in: db)
             }
+            noteReadSuccess()
+            return series
         } catch {
-            LogService.error("历史查询失败:\(error)", category: "History")
+            noteReadFailure("历史页查询失败", error)
             return nil
         }
     }

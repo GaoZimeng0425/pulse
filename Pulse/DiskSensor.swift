@@ -291,6 +291,12 @@ struct DiskThroughputReading: Equatable, Sendable {
 /// 差分三件防护——首读置零(只立基线)、计数回退/重置钳零并重立基线、
 /// elapsed 非有限或 ≤0 钳零。
 enum DiskThroughputDiffer {
+    /// 单轮速率上限(字节/秒):超过即视为计数跳变、整轮作废(不出速率、不进记账)。
+    /// 现役 NVMe 顶到 ~7 GB/s,20 GB/s 留足余量;主要防 rusage 求和回退档——进程计数
+    /// 上轮缺席、本轮带终身累计进账时和值一轮跳上百 GB(arch-review-2026-10-18/03 甲8,
+    /// 参照 NetworkRateDiffer 的跳变防护)。
+    static let maximumBytesPerSecond: Double = 20_000_000_000
+
     static func rates(previous: DiskIOCounters?, current: DiskIOCounters) -> DiskRates {
         guard let previous else { return .zero } // 首读:立基线,不出速率
         // 计数回退(重置/换盘/回绕)→ 本轮 0,基线以本轮为准(见 Accumulator)。
@@ -303,6 +309,7 @@ enum DiskThroughputDiffer {
         let read = Double(current.readBytes - previous.readBytes) / elapsed
         let write = Double(current.writeBytes - previous.writeBytes) / elapsed
         guard read.isFinite, write.isFinite else { return .zero }
+        guard read <= maximumBytesPerSecond, write <= maximumBytesPerSecond else { return .zero }
         return DiskRates(readBytesPerSecond: read, writeBytesPerSecond: write)
     }
 }

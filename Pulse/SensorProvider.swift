@@ -98,6 +98,8 @@ struct SensorDriver: Sendable {
     let tick: @Sendable () async -> Void
     /// `.onEvent` 档的唤醒流构造;非事件档为 nil。
     let wakeups: (@Sendable () -> AsyncStream<Void>?)?
+    /// 日志里点名用(provider 类型名);只在终态日志里出现。
+    var label = "传感器"
 }
 
 /// 一次交付的新鲜度:读成功的新读数,或读失败时重投的上次好值。只显示的消费方
@@ -142,7 +144,7 @@ extension SensorProvider {
         if cadence == .onEvent {
             wakeups = { provider.wakeups() }
         }
-        return SensorDriver(cadence: cadence, tick: tick, wakeups: wakeups)
+        return SensorDriver(cadence: cadence, tick: tick, wakeups: wakeups, label: String(describing: Self.self))
     }
 }
 
@@ -156,13 +158,17 @@ actor SensorScheduler {
     typealias Sleeping = @Sendable (TimeInterval) async throws -> Void
 
     private let sleep: Sleeping
+    /// 终态日志出口(事件流结束等,单测注入收件箱)。
+    private let log: @Sendable (String) -> Void
 
     init(
         sleep: @escaping Sleeping = {
             try await Task.sleep(nanoseconds: UInt64($0 * 1_000_000_000))
-        }
+        },
+        log: @escaping @Sendable (String) -> Void = { LogService.warn($0, category: "Sensor") }
     ) {
         self.sleep = sleep
+        self.log = log
     }
 
     /// 驱动全部登记项直至任务取消;每登记项一条子任务,同一 actor 内汇合。
@@ -190,10 +196,18 @@ actor SensorScheduler {
                 }
             }
         case .onEvent:
-            guard let wakeups = driver.wakeups?() else { return }
+            guard let wakeups = driver.wakeups?() else {
+                log("\(driver.label):事件档没有唤醒流,未启动")
+                return
+            }
             for await _ in wakeups {
                 if Task.isCancelled { return }
                 await driver.tick()
+            }
+            // 流非取消地结束 = 事件源死了,此后该传感器不再更新:记一条终态,不再静默
+            // (arch-review-2026-10-18/03 甲7)。只会发生一次,无需状态沿。
+            if !Task.isCancelled {
+                log("\(driver.label):事件流已结束,此后不再更新读数")
             }
         }
     }

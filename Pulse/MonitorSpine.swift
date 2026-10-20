@@ -137,6 +137,9 @@ protocol MonitorFeature: AnyObject {
     func visibilityChanged(_ visibility: MonitorVisibility)
     /// 其他模块的广播(MonitorHost.broadcast);模块只 switch 自己关心的事件。
     func onEvent(_ event: FeatureEvent)
+    /// 项目根:SystemMonitor.start 时(模块 start 之后)派发一次当前值,此后每次在设置里
+    /// 改根再派发(历史模块据此迁移组身份,arch-review-2026-10-18/03 乙3)。
+    func projectRootsChanged(_ roots: [String])
     /// 本模块自有的非心跳传感器(ADR-0004 SensorScheduler 登记项):SystemMonitor.start
     /// 时取一次,与既有传感器同一个调度器驱动。心跳型读数不走这里(住 Sampler,
     /// 经 onRound 的 `context.update` 送达)。
@@ -152,6 +155,7 @@ extension MonitorFeature {
     func onRound(_ context: RoundContext) {}
     func visibilityChanged(_ visibility: MonitorVisibility) {}
     func onEvent(_ event: FeatureEvent) {}
+    func projectRootsChanged(_ roots: [String]) {}
     func sensorDrivers() -> [SensorDriver] { [] }
     func start(_ host: MonitorHost) {}
     func stop() {}

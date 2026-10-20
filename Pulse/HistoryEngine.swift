@@ -38,6 +38,31 @@ struct LineageRow: Decodable, FetchableRecord, TableRecord {
     }
 }
 
+/// 历史库健康状态沿(过渡非轮询的日志惯例,LogService 教训③):失败进入记一条、持续
+/// 失败静默、恢复记一条。引擎写、读各持一面(读面由累计查询与历史页查询共用)。
+/// 持续失败若逐条记,5s 一轮会把日志刷满留存窗口。返回值 = 这一次要不要记日志。
+struct HistoryHealthEdge {
+    private(set) var healthy = true
+
+    mutating func recordFailure() -> Bool {
+        defer { healthy = false }
+        return healthy
+    }
+
+    mutating func recordSuccess() -> Bool {
+        defer { healthy = true }
+        return !healthy
+    }
+}
+
+/// 一轮落库的结果:只进了内存缓冲 / 冲刷写了分钟行 / 落库失败。网络累计只在库真变了
+/// (写了分钟行)或落库失败(读数可能已过时)时才需要重查(arch-review-2026-10-18/03 乙7)。
+enum HistoryIngestOutcome: Equatable, Sendable {
+    case buffered
+    case wroteMinute
+    case failed
+}
+
 /// 历史引擎(工单 03):采样落地 actor,把 5s 采样卷积进分钟表、按小时二次
 /// 卷积进小时表、按当地日清理留存、增量持久化出生登记与组展示元数据。
 ///
@@ -60,33 +85,37 @@ actor HistoryEngine {
     private var lastRetentionDayStart: Date?
     /// 已确认在库的出生 pid:增量写,避免每轮全表重插。
     private var persistedLineagePIDs: Set<pid_t> = []
+    /// 本会话回灌读回的记录(pid → 库里那一份):登记表里该 pid 换成了别的记录 = 跨会话
+    /// pid 复用、主干判活记录胜,库里那行要覆盖(覆盖一次即移出)。
+    private var restoredLineage: [pid_t: LineageRegistry.Entry] = [:]
     /// 已持久化的组名(stableKey → name):改名才重写。
     private var persistedGroupNames: [String: String] = [:]
-    /// 库健康状态沿(过渡非轮询的日志惯例,LogService 教训③):落库或累计
-    /// 查询失败进入记一条,恢复成功再记一条,期间静默——持续失败若逐条记,
-    /// 5s 一轮会把日志刷满留存窗口。写读共用一面旗:库坏时两边都会失败,
-    /// 第一处记进入边,其余静默;先恢复者记恢复边。
-    private var databaseHealthy = true
+    /// 库健康状态沿(HistoryHealthEdge),写与读各一面:磁盘写满 / 库只读时读仍成功,
+    /// 共用一面旗会让日志每分钟在「失败 / 恢复」间来回翻(审查 MEDIUM)。
+    private var writeHealth = HistoryHealthEdge()
+    private var readHealth = HistoryHealthEdge()
 
-    /// 构造:打开方负责给库(文件或内存);`now` 用于启动时的存量小时补卷积
-    /// (上一会话收尾未及卷积的分钟行在此补齐,不悬空)。
+    /// 构造:打开方负责给库(文件或内存)。只读回组名缓存(一张小表);存量小时补卷积
+    /// 不在这里做——构造跑在调用方线程(app 启动时是主线程),补卷积由本会话首笔落库
+    /// 在 actor 上完成,且只从小时表已有的最后一小时起卷(arch-review-2026-10-18/03 乙5)。
+    /// `now` 保留给调用方兼容。
     /// init 是非隔离上下文:闭包内只动局部量,actor 状态在闭包外赋值。
     init(database: DatabaseQueue?, now: Date = Date(), calendar: Calendar = .current) {
         self.database = database
         self.calendar = calendar
         guard let database else { return }
         do {
-            let boundary = HistoryWindows.hourStartSeconds(of: now)
-            var names: [String: String] = [:]
-            try database.write { db in
-                try Self.rollupHours(from: 0, through: boundary, in: db)
-                names = try Self.persistedGroupNames(in: db)
-            }
-            hourRollupBoundary = boundary
-            persistedGroupNames = names
+            persistedGroupNames = try database.read { db in try Self.persistedGroupNames(in: db) }
         } catch {
             LogService.error("历史库启动初始化失败:\(error)", category: "History")
         }
+    }
+
+    /// 小时表在 `boundary`(当前小时)之前的最后一小时(无行为 0 = 从头卷;重卷它幂等):
+    /// 首笔落库补卷积的下界,成本不随留存窗增长。只看当前小时之前——时钟曾跑快留下的
+    /// 未来小时行不能把下界顶到未来(审查 HIGH:否则中间的小时永远补不上)。
+    private static func lastRolledHour(before boundary: Int, in db: Database) throws -> Int {
+        try Int.fetchOne(db, sql: "SELECT MAX(ts) FROM system_hour WHERE ts < ?", arguments: [boundary]) ?? 0
     }
 
     /// 默认引擎:打开应用库;失败返回 nil(SystemMonitor 降级为无历史)。
@@ -106,7 +135,9 @@ actor HistoryEngine {
     /// 跨当地日顺带留存清理;出生登记与组元数据增量落库——同一事务。
     /// `netRxBytes`/`netTxBytes` = 本轮网络记账增量(工单 06,差分丢弃轮为 0);
     /// `diskReadBytes`/`diskWriteBytes` = 本轮磁盘吞吐记账增量(差分丢弃轮
-    /// 同为 0,与网络同口径)。
+    /// 同为 0,与网络同口径)。返回本轮落库结果(HistoryIngestOutcome)——调用方据此
+    /// 决定要不要重查网络累计(乙7)。
+    @discardableResult
     func ingest(
         at now: Date,
         systemLoad: Double,
@@ -117,8 +148,9 @@ actor HistoryEngine {
         netTxBytes: UInt64 = 0,
         diskReadBytes: UInt64 = 0,
         diskWriteBytes: UInt64 = 0
-    ) {
-        guard let database else { return }
+    ) -> HistoryIngestOutcome {
+        guard let database else { return .buffered }
+        var wroteMinute = false
         do {
             try database.write { db in
                 if let aggregate = buffer.ingest(
@@ -131,11 +163,13 @@ actor HistoryEngine {
                     diskWriteBytes: diskWriteBytes
                 ) {
                     try Self.insertMinute(aggregate, in: db)
+                    wroteMinute = true
                 }
 
                 let boundary = HistoryWindows.hourStartSeconds(of: now)
                 if boundary > (hourRollupBoundary ?? Int.min) {
-                    try Self.rollupHours(from: hourRollupBoundary ?? 0, through: boundary, in: db)
+                    let lower = try hourRollupBoundary ?? Self.lastRolledHour(before: boundary, in: db)
+                    try Self.rollupHours(from: lower, through: boundary, in: db)
                     hourRollupBoundary = boundary
                 }
 
@@ -149,20 +183,34 @@ actor HistoryEngine {
                 try persistLineage(lineage, seenAt: now, in: db)
                 try persistGroupMetadata(displayNames, in: db)
             }
-            markDatabaseHealthy()
+            noteWriteSuccess()
+            return wroteMinute ? .wroteMinute : .buffered
         } catch {
-            // 过渡非轮询:失败态进入记一条,期间静默,恢复成功再记一条。
-            guard databaseHealthy else { return }
-            databaseHealthy = false
-            LogService.error("历史落库失败(此后静默至恢复):\(error)", category: "History")
+            noteWriteFailure(error)
+            return .failed
         }
     }
 
-    /// 状态沿恢复边:从失败态回到成功记一条(只在该边记,平时安静)。
-    private func markDatabaseHealthy() {
-        guard !databaseHealthy else { return }
-        databaseHealthy = true
-        LogService.info("历史库恢复,落库继续", category: "History")
+    /// 写路径状态沿(落库):恢复边记一条,进入边记一条,其间静默。
+    private func noteWriteSuccess() {
+        guard writeHealth.recordSuccess() else { return }
+        LogService.info("历史落库恢复", category: "History")
+    }
+
+    private func noteWriteFailure(_ error: Error) {
+        guard writeHealth.recordFailure() else { return }
+        LogService.error("历史落库失败(此后静默至恢复):\(error)", category: "History")
+    }
+
+    /// 读路径状态沿(网络累计 / 历史页查询共用)。
+    func noteReadSuccess() {
+        guard readHealth.recordSuccess() else { return }
+        LogService.info("历史查询恢复", category: "History")
+    }
+
+    func noteReadFailure(_ what: String, _ error: Error) {
+        guard readHealth.recordFailure() else { return }
+        LogService.error("\(what)(此后静默至恢复):\(error)", category: "History")
     }
 
     // MARK: 网络 Today/7 天累计(工单 06)
@@ -175,7 +223,7 @@ actor HistoryEngine {
     func networkTotals(now: Date) -> NetworkTotalsReading? {
         guard let database else { return nil }
         do {
-            return try database.read { db in
+            let totals = try database.read { db in
                 let dayStart = calendar.startOfDay(for: now)
                 let weekStart = calendar.date(byAdding: .day, value: -6, to: dayStart)
                 let hourStart = HistoryWindows.hourStartSeconds(of: now)
@@ -216,14 +264,95 @@ actor HistoryEngine {
                     weekUpBytes: total(weekHourTx, currentMinuteTx)
                 )
             }
+            noteReadSuccess()
+            return totals
         } catch {
-            // 过渡非轮询:与 ingest 共用一面健康旗——库坏时两边都会失败,
-            // 第一处记进入边,这里静默;恢复边由先成功的一方记。
-            guard databaseHealthy else { return nil }
-            databaseHealthy = false
-            LogService.error("网络累计查询失败(此后静默至恢复):\(error)", category: "History")
+            noteReadFailure("网络累计查询失败", error)
             return nil
         }
+    }
+
+    // MARK: 改项目根的组身份迁移(arch-review-2026-10-18/03 乙3)
+
+    /// metadata 表里上一版项目根快照的键。
+    private static let projectRootsKey = "project_roots"
+
+    /// 对账项目根(启动时与每次改根各调一次):与库里上一版快照比对,按
+    /// ProjectRootMigration 的一对一配对把旧根的组键改写成新根(分钟表 / 小时表 /
+    /// 组元数据,worktree 后缀保留),再存下这一版快照。首启(无快照)只存快照。
+    /// 新键在同一时刻已有行时(PRIMARY KEY 冲突)保留新行、旧行原样留下(OR IGNORE)。
+    /// 失败只记日志——历史是旁路。
+    func reconcileProjectRoots(_ roots: [String]) {
+        guard let database else { return }
+        let normalized = roots.map(PathNormalization.normalize).sorted()
+        do {
+            let plan: ProjectRootMigration.Plan? = try database.write { db in
+                let stored = try String.fetchOne(
+                    db, sql: "SELECT value FROM metadata WHERE key = ?", arguments: [Self.projectRootsKey]
+                )
+                let previous = stored
+                    .flatMap { try? JSONDecoder().decode([String].self, from: Data($0.utf8)) }
+                var plan: ProjectRootMigration.Plan?
+                if let previous, previous != normalized {
+                    let computed = ProjectRootMigration.plan(previous: previous, current: normalized)
+                    for move in computed.moves {
+                        try Self.rewriteGroupKeys(move, in: db)
+                        buffer.rekeyGroups { Self.moved($0, by: move) }
+                    }
+                    plan = computed
+                }
+                try db.execute(
+                    sql: "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
+                    arguments: [Self.projectRootsKey, LineageRow.argvJSON(normalized)]
+                )
+                return plan
+            }
+            guard let plan else { return }
+            for move in plan.moves {
+                LogService.info("项目根变更:历史从 \(move.from) 迁到 \(move.to)", category: "History")
+            }
+            for root in plan.skipped {
+                LogService.info("项目根变更:\(root) 的新去处有歧义,历史未迁移", category: "History")
+            }
+            if !plan.moves.isEmpty {
+                persistedGroupNames = try database.read { db in try Self.persistedGroupNames(in: db) }
+            }
+        } catch {
+            LogService.error("项目根对账失败:\(error)", category: "History")
+        }
+    }
+
+    /// 组身份按一处根迁移换键:旧根下的项目组(含 worktree)换到新根,其余不动。
+    private static func moved(_ identity: GroupIdentity, by move: ProjectRootMigration.Move) -> GroupIdentity {
+        guard case .project(let root, let worktree) = identity, root == move.from else { return identity }
+        return .project(root: move.to, worktreeName: worktree)
+    }
+
+    /// 一处根迁移:旧键 "project:<from>" 与 "project:<from>@<wt>" 换成新根前缀。
+    /// 用 substr 比前缀而非 LIKE(路径里可能有 % 与 _);长度按 Unicode 码点数
+    /// (SQLite 对 TEXT 的 substr 以字符计)。
+    private static func rewriteGroupKeys(_ move: ProjectRootMigration.Move, in db: Database) throws {
+        let oldPrefix = ProjectRootMigration.keyPrefix(ofRoot: move.from)
+        let newPrefix = ProjectRootMigration.keyPrefix(ofRoot: move.to)
+        let worktreePrefix = oldPrefix + "@"
+        let tailStart = oldPrefix.unicodeScalars.count + 1
+        let arguments: StatementArguments = [
+            newPrefix, tailStart, oldPrefix, worktreePrefix.unicodeScalars.count, worktreePrefix,
+        ]
+        let match = "group_id = ? OR substr(group_id, 1, ?) = ?"
+        for table in ["sample_min", "sample_hour"] {
+            try db.execute(
+                sql: "UPDATE OR IGNORE \(table) SET group_id = ? || substr(group_id, ?) WHERE \(match)",
+                arguments: arguments
+            )
+        }
+        try db.execute(
+            sql: """
+                UPDATE OR IGNORE groups SET group_id = ? || substr(group_id, ?), project_root = ?
+                WHERE \(match)
+                """,
+            arguments: [newPrefix, tailStart, move.to, oldPrefix, worktreePrefix.unicodeScalars.count, worktreePrefix]
+        )
     }
 
     // MARK: 出生登记回灌(重启保归因)
@@ -241,6 +370,7 @@ actor HistoryEngine {
             for row in rows {
                 persistedLineagePIDs.insert(pid_t(row.pid))
                 registry.register(pid: pid_t(row.pid), entry: row.entry)
+                restoredLineage[pid_t(row.pid)] = row.entry
             }
             return registry
         } catch {
@@ -251,10 +381,31 @@ actor HistoryEngine {
 
     /// 增量登记:只写未持久化过的 pid(INSERT OR IGNORE,首记为准——与
     /// 内存登记表同口径)。first_seen = 落库时刻(登记即落库,滞后 ≤1 轮)。
+    /// 例外:回灌读回的 pid 在本会话被复用、主干判活记录胜(登记表里换成了别的
+    /// 记录)→ 整行覆盖,first_seen 记覆盖时刻(arch-review-2026-10-18/03)。
     private func persistLineage(
         _ lineage: LineageRegistry, seenAt now: Date, in db: Database
     ) throws {
         let firstSeen = now.timeIntervalSince1970
+        for (pid, restored) in restoredLineage {
+            guard let current = lineage.entries[pid], current != restored else { continue }
+            try db.execute(
+                sql: """
+                    INSERT OR REPLACE INTO lineage
+                        (pid, parent_pid, executable_path, cwd, argv, first_seen)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                arguments: [
+                    pid,
+                    current.parentPID,
+                    current.executablePath,
+                    current.cwd,
+                    LineageRow.argvJSON(current.argv),
+                    firstSeen,
+                ]
+            )
+            restoredLineage.removeValue(forKey: pid)
+        }
         for (pid, entry) in lineage.entries where !persistedLineagePIDs.contains(pid) {
             try db.execute(
                 sql: """

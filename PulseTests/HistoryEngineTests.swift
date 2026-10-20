@@ -271,7 +271,8 @@ final class HistoryEngineTests: XCTestCase {
         XCTAssertEqual(try scalarInt("SELECT count(*) FROM sample_min"), 2)
     }
 
-    /// 启动恢复:上一会话遗留的分钟行(未及小时卷积)在新引擎打开时补齐。
+    /// 启动恢复:上一会话遗留的分钟行(未及小时卷积)由新会话首笔落库补齐;构造本身
+    /// 不碰小时表(不在调用方线程上补卷积,乙5)。
     func testStartupRecoversUnrolledHours() async throws {
         let engineA = try makeFileEngine(now: minute0)
         await ingest(engineA, at: minute0, load: 12, groups: [GroupSample(id: .orphan, cpuPercent: 8, memoryBytes: 10)])
@@ -282,12 +283,53 @@ final class HistoryEngineTests: XCTestCase {
             try db.execute(sql: "DELETE FROM system_hour")
         }
 
-        // "重启"(且已跨入下一小时):新引擎打开同一文件 → 启动补卷积
+        // "重启"(且已跨入下一小时):新引擎打开同一文件,构造后小时表仍空;首笔落库
         // 把上一会话的完整小时补齐。
-        _ = try makeFileEngine(now: minute0.addingTimeInterval(3600))
+        let engineB = try makeFileEngine(now: minute0.addingTimeInterval(3600))
+        XCTAssertEqual(try scalarInt("SELECT count(*) FROM sample_hour"), 0, "构造不补卷积")
+        await ingest(engineB, at: minute0.addingTimeInterval(3600), load: 0, groups: [])
 
         XCTAssertEqual(try scalarInt("SELECT count(*) FROM sample_hour"), 1)
         XCTAssertEqual(try scalarDouble("SELECT load_avg FROM system_hour"), 12, accuracy: 0.0001)
+    }
+
+    /// 落库回报本轮是否写了分钟行(跨分钟冲刷):网络累计只在库真变了时才需要重查
+    /// (arch-review-2026-10-18/03 乙7,累计每轮 3×SUM → 每分钟一次)。
+    func testIngestReportsWhetherAMinuteRowWasWritten() async throws {
+        let engine = try makeMemoryEngine(now: minute0)
+        let first = await engine.ingest(at: minute0, systemLoad: 1, groups: [], displayNames: [:], lineage: LineageRegistry())
+        let sameMinute = await engine.ingest(
+            at: minute0.addingTimeInterval(30), systemLoad: 1, groups: [], displayNames: [:], lineage: LineageRegistry()
+        )
+        let nextMinute = await engine.ingest(
+            at: minute0.addingTimeInterval(65), systemLoad: 1, groups: [], displayNames: [:], lineage: LineageRegistry()
+        )
+
+        XCTAssertEqual(first, .buffered)
+        XCTAssertEqual(sameMinute, .buffered)
+        XCTAssertEqual(nextMinute, .wroteMinute, "跨分钟冲刷了上一分钟")
+    }
+
+    /// 时钟曾跑快、小时表里留下一行未来小时:补卷积下界只看当前小时之前,不被它卡住
+    /// (审查 HIGH:否则此后每次启动都补不进中间的小时,7 天后分钟行清理即永久缺失)。
+    func testFutureDatedHourRowDoesNotBlockStartupRollup() async throws {
+        let engineA = try makeFileEngine(now: minute0)
+        await ingest(engineA, at: minute0, load: 12, groups: [])
+        await ingest(engineA, at: minute0.addingTimeInterval(60), load: 0, groups: [])
+        let future = HistoryWindows.hourStartSeconds(of: minute0) + 10 * 365 * 24 * 3600
+        try await queue.write { db in
+            try db.execute(sql: "DELETE FROM system_hour")
+            try db.execute(sql: "INSERT INTO system_hour (ts, load_avg, load_max) VALUES (?, 1, 1)", arguments: [future])
+        }
+
+        let engineB = try makeFileEngine(now: minute0.addingTimeInterval(3600))
+        await ingest(engineB, at: minute0.addingTimeInterval(3600), load: 0, groups: [])
+
+        let rolled = try scalarInt(
+            "SELECT count(*) FROM system_hour WHERE ts = ?",
+            [HistoryWindows.hourStartSeconds(of: minute0)]
+        )
+        XCTAssertEqual(rolled, 1)
     }
 
     // MARK: 留存清理
@@ -469,6 +511,37 @@ final class HistoryEngineTests: XCTestCase {
         )
         let groups = GroupingEngine.groups(from: snapshot, lineage: restored)
         XCTAssertEqual(groups.map(\.id), [.app(bundlePath: "/Applications/Host.app")])
+    }
+
+    /// 跨会话 pid 复用(arch-review-2026-10-18/03):上一会话 pid 100 是 cargo 下的 rustc,
+    /// 本会话 pid 100 被 zsh 复用、主干判活记录胜——库里那一行要换成 zsh,下一会话
+    /// 回灌才不会再把它当 rustc。复用后又被同一 zsh 记录重投不重复写。
+    func testRestoredLineageRowIsReplacedWhenThePidWasReusedThisSession() async throws {
+        let rustc = LineageRegistry.Entry(
+            parentPID: 12,
+            identity: ProcessIdentity(executablePath: "/usr/bin/rustc", cwd: "/w", argv: ["rustc"])
+        )
+        let zsh = LineageRegistry.Entry(
+            parentPID: 1,
+            identity: ProcessIdentity(executablePath: "/bin/zsh", cwd: "/Users/x", argv: ["-zsh"])
+        )
+        var previousSession = LineageRegistry()
+        previousSession.register(pid: 100, entry: rustc)
+        let engineA = try makeFileEngine(now: minute0)
+        await ingest(engineA, at: minute0, load: 1, groups: [], lineage: previousSession)
+
+        let engineB = try makeFileEngine(now: minute0.addingTimeInterval(120))
+        _ = await engineB.importLineage()
+        var reused = LineageRegistry()
+        reused.register(pid: 100, entry: zsh)
+        await ingest(engineB, at: minute0.addingTimeInterval(120), load: 1, groups: [], lineage: reused)
+        await ingest(engineB, at: minute0.addingTimeInterval(125), load: 1, groups: [], lineage: reused)
+
+        XCTAssertEqual(try scalarInt("SELECT count(*) FROM lineage"), 1)
+        XCTAssertEqual(try scalarString("SELECT executable_path FROM lineage WHERE pid = 100"), "/bin/zsh")
+        let engineC = try makeFileEngine(now: minute0.addingTimeInterval(240))
+        let restored = await engineC.importLineage()
+        XCTAssertEqual(restored.entries[100]?.parentPID, 1)
     }
 
     // MARK: 组元数据

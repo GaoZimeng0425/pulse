@@ -73,6 +73,38 @@ final class SensorSchedulerTests: XCTestCase {
         XCTAssertEqual(box.ticks, 2)
     }
 
+    /// 唤醒流非取消地结束 = 事件源死了,传感器从此不再更新:记一条终态日志并点名
+    /// (arch-review-2026-10-18/03 甲7,此前静默死亡);取消导致的退出不记。
+    func testOnEventStreamEndingLogsATerminalLineNamingTheSensor() async {
+        let (stream, continuation) = AsyncStream.makeStream(of: Void.self)
+        let logs = LogBox()
+        let scheduler = SensorScheduler(sleep: { _ in }, log: { logs.append($0) })
+        let driver = SensorDriver(
+            cadence: .onEvent, tick: {}, wakeups: { stream }, label: "BatterySensorProvider"
+        )
+
+        let task = Task { await scheduler.run([driver]) }
+        continuation.finish()
+        await task.value
+
+        XCTAssertEqual(logs.lines.count, 1)
+        XCTAssertTrue(logs.lines.first?.contains("BatterySensorProvider") ?? false)
+    }
+
+    func testCancelledOnEventDriverLogsNothing() async {
+        let (stream, _) = AsyncStream.makeStream(of: Void.self)
+        let logs = LogBox()
+        let scheduler = SensorScheduler(sleep: { _ in }, log: { logs.append($0) })
+        let driver = SensorDriver(cadence: .onEvent, tick: {}, wakeups: { stream }, label: "x")
+
+        let task = Task { await scheduler.run([driver]) }
+        await Task.yield()
+        task.cancel()
+        await task.value
+
+        XCTAssertEqual(logs.lines, [])
+    }
+
     func testOnEventWithoutWakeupsDoesNotTick() async {
         // 事件档缺唤醒流:无法驱动,安静退出且不读(编程错误防御)。
         let scheduler = SensorScheduler(sleep: { _ in })
@@ -82,6 +114,22 @@ final class SensorSchedulerTests: XCTestCase {
         await scheduler.run([driver])
 
         XCTAssertEqual(box.ticks, 0)
+    }
+}
+
+/// 日志收件箱(调度器 actor 上写、测试读)。
+private final class LogBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: [String] = []
+
+    func append(_ line: String) {
+        lock.lock(); defer { lock.unlock() }
+        stored.append(line)
+    }
+
+    var lines: [String] {
+        lock.lock(); defer { lock.unlock() }
+        return stored
     }
 }
 
