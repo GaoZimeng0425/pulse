@@ -38,6 +38,23 @@ struct LineageRow: Decodable, FetchableRecord, TableRecord {
     }
 }
 
+/// 历史库健康状态沿(过渡非轮询的日志惯例,LogService 教训③):落库、累计查询与历史页
+/// 查询共用一面旗——库坏时几处都会失败,第一处记进入边,其余静默;先恢复者记恢复边。
+/// 持续失败若逐条记,5s 一轮会把日志刷满留存窗口。返回值 = 这一次要不要记日志。
+struct HistoryHealthEdge {
+    private(set) var healthy = true
+
+    mutating func recordFailure() -> Bool {
+        defer { healthy = false }
+        return healthy
+    }
+
+    mutating func recordSuccess() -> Bool {
+        defer { healthy = true }
+        return !healthy
+    }
+}
+
 /// 历史引擎(工单 03):采样落地 actor,把 5s 采样卷积进分钟表、按小时二次
 /// 卷积进小时表、按当地日清理留存、增量持久化出生登记与组展示元数据。
 ///
@@ -62,11 +79,8 @@ actor HistoryEngine {
     private var persistedLineagePIDs: Set<pid_t> = []
     /// 已持久化的组名(stableKey → name):改名才重写。
     private var persistedGroupNames: [String: String] = [:]
-    /// 库健康状态沿(过渡非轮询的日志惯例,LogService 教训③):落库或累计
-    /// 查询失败进入记一条,恢复成功再记一条,期间静默——持续失败若逐条记,
-    /// 5s 一轮会把日志刷满留存窗口。写读共用一面旗:库坏时两边都会失败,
-    /// 第一处记进入边,其余静默;先恢复者记恢复边。
-    private var databaseHealthy = true
+    /// 库健康状态沿(HistoryHealthEdge):落库、累计、历史页查询共用。
+    private var health = HistoryHealthEdge()
 
     /// 构造:打开方负责给库(文件或内存)。只读回组名缓存(一张小表);存量小时补卷积
     /// 不在这里做——构造跑在调用方线程(app 启动时是主线程),补卷积由本会话首笔落库
@@ -151,20 +165,22 @@ actor HistoryEngine {
                 try persistLineage(lineage, seenAt: now, in: db)
                 try persistGroupMetadata(displayNames, in: db)
             }
-            markDatabaseHealthy()
+            noteDatabaseSuccess()
         } catch {
-            // 过渡非轮询:失败态进入记一条,期间静默,恢复成功再记一条。
-            guard databaseHealthy else { return }
-            databaseHealthy = false
-            LogService.error("历史落库失败(此后静默至恢复):\(error)", category: "History")
+            noteDatabaseFailure("历史落库失败", error)
         }
     }
 
     /// 状态沿恢复边:从失败态回到成功记一条(只在该边记,平时安静)。
-    private func markDatabaseHealthy() {
-        guard !databaseHealthy else { return }
-        databaseHealthy = true
-        LogService.info("历史库恢复,落库继续", category: "History")
+    func noteDatabaseSuccess() {
+        guard health.recordSuccess() else { return }
+        LogService.info("历史库恢复", category: "History")
+    }
+
+    /// 状态沿进入边:健康 → 失败记一条,此后静默至恢复。
+    func noteDatabaseFailure(_ what: String, _ error: Error) {
+        guard health.recordFailure() else { return }
+        LogService.error("\(what)(此后静默至恢复):\(error)", category: "History")
     }
 
     // MARK: 网络 Today/7 天累计(工单 06)
@@ -177,7 +193,7 @@ actor HistoryEngine {
     func networkTotals(now: Date) -> NetworkTotalsReading? {
         guard let database else { return nil }
         do {
-            return try database.read { db in
+            let totals = try database.read { db in
                 let dayStart = calendar.startOfDay(for: now)
                 let weekStart = calendar.date(byAdding: .day, value: -6, to: dayStart)
                 let hourStart = HistoryWindows.hourStartSeconds(of: now)
@@ -218,12 +234,10 @@ actor HistoryEngine {
                     weekUpBytes: total(weekHourTx, currentMinuteTx)
                 )
             }
+            noteDatabaseSuccess()
+            return totals
         } catch {
-            // 过渡非轮询:与 ingest 共用一面健康旗——库坏时两边都会失败,
-            // 第一处记进入边,这里静默;恢复边由先成功的一方记。
-            guard databaseHealthy else { return nil }
-            databaseHealthy = false
-            LogService.error("网络累计查询失败(此后静默至恢复):\(error)", category: "History")
+            noteDatabaseFailure("网络累计查询失败", error)
             return nil
         }
     }

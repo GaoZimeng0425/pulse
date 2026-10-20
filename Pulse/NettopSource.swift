@@ -85,7 +85,7 @@ struct NettopRun: Sendable {
     let outcome: NettopRunOutcome
 }
 
-/// nettop 状态沿日志(票 A 中6;transition-not-tick,沿 HistoryEngine.databaseHealthy
+/// nettop 状态沿日志(票 A 中6;transition-not-tick,沿 HistoryHealthEdge
 /// 惯例):收尾方式变化才记一条——进入失败记错误、换一种失败再记、恢复记一条,
 /// 持续同态静默。5s 一档的子进程若逐趟记失败,会把有用日志挤出留存窗口
 /// (LogService 教训③)。纯值状态机,单测钉死。
