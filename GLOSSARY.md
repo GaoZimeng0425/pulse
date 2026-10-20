@@ -64,7 +64,7 @@ _Avoid_: tick(那是调度器的节拍,低频传感器各有各的 tick)、帧
 _Avoid_: reducer、中心模型(已否决的两版方案的叫法)
 
 **功能模块 (Feature)**:
-一个纵向功能(历史、模块排行,及待迁的告警、dev server、网络、磁盘、电池)= @Observable 薄壳 + 纯值内核,经 MonitorFeature 扩展点接入:收每轮上下文与自己的传感器读数,自持状态、自执行副作用;视图直读模块。由工厂构造、以注册列表交给 SystemMonitor(ADR-0003)。
+一个纵向功能(告警、dev server、网络、磁盘、电池、模块排行、历史)= @Observable 薄壳 + 纯值内核,经 MonitorFeature 扩展点接入:收每轮上下文、自己的传感器读数与其他模块的广播事件,自持状态、自执行副作用;视图直读模块。由工厂构造、以注册列表交给 SystemMonitor(ADR-0003)。
 _Avoid_: 插件(ADR-0003:编译期模块,不是运行时插件)、服务
 
 **榜单 (Leaderboard)**:

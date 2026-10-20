@@ -100,18 +100,22 @@ extension SystemMonitor {
                 coreTicks: LiveCoreTickSource(),
                 memoryStats: LiveMemoryStatsSource(),
                 networkCounters: LiveNetworkCountersSource(),
+                heartbeatRelay: HeartbeatRusageRelay(),
                 birthScan: InertBirthScanSource(),
-                battery: InertBatterySource(),
-                diskCapacity: InertDiskCapacitySource(),
-                diskThroughput: { _ in InertDiskThroughputSource() },
-                devServerPortScanner: InertDevServerPortScanner(),
                 killService: InertKillService()
             ),
             projectRoots: projectRoots,
-            alerts: .inert(),
             features: MonitorFeatures(
+                network: NetworkFeature(),
+                alerts: .inert(),
+                devServers: DevServerFeature(portScanner: InertDevServerPortScanner()),
                 rankings: RankingsFeature(nettopSource: InertNettopCSVSource()),
-                history: HistoryFeature(engine: historyEngine)
+                history: HistoryFeature(engine: historyEngine),
+                disk: DiskFeature(
+                    capacitySource: InertDiskCapacitySource(),
+                    throughputSource: InertDiskThroughputSource()
+                ),
+                battery: BatteryFeature(source: InertBatterySource())
             )
         )
     }

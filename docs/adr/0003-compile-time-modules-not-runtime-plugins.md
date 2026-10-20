@@ -5,3 +5,5 @@
 时机:P0 不引入扩展抽象(仅保留既定的 `ProcessSource` 接缝);P1 第一个功能模块落地时定义扩展点,dev server 侦测、告警、SQLite 历史各自成模块。
 
 澄清(评审 T1):`ProcessSource`、`KillService` 这类协议是**编译期测试注入接缝**——为让纯逻辑可单测而存在,产品运行期只有一个真实现、不做运行时替换;"编译期测试接缝"与"可运行时装卸的插件"是两回事,后者仍按本 ADR 不做。
+
+兑现(2026-10-20,arch-review-2026-10-18/01):扩展点为 `MonitorFeature`(`Pulse/MonitorSpine.swift`),告警 / dev server / 网络 / 磁盘 / 电池 / 模块排行 / 历史七个功能模块各为「@Observable 薄壳 + 纯值内核」,由工厂构造、以注册列表(`MonitorFeatures`)交给 SystemMonitor;SystemMonitor 只剩共享归组主干(RoundSpine)与派发。模块间不互持引用,经宿主广播事件通信。「模块」此时仍指同一 target 内的类型边界;编译器守门的 SPM 模块边界见 arch-review-2026-10-18/05(PulseCore)。设置中开关模块未做(无需求)。

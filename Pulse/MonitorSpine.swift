@@ -100,9 +100,26 @@ struct MonitorHost {
     /// 心跳排行账本门控(Sampler.setRankingsActive):宿主给每条消息编代号,
     /// 迟到的旧消息在 Sampler 侧丢弃。
     let setRankingsActive: (Bool) -> Void
+    /// 模块间广播:同步派发给全部功能模块的 onEvent(含发出者自己,按注册顺序)。
+    let broadcast: (FeatureEvent) -> Void
 
     /// 全不接线的宿主(单测直驱模块用)。
-    static let inert = MonitorHost(restoreBirths: { _ in }, setRankingsActive: { _ in })
+    static let inert = MonitorHost(
+        restoreBirths: { _ in },
+        setRankingsActive: { _ in },
+        broadcast: { _ in }
+    )
+}
+
+/// 功能模块之间的广播事件:一个模块的产出是另一个模块的输入时走这里(磁盘读数 →
+/// 历史记账 / 磁盘告警;dev server 盘点 → 闲置告警),模块之间不互相持有引用。
+enum FeatureEvent {
+    /// 磁盘吞吐交付(DiskFeature;带新鲜度,记账只认 fresh)。
+    case diskThroughput(SensorDelivery<DiskThroughputReading>)
+    /// 磁盘容量交付(DiskFeature;读失败时为重投的上次好值)。
+    case diskCapacity(DiskCapacityReading)
+    /// 本轮 dev server 盘点(DevServerFeature,每轮一次)。
+    case devServers([DevServerStatus])
 }
 
 /// 功能模块扩展点(ADR-0003 预约「每个服务以独立模块 + 小协议扩展点组织,经注册表
@@ -118,9 +135,8 @@ protocol MonitorFeature: AnyObject {
     /// 窗口可见性变化:值真变化才派发(同值重复调用不派发);初值为全不可见,
     /// 可能早于 start 到达。
     func visibilityChanged(_ visibility: MonitorVisibility)
-    /// 磁盘吞吐读数交付(SystemMonitor 的磁盘吞吐传感器,每份交付都派发,含读失败
-    /// 时重投的上次好值)。磁盘迁成功能模块后,这一钩子随之收回。
-    func diskThroughputDelivered(_ reading: DiskThroughputReading)
+    /// 其他模块的广播(MonitorHost.broadcast);模块只 switch 自己关心的事件。
+    func onEvent(_ event: FeatureEvent)
     /// 本模块自有的非心跳传感器(ADR-0004 SensorScheduler 登记项):SystemMonitor.start
     /// 时取一次,与既有传感器同一个调度器驱动。心跳型读数不走这里(住 Sampler,
     /// 经 onRound 的 `context.update` 送达)。
@@ -135,7 +151,7 @@ protocol MonitorFeature: AnyObject {
 extension MonitorFeature {
     func onRound(_ context: RoundContext) {}
     func visibilityChanged(_ visibility: MonitorVisibility) {}
-    func diskThroughputDelivered(_ reading: DiskThroughputReading) {}
+    func onEvent(_ event: FeatureEvent) {}
     func sensorDrivers() -> [SensorDriver] { [] }
     func start(_ host: MonitorHost) {}
     func stop() {}

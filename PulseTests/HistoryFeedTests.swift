@@ -10,8 +10,7 @@ final class HistoryFeedTests: XCTestCase {
 
     // MARK: 夹具
 
-    /// 磁盘吞吐读数:记账增量 + 一个能区分"新读数"的速率(真 driver 每次新读数
-    /// 都追加走势点,值必不相同;读失败重投的是同一个值)。
+    /// 磁盘吞吐读数:记账增量 + 速率。
     private func diskReading(read: UInt64, write: UInt64, rate: Double) -> DiskThroughputReading {
         DiskThroughputReading(
             current: DiskRates(readBytesPerSecond: rate, writeBytesPerSecond: rate / 2),
@@ -79,17 +78,31 @@ final class HistoryFeedTests: XCTestCase {
 
     // MARK: 磁盘吞吐记账:恰好一次
 
-    /// driver 读失败时重投上次好值(同一个读数):只记一次。
-    func testRedeliveredIdenticalDiskReadingIsCountedOnce() {
+    /// driver 读失败时重投上次好值(标 stale):只记新读数那一次。
+    func testStaleRedeliveryOfTheLastGoodDiskReadingIsNotCounted() {
         var feed = HistoryFeed()
         let reading = diskReading(read: 4_096, write: 1_024, rate: 800)
 
-        feed.recordDiskThroughput(reading)
-        feed.recordDiskThroughput(reading)
+        feed.recordDiskThroughput(.fresh(reading))
+        feed.recordDiskThroughput(.stale(reading))
         let ingest = feed.takeIngest(from: context(), at: ingestAt)
 
         XCTAssertEqual(ingest.diskReadBytes, 4_096)
         XCTAssertEqual(ingest.diskWriteBytes, 1_024)
+    }
+
+    /// 两份新读数逐字段全等(同速率、同增量)也各记一次——新鲜度看标记,不看值
+    /// (此前按值去重时这是已知边界)。
+    func testTwoFreshReadingsWithIdenticalValuesAreBothCounted() {
+        var feed = HistoryFeed()
+        let reading = diskReading(read: 4_096, write: 1_024, rate: 800)
+
+        feed.recordDiskThroughput(.fresh(reading))
+        feed.recordDiskThroughput(.fresh(reading))
+        let ingest = feed.takeIngest(from: context(), at: ingestAt)
+
+        XCTAssertEqual(ingest.diskReadBytes, 8_192)
+        XCTAssertEqual(ingest.diskWriteBytes, 2_048)
     }
 
     /// 两轮心跳之间来了两份不同读数(4096/1024 与 8192/2048):这一笔带走合计
@@ -97,8 +110,8 @@ final class HistoryFeedTests: XCTestCase {
     func testDistinctDiskReadingsAccumulateAndTheNextIngestDrainsThem() {
         var feed = HistoryFeed()
 
-        feed.recordDiskThroughput(diskReading(read: 4_096, write: 1_024, rate: 800))
-        feed.recordDiskThroughput(diskReading(read: 8_192, write: 2_048, rate: 1_600))
+        feed.recordDiskThroughput(.fresh(diskReading(read: 4_096, write: 1_024, rate: 800)))
+        feed.recordDiskThroughput(.fresh(diskReading(read: 8_192, write: 2_048, rate: 1_600)))
         let first = feed.takeIngest(from: context(), at: ingestAt)
         let second = feed.takeIngest(from: context(), at: ingestAt.addingTimeInterval(5))
 
@@ -113,9 +126,9 @@ final class HistoryFeedTests: XCTestCase {
         var feed = HistoryFeed()
         let reading = diskReading(read: 4_096, write: 1_024, rate: 800)
 
-        feed.recordDiskThroughput(reading)
+        feed.recordDiskThroughput(.fresh(reading))
         let drained = feed.takeIngest(from: context(), at: ingestAt)
-        feed.recordDiskThroughput(reading)
+        feed.recordDiskThroughput(.stale(reading))
         let afterRedelivery = feed.takeIngest(from: context(), at: ingestAt.addingTimeInterval(5))
 
         XCTAssertEqual(drained.diskReadBytes, 4_096)

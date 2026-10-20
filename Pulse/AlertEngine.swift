@@ -145,7 +145,7 @@ struct AlertRulePolicy: Equatable, Sendable {
 
 // MARK: - 喂食与事件
 
-/// 组级喂食行(SystemMonitor 每轮从管线读出;name 供通知文案)。
+/// 组级喂食行(告警模块每轮从主干上下文的组折出;name 供通知文案)。
 struct AlertGroupSnapshot: Sendable {
     let id: GroupIdentity
     let name: String

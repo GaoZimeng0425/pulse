@@ -33,7 +33,7 @@ struct DashboardView: View {
         // 历史页(工单 04)只在主窗口,弹窗轴恒滤掉。
         _tabSelection = State(initialValue: MetricTabSelection(
             current: initialTab,
-            axis: MetricTab.popoverAxis(hasBattery: monitor.hasBattery)
+            axis: MetricTab.popoverAxis(hasBattery: monitor.battery.hasBattery)
         ))
     }
 
@@ -65,7 +65,7 @@ struct DashboardView: View {
         .frame(width: Self.width)
         .background(Surface.window)
         // 首次电池读数落地 → 电池页入轴(工单 02);被隐藏的当前 tab 回落总览。
-        .onChange(of: monitor.hasBattery) { _, hasBattery in
+        .onChange(of: monitor.battery.hasBattery) { _, hasBattery in
             tabSelection.setAxis(MetricTab.popoverAxis(hasBattery: hasBattery))
         }
         .modifier(KillFailureAlert(report: $model.killFailureReport))
@@ -94,7 +94,7 @@ struct DashboardView: View {
     }
 
     /// 各 tab 的指标卡:总览 = 双列小卡(点卡跳 tab);CPU / 内存 / 电池 = 主卡
-    /// (内存再加按应用环形;电池六项读数读 monitor.battery,工单 02)。
+    /// (内存再加按应用环形;电池六项读数读 monitor.battery.reading,工单 02)。
     @ViewBuilder
     private var tabCards: some View {
         switch tabSelection.current {
@@ -111,7 +111,7 @@ struct DashboardView: View {
                 MetricCardView(model: model.memoryModel, style: .compact) { tabSelection.current = .memory }
                 MetricCardView(model: model.diskModel, style: .compact) { tabSelection.current = .disk }
                 MetricCardView(model: model.networkModel, style: .compact) { tabSelection.current = .network }
-                if monitor.hasBattery {
+                if monitor.battery.hasBattery {
                     MetricCardView(model: model.batteryModel, style: .compact) { tabSelection.current = .battery }
                 }
             }
@@ -128,8 +128,8 @@ struct DashboardView: View {
             // 磁盘页(工单 05):主卡(已用大数字 + 可用/可清除/速率)+ 各卷
             // 明细 + 快照列表;组排行与磁盘无关,不放(battery 同口径)。
             MetricMainCardView(model: model.diskModel, isCompact: true)
-            DiskVolumeBreakdownView(capacity: monitor.diskCapacity, isCompact: true)
-            DiskSnapshotsCardView(listing: monitor.diskCapacity?.snapshots, isCompact: true)
+            DiskVolumeBreakdownView(capacity: monitor.disk.capacity, isCompact: true)
+            DiskSnapshotsCardView(listing: monitor.disk.capacity?.snapshots, isCompact: true)
         case .network:
             // 网络页(工单 06):主卡(下行大数字 + 上行/Today/7 天/接口)+
             // 流量累计明细;组排行与网络无关,不放(磁盘同口径)。
