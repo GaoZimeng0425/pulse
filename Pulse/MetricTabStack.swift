@@ -5,7 +5,7 @@ import SwiftUI
 /// 一个 tab 的内容栈:主窗口与弹窗读同一份——卡片组成、顺序、数据出处全在这里,
 /// 两处只差排版档(`isCompact`:弹窗 360pt 定宽)。排版差异只有三种,全由宽度决定:
 /// 卡用紧凑档;主窗口并排的两卡(内存双环 / 各卷 + 快照)在弹窗里上下排;主窗口的
-/// 节标题(此刻 / 当前最忙 / 开发服务)弹窗不画,卡片各自带标题。
+/// 节标题(此刻 / 开发服务)弹窗不画,卡片各自带标题。排行卡一律卡内标题,不配节标题。
 ///
 /// 组排行卡由宿主经 `ranking` 给:主窗口带搜索过滤与可排序进程表,弹窗是紧凑行与
 /// 简版下钻——只差交互深度,出现在哪些 tab、排在哪里由本栈决定。
@@ -30,7 +30,6 @@ struct MetricTabStack<Ranking: View>: View {
                 RingCardView.memoryByType(monitor.memory, isCompact: isCompact)
                 memoryByApp
             }
-            sectionTitle("当前最忙")
             ranking()
             sectionTitle("开发服务")
             // dev server 卡(工单 p1-history/08):全部停止只上抛请求,确认对话框
@@ -54,6 +53,7 @@ struct MetricTabStack<Ranking: View>: View {
             MetricMainCardView(model: model.batteryModel, isCompact: isCompact)
             ModuleRankingCardView(
                 title: "能耗影响",
+                valueLabel: "CPU 时间",
                 rows: monitor.rankings.energyRows,
                 accent: Metric.battery.accentColor,
                 cadenceNote: "5 秒一档",
@@ -68,6 +68,7 @@ struct MetricTabStack<Ranking: View>: View {
             }
             ModuleRankingCardView(
                 title: "读写最多",
+                valueLabel: "读写",
                 rows: monitor.rankings.diskRows,
                 accent: Metric.disk.accentColor,
                 cadenceNote: "30 秒一档",
@@ -79,6 +80,7 @@ struct MetricTabStack<Ranking: View>: View {
             NetworkTotalsCardView(totals: monitor.history.networkTotals, isCompact: isCompact)
             ModuleRankingCardView(
                 title: "每进程流量",
+                valueLabel: "流量",
                 rows: monitor.rankings.networkRows,
                 accent: Metric.network.accentColor,
                 cadenceNote: "5 秒一档",

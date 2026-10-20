@@ -114,6 +114,7 @@
 		B7AF2DC3EECBC71EF6EC6346 /* RingCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 933B0BDAB34D052ED3CE1FDA /* RingCardView.swift */; };
 		B8090070D033A8B1C5ACC65E /* HistoryQueryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A74C884A89A50090FD584A68 /* HistoryQueryTests.swift */; };
 		BAA389388E0FABC05A298C73 /* RankingCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFA46EAEACE1FFB5C9B9CEF7 /* RankingCard.swift */; };
+		BF7351332BE19D94AFF82967 /* RankingList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C32782207026F97CAA62BBC /* RankingList.swift */; };
 		C28472B069243FA1523B97C5 /* LiveBatterySourceSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F686C4FCD1571352152AE894 /* LiveBatterySourceSmokeTests.swift */; };
 		C54E62D5C96A4FFA4851744E /* DiskSensorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0C2BC1088F0581063C1D49A /* DiskSensorTests.swift */; };
 		C9D369EFC541BEB9F91F11C0 /* HistoryQueries.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66AADABCE27FB816705A412A /* HistoryQueries.swift */; };
@@ -218,6 +219,7 @@
 		59315D07799E52E9D8CCB971 /* ProcessSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessSnapshot.swift; sourceTree = "<group>"; };
 		59B30E8456B68E98E3EFD9C7 /* Leaderboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Leaderboard.swift; sourceTree = "<group>"; };
 		5A686C29DAEAD2AC1D94E833 /* HistoryFeatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryFeatureTests.swift; sourceTree = "<group>"; };
+		5C32782207026F97CAA62BBC /* RankingList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingList.swift; sourceTree = "<group>"; };
 		643570A1AA82643F686AB57B /* LogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogService.swift; sourceTree = "<group>"; };
 		66AADABCE27FB816705A412A /* HistoryQueries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryQueries.swift; sourceTree = "<group>"; };
 		670AF87DB082DFF466DFF600 /* HistoryFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryFeature.swift; sourceTree = "<group>"; };
@@ -411,6 +413,7 @@
 				2A05454E2790B918CCFBFDA4 /* PulseFormat.swift */,
 				F051B348EF775E2C6061C759 /* RankingBoard.swift */,
 				DFA46EAEACE1FFB5C9B9CEF7 /* RankingCard.swift */,
+				5C32782207026F97CAA62BBC /* RankingList.swift */,
 				7EBD25E93A82EAAC47EE079E /* RankingsFeature.swift */,
 				933B0BDAB34D052ED3CE1FDA /* RingCardView.swift */,
 				30D9403FA7D11E59957A5230 /* SampleHistory.swift */,
@@ -753,6 +756,7 @@
 				EE3566C6FB14C20C796F9706 /* PulseFormat.swift in Sources */,
 				930C2E23A2D15A3AD13D8D1D /* RankingBoard.swift in Sources */,
 				BAA389388E0FABC05A298C73 /* RankingCard.swift in Sources */,
+				BF7351332BE19D94AFF82967 /* RankingList.swift in Sources */,
 				DD3ED5175C10C598BB5E5025 /* RankingsFeature.swift in Sources */,
 				B7AF2DC3EECBC71EF6EC6346 /* RingCardView.swift in Sources */,
 				D4C390E861801BEB0B50B02A /* SampleHistory.swift in Sources */,
