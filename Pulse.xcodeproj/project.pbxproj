@@ -30,6 +30,7 @@
 		2A294741604ED11BCA7E7E11 /* PulseApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D5309CAF2CC1BC7C626E937 /* PulseApp.swift */; };
 		2C68FC18B9EDF314A38BD5D8 /* HistoryRollup.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97653121F297163CBE1387A /* HistoryRollup.swift */; };
 		2DCD7137BF9BE9686D8C09A5 /* SensorSchedulerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AC27FEB37DD6E6D805622BC /* SensorSchedulerTests.swift */; };
+		2DD62D2DA9252E398DA6EBF7 /* MetricTabStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38E717E93875BA26B1FC8492 /* MetricTabStack.swift */; };
 		2DE046FD16E797B5FD5DAD86 /* GroupIdentityKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C824BEE522DE5FC8ACD3DC2 /* GroupIdentityKey.swift */; };
 		2E0156C2D5F69B58F6905BC2 /* MonitorSpine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08E2E5CF689AC7C827228B41 /* MonitorSpine.swift */; };
 		2E2002AEC31359B682E90AC6 /* MonitorAssembly.swift in Sources */ = {isa = PBXBuildFile; fileRef = E96FC92EB2F8E76A96DC5AE5 /* MonitorAssembly.swift */; };
@@ -204,6 +205,7 @@
 		32BE8BAC25214CEDFBA5AF6C /* DashboardModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardModel.swift; sourceTree = "<group>"; };
 		32DF241AAD5F8798ADDE0FC2 /* GroupingPipelineSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupingPipelineSmokeTests.swift; sourceTree = "<group>"; };
 		3876B006CE48D758E7238556 /* CPUDiffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CPUDiffer.swift; sourceTree = "<group>"; };
+		38E717E93875BA26B1FC8492 /* MetricTabStack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricTabStack.swift; sourceTree = "<group>"; };
 		3A992F5F503CAD7CB90DD838 /* LiveProcessSourceSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveProcessSourceSmokeTests.swift; sourceTree = "<group>"; };
 		3B54C03EEBCD8FC451ACA5DE /* AlertSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSettingsView.swift; sourceTree = "<group>"; };
 		405D7B0A83AFBAA5FAEA4A5D /* SystemMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMonitor.swift; sourceTree = "<group>"; };
@@ -381,6 +383,7 @@
 				CDD3F4E919A4F4E221C8DA95 /* MeterBar.swift */,
 				15A129D11862CB2382425940 /* MetricAccent.swift */,
 				AE61AAB8A3AD499BFDAD5BEF /* MetricTabModel.swift */,
+				38E717E93875BA26B1FC8492 /* MetricTabStack.swift */,
 				AA4729652A528B0AD0592677 /* MetricTabViews.swift */,
 				D1B0ADC99228786733FB5FC7 /* ModuleRanking.swift */,
 				D78F80B0E8FA3F9246753E87 /* ModuleRankingCard.swift */,
@@ -722,6 +725,7 @@
 				EBE6B448AA908BA66471F4A1 /* MeterBar.swift in Sources */,
 				3FA77C4232F6EE6783FBBA03 /* MetricAccent.swift in Sources */,
 				F788B059C21776EE62FE4E14 /* MetricTabModel.swift in Sources */,
+				2DD62D2DA9252E398DA6EBF7 /* MetricTabStack.swift in Sources */,
 				FEEBF3F50A4A4E78CEB7791C /* MetricTabViews.swift in Sources */,
 				0B4026141C1025B1B00BA202 /* ModuleRanking.swift in Sources */,
 				036D61BCA99F4A7877C12C74 /* ModuleRankingCard.swift in Sources */,

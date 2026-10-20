@@ -1,12 +1,14 @@
 import SwiftUI
 
-// MARK: - dev server 卡(工单 08,主窗口总览页;popover 不放——工单拍板)
+// MARK: - dev server 卡(工单 p1-history/08,总览页;2026-10-20 起弹窗同内容,紧凑档)
 
 /// 总览页 dev server 卡:列出在跑的开发服务进程(闲置时长/内存/监听端口),
 /// 「全部停止」上抛请求(确认流在 KillRequestFlow,绝不自动杀)。
 /// 空态安静文案——没有 dev server 是常态,不制造焦虑。
 struct DevServerCardView: View {
     let servers: [DevServerStatus]
+    /// 弹窗紧凑档:卡 {rounded.card-compact} 12 + {spacing.card-padding-compact} 12。
+    var isCompact = false
     let onStopAll: () -> Void
 
     var body: some View {
@@ -49,9 +51,9 @@ struct DevServerCardView: View {
                 }
             }
         }
-        .padding(16)
+        .padding(isCompact ? 12 : 16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Surface.card, in: .rect(cornerRadius: 18))
+        .background(Surface.card, in: .rect(cornerRadius: isCompact ? 12 : 18))
     }
 
     /// 空态:与"暂无活动组"同族的安静两行。
