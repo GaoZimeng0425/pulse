@@ -20,7 +20,22 @@ enum RankingListMetrics {
     static func spacing(compact: Bool) -> CGFloat { compact ? 8 : 10 }
     static func iconSize(compact: Bool) -> CGFloat { compact ? 18 : 22 }
     static func meterWidth(compact: Bool) -> CGFloat { compact ? 52 : 110 }
-    static func valueWidth(compact: Bool) -> CGFloat { compact ? 48 : 64 }
+    static func valueFontSize(compact: Bool) -> CGFloat { compact ? 12.5 : 13 }
+
+    /// 数值列**定宽**(全部排行共用):按最宽现实读数 "999.9 MB/s"(速率跨到 GB/s 前的
+    /// 最长串)以实际绘制字体量宽 + 2pt 余量。曾是最小宽度 64 / 48,速率文案逐行撑宽、
+    /// 把 meter 与名称区推得每行不同(2026-10-20 用户反馈);定宽后各排行同一竖线。
+    static func valueWidth(compact: Bool) -> CGFloat {
+        compact ? compactValueWidth : regularValueWidth
+    }
+
+    private static let regularValueWidth = measuredValueWidth(compact: false)
+    private static let compactValueWidth = measuredValueWidth(compact: true)
+
+    private static func measuredValueWidth(compact: Bool) -> CGFloat {
+        let font = NSFont.monospacedDigitSystemFont(ofSize: valueFontSize(compact: compact), weight: .semibold)
+        return ceil(("999.9 MB/s" as NSString).size(withAttributes: [.font: font]).width) + 2
+    }
 }
 
 /// 空态文案:标题一句 + 可选说明(与 dev server 卡空态同族的安静两行)。
@@ -125,7 +140,7 @@ struct RankingListRow<Badge: View, Trailing: View>: View {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 4) {
                     Text(name)
-                        .font(.system(size: isCompact ? 12.5 : 13, weight: .medium))
+                        .font(.system(size: RankingListMetrics.valueFontSize(compact: isCompact), weight: .medium))
                         .lineLimit(1)
                         .truncationMode(.middle)
                     badge()
@@ -139,9 +154,11 @@ struct RankingListRow<Badge: View, Trailing: View>: View {
             MeterBar(fraction: meterFraction, tint: tint)
                 .frame(width: RankingListMetrics.meterWidth(compact: isCompact))
             Text(valueText)
-                .font(.system(size: isCompact ? 12.5 : 13, weight: .semibold))
+                .font(.system(size: RankingListMetrics.valueFontSize(compact: isCompact), weight: .semibold))
                 .monospacedDigit()
-                .frame(minWidth: RankingListMetrics.valueWidth(compact: isCompact), alignment: .trailing)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: RankingListMetrics.valueWidth(compact: isCompact), alignment: .trailing)
             trailing()
                 .frame(width: RankingListMetrics.trailingWidth, alignment: .trailing)
         }

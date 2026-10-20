@@ -161,9 +161,10 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   「应用 | 指标名」(10.5 medium tertiary,右列对齐数值列)→ 行 → 可选注脚(10.5 tertiary,
   如"5 秒一档")→ 空态在卡内(12.5 medium secondary 一句 + 10.5 tertiary 说明)。
   行 = 图标 22 / 名称 13 medium(可挂徽章)/ 副文 10.5 secondary / meter 110 榜首归一 /
-  数值 13 semibold `monospacedDigit` 列宽 64 / **行尾恒留 30pt 列**(组排行放结束按钮 +
+  数值 13 semibold `monospacedDigit` **定宽列**(按最宽现实读数 `999.9 MB/s` 量宽 + 2,
+  全部排行共用;不许按内容撑宽——速率文案会逐行撑出不同宽度)/ **行尾恒留 30pt 列**(组排行放结束按钮 +
   展开箭头,模块排行留空)——所有排行的 meter 与数值在同一竖线上。紧凑档(弹窗):
-  图标 18、名称 / 数值 12.5、meter 52、数值列 48、行内距 5;卡 `{rounded.card-compact}` 12
+  图标 18、名称 / 数值 12.5、meter 52、数值列同法按 12.5pt 量宽、行内距 5;卡 `{rounded.card-compact}` 12
   + `{spacing.card-padding-compact}` 12;全尺寸卡 `{rounded.card}` 18 + `{spacing.card-padding}` 16。
   排行卡不配节标题(主窗口也不配「当前最忙」节标题)。
 - **AreaTrendChartView**:56 点、线 2px 指标色、线下渐变 32%→0、4 条 8% 网格线、
