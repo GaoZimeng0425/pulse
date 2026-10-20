@@ -51,11 +51,7 @@ struct DashboardView: View {
                         content: content,
                         onSelectTab: { tabSelection.current = $0 }
                     ) {
-                        if monitor.allGroups.isEmpty {
-                            emptyState
-                        } else {
-                            rankingCard
-                        }
+                        rankingCard
                     }
                 }
             }
@@ -103,7 +99,6 @@ struct DashboardView: View {
     /// "当前最忙"排行卡:全部组,榜单序随 tab;点行展开组内进程(只读最近一轮采样);
     private var rankingCard: some View {
         RankingCardView(
-            title: "当前最忙",
             groups: content.ranking,
             metric: content.metric,
             cpuLeader: content.cpuLeader,
@@ -156,15 +151,6 @@ struct DashboardView: View {
             .accessibilityLabel("退出 Pulse")
         }
         .buttonStyle(FooterButtonStyle())
-    }
-
-    /// 极端空载 / 首轮采样前:无组可显示,给一行安静文案而不是坏 UI(所有 tab 同)。
-    private var emptyState: some View {
-        Text("暂无活动组")
-            .font(.caption)
-            .foregroundStyle(.tertiary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 24)
     }
 }
 

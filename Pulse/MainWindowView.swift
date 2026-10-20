@@ -210,33 +210,23 @@ struct MainWindowView: View {
         }
     }
 
-    /// 排行卡:全部组;搜索生效时换成过滤后的组(无命中 → 专用空态);
-    /// 点行展开主窗口版进程表(表头可排序)。
+    /// 排行卡:全部组;搜索生效时换成过滤后的组(无命中 → 卡内专用空态,与首轮
+    /// 空载区分开);点行展开主窗口版进程表(表头可排序)。
     /// meter 归一榜首仍取全榜单(content 口径),过滤不改变条的相对读数。
-    @ViewBuilder
     private var rankingCard: some View {
         let filter = searchFilter
-        if filter.isActive {
-            if displayGroups.isEmpty {
-                searchMissState
-            } else {
-                rankingCardList(displayGroups)
-            }
-        } else if monitor.allGroups.isEmpty {
-            emptyState
-        } else {
-            rankingCardList(content.ranking)
-        }
-    }
-
-    /// 排行卡本体(有无搜索共用一份构造,只差组列表)。
-    private func rankingCardList(_ groups: [ProcessGroup]) -> some View {
-        RankingCardView(
-            groups: groups,
+        return RankingCardView(
+            groups: filter.isActive ? displayGroups : content.ranking,
             metric: content.metric,
             cpuLeader: content.cpuLeader,
             memoryLeaderBytes: content.memoryLeaderBytes,
             expandedGroupIDs: model.expandedGroupIDs,
+            emptyMessage: filter.isActive
+                ? RankingEmptyMessage(
+                    title: "没有匹配“\(filter.normalized)”的结果",
+                    detail: "试试应用名的片段,或输入纯数字按 PID 前缀搜"
+                )
+                : RankingEmptyMessage(title: "暂无活动组", detail: "首轮采样尚未完成,或系统极端空闲"),
             onToggle: model.toggleExpansion(of:),
             onEndGroup: model.requestEndGroup
         ) { group in
@@ -244,42 +234,12 @@ struct MainWindowView: View {
                 SortableProcessTableView(
                     group: group,
                     drilldown: drilldown,
-                    searchFilter: searchFilter,
+                    searchFilter: filter,
                     selectedProcessID: $model.selectedProcessID,
                     onEndProcess: model.requestEndProcess
                 )
             }
         }
-    }
-
-    /// 搜索无命中:与"暂无活动组"区分开——首轮空载和搜不到是两回事。
-    private var searchMissState: some View {
-        VStack(spacing: 8) {
-            Text("没有匹配“\(searchFilter.normalized)”的结果")
-                .font(.title3)
-                .foregroundStyle(.tertiary)
-            Text("试试应用名的片段,或输入纯数字按 PID 前缀搜")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
-        .background(Surface.card, in: .rect(cornerRadius: 18))
-    }
-
-    /// 首轮采样前 / 极端空闲:与弹窗同一句安静文案。
-    private var emptyState: some View {
-        VStack(spacing: 8) {
-            Text("暂无活动组")
-                .font(.title3)
-                .foregroundStyle(.tertiary)
-            Text("首轮采样尚未完成,或系统极端空闲")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
-        .background(Surface.card, in: .rect(cornerRadius: 18))
     }
 }
 

@@ -3,9 +3,9 @@ import AppKit
 
 // MARK: - 应用排行卡(工单 P0.6-05,参考文档 §2.3 应用排行卡 / OG "Busiest Right Now")
 
-/// 排行卡:一张卡内的应用榜单——表头 `应用 | CPU`(或内存),
-/// 行 = 图标 + 名称 + 进程数副文 | 榜首归一 meter + 数值。
-/// 点行展开组内进程(展开内容由调用方给:弹窗 = 下钻列表,主窗口 = 可排序进程表)。
+/// 组排行卡("当前最忙"):排行列表通用组件(RankingListCard / RankingListRow)上的
+/// 组排行——行可点开组内进程(展开内容由调用方给:弹窗 = 下钻列表,主窗口 = 可排序
+/// 进程表),悬停出「结束整组」。标题色随口径(CPU / 内存指标色)。
 /// 取代原先"每组一张大卡"的形态(用户拍板)。
 struct RankingCardView<Expanded: View>: View {
     enum Density {
@@ -15,26 +15,28 @@ struct RankingCardView<Expanded: View>: View {
         case compact
     }
 
-    var title: String?
+    var title = "当前最忙"
     let groups: [ProcessGroup]
     let metric: GroupCardMetric
     let cpuLeader: Double
     let memoryLeaderBytes: UInt64
     let expandedGroupIDs: Set<GroupIdentity>
     var density: Density = .regular
+    /// 组列表为空时的卡内空态(首轮前 / 搜索无命中,由调用方给文案)。
+    var emptyMessage = RankingEmptyMessage(title: "暂无活动组", detail: "首轮采样尚未完成,或系统极端空闲")
     let onToggle: (GroupIdentity) -> Void
     let onEndGroup: (ProcessGroup) -> Void
     @ViewBuilder let expandedContent: (ProcessGroup) -> Expanded
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            if let title {
-                Text(title)
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.bottom, 6)
-            }
-            columnHeader
+        RankingListCard(
+            title: title,
+            accent: metric == .cpu ? Metric.cpu.accentColor : Metric.memory.accentColor,
+            valueLabel: metric == .cpu ? "CPU" : "内存",
+            isCompact: density == .compact,
+            isEmpty: groups.isEmpty,
+            emptyMessage: emptyMessage
+        ) {
             ForEach(groups) { group in
                 let isExpanded = expandedGroupIDs.contains(group.id)
                 VStack(spacing: 4) {
@@ -54,24 +56,9 @@ struct RankingCardView<Expanded: View>: View {
                 }
             }
         }
-        .padding(density == .compact ? 12 : 16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Surface.card, in: .rect(cornerRadius: density == .compact ? 12 : 18))
     }
 
-    private var columnHeader: some View {
-        HStack {
-            Text("应用")
-            Spacer()
-            Text(metric == .cpu ? "CPU" : "内存")
-        }
-        .font(.system(size: 10.5, weight: .medium))
-        .foregroundStyle(.tertiary)
-        .padding(.horizontal, 6)
-        .padding(.bottom, 2)
-    }
-
-    /// meter 榜首归一(工单 02 口径,随口径换指标)。
+    /// meter 榜首归一(工单 p0.6-ui-alignment/02 口径,随口径换指标)。
     private func meterFraction(for group: ProcessGroup) -> Double {
         switch metric {
         case .cpu:
@@ -82,9 +69,8 @@ struct RankingCardView<Expanded: View>: View {
     }
 }
 
-/// 排行行:图标 + 名称 / 副文 | meter + 数值 + 展开指示。
-/// 组 CPU% > 100%(工单 04 徽章语义)在名称行内挂红色 高负载 chip;
-/// "结束整组"(工单 08)悬停时出现在行尾,右键菜单同入口;点击只是请求确认。
+/// 组排行行:通用行配方 + 交互——点行展开、悬停底色与「结束整组」、右键同入口。
+/// 组 CPU% > 100%(徽章语义)在名称后挂红色 高负载 chip;点击结束只是请求确认。
 struct RankingRowView: View {
     let group: ProcessGroup
     let metric: GroupCardMetric
@@ -98,36 +84,24 @@ struct RankingRowView: View {
 
     var body: some View {
         Button(action: onToggle) {
-            HStack(spacing: isCompact ? 8 : 10) {
-                icon
-                    .frame(width: iconSize, height: iconSize)
-                VStack(alignment: .leading, spacing: 1) {
-                    HStack(spacing: 4) {
-                        Text(group.name)
-                            .font(.system(size: isCompact ? 12.5 : 13, weight: .medium))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        if let badge = StatusBadgeRules.groupBadge(cpuPercent: group.cpuPercent) {
-                            MetricChipView(chip: badge.chip, compact: true)
-                                .fixedSize()
-                        }
-                    }
-                    Text(subtitle)
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+            RankingListRow(
+                name: group.name,
+                subtitle: subtitle,
+                bundlePath: group.bundlePath,
+                tileSymbol: group.category.cardStyle.symbolName,
+                tileColor: group.category.cardStyle.tileColor,
+                meterFraction: meterFraction,
+                tint: accent,
+                valueText: valueText,
+                isCompact: isCompact
+            ) {
+                if let badge = StatusBadgeRules.groupBadge(cpuPercent: group.cpuPercent) {
+                    MetricChipView(chip: badge.chip, compact: true)
+                        .fixedSize()
                 }
-                Spacer(minLength: 8)
-                MeterBar(fraction: meterFraction, tint: accent)
-                    .frame(width: isCompact ? 52 : 110)
-                Text(valueText)
-                    .font(.system(size: isCompact ? 12.5 : 13, weight: .semibold))
-                    .monospacedDigit()
-                    .frame(minWidth: isCompact ? 48 : 64, alignment: .trailing)
+            } trailing: {
                 trailingControls
             }
-            .padding(.horizontal, 6)
-            .padding(.vertical, isCompact ? 5 : 7)
             .background(
                 isHovering || isExpanded ? Color.primary.opacity(0.05) : Color.clear,
                 in: .rect(cornerRadius: 8)
@@ -142,8 +116,6 @@ struct RankingRowView: View {
         .accessibilityLabel("\(group.name),\(group.processes.count) 进程,\(valueText)")
         .accessibilityHint(isExpanded ? "收起组内进程列表" : "展开组内进程列表")
     }
-
-    private var iconSize: CGFloat { isCompact ? 18 : 22 }
 
     /// 结束按钮只在悬停时可见(占位不变,行宽不跳);chevron 常驻指示展开态。
     private var trailingControls: some View {
@@ -189,22 +161,6 @@ struct RankingRowView: View {
         }
         return group.category.cardStyle.accentColor
     }
-
-    /// bundle 组用真实应用图标;其余类别用"外壳底色 + 白符号"瓦片(形态对齐 app logo)。
-    @ViewBuilder
-    private var icon: some View {
-        if let bundlePath = group.bundlePath {
-            Image(nsImage: NSWorkspace.shared.icon(forFile: bundlePath))
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-        } else {
-            CategoryIconTile(
-                symbolName: group.category.cardStyle.symbolName,
-                color: group.category.cardStyle.tileColor,
-                size: iconSize
-            )
-        }
-    }
 }
 
 #Preview("排行卡") {
@@ -225,7 +181,7 @@ struct RankingRowView: View {
     ]
     return VStack(spacing: 16) {
         RankingCardView(
-            title: "当前最忙", groups: groups, metric: .cpu, cpuLeader: 51.4, memoryLeaderBytes: 5_200_000_000,
+            groups: groups, metric: .cpu, cpuLeader: 51.4, memoryLeaderBytes: 5_200_000_000,
             expandedGroupIDs: [], onToggle: { _ in }, onEndGroup: { _ in }
         ) { _ in EmptyView() }
         RankingCardView(
@@ -233,6 +189,10 @@ struct RankingRowView: View {
             expandedGroupIDs: [], density: .compact, onToggle: { _ in }, onEndGroup: { _ in }
         ) { _ in EmptyView() }
         .frame(width: 332)
+        RankingCardView(
+            groups: [], metric: .cpu, cpuLeader: 0, memoryLeaderBytes: 0,
+            expandedGroupIDs: [], onToggle: { _ in }, onEndGroup: { _ in }
+        ) { _ in EmptyView() }
     }
     .padding(24)
     .frame(width: 720)
