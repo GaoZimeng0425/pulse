@@ -22,6 +22,8 @@ struct GroupingPipeline {
     private var unsettledRestoredPIDs: Set<pid_t> = []
     /// 上次 update 以来出生扫描并入的 pid:当轮修剪时保留(它们可能还没进快照)。
     private var recentScannerBirths: Set<pid_t> = []
+    /// 跨轮的自身归属缓存(arch-review-2026-10-18/04):项目根变化时缓存自行作废。
+    private let attributionCache = SelfAttributionCache()
     /// 全部组(工单 P0.5-01):最近一轮 update 截取**之前**的完整榜单,
     /// 与 Top 组同序同源——主窗口读这里,弹窗读 update 的返回值。
     private(set) var allGroups: [ProcessGroup] = []
@@ -109,7 +111,8 @@ struct GroupingPipeline {
             from: snapshot,
             lineage: lineage,
             configuration: configuration,
-            cpuPercentByPID: processCPU.cpuPercentByPID
+            cpuPercentByPID: processCPU.cpuPercentByPID,
+            selfAttributionCache: attributionCache
         )
         allGroups = groups
         return Array(groups.prefix(displayLimit))

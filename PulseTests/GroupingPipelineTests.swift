@@ -212,6 +212,41 @@ final class GroupingPipelineTests: XCTestCase {
         XCTAssertEqual(groups[0].memoryBytes, 512_000_000)
     }
 
+    // MARK: 跨轮归属缓存(arch-review-2026-10-18/04)
+
+    /// 同一 pid 下一轮换了身份(被复用 / exec 了别的程序):不能沿用上一轮缓存的归属。
+    func testSamePIDWithANewIdentityIsReattributed() {
+        let zed = RawProcess(pid: 50, parentPID: 1, executablePath: "/Applications/Zed.app/Contents/MacOS/zed")
+        let xcode = RawProcess(pid: 50, parentPID: 1, executablePath: "/Applications/Xcode.app/Contents/MacOS/Xcode")
+        var pipeline = GroupingPipeline()
+
+        _ = pipeline.update(snapshot: ProcessSnapshot(takenAt: base, processes: [zed]), processCPU: [])
+        let second = pipeline.update(
+            snapshot: ProcessSnapshot(takenAt: base.addingTimeInterval(5), processes: [xcode]),
+            processCPU: []
+        )
+
+        XCTAssertEqual(second.map(\.id), [.app(bundlePath: "/Applications/Xcode.app")])
+    }
+
+    /// 缓存命中的轮次与从头计算结果一致:同一棵进程树连续多轮,组完全相同。
+    func testCachedRoundsMatchAFreshComputation() {
+        let tree = gateTree(zcodeCPU: 0, nodeCPU: 0, cargoCPU: 0, rustcCPU: 0, windowServerCPU: 0)
+        let configuration = GroupingConfiguration(projectRoots: [octokRoot])
+        var cached = GroupingPipeline(configuration: configuration)
+        for offset in 0..<3 {
+            _ = cached.update(
+                snapshot: ProcessSnapshot(takenAt: base.addingTimeInterval(Double(offset) * 5), processes: tree),
+                processCPU: []
+            )
+        }
+        var fresh = GroupingPipeline(configuration: configuration)
+        _ = fresh.update(snapshot: ProcessSnapshot(takenAt: base, processes: tree), processCPU: [])
+
+        XCTAssertEqual(cached.allGroups.map(\.id), fresh.allGroups.map(\.id))
+        XCTAssertEqual(cached.allGroups.map { $0.processes.map(\.pid) }, fresh.allGroups.map { $0.processes.map(\.pid) })
+    }
+
     // MARK: 项目根热更新(工单 07:设置窗增删 ≤1 轮采样生效)
 
     /// 项目根为空 → dev 门禁链走 03 降级路径(父链上溯归宿主 Zcode);
