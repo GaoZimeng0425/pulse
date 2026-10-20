@@ -293,6 +293,23 @@ final class HistoryEngineTests: XCTestCase {
         XCTAssertEqual(try scalarDouble("SELECT load_avg FROM system_hour"), 12, accuracy: 0.0001)
     }
 
+    /// 落库回报本轮是否写了分钟行(跨分钟冲刷):网络累计只在库真变了时才需要重查
+    /// (arch-review-2026-10-18/03 乙7,累计每轮 3×SUM → 每分钟一次)。
+    func testIngestReportsWhetherAMinuteRowWasWritten() async throws {
+        let engine = try makeMemoryEngine(now: minute0)
+        let first = await engine.ingest(at: minute0, systemLoad: 1, groups: [], displayNames: [:], lineage: LineageRegistry())
+        let sameMinute = await engine.ingest(
+            at: minute0.addingTimeInterval(30), systemLoad: 1, groups: [], displayNames: [:], lineage: LineageRegistry()
+        )
+        let nextMinute = await engine.ingest(
+            at: minute0.addingTimeInterval(65), systemLoad: 1, groups: [], displayNames: [:], lineage: LineageRegistry()
+        )
+
+        XCTAssertFalse(first)
+        XCTAssertFalse(sameMinute)
+        XCTAssertTrue(nextMinute, "跨分钟冲刷了上一分钟")
+    }
+
     // MARK: 留存清理
 
     /// 分钟 7 天 / 小时 30 天,随每日首次 rollup 顺带;同日不重复清理。

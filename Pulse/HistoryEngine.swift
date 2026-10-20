@@ -121,7 +121,9 @@ actor HistoryEngine {
     /// 跨当地日顺带留存清理;出生登记与组元数据增量落库——同一事务。
     /// `netRxBytes`/`netTxBytes` = 本轮网络记账增量(工单 06,差分丢弃轮为 0);
     /// `diskReadBytes`/`diskWriteBytes` = 本轮磁盘吞吐记账增量(差分丢弃轮
-    /// 同为 0,与网络同口径)。
+    /// 同为 0,与网络同口径)。返回本轮是否写了分钟行(跨分钟冲刷)——库里的累计
+    /// 只在这时变,调用方据此决定要不要重查网络累计(乙7)。
+    @discardableResult
     func ingest(
         at now: Date,
         systemLoad: Double,
@@ -132,8 +134,9 @@ actor HistoryEngine {
         netTxBytes: UInt64 = 0,
         diskReadBytes: UInt64 = 0,
         diskWriteBytes: UInt64 = 0
-    ) {
-        guard let database else { return }
+    ) -> Bool {
+        guard let database else { return false }
+        var wroteMinute = false
         do {
             try database.write { db in
                 if let aggregate = buffer.ingest(
@@ -146,6 +149,7 @@ actor HistoryEngine {
                     diskWriteBytes: diskWriteBytes
                 ) {
                     try Self.insertMinute(aggregate, in: db)
+                    wroteMinute = true
                 }
 
                 let boundary = HistoryWindows.hourStartSeconds(of: now)
@@ -166,8 +170,10 @@ actor HistoryEngine {
                 try persistGroupMetadata(displayNames, in: db)
             }
             noteDatabaseSuccess()
+            return wroteMinute
         } catch {
             noteDatabaseFailure("历史落库失败", error)
+            return false
         }
     }
 

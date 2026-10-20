@@ -19,7 +19,7 @@ import Observation
 @Observable
 @MainActor
 final class HistoryFeature: MonitorFeature {
-    /// 网络 Today/7 天累计(工单 p1-history/06):每笔落库之后读回;库缺席 / 查询失败 / 首笔
+    /// 网络 Today/7 天累计(工单 p1-history/06):分钟行落库之后读回(累计只在那时变);库缺席 / 查询失败 / 首笔
     /// 落库前为 nil → 累计列占位。
     private(set) var networkTotals: NetworkTotalsReading?
 
@@ -59,7 +59,10 @@ final class HistoryFeature: MonitorFeature {
             for await write in writes {
                 switch write {
                 case .ingest(let round):
-                    await engine.ingest(round)
+                    // 累计只在分钟行落库时才变(当前分钟还在内存缓冲):写了分钟行、或
+                    // 尚无读数时才重查,弹窗 1s 节奏下每分钟一次而非每轮(乙7)。
+                    let wroteMinute = await engine.ingest(round)
+                    guard wroteMinute || self?.networkTotals == nil else { continue }
                     let totals = await engine.networkTotals(now: round.at)
                     self?.networkTotals = totals
                 case .reconcileProjectRoots(let roots):
