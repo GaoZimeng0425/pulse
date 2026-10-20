@@ -2,14 +2,13 @@ import AppKit
 import SwiftUI
 import PulseCore
 
-// 菜单栏徽标可配置(工单 09):槽位配置、配置 → 渲染输入的纯函数映射、
-// 参数化位图渲染器。渲染先例的血泪教训沿用——MenuBarExtra 的 label 里
+// 菜单栏徽标可配置(p1-history/09)的参数化位图渲染器。渲染先例的血泪教训沿用——MenuBarExtra 的 label 里
 // 多张位图 Image 只渲染第一张,双徽标必须一次 ImageRenderer 合成**单张**
 // 位图交系统(.renderingMode(.original),foregroundStyle 会被 NSStatusItem
 // 剥掉,只有位图保得住颜色)。
 
 // 槽位配置与数据快照在核心层 MenuBarBadgeConfiguration.swift,LRU 在 LRUBoundedCache.swift;
-// 配置 → 渲染输入在 MenuBarBadgeComposer.swift。本文件只留位图渲染器。
+// 配置 → 渲染输入在 MenuBarBadgeComposer.swift。
 
 // MARK: - 位图渲染器(参数化,单张合成)
 

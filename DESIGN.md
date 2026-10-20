@@ -97,8 +97,8 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   图标)/ 项目 = CPU 蓝 / 系统 中性灰 / 后台服务 = Network 绿 / **孤儿 橙**,唯一出处
   `GroupCategory.identityColor`(与 `Metric` 同级,在 MetricAccent.swift)。孤儿橙是
   **身份**不是强调级,有意不与 `{colors.state-warning}` 琥珀合并(GLOSSARY:橙色高亮)。
-- 强调级(正常/偏高/紧张)→ 色的映射只允许集中在三处:`StatusBadgeRules.chip`(系统 /
-  组负载)、`MetricCardModel` 的 chip 构造(内存压力、电池充电状态,OverviewCards.swift)
+- 强调级(正常/偏高/紧张)→ 色的映射只允许集中在三处:`StatusBadge.chip`(系统 /
+  组负载)、`MetricCardModel` 的 chip 构造(内存压力、电池充电状态;两者都在 MetricCardModel.swift)
   与 `MenuBarBadgeRenderer.color(for:ink:)`;色值一律取语义令牌(菜单栏例外见 §已知偏差)。
 - 菜单栏位图颜色只能经 ImageRenderer 预绘(`.renderingMode(.original)`);
   NSStatusItem 会剥掉 SwiftUI 前景色,这是实测结论不是风格偏好。

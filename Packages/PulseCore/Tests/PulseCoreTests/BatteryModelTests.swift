@@ -1,7 +1,7 @@
 import XCTest
 @testable import PulseCore
 
-/// 工单 02 电池卡:核心层 BatteryModel 的合成夹具单测(健康度回退链 /
+/// p1-history/02 电池卡:核心层 BatteryModel 的合成夹具单测(健康度回退链 /
 /// NotChargingReason 映射 / 除零防护 / 功率)。Provider 与事件挂接在
 /// PulseTests/BatterySensorTests。
 final class BatteryModelTests: XCTestCase {

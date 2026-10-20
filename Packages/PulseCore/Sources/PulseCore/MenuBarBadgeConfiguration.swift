@@ -1,6 +1,6 @@
 import Foundation
 
-// 菜单栏徽标可配置(工单 09)的纯值层:槽位配置及其编辑动作、数据快照。
+// 菜单栏徽标可配置(p1-history/09)的纯值层:槽位配置及其编辑动作、数据快照。
 // 配置 → 渲染输入的组合规则要按菜单栏字体量字宽(NSFont),在 app 的
 // MenuBarBadgeComposer.swift;位图渲染在 MenuBarBadge.swift。
 
@@ -69,7 +69,7 @@ public struct MenuBarBadgeData: Equatable, Sendable {
     public var diskAvailableBytes: Int64?
     /// 磁盘容器总容量(剩余百分比的分母);nil = 未到读数。
     public var diskTotalBytes: UInt64?
-    /// 网络速率(工单 06 填充):直用核心层 NetworkModel 的 NetworkRates——09 的
+    /// 网络速率(p1-history/06 填充):直用核心层 NetworkModel 的 NetworkRates——p1-history/09 的
     /// 壳契约副本已并入该类型(字段不再两次转译);nil = 未上线/未到读数,占位。
     public var networkRate: NetworkRates?
 

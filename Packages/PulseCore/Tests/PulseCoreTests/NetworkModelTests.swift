@@ -2,7 +2,7 @@ import Darwin
 import XCTest
 @testable import PulseCore
 
-/// 工单 06 网络卡:核心层 NetworkModel 的合成夹具单测(spec 测试决策,调研 §2.2 逐条钉死)。
+/// p1-history/06 网络卡:核心层 NetworkModel 的合成夹具单测(spec 测试决策,调研 §2.2 逐条钉死)。
 /// 三组断言:①接口选择与降级链(虚拟前缀降级 → UP+RUNNING 回退,注入假链路状态);
 /// ②NET_RT_IFLIST2 回包解包(合成字节,stats 同款负例);③差分三件套(首读置零/
 /// 负值钳零/重连跳变丢弃,合成计数序列,不制造真实网络流量)。入向死表回退的编排

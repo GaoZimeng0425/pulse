@@ -1,32 +1,11 @@
-import Darwin
 import XCTest
 @testable import Pulse
 @testable import PulseCore
 
-/// 工单 06 网络卡的 app 侧:LiveNetworkCountersSource 的入向死表回退编排(注入假
+/// p1-history/06 网络卡的 app 侧:LiveNetworkCountersSource 的入向死表回退编排(注入假
 /// 主接口 / 候选列表 / 读数)与 Live 源构造冒烟。纯逻辑在核心包 NetworkModelTests。
 final class NetworkSensorTests: XCTestCase {
-    // MARK: - 接口选择与降级(注入假链路状态)
-
-    /// 合成一行 getifaddrs 链路状态。flags 用 SDK 字面量:UP=0x1 / LOOPBACK=0x8 /
-    /// POINTOPOINT=0x10 / RUNNING=0x40;family 2 = AF_INET、30 = AF_INET6。
-    private func state(
-        _ name: String,
-        up: Bool = true,
-        running: Bool = true,
-        loopback: Bool = false,
-        pointToPoint: Bool = false,
-        family: Int32 = 2
-    ) -> NetworkInterfaceState {
-        var flags: Int32 = 0
-        if up { flags |= NetworkInterfaceSelector.iffUp }
-        if running { flags |= NetworkInterfaceSelector.iffRunning }
-        if loopback { flags |= NetworkInterfaceSelector.iffLoopback }
-        if pointToPoint { flags |= NetworkInterfaceSelector.iffPointToPoint }
-        return NetworkInterfaceState(name: name, flags: flags, addressFamily: family)
-    }
-
-    // MARK: - 差分三件套(合成计数序列)
+    // MARK: - 回退编排夹具(注入假链路状态 + 假读数)
 
     private func counters(
         _ interface: String = "en0",
@@ -48,7 +27,7 @@ final class NetworkSensorTests: XCTestCase {
         )
     }
 
-    /// 注入假链路状态 + 假读数的源构造(钉死 LiveNetworkCountersSource 的回退编排)。
+    /// 假主接口 / 假候选列表(钉死 LiveNetworkCountersSource 的回退编排)。
     private struct FixedPrimarySource: NetworkPrimaryInterfaceSource {
         let name: String?
         func primaryInterfaceName() -> String? { name }

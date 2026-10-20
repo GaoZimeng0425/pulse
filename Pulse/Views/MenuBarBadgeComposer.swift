@@ -1,7 +1,7 @@
 import AppKit
 import PulseCore
 
-// 菜单栏徽标(工单 09):槽位配置 × 数据快照 → 渲染输入。槽位定宽按菜单栏实际
+// 菜单栏徽标(p1-history/09):槽位配置 × 数据快照 → 渲染输入。槽位定宽按菜单栏实际
 // 绘制字体量(NSFont),故留 app;配置与数据快照是纯值,在核心层
 // MenuBarBadgeConfiguration.swift;位图渲染在 MenuBarBadge.swift。
 

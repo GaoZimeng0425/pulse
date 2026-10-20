@@ -1,7 +1,7 @@
 import XCTest
 @testable import PulseCore
 
-/// 工单 05 磁盘卡:核心层 DiskModel 的合成夹具单测(spec 测试决策)。核心断言四组:
+/// p1-history/05 磁盘卡:核心层 DiskModel 的合成夹具单测(spec 测试决策)。核心断言四组:
 /// ①容器对账不变式——各卷已用之和 + 其他卷 == 容器总量(petal 同款断言);
 /// ②purgeable 两 key 差值与缺失占位;③快照记录解析(合成 packed 字节,petal
 /// 同款负例)+ TM 前缀识别;④吞吐差分三件防护(首读置零/计数回退/elapsed 有限)。

@@ -128,7 +128,7 @@ struct PulseApp: App {
 /// NSStatusItem 内容,SwiftUI 的 foregroundStyle / AttributedString 颜色一律被
 /// 剥掉(实测 macOS 26 上数字永远是默认色,只有 Shape 能保住颜色)。因此徽标
 /// 用 ImageRenderer 预绘成**带颜色的位图**,以 `.renderingMode(.original)` 交给
-/// 系统——这是 SwiftUI 栈下唯一可靠的方式。渲染器与合成逻辑见 MenuBarBadge.swift。
+/// 系统——这是 SwiftUI 栈下唯一可靠的方式。渲染器见 MenuBarBadge.swift,合成逻辑见 MenuBarBadgeComposer.swift。
 struct MenuBarLoadLabel: View {
     let monitor: SystemMonitor
     /// 菜单栏深浅外观:正常态文字用白/黑随外观,警示态固定系统色。

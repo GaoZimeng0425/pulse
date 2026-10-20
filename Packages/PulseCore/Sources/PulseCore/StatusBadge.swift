@@ -22,7 +22,7 @@ public enum StatusBadgeRules {
     /// 系统空载线:负载 < 30% 挂 ✓正常(恰 30% 落入静默档)。
     public static let systemIdleLoadThreshold: Double = 30
     /// 系统高负载线:> 70%,与菜单栏变红同一口径(SystemMonitor.redThreshold,
-    /// 字面量直写避免 MainActor 隔离引用;两处相等由单测 @MainActor 断言钉死)。
+    /// 字面量直写避免 MainActor 隔离引用;两处相等由 app 侧 StatusBadgeChipTests 的 @MainActor 断言钉死)。
     public static let systemHighLoadThreshold: Double = 70
 
     /// 系统负载徽章:> 70% → .high;< 30% → .normal;中间静默(nil,不挂 chip)。

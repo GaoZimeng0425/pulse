@@ -230,7 +230,7 @@ extension GroupCategory {
     }
 }
 
-// MARK: - 处置失败弹窗(工单 08;确认与编排在 KillRequestFlow.swift)
+// MARK: - 处置失败弹窗(p0/08;确认与编排在 KillRequestFlow.swift)
 
 /// 处置失败汇总弹窗:**有失败才弹**(标题 / 正文 / "知道了"按钮与工单 08 一致)。
 struct KillFailureAlert: ViewModifier {

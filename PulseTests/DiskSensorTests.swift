@@ -2,7 +2,7 @@ import XCTest
 @testable import Pulse
 @testable import PulseCore
 
-/// 工单 05 磁盘卡的 app 侧:容量 / 吞吐 Provider 的节奏、lastGood 与标记交付,
+/// p1-history/05 磁盘卡的 app 侧:容量 / 吞吐 Provider 的节奏、lastGood 与标记交付,
 /// Live 源只做构造冒烟,不打真实磁盘语义断言。纯逻辑在核心包 DiskModelTests。
 final class DiskSensorTests: XCTestCase {
     // MARK: - 容量对账夹具(合成,不读真实卷)
