@@ -1,15 +1,29 @@
 #!/bin/sh
 # Pulse 提交闸门(源头文件;安装副本由 install.sh 生成,勿直接改安装副本)。
-# 规则:staged 含 *.swift 时——
-#   1. xcodegen generate 重新接线工程文件(新文件漏进 pbxproj 会被静默不编译,
+# 规则:
+#   0. 副本自检:.githooks 源与已安装副本不一致 → 自动重装并中止本次提交
+#      (见 .githooks/freshness.sh;对所有提交生效,不只 Swift)
+#   1. Swift lint(staged 含 *.swift 时):SwiftFormat 自动修 + 重新暂存,
+#      SwiftLint error 级拦截(见 scripts/lint.sh;部分暂存的文件只查不改,
+#      防止把未暂存改动卷进提交)
+#   2. xcodegen generate 重新接线工程文件(新文件漏进 pbxproj 会被静默不编译,
 #      实测写坏的新文件构建照样绿;project.yml 是文件夹源,重新生成即纳新),
 #      有变化则并入暂存区;project.yml 坏了则直接拦截。
-#   2. 增量构建,失败即拦截 —— 防止把编译不过的代码提交进仓库
+#   3. 增量构建,失败即拦截 —— 防止把编译不过的代码提交进仓库
 #      (2026-10-15 事故:构建失败仍被 `;` 链命令提交并启动旧二进制)。
-# 应急绕过:git commit --no-verify 或 PULSE_SKIP_BUILD=1 git commit ...
+#   4. 核心包测试编译(arch-review-2026-10-18/05):app 构建只编核心包源码,
+#      核心包有改动时补一遍测试编译。
+# 应急绕过:git commit --no-verify 或 PULSE_SKIP_BUILD=1(跳过本 hook 全部门禁)。
 
 if [ "${PULSE_SKIP_BUILD:-0}" = "1" ]; then
   exit 0
+fi
+
+# ── 0. 已安装副本自检 ──
+primary=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
+if [ -f "$primary/.githooks/freshness.sh" ]; then
+  . "$primary/.githooks/freshness.sh"
+  pulse_check_fresh "$primary" || exit 1
 fi
 
 staged_swift=$(git diff --cached --name-only --diff-filter=ACM -- '*.swift')
@@ -19,7 +33,15 @@ root=$(git rev-parse --show-toplevel)
 mkdir -p "$root/build"
 log="$root/build/precommit-build.log"
 
-# ── 1. 新文件接线 ──
+# ── 1. Swift lint 门禁 ──
+if [ -f "$root/scripts/lint.sh" ]; then
+  echo "🎨 staged 含 Swift 文件 — lint 门禁(SwiftFormat 自动修 + SwiftLint 检测)"
+  sh "$root/scripts/lint.sh" --staged --fix || exit 1
+else
+  echo "⚠️  scripts/lint.sh 不存在(基于旧 develop 的 worktree?)— 跳过 Swift lint" >&2
+fi
+
+# ── 2. 新文件接线 ──
 if command -v xcodegen >/dev/null 2>&1; then
   if (cd "$root" && xcodegen generate > "$root/build/xcodegen.log" 2>&1); then
     if ! git diff --quiet -- Pulse.xcodeproj/project.pbxproj; then
@@ -35,7 +57,7 @@ else
   echo "⚠️  未安装 xcodegen — 新增 .swift 文件不会被编译到,慎行" >&2
 fi
 
-# ── 2. 构建门禁 ──
+# ── 3. 构建门禁 ──
 echo "🛠  staged 含 Swift 文件 — 构建门禁(增量;完整日志: $log)"
 # 输出整体重定向到日志而不是接管道:POSIX sh 拿不到管道里 xcodebuild 的
 # 真实退出码,而退出码正是门禁依据(参考 NemoNotch scripts/test.sh 同款)。
@@ -59,7 +81,7 @@ if [ "$status" != 0 ]; then
 fi
 echo "✅ 构建通过"
 
-# ── 3. 核心包测试编译(arch-review-2026-10-18/05)──
+# ── 4. 核心包测试编译(arch-review-2026-10-18/05)──
 # app 构建只编核心包的源码,不编它的测试;核心包有改动时补一遍测试编译,免得测试编译不过也能提交。
 if git diff --cached --name-only --diff-filter=ACM -- 'Packages/PulseCore/*.swift' | grep -q .; then
   core_log="$root/build/precommit-core.log"

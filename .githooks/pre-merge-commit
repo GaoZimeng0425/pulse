@@ -1,0 +1,29 @@
+#!/bin/sh
+# Pulse 合并闸门(源头文件;安装副本由 install.sh 生成,勿直接改安装副本)。
+# 规则:
+#   main/master       : 不许产生 merge 提交 — main 只在用户明确要求时才动,
+#                       且一贯用 fast-forward 推进(ff 不产生提交,本 hook 不触发)
+#   p1-implementation : 已冻结,不再合入任何分支
+#   develop           : 合并来源白名单暂不设卡(分支命名未收敛),后续再补
+#
+# Note: fast-forward updates create no commit, so this hook does not run for
+# them — `git pull --ff-only` stays unaffected.
+
+branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+
+case "$branch" in
+  main|master)
+    echo "" >&2
+    echo "✋ 禁止在 $branch 上创建 merge 提交。" >&2
+    echo "   main 只在用户明确要求时才动;推进一律先合 develop。" >&2
+    echo "   (应急绕过: git merge --no-verify ...)" >&2
+    echo "" >&2
+    exit 1 ;;
+  p1-implementation)
+    echo "" >&2
+    echo "✋ p1-implementation 已冻结 — 不再合入任何分支。" >&2
+    echo "   (应急绕过: git merge --no-verify ...)" >&2
+    echo "" >&2
+    exit 1 ;;
+esac
+exit 0

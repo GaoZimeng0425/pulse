@@ -1,0 +1,28 @@
+#!/bin/sh
+# Pulse 合并闸门(源头文件;安装副本由 install.sh 生成,勿直接改安装副本)。
+# 规则:merge 真正落到 develop 分支上时(git merge 或 git pull 都算),
+# Release 构建并安装到 /Applications —— 合入即换新版。
+# 与 pre-commit 门禁互补:那边保提交可编译,这边保宿主跑的是 develop 最新版。
+# 应急跳过:PULSE_SKIP_BUILD=1 git merge ...;干跑:PULSE_HOOK_DEBUG=1 只打印
+# 将执行的命令,用于测试触发面;post-merge 失败不影响合并结果。
+
+[ "${PULSE_SKIP_BUILD:-0}" = "1" ] && exit 0
+
+branch=$(git rev-parse --abbrev-ref HEAD)
+[ "$branch" = "develop" ] || exit 0
+
+root=$(git rev-parse --show-toplevel)
+
+if [ "${PULSE_HOOK_DEBUG:-0}" = "1" ]; then
+  echo "[debug] PULSE_HOOK_DEBUG=1 — 干跑,不真构建。将执行: sh \"$root/scripts/build.sh\""
+  exit 0
+fi
+
+if sh "$root/scripts/build.sh"; then
+  echo "✅ 新 build 已安装到 /Applications 并重启"
+else
+  echo "" >&2
+  echo "❌ 自动构建失败 —— 合并本身已完成,不会回滚。" >&2
+  echo "   手动重试: sh scripts/build.sh" >&2
+  exit 1
+fi

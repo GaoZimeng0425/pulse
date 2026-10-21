@@ -16,10 +16,12 @@
 ## 分支
 
 - 一律合回 `develop`;`p1-implementation` 已冻结别再合,`main` 只在用户明确要求时才动。
-- 合入前:合进 `develop` 新提交 → `xcodegen generate` → `sh scripts/check.sh` 全绿;推送与 `sh scripts/build.sh` 安装先问用户。
+- 合入前:合进 `develop` 新提交 → `xcodegen generate` → `sh scripts/check.sh` 全绿;推送先问用户。merge 真正落到 `develop` 后,post-merge hook 自动 `sh scripts/build.sh` Release 安装(应急 `PULSE_SKIP_BUILD=1` 跳过,`PULSE_HOOK_DEBUG=1` 干跑)。
+- 分支保护由 hook 机械化(pre-merge-commit):`main` / `master` 禁止 merge 提交,`p1-implementation` 已冻结禁合;develop 合并来源白名单待分支命名收敛后再补。
 
 ## 构建与测试
 
 - 工程由 `project.yml` 生成:加 / 移文件后先 `xcodegen generate`,绝不手改 `project.pbxproj`。
 - 纯逻辑写进 `Packages/PulseCore`(只依赖 Foundation / GRDB,不碰 AppKit / SwiftUI / Darwin 采集调用);Live 适配器、`@Observable` 功能模块与 SwiftUI 留在 app target。测试跟着被测代码走:核心测试放包里(`swift test` 不起宿主),Live / SwiftUI 薄壳测试放 `PulseTests`。
-- 全量检查 `sh scripts/check.sh`;只跑测试 `sh scripts/test.sh [--only 套件]`;Release 安装 `sh scripts/build.sh`。改 `.githooks/pre-commit` 后重跑 `sh .githooks/install.sh`。
+- 全量检查 `sh scripts/check.sh`(lint → 构建 → 测试);只跑测试 `sh scripts/test.sh [--only 套件]`;Release 安装 `sh scripts/build.sh`。
+- Swift lint 门禁:`sh scripts/lint.sh [--staged] [--fix]`(SwiftFormat `.swiftformat` 管美化,SwiftLint `.swiftlint.yml` 管 error 级检测);pre-commit 对 staged 自动修,工具缺失即拦截。改 `.githooks/` 下任何 hook 后重跑 `sh .githooks/install.sh`(副本自检会兜底)。
