@@ -120,6 +120,45 @@ final class DiagnosticReportTests: XCTestCase {
         XCTAssertTrue(report.contains("暂无"))
     }
 
+    // MARK: 分阶段耗时(resident-cost/01)
+
+    func testAssembleListsStageAveragesWhenPresent() {
+        var stats = sampledStats
+        stats.record(stage: .processSnapshot, duration: 0.009)
+        stats.record(stage: .processSnapshot, duration: 0.011)
+        stats.record(stage: .spineAdvance, duration: 0.004)
+
+        let report = DiagnosticReport.assemble(
+            version: "0.1.0",
+            build: "1",
+            macOSVersion: "Version 26.0",
+            chipName: nil,
+            stats: stats,
+            logTail: nil,
+            now: base
+        )
+
+        XCTAssertTrue(report.contains("阶段耗时(轮均 / 次数):"))
+        // 轮均毫秒一位小数,次数独立于轮数;未记录的阶段不出现,不伪造 0。
+        XCTAssertTrue(report.contains("进程快照采集: 10.0 ms / 2"))
+        XCTAssertTrue(report.contains("归组与下钻: 4.0 ms / 1"))
+        XCTAssertFalse(report.contains("主线程落地"))
+    }
+
+    func testAssembleOmitsStageSectionWhenNoStagesRecorded() {
+        let report = DiagnosticReport.assemble(
+            version: "0.1.0",
+            build: "1",
+            macOSVersion: "Version 26.0",
+            chipName: nil,
+            stats: sampledStats,
+            logTail: nil,
+            now: base
+        )
+
+        XCTAssertFalse(report.contains("阶段耗时"))
+    }
+
     // MARK: logTail(日志尾部截取)
 
     private func writeLog(_ name: String, lines: [String], modifiedAt: Date) throws {

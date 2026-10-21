@@ -49,10 +49,36 @@ public enum DiagnosticReport {
         lines.append("采样轮数: \(stats.sampleCount > 0 ? "\(stats.sampleCount)" : unavailable)")
         lines.append("平均轮耗时: \(stats.averageRoundDuration.map { PulseFormat.milliseconds($0) } ?? unavailable)")
         lines.append("进程数峰值: \(stats.peakProcessCount.map(String.init) ?? unavailable)")
+        // 分阶段耗时(resident-cost/01):一轮全部同步工作按阶段拆开;SwiftUI 属性图 /
+        // CA 提交发生在 runloop 提交期、不在阶段内,那部分由 sample 抓栈核对(票内口径)。
+        if !stats.stageTimings.isEmpty {
+            lines.append("阶段耗时(轮均 / 次数):")
+            for stage in SamplingStats.Stage.allCases {
+                guard let timing = stats.stageTimings[stage] else { continue }
+                lines
+                    .append(
+                        "  \(Self.label(for: stage)): \(PulseFormat.milliseconds(timing.averageDuration)) / \(timing.sampleCount)"
+                    )
+            }
+        }
         lines.append("")
         lines.append("[最近日志(尾部 \(logTailLineLimit) 行,本地时间戳)]")
         lines.append(logTail ?? unavailable)
         return lines.joined(separator: "\n")
+    }
+
+    /// 阶段的报告用名(resident-cost/01):采样侧与主线程落地两组,与 Stage 一一对应。
+    private static func label(for stage: SamplingStats.Stage) -> String {
+        switch stage {
+        case .processSnapshot: "进程快照采集"
+        case .systemCounters: "系统计数读取"
+        case .diff: "差分"
+        case .rankingsLedger: "排行账本"
+        case .mainActorLanding: "主线程落地"
+        case .spineAdvance: "归组与下钻"
+        case .historyStore: "采样历史"
+        case .featureDispatch: "模块派发"
+        }
     }
 
     private static let unavailable = "暂无"

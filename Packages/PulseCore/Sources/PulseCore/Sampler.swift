@@ -19,9 +19,56 @@ public struct SamplingCadence: Equatable, Sendable {
     }
 }
 
-/// 采样累计统计(工单 11:诊断报告取数):Sampler 每轮推进一次的纯值账本。
-/// 未采一轮时保持"空"(nil / 0)——报告侧据此如实标"暂无",不伪造数字。
+/// 采样累计统计(工单 11:诊断报告取数;resident-cost/01 扩充分阶段账本):Sampler 每轮
+/// 推进一次的纯值账本。未采一轮时保持"空"(nil / 0)——报告侧据此如实标"暂无",不伪造数字。
+/// 分阶段耗时(resident-cost/01):采样侧阶段由 Sampler 记在本账本上,主线程落地阶段由
+/// SystemMonitor 记在它自己的账本上,报告取数时经 `merging` 合一——两侧各在各的执行域,
+/// 不跨域加锁。阶段集合覆盖一轮的全部**同步**工作;SwiftUI 属性图 / CA 提交发生在
+/// runloop 提交期、不落在任何阶段内,那部分由 `sample` 抓栈与分阶段账核对(票内口径)。
 public struct SamplingStats: Equatable, Sendable {
+    /// 一轮工作的具名阶段(resident-cost/01)。采样侧四段按执行顺序,主线程落地
+    /// 四段以 mainActorLanding 为总、其余三段为其内子项。
+    public enum Stage: Hashable, Sendable, CaseIterable {
+        /// 采样侧:进程明细采集(逐进程系统调用,身份缓存命中后稳态 3 次/进程)。
+        case processSnapshot
+        /// 采样侧:每核 tick / 内存构成 / 网络计数三路读取。
+        case systemCounters
+        /// 采样侧:进程差分 + 系统负载差分 + 网络速率差分。
+        case diff
+        /// 采样侧:模块排行账本推进(排行门开才记,关着不产生条目)。
+        case rankingsLedger
+        /// 主线程:apply 整体(状态发布 + 下列三段 + 粘合)。
+        case mainActorLanding
+        /// 主线程:出生登记并入 → 归组 → 下钻(RoundSpine.advance)。
+        case spineAdvance
+        /// 主线程:采样历史窗口推进。
+        case historyStore
+        /// 主线程:功能模块逐个 onRound 派发。
+        case featureDispatch
+    }
+
+    /// 单阶段累计:总耗时 + 次数,均值相除;次数独立于轮数(排行账本只在门开时记)。
+    public struct StageTiming: Equatable, Sendable {
+        public let totalDuration: TimeInterval
+        public let sampleCount: Int
+
+        public var averageDuration: TimeInterval {
+            sampleCount > 0 ? totalDuration / Double(sampleCount) : 0
+        }
+
+        public init(totalDuration: TimeInterval = 0, sampleCount: Int = 0) {
+            self.totalDuration = totalDuration
+            self.sampleCount = sampleCount
+        }
+
+        public func merged(duration: TimeInterval) -> StageTiming {
+            StageTiming(
+                totalDuration: totalDuration + max(0, duration),
+                sampleCount: sampleCount + 1
+            )
+        }
+    }
+
     /// 首轮采样的时刻(运行时长的起点);未采样为 nil。
     public private(set) var startedAt: Date?
     /// 累计采样轮数。
@@ -30,6 +77,8 @@ public struct SamplingStats: Equatable, Sendable {
     public private(set) var totalRoundDuration: TimeInterval = 0
     /// 见过的最大单轮进程数;未采样为 nil(与 0 区分)。
     public private(set) var peakProcessCount: Int?
+    /// 分阶段耗时累计(resident-cost/01);空 = 尚无任何阶段记录。
+    public private(set) var stageTimings: [Stage: StageTiming] = [:]
 
     /// 平均一轮采样的耗时(秒);未采样为 nil。
     public var averageRoundDuration: TimeInterval? {
@@ -46,10 +95,35 @@ public struct SamplingStats: Equatable, Sendable {
         peakProcessCount = max(peakProcessCount ?? 0, processCount)
     }
 
-    public init(startedAt: Date? = nil, totalRoundDuration: TimeInterval = 0, peakProcessCount: Int? = nil) {
+    /// 登记一个阶段的耗时(时钟由调用方注入,测试可确定性断言)。
+    public mutating func record(stage: Stage, duration: TimeInterval) {
+        stageTimings[stage] = (stageTimings[stage] ?? StageTiming()).merged(duration: duration)
+    }
+
+    /// 合并另一份账本(resident-cost/01:采样侧 + 主线程侧合一,报告取数用):轮数 /
+    /// 起点 / 轮耗时 / 峰值以自身(采样侧)为准,阶段表按阶段相加。
+    public func merging(_ other: SamplingStats) -> SamplingStats {
+        var merged = self
+        for (stage, timing) in other.stageTimings {
+            let mine = merged.stageTimings[stage] ?? StageTiming()
+            merged.stageTimings[stage] = StageTiming(
+                totalDuration: mine.totalDuration + timing.totalDuration,
+                sampleCount: mine.sampleCount + timing.sampleCount
+            )
+        }
+        return merged
+    }
+
+    public init(
+        startedAt: Date? = nil,
+        totalRoundDuration: TimeInterval = 0,
+        peakProcessCount: Int? = nil,
+        stageTimings: [Stage: StageTiming] = [:]
+    ) {
         self.startedAt = startedAt
         self.totalRoundDuration = totalRoundDuration
         self.peakProcessCount = peakProcessCount
+        self.stageTimings = stageTimings
     }
 }
 
@@ -223,25 +297,39 @@ public actor Sampler {
         while !Task.isCancelled {
             let wait = scheduler.delay(until: clock())
             if wait <= 0 {
+                // 分阶段计时(resident-cost/01):同一段可注入时钟,零真实等待下可测;
+                // 三路系统计数与差分按阶段归组,语义与未计时版逐位一致(纯函数间无顺序耦合)。
                 let roundStart = clock()
+                let snapshotStart = clock()
                 let snapshot = source.snapshot()
+                let snapshotDuration = clock().timeIntervalSince(snapshotStart)
+
+                let countersStart = clock()
                 let ticks = coreTicks.sample()
-                let diff = CPUDiffer.diff(previous: previousSnapshot, current: snapshot)
-                let cpu = CoreTickDiffer.breakdown(previous: previousCoreTicks, current: ticks)
                 let memory = memoryStats.sample()
                 // 网络心跳轮(工单 06):每轮一次 sysctl 差分。读缺失(nil)保留
                 // 旧基线等下一轮;读到了则以本轮计数重立基线——丢弃轮(首读/
                 // 跳变/换口)速率为 0 但基线照常推进,下一轮即可正常差分。
                 let networkCounters = networkCounters.sample()
+                let countersDuration = clock().timeIntervalSince(countersStart)
+
+                let diffStart = clock()
+                let diff = CPUDiffer.diff(previous: previousSnapshot, current: snapshot)
+                let cpu = CoreTickDiffer.breakdown(previous: previousCoreTicks, current: ticks)
                 let network = networkCounters.map {
                     NetworkRateDiffer.result(previous: previousNetworkCounters, current: $0)
                 }
+                let diffDuration = clock().timeIntervalSince(diffStart)
+
                 if networkCounters != nil {
                     previousNetworkCounters = networkCounters
                 }
                 // 模块排行(票 A 高2):同一张快照推进账本(门关不推进),并发布给
                 // 心跳中继——全进程 rusage 只在 source.snapshot() 里读这一趟。
+                let rankingStart = clock()
                 let rankingRound = rankingsActive ? rankings.record(snapshot) : .empty
+                let rankingDuration = clock().timeIntervalSince(rankingStart)
+
                 heartbeatRelay?.publish(snapshot)
                 previousSnapshot = snapshot
                 previousCoreTicks = ticks
@@ -252,6 +340,12 @@ public actor Sampler {
                     roundDuration: clock().timeIntervalSince(roundStart),
                     processCount: snapshot.processes.count
                 )
+                stats.record(stage: .processSnapshot, duration: snapshotDuration)
+                stats.record(stage: .systemCounters, duration: countersDuration)
+                stats.record(stage: .diff, duration: diffDuration)
+                if rankingsActive {
+                    stats.record(stage: .rankingsLedger, duration: rankingDuration)
+                }
                 deliver(
                     SamplingUpdate(
                         snapshot: snapshot,

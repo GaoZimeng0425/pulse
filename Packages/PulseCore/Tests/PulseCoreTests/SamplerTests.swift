@@ -219,4 +219,23 @@ final class SamplerTests: XCTestCase {
         XCTAssertEqual(stats.startedAt, base)
         XCTAssertEqual(stats.averageRoundDuration ?? -1, 0, accuracy: 0.0001)
     }
+
+    // MARK: 分阶段耗时(resident-cost/01)
+
+    func testRoundRecordsSamplerSideStagesPerRound() async {
+        // 三轮交付后:采样侧三阶段各记 3 次;排行门关着,rankingsLedger 不产生条目
+        // (次数独立于轮数是设计语义)。假时钟同一轮内不走秒,时长为 0——
+        // 累计与均值口径在 SamplingStageStatsTests 纯值测试里钉。
+        let timeline = FakeTimeline(start: base, sleepBudget: 2)
+        let sampler = makeSampler(timeline: timeline)
+        _ = await drain(sampler, timeline: timeline)
+
+        let stats = await sampler.samplingStats()
+
+        XCTAssertEqual(stats.stageTimings[.processSnapshot]?.sampleCount, 3)
+        XCTAssertEqual(stats.stageTimings[.systemCounters]?.sampleCount, 3)
+        XCTAssertEqual(stats.stageTimings[.diff]?.sampleCount, 3)
+        XCTAssertNil(stats.stageTimings[.rankingsLedger], "排行门关着不产生条目")
+        XCTAssertNil(stats.stageTimings[.spineAdvance], "主线程阶段在 SystemMonitor 侧的账本里")
+    }
 }
