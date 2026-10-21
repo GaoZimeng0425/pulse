@@ -43,10 +43,11 @@ struct MenuBarBadgeContent: Equatable {
 /// 槽位配置 × 数据快照 → 有序徽标内容。降级规则全在此折叠:
 /// 读数缺失占位("–"/"—",不伪造)。
 enum MenuBarBadgeComposer {
-    /// CPU 变红阈值:与菜单栏红线同一出处语义。字面量直写绕开
-    /// SystemMonitor 的 MainActor 隔离(先例:StatusBadgeRules),漂移由
+    /// CPU 变红阈值:徽标域唯一出处 = PulseCore 的 BadgeDisplayHysteresis 常量
+    /// (显示迟滞的强调级越权与组合折算必须同一红线)。与 SystemMonitor 的
+    /// MainActor 隔离无涉(跨层常量可直接引用);与 redThreshold 的漂移由
     /// MenuBarBadgeTests 的 @MainActor 断言拦截。
-    static let cpuRedThreshold: Double = 70
+    static let cpuRedThreshold = BadgeDisplayHysteresis.cpuRedThreshold
 
     static func compose(
         _ configuration: MenuBarBadgeConfiguration,
