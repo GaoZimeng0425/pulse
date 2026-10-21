@@ -91,6 +91,12 @@ final class SystemMonitor {
     @ObservationIgnored private var projectRoots: [String]
     /// 排行门控消息的代号(单调递增):Sampler 侧丢弃迟到的旧消息。
     @ObservationIgnored private var rankingsGateGeneration: UInt64 = 0
+    /// 主线程落地阶段的耗时账本(resident-cost/01):与 Sampler 的采样侧账本在
+    /// `samplingStats()` 合一。主线程字段,apply 内直接读写,无需加锁;
+    /// 只用其中的阶段表,轮数 / 起点以采样侧为准。
+    @ObservationIgnored private var landingStats = SamplingStats()
+    /// 落地计时(resident-cost/01):ContinuousClock 单调钟,不受系统对时影响。
+    @ObservationIgnored private let landingClock = ContinuousClock()
     /// 主干纯内核:出生登记(扫描 / 回灌并入 + 采样轮兜底)、归组配置与下钻
     /// 构建;每轮 apply 产出 RoundContext。
     private var spine: RoundSpine
@@ -276,11 +282,11 @@ final class SystemMonitor {
         }
     }
 
-    /// 诊断报告取数(工单 11):按需向采样器要一份累计统计快照
-    /// (运行起点/轮数/均值/峰值),不做常驻观察。
+    /// 诊断报告取数(工单 11;resident-cost/01 扩充):按需合并采样侧与主线程落地侧的
+    /// 统计快照(运行起点/轮数/均值/峰值 + 分阶段耗时),不做常驻观察。
     func samplingStats() async -> SamplingStats {
         let sampler = sampler
-        return await sampler.samplingStats()
+        return await sampler.samplingStats().merging(landingStats)
     }
 
     /// 结束进程(工单 08):UI 确认后调用——SIGTERM 逐目标投递,
@@ -308,23 +314,44 @@ final class SystemMonitor {
     /// 一轮采样落地:菜单栏负载 + 主干推进(出生登记 → 归组 → 下钻,纯逻辑在
     /// RoundSpine,同轮一致),落地主干自己的发布状态;再把同一份上下文按注册顺序
     /// 派发给功能模块。外部登记(出生扫描 / 历史回灌)已随到随并入主干。
+    /// 分阶段计时(resident-cost/01):落地整体 + 三个子段记进 landingStats;
+    /// SwiftUI 属性图 / CA 提交发生在本方法之后的 runloop 提交期,不在此列。
     private func apply(_ update: SamplingUpdate) {
+        let landingStart = landingClock.now
         systemCPULoad = update.systemCPULoad
         cpuBreakdown = update.cpu
         memory = update.memory
+        let spineStart = landingClock.now
         let context = spine.advance(update)
+        let spineDuration = elapsedSince(spineStart)
         allGroups = context.groups
         // 采样历史随同一轮推进:在场组追加,消失组逐出。组采样与历史落库同一个
         // 折算(GroupSample(group:),落库在历史模块的 onRound)。
+        let historyStart = landingClock.now
         sampleHistory.advance(
             systemCPULoad: update.systemCPULoad,
             memoryUsedBytes: update.memory?.usedBytes,
             groups: allGroups.map(GroupSample.init(group:))
         )
+        let historyDuration = elapsedSince(historyStart)
         drilldown = context.drilldown
         // 功能模块(ADR-0003 扩展点):既有发布状态落定之后,同一份上下文按登记顺序派发。
+        let featuresStart = landingClock.now
         for feature in features.registry {
             feature.onRound(context)
         }
+        let featuresDuration = elapsedSince(featuresStart)
+
+        landingStats.record(stage: .mainActorLanding, duration: elapsedSince(landingStart))
+        landingStats.record(stage: .spineAdvance, duration: spineDuration)
+        landingStats.record(stage: .historyStore, duration: historyDuration)
+        landingStats.record(stage: .featureDispatch, duration: featuresDuration)
+    }
+
+    /// 落地耗时折算(resident-cost/01):ContinuousClock 的 Instant 只给
+    /// `duration(to:)`(Duration),折回秒进纯值账本。
+    private func elapsedSince(_ start: ContinuousClock.Instant) -> TimeInterval {
+        let duration = start.duration(to: landingClock.now)
+        return Double(duration.components.seconds) + Double(duration.components.attoseconds) * 1e-18
     }
 }
