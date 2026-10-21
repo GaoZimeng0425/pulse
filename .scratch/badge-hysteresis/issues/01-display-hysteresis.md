@@ -29,13 +29,13 @@
 
 ## 验收
 
-- [ ] 迟滞状态机进 PulseCore 纯值实现:死区阈值、强调级越权、占位切换、对称/非对称行为各有单测(含 CPU 70 红线立即生效、显示误差 ≤ 阈值不累积)
-- [ ] `MenuBarLoadLabel` 不再直读 monitor 原始读数(显示快照为唯一数据源;`@AppStorage` / `colorScheme` 依赖保留)
-- [ ] 网络槽行为零变化(逐轮刷新、两行叠排、占位规则)
-- [ ] 稳态复测按上述口径记档:150s 窗数字 + `sample` AttributeGraph/CA 点数,与 1.07–1.09% 安静对安静对比,如实写
+- [x] 迟滞状态机进 PulseCore 纯值实现:死区阈值、强调级越权、占位切换、对称/非对称行为各有单测(含 CPU 70 红线立即生效、显示误差 ≤ 阈值不累积)——`BadgeDisplayHysteresisTests` 11 例
+- [x] `MenuBarLoadLabel` 不再直读 monitor 原始读数(显示快照为唯一数据源;`@AppStorage` / `colorScheme` 依赖保留)
+- [x] 网络槽行为零变化(逐轮刷新、两行叠排、占位规则)——状态机直通 + 连线测试
+- [ ] 稳态复测按上述口径记档:150s 窗数字 + `sample` AttributeGraph/CA 点数,与 1.07–1.09% 安静对安静对比,如实写(2026-10-21 两窗被观看态污染作废,见实施记录;待安静时段)
 - [ ] 观感用户目验通过(数字迟滞、强调级即时、槽位/外观切换)
-- [ ] 既有 641 例零回归 + 新增测试全绿;`sh scripts/check.sh` 全绿
-- [ ] GLOSSARY 若 grill 落新词条(如"显示迟滞")则补
+- [x] 既有 641 例零回归 + 新增测试全绿;`sh scripts/check.sh` 全绿——654 例
+- [x] GLOSSARY 若 grill 落新词条(如"显示迟滞")则补——已增「显示迟滞」
 
 ## Comments
 
@@ -83,3 +83,19 @@
 - 位图渲染器改 Core Graphics 直绘(resident-cost/01 已拍板跳过)
 - 采样节奏、弹窗 / 主窗口等其他视图的数据路径
 - 状态翻搅之外的进一步压降(北极星 0.1% 的其余项,另立项)
+
+> 2026-10-21 晚实施记录(主会话,分支 `feat/badge-hysteresis` → 合 develop @f938e3a,hook Release 装机重启 19:18)
+
+**已落地**(`sh scripts/check.sh` 全绿,测试 641 → 654:核心 +11、app +2):
+- PulseCore `BadgeDisplayHysteresis`:纯值状态机,逐槽判定——CPU / RAM / 磁盘百分比 ±2pp 对称死区锚在显示值、红线(>70)与压力等级越权立即、占位切换立即、网络槽直通;`cpuRedThreshold` 移为徽标域唯一出处(composer 引用,与 SystemMonitor.redThreshold 的既有漂移断言继续生效);参数由测试钉死。
+- app `MenuBarBadgeDisplayModel`:`withObservationTracking` 自续环观察四个原始读数源,折算输出与当前显示快照相等就不赋值;`MenuBarLoadLabel` 改读显示快照,不再触碰 `SystemMonitor` 原始读数(fold 闭包在 PulseApp 装配处)。两例连线测试(死区内不换 / 越死区换 / 网络直通)。
+- 装机二进制确认含新代码(PulseCore framework `nm` 13 处新符号)。
+
+**复测受阻,两窗作废,如实记档**:
+- 第一窗 150s(19:24–19:27)= 1.48s ÷ 150s = **0.99%**(测前 5s 指纹 0 命中);随后机器转忙(用户在场使用:WindowServer 49%、浏览器 30%、load 9),第二窗 150s(19:34–19:36)= **2.79%**;30s sample 栈里 RankingListRow 47 / RankingRowView 45 / DashboardView 21 / RankingCardView 8——**主窗口排行页开着**(疑 hook 重启后窗口状态恢复,或用户手开),两窗都是观看态,不能作稳态数。改前安静基线 1.07–1.09% 的对照**尚未取得**。
+- 指纹方法两处缺陷记档:① 5s 窗会假阴性(排行视图 5s/30s 档刷新,5s 未必覆盖一轮;19:24 的 0 命中与 19:38 的近百命中之间无法区分"窗口后开"与"没抓到");② 模式须含 `RankingRowView` / `RankingCardView` / `DashboardView`,只查 RankingCard/RankingListRow 会漏。建议测前用 ≥15s 窗。
+- **配置口径发现(影响收益兑现)**:维护者现行徽标配置 = `cpu,ram,diskRemaining,networkRate`(四槽含网络)。网络槽按拍板直通不迟滞,该配置下网络速率文本逐轮变 → 显示快照逐轮发布 → 标签照旧逐轮刷新。**本票稳态收益在该配置下只在网络空闲(速率文本稳定在同一串)时兑现**;要无条件兑现需配置去掉网络槽——这是用户的配置选择,本票不动。
+
+**待办(用户参与点,与 resident-cost/01 同款)**:
+- [ ] 安静时段、关闭 Pulse 全部窗口(含被状态恢复拉回的主窗口)后复测:≥15s 指纹(含上述三个视图名)确认无人观看 → 150s cputime 窗 → 60s sample 数 AttributeGraph / ImageRenderer / CA 点数;与 1.07–1.09% 安静对安静对比,如实写
+- [ ] 观感目验:数字刷新迟滞(≤2pp 内不动)、CPU 跨 70 变红即时、内存压力变色即时、网络槽逐轮刷新不变、改槽位 / 切外观正常
