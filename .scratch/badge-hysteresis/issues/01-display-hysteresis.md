@@ -32,7 +32,7 @@
 - [x] 迟滞状态机进 PulseCore 纯值实现:死区阈值、强调级越权、占位切换、对称/非对称行为各有单测(含 CPU 70 红线立即生效、显示误差 ≤ 阈值不累积)——`BadgeDisplayHysteresisTests` 11 例
 - [x] `MenuBarLoadLabel` 不再直读 monitor 原始读数(显示快照为唯一数据源;`@AppStorage` / `colorScheme` 依赖保留)
 - [x] 网络槽行为零变化(逐轮刷新、两行叠排、占位规则)——状态机直通 + 连线测试
-- [ ] 稳态复测按上述口径记档:150s 窗数字 + `sample` AttributeGraph/CA 点数,与 1.07–1.09% 安静对安静对比,如实写(2026-10-21 两窗被观看态污染作废,见实施记录;待安静时段)
+- [x] 稳态复测按上述口径记档:150s 窗数字 + `sample` AttributeGraph/CA 点数,与 1.07–1.09% 安静对安静对比,如实写——**2026-10-21 20:12 复测:0.96%(负载 2.9→12.5 重于基线,仍低于基线);60s sample 属性图 186 点全部归属标签的 3–4 次合法更新,无后台翻搅**,见下方复测记录
 - [ ] 观感用户目验通过(数字迟滞、强调级即时、槽位/外观切换)
 - [x] 既有 641 例零回归 + 新增测试全绿;`sh scripts/check.sh` 全绿——654 例
 - [x] GLOSSARY 若 grill 落新词条(如"显示迟滞")则补——已增「显示迟滞」
@@ -97,5 +97,21 @@
 - **配置口径发现(影响收益兑现)**:维护者现行徽标配置 = `cpu,ram,diskRemaining,networkRate`(四槽含网络)。网络槽按拍板直通不迟滞,该配置下网络速率文本逐轮变 → 显示快照逐轮发布 → 标签照旧逐轮刷新。**本票稳态收益在该配置下只在网络空闲(速率文本稳定在同一串)时兑现**;要无条件兑现需配置去掉网络槽——这是用户的配置选择,本票不动。
 
 **待办(用户参与点,与 resident-cost/01 同款)**:
-- [ ] 安静时段、关闭 Pulse 全部窗口(含被状态恢复拉回的主窗口)后复测:≥15s 指纹(含上述三个视图名)确认无人观看 → 150s cputime 窗 → 60s sample 数 AttributeGraph / ImageRenderer / CA 点数;与 1.07–1.09% 安静对安静对比,如实写
+- [x] 安静时段、关闭 Pulse 全部窗口后复测——2026-10-21 20:12 完成,见下
 - [ ] 观感目验:数字刷新迟滞(≤2pp 内不动)、CPU 跨 70 变红即时、内存压力变色即时、网络槽逐轮刷新不变、改槽位 / 切外观正常
+
+> 2026-10-21 20:05–20:16 复测记录(主会话)
+
+**为什么前两窗会污染(根因,与用户无关)**:用户确实每次都关了窗。真凶是**弹窗(DashboardView,内含 RankingRowView 排行行)关闭后视图树不销毁**:辅助功能报 Pulse 0 个窗口,15s 采样栈里却有 RankingRowView 27 / RankingListRow 12 / DashboardView 8——用户点菜单栏看一眼徽标即触发,关掉后继续逐轮重算,直到进程重启。已另立票 `popover-leak/01`(needs-triage)。
+
+**协议**:`tell application "Pulse" to quit` 优雅退出 → `open -a Pulse --args -ApplePersistenceIgnoreState YES` 跳过状态恢复重启(PID 769,20:05:59),全程不碰 Pulse → 落地 5 分钟 → 15s 指纹(修正模式)全 0,仅 MenuBarLoadLabel 2 点 → 150s cputime 窗 → 60s sample。
+
+**数字**:
+- 150s 窗(20:12:14–20:14:44):cputime 3.91s → 5.35s,**1.44s ÷ 150s = 0.96%**;窗内 load 2.87 → **12.52**(机器重负载,重于 1.07–1.09% 基线时的安静态)。
+- 60s sample:ImageRenderer 15 点、AttributeGraph 186 点、CA commit 6 点、MenuBarLoadLabel.body 子树 60 点(=60ms/60s=0.1%)、ViewGraph updateGraph 71、render 54;`MenuBarBadgeDisplayModel` / `BadgeDisplayHysteresis` 0 点;`__sysctl`/proc_pidinfo 40;nettop 0;观看态视图全 0。
+
+**解读(诚实口径)**:
+- 不是安静对安静——复测时负载重得多(系统调用忙时慢 2–3 倍),**总量仍从 1.07–1.09% 降到 0.96%**,方向无歧义;单窗不同负载不做精确 pp 相减(resident-cost/01 口径)。
+- 机制实锤:属性图 186 点 = 标签 body 60 + 图更新 71 + 渲染 54(≈185),**全部归属标签那 3–4 次合法更新**(ImageRenderer 15 点 ≈ 3 次重绘 / 12 轮),无任何后台翻搅;迟滞折算本身不可测(0 点)。重负载风暴下的翻搅密度 ≈ 改前**安静态**水平(改前安静 ImageRenderer 17 点/60s;改前若遇此负载应是逐轮重绘 ≈60 点)。
+- 网络槽本窗恰好稳定(用户离手、nettop 未跑),故四槽配置下也兑现了收益;网络活跃时仍按拍板逐轮刷新。
+- 余项 = 观感目验(用户)。
