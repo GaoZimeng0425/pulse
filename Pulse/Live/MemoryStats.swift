@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 import PulseCore
 
 // MARK: - 采集源
@@ -41,4 +41,3 @@ struct LiveMemoryStatsSource: MemoryStatsSource {
         return level
     }
 }
-

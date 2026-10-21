@@ -7,8 +7,8 @@ public enum NetworkFixture {
         _ interface: String = "en0",
         up: UInt64,
         down: UInt64,
-        upPackets: UInt64 = 1_000,
-        downPackets: UInt64 = 1_000,
+        upPackets: UInt64 = 1000,
+        downPackets: UInt64 = 1000,
         baud: UInt64? = 1_000_000_000,
         at: UInt64
     ) -> NetworkCounters {

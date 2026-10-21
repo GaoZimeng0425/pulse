@@ -1,6 +1,6 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 菜单栏徽标槽位配置 → 渲染输入的映射(spec 测试决策钉死的纯函数缝):
 /// 默认态与现状逐像素一致、四项指标可同时上屏、顺序可调、读数缺失占位不伪造、
@@ -63,14 +63,18 @@ final class MenuBarBadgeTests: XCTestCase {
     }
 
     /// RAM 压力联动:偏高橙(warning)/ 紧张红(critical)。
-    func testRAMPressureDrivesEmphasis() {
-        let base = Self.sampleData.memory!
-        let warning = MenuBarBadgeComposer.ramContent(memory: Self.memory(total: base.totalBytes,
-                                                                          used: base.usedBytes,
-                                                                          pressure: .warning))
-        let critical = MenuBarBadgeComposer.ramContent(memory: Self.memory(total: base.totalBytes,
-                                                                           used: base.usedBytes,
-                                                                           pressure: .critical))
+    func testRAMPressureDrivesEmphasis() throws {
+        let base = try XCTUnwrap(Self.sampleData.memory)
+        let warning = MenuBarBadgeComposer.ramContent(memory: Self.memory(
+            total: base.totalBytes,
+            used: base.usedBytes,
+            pressure: .warning
+        ))
+        let critical = MenuBarBadgeComposer.ramContent(memory: Self.memory(
+            total: base.totalBytes,
+            used: base.usedBytes,
+            pressure: .critical
+        ))
         XCTAssertEqual(warning.emphasis, .warning)
         XCTAssertEqual(critical.emphasis, .critical)
     }
@@ -134,12 +138,18 @@ final class MenuBarBadgeTests: XCTestCase {
 
         // 同内容同外观 → 同键(缓存命中);槽位顺序变 → 键变;
         // 外观变 → 键变;数值/强调级任一变化 → 键变。
-        XCTAssertEqual(MenuBarBadgeRenderer.cacheKey(for: cpuFirst, colorScheme: .dark),
-                       MenuBarBadgeRenderer.cacheKey(for: cpuFirst, colorScheme: .dark))
-        XCTAssertNotEqual(MenuBarBadgeRenderer.cacheKey(for: cpuFirst, colorScheme: .dark),
-                          MenuBarBadgeRenderer.cacheKey(for: ramFirst, colorScheme: .dark))
-        XCTAssertNotEqual(MenuBarBadgeRenderer.cacheKey(for: cpuFirst, colorScheme: .dark),
-                          MenuBarBadgeRenderer.cacheKey(for: cpuFirst, colorScheme: .light))
+        XCTAssertEqual(
+            MenuBarBadgeRenderer.cacheKey(for: cpuFirst, colorScheme: .dark),
+            MenuBarBadgeRenderer.cacheKey(for: cpuFirst, colorScheme: .dark)
+        )
+        XCTAssertNotEqual(
+            MenuBarBadgeRenderer.cacheKey(for: cpuFirst, colorScheme: .dark),
+            MenuBarBadgeRenderer.cacheKey(for: ramFirst, colorScheme: .dark)
+        )
+        XCTAssertNotEqual(
+            MenuBarBadgeRenderer.cacheKey(for: cpuFirst, colorScheme: .dark),
+            MenuBarBadgeRenderer.cacheKey(for: cpuFirst, colorScheme: .light)
+        )
         XCTAssertNotEqual(
             MenuBarBadgeRenderer.cacheKey(for: cpuFirst, colorScheme: .dark),
             MenuBarBadgeRenderer.cacheKey(

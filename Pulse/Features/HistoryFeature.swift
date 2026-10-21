@@ -59,7 +59,7 @@ final class HistoryFeature: MonitorFeature {
             host.restoreBirths(restored)
             for await write in writes {
                 switch write {
-                case .ingest(let round):
+                case let .ingest(round):
                     // 累计只在分钟行落库时才变(当前分钟还在内存缓冲):写了分钟行、尚无
                     // 读数、或落库失败(已发布的读数可能过时,如跨零点)才重查——弹窗 1s
                     // 节奏下每分钟一次而非每轮(乙7)。
@@ -67,7 +67,7 @@ final class HistoryFeature: MonitorFeature {
                     guard outcome != .buffered || self?.networkTotals == nil else { continue }
                     let totals = await engine.networkTotals(now: round.at)
                     self?.networkTotals = totals
-                case .reconcileProjectRoots(let roots):
+                case let .reconcileProjectRoots(roots):
                     await engine.reconcileProjectRoots(roots)
                 }
             }
@@ -92,7 +92,7 @@ final class HistoryFeature: MonitorFeature {
     /// 磁盘吞吐交付(磁盘模块广播,含标 stale 的重投):恰好一次记账由内核负责
     /// ——只记 fresh。引擎缺席不记账。
     func onEvent(_ event: FeatureEvent) {
-        guard engine != nil, case .diskThroughput(let delivery) = event else { return }
+        guard engine != nil, case let .diskThroughput(delivery) = event else { return }
         feed.recordDiskThroughput(delivery)
     }
 

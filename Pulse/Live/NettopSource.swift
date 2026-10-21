@@ -85,7 +85,9 @@ final class LiveNettopCSVSource: NettopCSVSource, @unchecked Sendable {
         process.arguments = arguments
         // 继承环境再覆盖两项:nettop 依赖的框架路径等保持原样。
         var environment = ProcessInfo.processInfo.environment
-        for (key, value) in Self.extraEnvironment { environment[key] = value }
+        for (key, value) in Self.extraEnvironment {
+            environment[key] = value
+        }
         process.environment = environment
         // Pipe 两端不带 CLOEXEC:Process 以 CLOEXEC_DEFAULT 起子进程、run() 后即关
         // 父进程写端,本 App 亦无别处起子进程;将来若别处加 system/popen/fork,
@@ -209,7 +211,9 @@ final class ProcessNetworkRateProvider: SensorProvider {
     private let accumulator = ProcessNetworkRateAccumulator()
     private let slot = SensorLastGoodBox<Reading>()
 
-    var lastGood: Reading? { slot.current }
+    var lastGood: Reading? {
+        slot.current
+    }
 
     init(
         source: any NettopCSVSource = LiveNettopCSVSource(),
@@ -221,12 +225,13 @@ final class ProcessNetworkRateProvider: SensorProvider {
 
     /// 可见性切换(同能耗影响)。
     func setVisible(_ visible: Bool) {
-        if gate.setVisible(visible), !visible { accumulator.reset() }
+        if gate.setVisible(visible), !visible {
+            accumulator.reset()
+        }
     }
 
     func snapshot() async -> Reading? {
-        guard gate.isVisible else { return nil }
-        guard let csv = await source.read() else { return nil }
+        guard gate.isVisible, let csv = await source.read() else { return nil }
         let table = NettopCSVParser.parse(csv, takenAt: clock())
         guard let reading = accumulator.record(table) else { return nil }
         slot.store(reading)

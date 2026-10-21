@@ -1,11 +1,10 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 接缝:SensorScheduler 单一调度器 actor(ADR-0004)——按各 provider 的
 /// cadence 驱动"读一次并交付"。睡眠与唤醒流全部注入,零真实等待;
 /// 心跳型不归它管(住 Sampler),登记进来安静忽略。
 final class SensorSchedulerTests: XCTestCase {
-
     // MARK: - 测试替身
 
     /// 读数次数(线程安全计数)。
@@ -123,12 +122,14 @@ private final class LogBox: @unchecked Sendable {
     private var stored: [String] = []
 
     func append(_ line: String) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         stored.append(line)
     }
 
     var lines: [String] {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return stored
     }
 }

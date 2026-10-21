@@ -7,7 +7,7 @@ import Foundation
 public enum PathNormalization {
     public static func normalize(_ path: String) -> String {
         var result = path
-        while result.count > 1 && result.hasSuffix("/") {
+        while result.count > 1, result.hasSuffix("/") {
             result.removeLast()
         }
         return result

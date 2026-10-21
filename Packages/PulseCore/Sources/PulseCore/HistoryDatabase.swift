@@ -59,79 +59,79 @@ public enum HistoryDatabase {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("p1-history-v1") { db in
             try db.execute(sql: """
-                CREATE TABLE sample_min (
-                    ts       INTEGER NOT NULL,
-                    group_id TEXT    NOT NULL,
-                    cpu_avg  REAL    NOT NULL,
-                    cpu_max  REAL    NOT NULL,
-                    mem_max  INTEGER NOT NULL,
-                    procs    INTEGER NOT NULL,
-                    disk_r   INTEGER,
-                    disk_w   INTEGER,
-                    PRIMARY KEY (ts, group_id)
-                )
-                """)
+            CREATE TABLE sample_min (
+                ts       INTEGER NOT NULL,
+                group_id TEXT    NOT NULL,
+                cpu_avg  REAL    NOT NULL,
+                cpu_max  REAL    NOT NULL,
+                mem_max  INTEGER NOT NULL,
+                procs    INTEGER NOT NULL,
+                disk_r   INTEGER,
+                disk_w   INTEGER,
+                PRIMARY KEY (ts, group_id)
+            )
+            """)
             try db.execute(sql: """
-                CREATE TABLE sample_hour (
-                    ts       INTEGER NOT NULL,
-                    group_id TEXT    NOT NULL,
-                    cpu_avg  REAL    NOT NULL,
-                    cpu_max  REAL    NOT NULL,
-                    mem_max  INTEGER NOT NULL,
-                    procs    INTEGER NOT NULL,
-                    disk_r   INTEGER,
-                    disk_w   INTEGER,
-                    PRIMARY KEY (ts, group_id)
-                )
-                """)
+            CREATE TABLE sample_hour (
+                ts       INTEGER NOT NULL,
+                group_id TEXT    NOT NULL,
+                cpu_avg  REAL    NOT NULL,
+                cpu_max  REAL    NOT NULL,
+                mem_max  INTEGER NOT NULL,
+                procs    INTEGER NOT NULL,
+                disk_r   INTEGER,
+                disk_w   INTEGER,
+                PRIMARY KEY (ts, group_id)
+            )
+            """)
             try db.execute(sql: """
-                CREATE TABLE system_min (
-                    ts           INTEGER PRIMARY KEY,
-                    load_avg     REAL    NOT NULL,
-                    load_max     REAL    NOT NULL,
-                    net_rx       INTEGER,
-                    net_tx       INTEGER,
-                    disk_read    INTEGER,
-                    disk_written INTEGER
-                )
-                """)
+            CREATE TABLE system_min (
+                ts           INTEGER PRIMARY KEY,
+                load_avg     REAL    NOT NULL,
+                load_max     REAL    NOT NULL,
+                net_rx       INTEGER,
+                net_tx       INTEGER,
+                disk_read    INTEGER,
+                disk_written INTEGER
+            )
+            """)
             try db.execute(sql: """
-                CREATE TABLE system_hour (
-                    ts           INTEGER PRIMARY KEY,
-                    load_avg     REAL    NOT NULL,
-                    load_max     REAL    NOT NULL,
-                    net_rx       INTEGER,
-                    net_tx       INTEGER,
-                    disk_read    INTEGER,
-                    disk_written INTEGER
-                )
-                """)
+            CREATE TABLE system_hour (
+                ts           INTEGER PRIMARY KEY,
+                load_avg     REAL    NOT NULL,
+                load_max     REAL    NOT NULL,
+                net_rx       INTEGER,
+                net_tx       INTEGER,
+                disk_read    INTEGER,
+                disk_written INTEGER
+            )
+            """)
             try db.execute(sql: """
-                CREATE TABLE lineage (
-                    pid             INTEGER PRIMARY KEY,
-                    parent_pid      INTEGER NOT NULL,
-                    executable_path TEXT,
-                    cwd             TEXT,
-                    argv            TEXT,
-                    first_seen      REAL    NOT NULL
-                )
-                """)
+            CREATE TABLE lineage (
+                pid             INTEGER PRIMARY KEY,
+                parent_pid      INTEGER NOT NULL,
+                executable_path TEXT,
+                cwd             TEXT,
+                argv            TEXT,
+                first_seen      REAL    NOT NULL
+            )
+            """)
             try db.execute(sql: """
-                CREATE TABLE groups (
-                    group_id     TEXT PRIMARY KEY,
-                    name         TEXT NOT NULL,
-                    category     TEXT NOT NULL,
-                    project_root TEXT
-                )
-                """)
+            CREATE TABLE groups (
+                group_id     TEXT PRIMARY KEY,
+                name         TEXT NOT NULL,
+                category     TEXT NOT NULL,
+                project_root TEXT
+            )
+            """)
         }
         migrator.registerMigration("p1-history-v2-metadata") { db in
             try db.execute(sql: """
-                CREATE TABLE metadata (
-                    key   TEXT PRIMARY KEY,
-                    value TEXT NOT NULL
-                )
-                """)
+            CREATE TABLE metadata (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+            """)
         }
         return migrator
     }

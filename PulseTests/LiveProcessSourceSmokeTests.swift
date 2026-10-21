@@ -1,7 +1,7 @@
-import XCTest
 import Darwin
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 接缝:LiveProcessSource 冒烟测试(spec 测试决策:探针已验证的部分不重复深测,
 /// 只证明采集在本机真实可用、降级路径安全、耗时毫秒级)。
@@ -18,13 +18,15 @@ final class LiveProcessSourceSmokeTests: XCTestCase {
         let coldMs = Date().timeIntervalSince(start) * 1000
         // 稳态口径:后续几轮(缓冲已热)取平均,这是采样循环每 1–5s 的真实开销。
         var warmMs = 0.0
-        for _ in 0..<3 {
+        for _ in 0 ..< 3 {
             let t = Date()
             _ = source.snapshot()
             warmMs += Date().timeIntervalSince(t) * 1000
         }
         warmMs /= 3
-        print("[smoke] LiveProcessSource 一轮采集:\(snapshot.processes.count) 个进程,冷 \(String(format: "%.1f", coldMs)) ms / 热 \(String(format: "%.1f", warmMs)) ms")
+        print(
+            "[smoke] LiveProcessSource 一轮采集:\(snapshot.processes.count) 个进程,冷 \(String(format: "%.1f", coldMs)) ms / 热 \(String(format: "%.1f", warmMs)) ms"
+        )
 
         XCTAssertGreaterThan(snapshot.processes.count, 0, "本机进程数应 > 0")
         XCTAssertLessThan(warmMs, 500, "一轮采集应远低于半秒(目标毫秒级)")
@@ -97,7 +99,10 @@ final class LiveProcessSourceSmokeTests: XCTestCase {
         guard let shell else { return }
 
         XCTAssertEqual(shell.parentPID, getpid(), "子进程的父应是自己")
-        XCTAssertTrue(shell.executablePath?.hasSuffix("zsh") == true, "应能读到 zsh 的可执行路径,实际:\(shell.executablePath ?? "nil")")
+        XCTAssertTrue(
+            shell.executablePath?.hasSuffix("zsh") == true,
+            "应能读到 zsh 的可执行路径,实际:\(shell.executablePath ?? "nil")"
+        )
         XCTAssertTrue(shell.argv.contains("-c"), "argv 应含 -c,实际:\(shell.argv)")
         XCTAssertTrue(shell.argv.contains { $0.contains(marker) }, "argv 应含标记参数,实际:\(shell.argv)")
         XCTAssertTrue(shell.cwd == "/private/tmp" || shell.cwd == "/tmp", "应能读到子进程 cwd,实际:\(shell.cwd ?? "nil")")
@@ -131,7 +136,9 @@ final class LiveProcessSourceSmokeTests: XCTestCase {
 
         var sink: Double = 0
         while ownRusageCPUSeconds() - rusageBefore < 0.4 {
-            for i in 0..<10_000 { sink += Double(i) * 0.5 }
+            for i in 0 ..< 10000 {
+                sink += Double(i) * 0.5
+            }
         }
         _ = sink
 
@@ -142,6 +149,11 @@ final class LiveProcessSourceSmokeTests: XCTestCase {
         let deltaSeconds = Double(after - before) / 1_000_000_000
 
         print("[smoke] 刻度校准:烧 \(String(format: "%.3f", burned))s CPU,快照读回 \(String(format: "%.3f", deltaSeconds))s")
-        XCTAssertEqual(deltaSeconds, burned, accuracy: 0.2, "快照 CPU 累计时间必须与 getrusage 同刻度(缩小 ~41.7 倍 = 拿到的是 mach tick 而非纳秒)")
+        XCTAssertEqual(
+            deltaSeconds,
+            burned,
+            accuracy: 0.2,
+            "快照 CPU 累计时间必须与 getrusage 同刻度(缩小 ~41.7 倍 = 拿到的是 mach tick 而非纳秒)"
+        )
     }
 }

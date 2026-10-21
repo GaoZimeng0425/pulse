@@ -1,6 +1,6 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// launchd-attribution/01 的 app 侧薄壳:LaunchdManifestProvider 的节奏钉子、lastGood 交付口径、
 /// 状态沿日志只记切换,以及 LaunchdManifestFeature 把交付接进 MonitorHost。纯逻辑(解析 /
@@ -22,12 +22,14 @@ final class LaunchdManifestFeatureTests: XCTestCase {
         }
 
         func set(_ response: LaunchdPlistDirectoryRead) {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             self.response = response
         }
 
         func read(directory: String) -> LaunchdPlistDirectoryRead {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             return response
         }
     }
@@ -38,12 +40,14 @@ final class LaunchdManifestFeatureTests: XCTestCase {
         private var items: [Value] = []
 
         func append(_ value: Value) {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             items.append(value)
         }
 
         var values: [Value] {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             return items
         }
     }
@@ -54,6 +58,8 @@ final class LaunchdManifestFeatureTests: XCTestCase {
     }
 
     private func plist(program: String) -> Data {
+        // 测试夹具:字典字面量序列化不会失败,失败即崩是期望行为
+        // swiftlint:disable:next force_try
         try! PropertyListSerialization.data(
             fromPropertyList: ["Label": "test", "Program": program], format: .xml, options: 0
         )
@@ -131,7 +137,7 @@ final class LaunchdManifestFeatureTests: XCTestCase {
         XCTAssertEqual(drivers.count, 1)
         await drivers[0].tick()
         // 交付经 Task { @MainActor } 跳回主线程:让出若干次直到到达。
-        for _ in 0..<200 where recorder.sets.isEmpty {
+        for _ in 0 ..< 200 where recorder.sets.isEmpty {
             await Task.yield()
         }
 
@@ -151,7 +157,7 @@ final class LaunchdManifestFeatureTests: XCTestCase {
         ))
 
         await feature.sensorDrivers()[0].tick()
-        for _ in 0..<20 {
+        for _ in 0 ..< 20 {
             await Task.yield()
         }
 

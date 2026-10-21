@@ -1,7 +1,8 @@
-import SwiftUI
 import PulseCore
+import SwiftUI
 
 // MARK: - 历史页(工单 04):指标 × 时间范围 Canvas 走势
+
 // 取数口径(表档/列/聚合/空段)全在 HistoryQueries.swift,本文件只消费
 // HistorySeries——查询经 monitor.history.series 走引擎 actor(UI 线程零 SQL,
 // spec User Story 10);UI 不单测,预览 + 真机验收(spec 既定)。
@@ -168,11 +169,11 @@ struct HistoryCurveView: View {
     private func draw(in context: inout GraphicsContext, size: CGSize) {
         let count = series.values.count
         guard count > 1 else { return }
-        let filled = series.values.compactMap { $0 }
+        let filled = series.values.compactMap(\.self)
         let normalizer =
             series.metric == .systemLoad
-            ? 100.0
-            : max(filled.max() ?? 0, 1)
+                ? 100.0
+                : max(filled.max() ?? 0, 1)
         let drawableHeight = size.height - Self.verticalInset * 2
 
         // 桶中心取 x(首尾桶的半桶让出边缘,窗界读数不裁半)。
@@ -231,13 +232,16 @@ struct HistoryCurveView: View {
 // MARK: - 预览(内存库夹具,spec 测试决策:UI 以预览 + 真机验收)
 
 #Preview("历史页:分钟 3 小时(带缺口)+ 小时 3 天") {
+    // 预览夹具:失败即崩是期望行为
+    // swiftlint:disable:next force_try
     let queue = try! HistoryDatabase.openInMemory()
     let now = Int(Date().timeIntervalSince1970)
     let hourStart = now / 3600 * 3600
+    // swiftlint:disable:next force_try
     try! queue.write { db in
         // 分钟表:最近 3 小时,每 17 分钟缺一行(app 未运行的时段示意);
         // 系统负载锯齿 + 两个组(CPU 求和口径、内存合计口径都有形)。
-        for minute in 0..<180 where minute % 17 != 0 {
+        for minute in 0 ..< 180 where minute % 17 != 0 {
             let ts = hourStart - (180 - minute) * 60
             let load = 18.0 + Double((minute * 37) % 64)
             try db.execute(
@@ -246,21 +250,21 @@ struct HistoryCurveView: View {
             )
             try db.execute(
                 sql: """
-                    INSERT INTO sample_min (ts, group_id, cpu_avg, cpu_max, mem_max, procs)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
+                INSERT INTO sample_min (ts, group_id, cpu_avg, cpu_max, mem_max, procs)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
                 arguments: [ts, "app:Zed", load * 0.6, load, 1_400_000_000, 3]
             )
             try db.execute(
                 sql: """
-                    INSERT INTO sample_min (ts, group_id, cpu_avg, cpu_max, mem_max, procs)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
+                INSERT INTO sample_min (ts, group_id, cpu_avg, cpu_max, mem_max, procs)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
                 arguments: [ts, "app:Chrome", 22, 22, 900_000_000, 21]
             )
         }
         // 小时表:最近 3 天,留两小时缺口(远期趋势形态)。
-        for hour in 0..<72 where hour % 29 != 0 {
+        for hour in 0 ..< 72 where hour % 29 != 0 {
             let ts = hourStart - (72 - hour) * 3600
             let load = 30.0 + Double((hour * 53) % 45)
             try db.execute(

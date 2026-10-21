@@ -1,12 +1,12 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
-// 测试进程文件日志隔离(2026-10-19 误报事故的回归钉):
-// 单元测试托管在 app 内(TEST_HOST),夹具告警会走真实 LogService 路径;
-// 判定函数保证测试环境不装文件日志,~/.Pulse/logs 只反映真实运行。
-// 端到端半边(跑测试后生产日志目录无新文件)由 scripts/test.sh +
-// `find ~/.Pulse/logs -newer` 走查覆盖,不在单测内伪造。
+/// 测试进程文件日志隔离(2026-10-19 误报事故的回归钉):
+/// 单元测试托管在 app 内(TEST_HOST),夹具告警会走真实 LogService 路径;
+/// 判定函数保证测试环境不装文件日志,~/.Pulse/logs 只反映真实运行。
+/// 端到端半边(跑测试后生产日志目录无新文件)由 scripts/test.sh +
+/// `find ~/.Pulse/logs -newer` 走查覆盖,不在单测内伪造。
 final class LogServiceTests: XCTestCase {
     func testXCTestHostEnvironmentIsDetected() {
         XCTAssertTrue(LogService.isRunningTests(

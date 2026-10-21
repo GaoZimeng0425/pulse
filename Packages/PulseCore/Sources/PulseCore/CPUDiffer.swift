@@ -28,10 +28,10 @@ public struct ProcessCPU: Equatable, Sendable {
     }
 }
 
-extension Sequence where Element == ProcessCPU {
+public extension Sequence<ProcessCPU> {
     /// 差分条目 → pid → CPU% 映射(评审 T4,共享构建):新出生(nil)与缺条目
     /// 一律按 0 计——组聚合与下钻行同口径,此前两处各写一份。
-    public var cpuPercentByPID: [pid_t: Double] {
+    var cpuPercentByPID: [pid_t: Double] {
         var map: [pid_t: Double] = [:]
         map.reserveCapacity(underestimatedCount)
         for entry in self {

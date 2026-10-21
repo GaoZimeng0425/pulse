@@ -16,7 +16,7 @@ final class DevServerFeature: MonitorFeature {
     @ObservationIgnored private var host: MonitorHost?
 
     init(portScanner: any DevServerPortScanning) {
-        self.finder = DevServerFinder(portScanner: portScanner)
+        finder = DevServerFinder(portScanner: portScanner)
     }
 
     func start(_ host: MonitorHost) {

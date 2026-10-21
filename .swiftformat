@@ -1,0 +1,42 @@
+# Pulse SwiftFormat configuration(基线取自 NemoNotch 同款,风格口径保持一致)
+--swiftversion 6.0
+
+# 根目录 build/ 是 xcodebuild 产物;.build(隐藏目录)swiftformat 默认跳过
+--exclude build
+
+# Indentation
+--indent 4
+--tabwidth 4
+--smarttabs enabled
+--indentcase false
+
+# Wrapping
+--maxwidth 120
+--wraparguments before-first
+--wrapcollections before-first
+
+# Other
+--self remove
+--importgrouping alpha
+--semicolons never
+--commas always
+--decimalgrouping 3,6
+--exponentcase lowercase
+--header ignore
+--ifdef indent
+--operatorfunc spaced
+--ranges spaced
+--stripunusedargs closure-only
+--trimwhitespace always
+--voidtype void
+--emptybraces no-space
+
+# Disabled rules
+--disable redundantReturn
+--disable trailingClosures
+--disable wrapMultilineStatementBraces
+--disable redundantSendable
+# preferForLoop 把 .forEach { } 改写成 for-in,但数组字面量的类型推断上下文随之
+# 改变(.forEach 闭包参数随调用方推断,for-in 裸字面量默认 [Int]),实测把
+# Double 测试改编译不过 — 语义类改写不进格式化
+--disable preferForLoop

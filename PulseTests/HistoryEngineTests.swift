@@ -1,7 +1,7 @@
 import GRDB
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 历史引擎(工单 03):真 SQLite(内存/临时目录库)+ 显式注入时间,
 /// 断言分钟卷积行数与数值、小时二级卷积、按日留存、出生登记持久化与
@@ -80,9 +80,9 @@ final class HistoryEngineTests: XCTestCase {
 
     private static func title(of identity: GroupIdentity) -> String {
         switch identity {
-        case .app(let path):
+        case let .app(path):
             String((path as NSString).lastPathComponent.dropLast(4))
-        case .project(let root, _):
+        case let .project(root, _):
             (root as NSString).lastPathComponent
         case .system: "系统"
         case .backgroundService: "后台服务"
@@ -121,7 +121,7 @@ final class HistoryEngineTests: XCTestCase {
         let alpha = app("Alpha")
         let beta = GroupIdentity.project(root: "/Users/x/beta", worktreeName: nil)
 
-        for step in 0..<12 {
+        for step in 0 ..< 12 {
             await ingest(
                 engine,
                 at: minute0.addingTimeInterval(TimeInterval(step * 5)),
@@ -158,7 +158,7 @@ final class HistoryEngineTests: XCTestCase {
         )
         XCTAssertEqual(
             try scalarInt("SELECT mem_max FROM sample_min WHERE group_id = ?", [alpha.stableKey]),
-            1_100
+            1100
         )
         XCTAssertEqual(
             try scalarInt("SELECT procs FROM sample_min WHERE group_id = ?", [alpha.stableKey]),
@@ -211,9 +211,17 @@ final class HistoryEngineTests: XCTestCase {
         let engine = try makeMemoryEngine(now: minute0)
 
         await ingest(engine, at: minute0, groups: [GroupSample(id: .orphan, cpuPercent: 1, memoryBytes: 1)])
-        await ingest(engine, at: minute0.addingTimeInterval(60), groups: [GroupSample(id: .orphan, cpuPercent: 2, memoryBytes: 1)])
+        await ingest(
+            engine,
+            at: minute0.addingTimeInterval(60),
+            groups: [GroupSample(id: .orphan, cpuPercent: 2, memoryBytes: 1)]
+        )
         // 三分钟静默后恢复采样:只冲刷有样本的分钟。
-        await ingest(engine, at: minute0.addingTimeInterval(240), groups: [GroupSample(id: .orphan, cpuPercent: 3, memoryBytes: 1)])
+        await ingest(
+            engine,
+            at: minute0.addingTimeInterval(240),
+            groups: [GroupSample(id: .orphan, cpuPercent: 3, memoryBytes: 1)]
+        )
 
         // 分钟行 = 各"已完整"的窗口(尾分钟要等下一次采样才冲刷);
         // 中间静默的 +120/+180 没有行——不补零。
@@ -238,8 +246,18 @@ final class HistoryEngineTests: XCTestCase {
         let alpha = app("Alpha")
 
         // 小时 H 的 25、26 两个分钟窗。
-        await ingest(engine, at: minute0.addingTimeInterval(25 * 60), load: 10, groups: [GroupSample(id: alpha, cpuPercent: 10, memoryBytes: 1_000, processCount: 2)])
-        await ingest(engine, at: minute0.addingTimeInterval(26 * 60), load: 30, groups: [GroupSample(id: alpha, cpuPercent: 30, memoryBytes: 3_000, processCount: 4)])
+        await ingest(
+            engine,
+            at: minute0.addingTimeInterval(25 * 60),
+            load: 10,
+            groups: [GroupSample(id: alpha, cpuPercent: 10, memoryBytes: 1000, processCount: 2)]
+        )
+        await ingest(
+            engine,
+            at: minute0.addingTimeInterval(26 * 60),
+            load: 30,
+            groups: [GroupSample(id: alpha, cpuPercent: 30, memoryBytes: 3000, processCount: 4)]
+        )
         await ingest(engine, at: minute0.addingTimeInterval(27 * 60), load: 20, groups: [])
         // 本小时不卷积(小时未完),分钟行已落。
         XCTAssertEqual(try scalarInt("SELECT count(*) FROM sample_min"), 2)
@@ -259,7 +277,7 @@ final class HistoryEngineTests: XCTestCase {
         )
         XCTAssertEqual(
             try scalarInt("SELECT mem_max FROM sample_hour WHERE group_id = ?", [alpha.stableKey]),
-            3_000
+            3000
         )
         XCTAssertEqual(
             try scalarInt("SELECT procs FROM sample_hour WHERE group_id = ?", [alpha.stableKey]),
@@ -298,7 +316,13 @@ final class HistoryEngineTests: XCTestCase {
     /// (arch-review-2026-10-18/03 乙7,累计每轮 3×SUM → 每分钟一次)。
     func testIngestReportsWhetherAMinuteRowWasWritten() async throws {
         let engine = try makeMemoryEngine(now: minute0)
-        let first = await engine.ingest(at: minute0, systemLoad: 1, groups: [], displayNames: [:], lineage: LineageRegistry())
+        let first = await engine.ingest(
+            at: minute0,
+            systemLoad: 1,
+            groups: [],
+            displayNames: [:],
+            lineage: LineageRegistry()
+        )
         let sameMinute = await engine.ingest(
             at: minute0.addingTimeInterval(30), systemLoad: 1, groups: [], displayNames: [:], lineage: LineageRegistry()
         )
@@ -320,7 +344,10 @@ final class HistoryEngineTests: XCTestCase {
         let future = HistoryWindows.hourStartSeconds(of: minute0) + 10 * 365 * 24 * 3600
         try await queue.write { db in
             try db.execute(sql: "DELETE FROM system_hour")
-            try db.execute(sql: "INSERT INTO system_hour (ts, load_avg, load_max) VALUES (?, 1, 1)", arguments: [future])
+            try db.execute(
+                sql: "INSERT INTO system_hour (ts, load_avg, load_max) VALUES (?, 1, 1)",
+                arguments: [future]
+            )
         }
 
         let engineB = try makeFileEngine(now: minute0.addingTimeInterval(3600))
@@ -384,7 +411,7 @@ final class HistoryEngineTests: XCTestCase {
         await ingest(engine, at: minute0.addingTimeInterval(5), load: 1, groups: [], diskRead: 300, diskWrite: 20)
         await ingest(engine, at: minute0.addingTimeInterval(60), load: 1, groups: [])
 
-        XCTAssertEqual(try scalarInt("SELECT disk_read FROM system_min"), 1_000)
+        XCTAssertEqual(try scalarInt("SELECT disk_read FROM system_min"), 1000)
         XCTAssertEqual(try scalarInt("SELECT disk_written FROM system_min"), 50)
     }
 
@@ -398,9 +425,9 @@ final class HistoryEngineTests: XCTestCase {
         let series = await engine.series(metric: .disk, range: .hour1, now: minute0.addingTimeInterval(120))
         let diskSeries = try XCTUnwrap(series)
         XCTAssertFalse(diskSeries.isEmpty, "磁盘历史不再恒空")
-        let filled = diskSeries.values.compactMap { $0 }
+        let filled = diskSeries.values.compactMap(\.self)
         XCTAssertEqual(filled.count, 1, "只有 ingest 过的那一分钟有桶")
-        XCTAssertEqual(filled.first ?? -1, 1_000 / 60.0, accuracy: 1e-9, "1 分钟桶 1000 字节 → 平均速率")
+        XCTAssertEqual(filled.first ?? -1, 1000 / 60.0, accuracy: 1e-9, "1 分钟桶 1000 字节 → 平均速率")
     }
 
     /// Today/7 天累计与库内增量吻合,跨当地零点翻日,且已卷积分钟不重复计数:
@@ -417,7 +444,12 @@ final class HistoryEngineTests: XCTestCase {
         await ingest(engine, at: lateNight.addingTimeInterval(60), load: 1, groups: [])
 
         // 跨当地零点 + 跨小时:今日 00:05 一分钟(下行 50 / 上行 5)。
-        let nextDay = try XCTUnwrap(calendar.date(bySettingHour: 0, minute: 5, second: 0, of: day0.addingTimeInterval(86_400)))
+        let nextDay = try XCTUnwrap(calendar.date(
+            bySettingHour: 0,
+            minute: 5,
+            second: 0,
+            of: day0.addingTimeInterval(86400)
+        ))
         await ingest(engine, at: nextDay, load: 1, groups: [], netRx: 50, netTx: 5)
         await ingest(engine, at: nextDay.addingTimeInterval(60), load: 1, groups: [])
 
@@ -444,7 +476,7 @@ final class HistoryEngineTests: XCTestCase {
     }
 
     /// 库缺席(降级为无历史):累计返回 nil,UI 占位,不伪造。
-    func testNetworkTotalsWithoutDatabaseReturnsNil() async throws {
+    func testNetworkTotalsWithoutDatabaseReturnsNil() async {
         let engine = HistoryEngine(database: nil, now: minute0, calendar: calendar)
         let totals = await engine.networkTotals(now: minute0)
         XCTAssertNil(totals)
@@ -507,7 +539,7 @@ final class HistoryEngineTests: XCTestCase {
                     parentPID: 1,
                     executablePath: "/usr/local/bin/worker",
                     argv: ["worker"]
-                )
+                ),
             ]
         )
         let groups = GroupingEngine.groups(from: snapshot, lineage: restored)
@@ -575,14 +607,14 @@ final class HistoryEngineTests: XCTestCase {
     func testLineageRowsAbsentFromTheRegistryArePrunedPeriodically() async throws {
         let engine = try makeMemoryEngine(now: minute0)
         var everything = LineageRegistry()
-        for pid in pid_t(1)...pid_t(50) {
+        for pid in pid_t(1) ... pid_t(50) {
             everything.register(pid: pid, entry: LineageRegistry.Entry(
                 parentPID: 1, identity: ProcessIdentity(executablePath: "/bin/p\(pid)")
             ))
         }
         await ingest(engine, at: minute0, load: 1, groups: [], lineage: everything)
         let survivors = everything.pruned(keeping: [7, 8])
-        for round in 1...HistoryEngine.lineagePruneInterval {
+        for round in 1 ... HistoryEngine.lineagePruneInterval {
             await ingest(engine, at: minute0.addingTimeInterval(Double(round)), load: 1, groups: [], lineage: survivors)
         }
 

@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 import PulseCore
 
 // MARK: - 采集源
@@ -42,7 +42,7 @@ struct LiveCoreTickSource: CoreTickSource {
         total.reserveCapacity(Int(coreCount))
         userTicks.reserveCapacity(Int(coreCount))
         systemTicks.reserveCapacity(Int(coreCount))
-        for core in 0..<Int(coreCount) {
+        for core in 0 ..< Int(coreCount) {
             let base = core * statesPerCore
             let user = UInt64(info[base + Int(CPU_STATE_USER)])
             let system = UInt64(info[base + Int(CPU_STATE_SYSTEM)])
@@ -62,4 +62,3 @@ struct LiveCoreTickSource: CoreTickSource {
         )
     }
 }
-

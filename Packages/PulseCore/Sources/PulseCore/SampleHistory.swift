@@ -2,10 +2,10 @@ import Foundation
 
 // MARK: - 采样历史(工单 P0.6-01)
 
-/// 内存版近期采样窗口(spec 实现决策):不落盘、重启即失,只回答
-/// "最近 ~60 个采样轮"的走势与统计。系统负载 + 每组 CPU%/内存三条口径
-/// 各一条环形序列,avg/peak/min 按需折叠——纯值类型 + Sendable,
-/// 由 SystemMonitor 每轮 apply() 推进,单测见 SampleHistoryTests。
+// 内存版近期采样窗口(spec 实现决策):不落盘、重启即失,只回答
+// "最近 ~60 个采样轮"的走势与统计。系统负载 + 每组 CPU%/内存三条口径
+// 各一条环形序列,avg/peak/min 按需折叠——纯值类型 + Sendable,
+// 由 SystemMonitor 每轮 apply() 推进,单测见 SampleHistoryTests。
 
 /// 环形序列可承载的数值:可比较(峰值/谷值)、可折算 Double(均值)。
 /// 组 CPU% 用 Double,组内存用 UInt64(字节,GB 级在 Double 整数精度内无损)。
@@ -15,13 +15,23 @@ public protocol HistoryValue: Comparable, Sendable {
 }
 
 extension Double: HistoryValue {
-    public var asDouble: Double { self }
-    public static var zeroValue: Double { 0 }
+    public var asDouble: Double {
+        self
+    }
+
+    public static var zeroValue: Double {
+        0
+    }
 }
 
 extension UInt64: HistoryValue {
-    public var asDouble: Double { Double(self) }
-    public static var zeroValue: UInt64 { 0 }
+    public var asDouble: Double {
+        Double(self)
+    }
+
+    public static var zeroValue: UInt64 {
+        0
+    }
 }
 
 /// 单条序列的窗口统计(avg/peak/min 按需折叠的结果)。
@@ -56,11 +66,13 @@ public struct RingSeries<Value: HistoryValue>: Equatable, Sendable {
     public init(capacity: Int) {
         precondition(capacity > 0, "环形序列容量必须为正")
         self.capacity = capacity
-        self.storage = Array(repeating: Value.zeroValue, count: capacity)
+        storage = Array(repeating: Value.zeroValue, count: capacity)
     }
 
     /// 窗口内样本数。
-    public var count: Int { min(written, capacity) }
+    public var count: Int {
+        min(written, capacity)
+    }
 
     /// 时间序快照(旧 → 新)。容量级(≤60)拷贝,弹窗每轮一次,开销可忽略。
     public var values: [Value] {
@@ -68,7 +80,7 @@ public struct RingSeries<Value: HistoryValue>: Equatable, Sendable {
         guard n > 0 else { return [] }
         if n < capacity {
             // 未满环:写入位即样本数,最旧在 0。
-            return Array(storage[0..<n])
+            return Array(storage[0 ..< n])
         }
         // 满环:最旧在 head,跨尾回绕拼两段。
         return Array(storage[head...]) + Array(storage[..<head])
@@ -137,8 +149,8 @@ public struct GroupSeries: Equatable, Sendable {
     public var memoryBytes: RingSeries<UInt64>
 
     public init(capacity: Int) {
-        self.cpuPercent = RingSeries<Double>(capacity: capacity)
-        self.memoryBytes = RingSeries<UInt64>(capacity: capacity)
+        cpuPercent = RingSeries<Double>(capacity: capacity)
+        memoryBytes = RingSeries<UInt64>(capacity: capacity)
     }
 }
 
@@ -159,8 +171,8 @@ public struct SampleHistoryStore: Equatable, Sendable {
     public init(capacity: Int = SampleHistoryStore.defaultCapacity) {
         precondition(capacity > 0, "历史窗口容量必须为正")
         self.capacity = capacity
-        self.systemCPULoad = RingSeries<Double>(capacity: capacity)
-        self.memoryUsed = RingSeries<UInt64>(capacity: capacity)
+        systemCPULoad = RingSeries<Double>(capacity: capacity)
+        memoryUsed = RingSeries<UInt64>(capacity: capacity)
     }
 
     /// 读取某组的历史序列;组已被逐出(或从未出现)返回 nil。
@@ -176,7 +188,7 @@ public struct SampleHistoryStore: Equatable, Sendable {
         memoryUsedBytes: UInt64? = nil,
         groups present: [GroupSample]
     ) {
-        self.systemCPULoad.append(load)
+        systemCPULoad.append(load)
         if let memoryUsedBytes {
             memoryUsed.append(memoryUsedBytes)
         }

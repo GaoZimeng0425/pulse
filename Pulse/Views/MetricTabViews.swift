@@ -1,7 +1,8 @@
-import SwiftUI
 import PulseCore
+import SwiftUI
 
 // MARK: - 指标 tab 视图族(工单 P0.6-03)
+
 // 内容模型(tab 展示什么)在 MetricTabModel(纯逻辑,单测覆盖);本文件只做
 // SwiftUI 外观:面积趋势图(§3-2)、CPU 主卡、Memory by App 环形卡、两种 tab 条
 // 与键盘 ←/→ 接线——按 spec 测试决策走预览 + 手动验收。
@@ -59,7 +60,7 @@ struct AreaTrendChartView: View {
         // 左垫底右对齐:不足 56 点时旧槽位 2% 垫底——刚启动只见网格与底线。
         var points: [CGPoint] = []
         points.reserveCapacity(count)
-        for index in 0..<count {
+        for index in 0 ..< count {
             let dataIndex = index - (count - window.count)
             let normalized: Double = dataIndex >= 0
                 ? min(max(window[dataIndex] / domainMax, 0), 1)
@@ -293,7 +294,7 @@ struct MetricMainCardView: View {
 // MARK: - 预览(spec 测试决策:图表与 tab 外观走预览 + 手动验收)
 
 #Preview("面积图") {
-    let series: [Double] = (0..<56).map { i in
+    let series: [Double] = (0 ..< 56).map { i in
         let ramp = Double(i) / 55 * 60
         let wave = Double((i * 7) % 13) * 2.2
         return min(ramp + wave, 100)
@@ -312,9 +313,9 @@ struct MetricMainCardView: View {
 
 #Preview("tab 主卡") {
     let host = HostInfo(chipName: "Apple M4 Pro", coreCount: 12, physicalMemoryBytes: 51_539_607_552)
-    let loadTrend: [Double] = (0..<56).map { (i: Int) -> Double in
-        let ramp: Double = Double(i) / 55 * 50
-        let wave: Double = Double((i * 5) % 17) * 2
+    let loadTrend: [Double] = (0 ..< 56).map { (i: Int) -> Double in
+        let ramp = Double(i) / 55 * 50
+        let wave = Double((i * 5) % 17) * 2
         return min(ramp + wave, 100)
     }
     let memory = MemoryBreakdown(

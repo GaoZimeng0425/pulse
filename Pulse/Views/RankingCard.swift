@@ -1,6 +1,6 @@
-import SwiftUI
 import AppKit
 import PulseCore
+import SwiftUI
 
 // MARK: - 应用排行卡(工单 P0.6-05,参考文档 §2.3 应用排行卡 / OG "Busiest Right Now")
 
@@ -189,7 +189,7 @@ struct RankingRowView: View {
             groups: groups, metric: .memory, cpuLeader: 51.4, memoryLeaderBytes: 5_200_000_000,
             expandedGroupIDs: [], density: .compact, onToggle: { _ in }, onEndGroup: { _ in }
         ) { _ in EmptyView() }
-        .frame(width: 332)
+            .frame(width: 332)
         RankingCardView(
             groups: [], metric: .cpu, cpuLeader: 0, memoryLeaderBytes: 0,
             expandedGroupIDs: [], onToggle: { _ in }, onEndGroup: { _ in }

@@ -1,5 +1,5 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 模块排行聚合(工单 01,纯逻辑):每 pid 读数字典 → 按组聚合的排行行。
 /// 钉死六件事:组行 = 成员之和、按主值降序次键稳定、未知 pid 入"其他进程"
@@ -91,7 +91,8 @@ final class ModuleRankingAggregatorTests: XCTestCase {
     // MARK: 空字典 / 零值
 
     func testEmptyDictionariesYieldEmptyBoards() {
-        XCTAssertTrue(ModuleRankingAggregator.energyRows(impacts: [:], windowSeconds: 5, groups: sampleGroups()).isEmpty)
+        XCTAssertTrue(ModuleRankingAggregator.energyRows(impacts: [:], windowSeconds: 5, groups: sampleGroups())
+            .isEmpty)
         XCTAssertTrue(ModuleRankingAggregator.diskRows(rates: [:], groups: sampleGroups()).isEmpty)
         XCTAssertTrue(ModuleRankingAggregator.networkRows(rates: [:], groups: []).isEmpty)
     }
@@ -124,13 +125,13 @@ final class ModuleRankingAggregatorTests: XCTestCase {
             rows[0].subtitle,
             "读 \(PulseFormat.diskRate(1_250_000)) · 写 \(PulseFormat.diskRate(500_000))"
         )
-        XCTAssertEqual(rows[1].meterFraction, 300.0 / 1_750.0, accuracy: 1e-9)
+        XCTAssertEqual(rows[1].meterFraction, 300.0 / 1750.0, accuracy: 1e-9)
     }
 
     func testNetworkRowsRankByDownPlusUpAndBucketUnknownPIDs() {
         let rates: [pid_t: ProcessNetworkRates] = [
             20: ProcessNetworkRates(downBytesPerSec: 800_000, upBytesPerSec: 200_000),
-            99: ProcessNetworkRates(downBytesPerSec: 100_000, upBytesPerSec: 50_000),
+            99: ProcessNetworkRates(downBytesPerSec: 100_000, upBytesPerSec: 50000),
         ]
         let rows = ModuleRankingAggregator.networkRows(rates: rates, groups: sampleGroups())
 
@@ -140,7 +141,7 @@ final class ModuleRankingAggregatorTests: XCTestCase {
         XCTAssertEqual(rows[0].meterFraction, 1.0, accuracy: 1e-9)
         XCTAssertEqual(rows[1].id, ModuleRankingAggregator.otherProcessesKey)
         XCTAssertEqual(rows[1].primary, 150_000, accuracy: 1e-6)
-        XCTAssertEqual(rows[1].meterFraction, 150.0 / 1_000.0, accuracy: 1e-9)
+        XCTAssertEqual(rows[1].meterFraction, 150.0 / 1000.0, accuracy: 1e-9)
         // 副文箭头分列上下行。
         XCTAssertEqual(
             rows[0].subtitle,

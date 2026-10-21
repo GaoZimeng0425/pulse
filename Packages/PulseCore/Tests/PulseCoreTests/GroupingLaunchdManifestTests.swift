@@ -1,5 +1,5 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// launchd 服务清单在归组引擎兜底分类里的四态(launchd-attribution/01):清单命中 ∧ 父为
 /// launchd → 后台服务;命中 ∧ 父非 launchd → 与改前一致(清单不单独改判);未命中 → 与改前

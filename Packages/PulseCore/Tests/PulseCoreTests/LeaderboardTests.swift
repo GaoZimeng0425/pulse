@@ -1,5 +1,5 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 榜单内核(架构审查高3,纯函数):组卡榜单 / 模块排行 / 进程表 meter / 归组引擎
 /// 共用的唯一排序与榜首口径——按值降序、同值身份升序(跨采样轮稳定)、

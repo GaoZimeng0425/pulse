@@ -1,7 +1,7 @@
 import Darwin
-import XCTest
 @testable import PulseCore
 import PulseCoreTestSupport
+import XCTest
 
 /// p1-history/06 网络卡:核心层 NetworkModel 的合成夹具单测(spec 测试决策,调研 §2.2 逐条钉死)。
 /// 三组断言:①接口选择与降级链(虚拟前缀降级 → UP+RUNNING 回退,注入假链路状态);
@@ -22,10 +22,18 @@ final class NetworkModelTests: XCTestCase {
         family: Int32 = 2
     ) -> NetworkInterfaceState {
         var flags: Int32 = 0
-        if up { flags |= NetworkInterfaceSelector.iffUp }
-        if running { flags |= NetworkInterfaceSelector.iffRunning }
-        if loopback { flags |= NetworkInterfaceSelector.iffLoopback }
-        if pointToPoint { flags |= NetworkInterfaceSelector.iffPointToPoint }
+        if up {
+            flags |= NetworkInterfaceSelector.iffUp
+        }
+        if running {
+            flags |= NetworkInterfaceSelector.iffRunning
+        }
+        if loopback {
+            flags |= NetworkInterfaceSelector.iffLoopback
+        }
+        if pointToPoint {
+            flags |= NetworkInterfaceSelector.iffPointToPoint
+        }
         return NetworkInterfaceState(name: name, flags: flags, addressFamily: family)
     }
 
@@ -70,9 +78,9 @@ final class NetworkModelTests: XCTestCase {
             state("lo0", loopback: true),
             state("utun3", pointToPoint: true),
             state("en7", up: false),
-            state("awdl0", family: 30),           // IPv6-only:跳过
-            state("bridge100"),                    // OrbStack/共享桥:跳过
-            state("vmenet2"),                      // OrbStack 虚拟网卡:跳过
+            state("awdl0", family: 30), // IPv6-only:跳过
+            state("bridge100"), // OrbStack/共享桥:跳过
+            state("vmenet2"), // OrbStack 虚拟网卡:跳过
             state("en5"),
         ]
         XCTAssertEqual(NetworkInterfaceSelector.select(primary: nil, candidates: candidates), "en5")
@@ -148,13 +156,13 @@ final class NetworkModelTests: XCTestCase {
     func testRouteRecordParsesCountersAndBaudrate() {
         let buffer = ifinfo2(
             index: 14, up: 17_070_513_416, down: 987_654_321,
-            baudrate: 304_200_000, upPackets: 4_436, downPackets: 12_070
+            baudrate: 304_200_000, upPackets: 4436, downPackets: 12070
         )
         let parsed = NetworkRouteRecord.parse(buffer, expectingIndex: 14)
         XCTAssertEqual(parsed?.upBytes, 17_070_513_416)
         XCTAssertEqual(parsed?.downBytes, 987_654_321)
-        XCTAssertEqual(parsed?.upPackets, 4_436)
-        XCTAssertEqual(parsed?.downPackets, 12_070)
+        XCTAssertEqual(parsed?.upPackets, 4436)
+        XCTAssertEqual(parsed?.downPackets, 12070)
         XCTAssertEqual(parsed?.linkBaudrateBitsPerSecond, 304_200_000)
     }
 
@@ -162,7 +170,7 @@ final class NetworkModelTests: XCTestCase {
     /// NEWADDR/NEWMADDR2;逐条 msglen 步进,只认第一条匹配的 IFINFO2。
     func testRouteRecordStepsThroughMultiMessageReply() {
         var buffer = ifinfo2(index: 14, up: 10, down: 20, trailing: 20)
-        buffer.append(contentsOf: otherMessage(length: 60, type: 0x0c))   // RTM_NEWADDR
+        buffer.append(contentsOf: otherMessage(length: 60, type: 0x0C)) // RTM_NEWADDR
         buffer.append(contentsOf: otherMessage(length: 76))
         buffer.append(contentsOf: otherMessage(length: 88))
         let parsed = NetworkRouteRecord.parse(buffer, expectingIndex: 14)
@@ -205,20 +213,20 @@ final class NetworkModelTests: XCTestCase {
     /// 正常差分:Δ/elapsed;记账增量 = 整段净增(与速率同源)。
     func testRatesDivideDeltaByElapsed() {
         let result = NetworkRateDiffer.result(
-            previous: NetworkFixture.counters(up: 1_000, down: 2_000, at: 0),
-            current: NetworkFixture.counters(up: 6_000, down: 7_000, at: 5_000_000_000)
+            previous: NetworkFixture.counters(up: 1000, down: 2000, at: 0),
+            current: NetworkFixture.counters(up: 6000, down: 7000, at: 5_000_000_000)
         )
-        XCTAssertEqual(result.rates.upBytesPerSecond, 1_000, accuracy: 0.0001)
-        XCTAssertEqual(result.rates.downBytesPerSecond, 1_000, accuracy: 0.0001)
-        XCTAssertEqual(result.upBytesDelta, 5_000)
-        XCTAssertEqual(result.downBytesDelta, 5_000)
+        XCTAssertEqual(result.rates.upBytesPerSecond, 1000, accuracy: 0.0001)
+        XCTAssertEqual(result.rates.downBytesPerSecond, 1000, accuracy: 0.0001)
+        XCTAssertEqual(result.upBytesDelta, 5000)
+        XCTAssertEqual(result.downBytesDelta, 5000)
     }
 
     /// 防护二(负值钳零):接口重置令计数回退 → 本轮 0(基线由调用方以本轮重立)。
     func testCounterRollbackYieldsZero() {
         let result = NetworkRateDiffer.result(
-            previous: NetworkFixture.counters(up: 6_000, down: 7_000, at: 0),
-            current: NetworkFixture.counters(up: 1_000, down: 7_000, at: 5_000_000_000)
+            previous: NetworkFixture.counters(up: 6000, down: 7000, at: 0),
+            current: NetworkFixture.counters(up: 1000, down: 7000, at: 5_000_000_000)
         )
         XCTAssertEqual(result.rates, .zero)
         XCTAssertEqual(result.upBytesDelta, 0)
@@ -228,8 +236,8 @@ final class NetworkModelTests: XCTestCase {
     /// 接口切换:基线属于旧口,直接作废本轮,不出跨口假速率。
     func testInterfaceSwitchYieldsZero() {
         let result = NetworkRateDiffer.result(
-            previous: NetworkFixture.counters("en0", up: 1_000, down: 1_000, at: 0),
-            current: NetworkFixture.counters("en1", up: 2_000, down: 2_000, at: 5_000_000_000)
+            previous: NetworkFixture.counters("en0", up: 1000, down: 1000, at: 0),
+            current: NetworkFixture.counters("en1", up: 2000, down: 2000, at: 5_000_000_000)
         )
         XCTAssertEqual(result.rates, .zero)
         XCTAssertEqual(result.upBytesDelta, 0)
@@ -284,8 +292,8 @@ final class NetworkModelTests: XCTestCase {
     /// elapsed 非正(时钟异常/同刻):本轮 0。
     func testNonPositiveElapsedYieldsZero() {
         let result = NetworkRateDiffer.result(
-            previous: NetworkFixture.counters(up: 1_000, down: 1_000, at: 5_000_000_000),
-            current: NetworkFixture.counters(up: 2_000, down: 2_000, at: 5_000_000_000)
+            previous: NetworkFixture.counters(up: 1000, down: 1000, at: 5_000_000_000),
+            current: NetworkFixture.counters(up: 2000, down: 2000, at: 5_000_000_000)
         )
         XCTAssertEqual(result.rates, .zero)
     }
@@ -319,7 +327,7 @@ final class NetworkModelTests: XCTestCase {
     /// 环容量满挤掉最旧(图表窗口固定),合计口径 = 上 + 下。
     func testTrendBufferEvictsOldestBeyondCapacity() {
         var buffer = NetworkTrendBuffer()
-        for index in 0..<(NetworkTrendBuffer.capacity + 5) {
+        for index in 0 ..< (NetworkTrendBuffer.capacity + 5) {
             buffer.append(NetworkRates(upBytesPerSecond: Double(index), downBytesPerSecond: 1))
         }
         let totals = buffer.totalBytesPerSecond

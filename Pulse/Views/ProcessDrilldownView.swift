@@ -1,6 +1,6 @@
-import SwiftUI
 import AppKit
 import PulseCore
+import SwiftUI
 
 // MARK: - 组内下钻(工单 06)
 
@@ -181,9 +181,9 @@ struct ProcessDetailView: View {
         NSPasteboard.general.setString(detail.process.argv.joined(separator: " "), forType: .string)
     }
 
-    private func field<Content: View>(
+    private func field(
         _ label: String,
-        @ViewBuilder _ value: () -> Content
+        @ViewBuilder _ value: () -> some View
     ) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Text(label)

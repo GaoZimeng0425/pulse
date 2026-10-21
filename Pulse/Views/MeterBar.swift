@@ -1,5 +1,5 @@
-import SwiftUI
 import PulseCore
+import SwiftUI
 
 // MARK: - 占比 meter 条(工单 P0.6-02,参考文档 §3-3)
 

@@ -1,13 +1,12 @@
-import XCTest
-import UserNotifications
 @testable import Pulse
 @testable import PulseCore
+import UserNotifications
+import XCTest
 
 /// 接缝:通知发送薄封装(spec 测试决策:OS 边界只冒烟,不深测——文案拼装与
 /// 路由解析是纯逻辑在此钉死;真实授权弹窗、系统投递与点开横幅属真机走查,
 /// 工单验收"通知授权时序正确(首开才请求)"由真机点击验证)。
 final class AlertNotificationSmokeTests: XCTestCase {
-
     // MARK: - 文案拼装(纯逻辑)
 
     func testContentBuilderProducesTitleBodyAndRoute() {
@@ -40,14 +39,14 @@ final class AlertNotificationSmokeTests: XCTestCase {
         )
     }
 
-    func testSystemStatusMapsToThreeStates() {
+    func testSystemStatusMapsToThreeStates() throws {
         // 显式映射(代码审查 LOW):provisional 静默送达算可发;未知新值按拒绝
         // (不弹窗、不循环请求)。
         XCTAssertEqual(NotificationAuthorization(.authorized), .authorized)
         XCTAssertEqual(NotificationAuthorization(.provisional), .authorized)
         XCTAssertEqual(NotificationAuthorization(.notDetermined), .notDetermined)
         XCTAssertEqual(NotificationAuthorization(.denied), .denied)
-        XCTAssertEqual(NotificationAuthorization(UNAuthorizationStatus(rawValue: 99)!), .denied)
+        XCTAssertEqual(try NotificationAuthorization(XCTUnwrap(UNAuthorizationStatus(rawValue: 99))), .denied)
     }
 
     func testSystemNotificationSettingsDeepLinkSelectsThisApp() {

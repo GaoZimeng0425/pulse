@@ -1,9 +1,10 @@
-import Foundation
-import UserNotifications
 import AppKit
+import Foundation
 import PulseCore
+import UserNotifications
 
 // MARK: - 通知发送缝(spec 六缝之「通知发送」)
+
 //
 // 薄封装:授权请求 / 授权查询 / 发送三件事直通 UNUserNotificationCenter,
 // 缝上无逻辑(纯逻辑在 AlertNotificationContent 的文案拼装与路由解析,可单测;
@@ -73,7 +74,7 @@ struct LiveAlertNotificationSender: AlertNotificationSending {
     }
 
     func authorizationStatus() async -> NotificationAuthorization {
-        NotificationAuthorization(await UNUserNotificationCenter.current().notificationSettings().authorizationStatus)
+        await NotificationAuthorization(UNUserNotificationCenter.current().notificationSettings().authorizationStatus)
     }
 
     func authorizationDiagnostics() async -> String {

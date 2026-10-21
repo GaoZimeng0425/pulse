@@ -1,6 +1,6 @@
 import GRDB
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 改项目根后的历史迁移(arch-review-2026-10-18/03 乙3,用户拍板 2026-10-19:自动迁移,
 /// 不文档化断史)。纯规则(ProjectRootMigration.plan)+ 真 SQLite 上的改写
@@ -64,7 +64,7 @@ final class ProjectRootMigrationTests: XCTestCase {
         let worktree = GroupIdentity.project(root: oldRoot, worktreeName: "feat")
         let other = GroupIdentity.app(bundlePath: "/Applications/Zed.app")
         await engine.reconcileProjectRoots([oldRoot])
-        for offset in [0.0, 65, 3_605] {
+        for offset in [0.0, 65, 3605] {
             await engine.ingest(
                 at: minute0.addingTimeInterval(offset),
                 systemLoad: 10,
@@ -77,11 +77,14 @@ final class ProjectRootMigrationTests: XCTestCase {
         await engine.reconcileProjectRoots(["/Users/x/new/pulse"])
 
         let expected = ["bundle:/Applications/Zed.app", "project:/Users/x/new/pulse", "project:/Users/x/new/pulse@feat"]
-        XCTAssertEqual(Set(try groupKeys("sample_min", in: queue)), Set(expected))
-        XCTAssertEqual(Set(try groupKeys("sample_hour", in: queue)), Set(expected))
+        XCTAssertEqual(try Set(groupKeys("sample_min", in: queue)), Set(expected))
+        XCTAssertEqual(try Set(groupKeys("sample_hour", in: queue)), Set(expected))
         XCTAssertEqual(try groupKeys("groups", in: queue), expected)
         let root = try await queue.read { db in
-            try String.fetchOne(db, sql: "SELECT project_root FROM groups WHERE group_id = 'project:/Users/x/new/pulse@feat'")
+            try String.fetchOne(
+                db,
+                sql: "SELECT project_root FROM groups WHERE group_id = 'project:/Users/x/new/pulse@feat'"
+            )
         }
         XCTAssertEqual(root, "/Users/x/new/pulse")
     }
@@ -131,8 +134,8 @@ final class ProjectRootMigrationTests: XCTestCase {
             at: minute0.addingTimeInterval(65), systemLoad: 1, groups: [], displayNames: [:], lineage: LineageRegistry()
         )
 
-        await engine.reconcileProjectRoots(["/a/x", "/a/y"])   // 首启:只记快照
-        await engine.reconcileProjectRoots(["/a"])             // 多对一:跳过
+        await engine.reconcileProjectRoots(["/a/x", "/a/y"]) // 首启:只记快照
+        await engine.reconcileProjectRoots(["/a"]) // 多对一:跳过
 
         XCTAssertEqual(try groupKeys("sample_min", in: queue), ["project:/a/x"])
         XCTAssertEqual(try groupKeys("groups", in: queue), ["project:/a/x"])

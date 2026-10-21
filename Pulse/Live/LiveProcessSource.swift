@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 import PulseCore
 
 /// Live 采集源:Darwin 薄适配器,API 全集与 docs/probe.swift 一一对应。
@@ -36,7 +36,7 @@ final class LiveProcessSource: ProcessSource, @unchecked Sendable {
     /// KERN_PROCARGS2 缓冲:argc + execpath + argv + envp,1 MiB 覆盖 ARG_MAX。
     static let procArgsBufferSize = 1 << 20
     /// 进程列表缓冲(pid 数),远超实际进程数。
-    private static let pidListCapacity = 16_384
+    private static let pidListCapacity = 16384
     /// mach 时间基准(本机实测 125/3 ns/tick;Intel 上为 1/1,即 tick == 纳秒)。
     /// pti_total_user/system 实为 mach_absolute_time 原始 tick 而非纳秒——
     /// 工单 04 用 getrusage 基准校准发现:不换算 CPU% 会缩小 ~41.7 倍
@@ -119,6 +119,7 @@ final class LiveProcessSource: ProcessSource, @unchecked Sendable {
     }
 
     // MARK: - Darwin 调用(每个都对应 docs/probe.swift 中已验证的写法)
+
     // 下列四个为 internal:出生扫描器(LiveBirthScanSource,评审 S1)复用同一批
     // 调用做轻量新 pid 探测——单测冒烟与缓冲上限共用一处事实。
 
@@ -134,7 +135,7 @@ final class LiveProcessSource: ProcessSource, @unchecked Sendable {
         var info = kinfo_proc()
         var length = MemoryLayout<kinfo_proc>.size
         guard sysctl(&mib, 4, &info, &length, nil, 0) == 0,
-            info.kp_proc.p_pid == pid
+              info.kp_proc.p_pid == pid
         else { return nil }
         return info
     }

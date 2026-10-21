@@ -1,6 +1,6 @@
 import GRDB
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 历史页查询层(工单 04):真 SQLite(内存库)+ 显式注入时间(spec 测试
 /// 决策:历史库不设缝,聚合查询打真 SQLite)。缝 = HistoryQuery.series——
@@ -9,7 +9,9 @@ import XCTest
 final class HistoryQueryTests: XCTestCase {
     /// 基准时刻:对齐到小时边界(分钟 / 5 分钟 / 小时桶边界在此重合,
     /// 槽位断言无歧义)。
-    private var base: Int { 1_789_000_000 / 3600 * 3600 }
+    private var base: Int {
+        1_789_000_000 / 3600 * 3600
+    }
 
     private var queue: DatabaseQueue!
 
@@ -26,10 +28,10 @@ final class HistoryQueryTests: XCTestCase {
             for row in rows {
                 try db.execute(
                     sql: """
-                        INSERT INTO system_min
-                            (ts, load_avg, load_max, net_rx, net_tx, disk_read, disk_written)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                        """,
+                    INSERT INTO system_min
+                        (ts, load_avg, load_max, net_rx, net_tx, disk_read, disk_written)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
                     arguments: [row.ts, row.load, row.load, row.rx, row.tx, row.read, row.written]
                 )
             }
@@ -54,10 +56,10 @@ final class HistoryQueryTests: XCTestCase {
             for row in rows {
                 try db.execute(
                     sql: """
-                        INSERT INTO sample_min
-                            (ts, group_id, cpu_avg, cpu_max, mem_max, procs)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                        """,
+                    INSERT INTO sample_min
+                        (ts, group_id, cpu_avg, cpu_max, mem_max, procs)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
                     arguments: [row.ts, row.group, row.cpu, row.cpu, row.mem, 1]
                 )
             }
@@ -71,9 +73,9 @@ final class HistoryQueryTests: XCTestCase {
             for row in rows {
                 try db.execute(
                     sql: """
-                        INSERT INTO sample_hour (ts, group_id, cpu_avg, cpu_max, mem_max, procs)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                        """,
+                    INSERT INTO sample_hour (ts, group_id, cpu_avg, cpu_max, mem_max, procs)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
                     arguments: [row.ts, row.group, row.cpu, row.cpu, 0, 1]
                 )
             }
@@ -118,9 +120,9 @@ final class HistoryQueryTests: XCTestCase {
     func testRangeBucketGridAlignsToBoundsAndCapsPointCount() {
         let table: [(range: HistoryRange, span: Int, bucket: Int)] = [
             (.hour1, 3600, 60),
-            (.day1, 86_400, 300),
-            (.days7, 7 * 86_400, 3600),
-            (.days30, 30 * 86_400, 3600),
+            (.day1, 86400, 300),
+            (.days7, 7 * 86400, 3600),
+            (.days30, 30 * 86400, 3600),
         ]
         for entry in table {
             let (start, end) = entry.range.bounds(now: Date(timeIntervalSince1970: Double(base)))
@@ -179,7 +181,7 @@ final class HistoryQueryTests: XCTestCase {
     // MARK: 降采样分桶(24 小时:分钟行 → 5 分钟桶)
 
     func testTwentyFourHoursDownsamplesMinutesIntoFiveMinuteBuckets() throws {
-        let start = base - 86_400
+        let start = base - 86400
         try insertSystemMinutes([
             (ts: start + 60, load: 10, rx: nil, tx: nil, read: nil, written: nil),
             (ts: start + 120, load: 30, rx: nil, tx: nil, read: nil, written: nil),
@@ -310,8 +312,8 @@ final class HistoryQueryTests: XCTestCase {
         XCTAssertEqual(HistoryMetricKey.systemLoad.statisticText(42.4), "42%")
         XCTAssertEqual(HistoryMetricKey.cpu.statisticText(445.2), "445%")
         XCTAssertEqual(HistoryMetricKey.memory.statisticText(2_400_000_000), "2.4 GB")
-        XCTAssertEqual(HistoryMetricKey.network.statisticText(12_400), "12.4 KB/s")
-        XCTAssertEqual(HistoryMetricKey.disk.statisticText(12_400), "12.4 KB/s")
+        XCTAssertEqual(HistoryMetricKey.network.statisticText(12400), "12.4 KB/s")
+        XCTAssertEqual(HistoryMetricKey.disk.statisticText(12400), "12.4 KB/s")
     }
 
     func testRangeTitlesAreChinese() {

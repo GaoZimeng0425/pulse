@@ -1,7 +1,7 @@
-import SwiftUI
 import AppKit
-import UserNotifications
 import PulseCore
+import SwiftUI
+import UserNotifications
 
 /// 进程入口:xctest 宿主只起空壳 App(TestHostApp),真实运行才走完整装配。
 /// 单元测试托管在 app 内(TEST_HOST 同进程),宿主若走 PulseApp,拉起即建

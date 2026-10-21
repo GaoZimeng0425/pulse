@@ -1,5 +1,5 @@
-import SwiftUI
 import PulseCore
+import SwiftUI
 
 /// 菜单栏徽标设置(工单 p1-history/09):1–4 个槽位,每槽从 CPU%/RAM%/磁盘剩余%/
 /// 网络上下行里选,四项可同时上屏,顺序可调(上移/下移);默认 CPU + RAM。

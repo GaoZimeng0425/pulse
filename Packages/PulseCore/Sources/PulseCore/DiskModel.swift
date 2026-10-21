@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 
 // 磁盘的纯值层:容量对账、本地快照记录解析、吞吐差分与累计、源接缝与 rusage 求和回退源。getattrlist / IORegistry / fs_snapshot_list 适配器在 app target(DiskSensor.swift)。
 
@@ -10,7 +10,9 @@ public struct DiskVolumeUsage: Equatable, Identifiable, Sendable {
     public let mountPoint: String
     public let usedBytes: UInt64
 
-    public var id: String { mountPoint }
+    public var id: String {
+        mountPoint
+    }
 
     public init(label: String, mountPoint: String, usedBytes: UInt64) {
         self.label = label
@@ -175,11 +177,18 @@ public struct DiskSnapshot: Equatable, Identifiable, Sendable {
     /// Unix 秒(petal created)。
     public let createdEpoch: Int64
 
-    public var id: String { name }
-    public var createdAt: Date { Date(timeIntervalSince1970: TimeInterval(createdEpoch)) }
+    public var id: String {
+        name
+    }
+
+    public var createdAt: Date {
+        Date(timeIntervalSince1970: TimeInterval(createdEpoch))
+    }
 
     /// 本地 Time Machine 快照(macOS 自留 24 小时;petal is_time_machine,disk.rs:55-57)。
-    public var isTimeMachine: Bool { name.hasPrefix("com.apple.TimeMachine.") }
+    public var isTimeMachine: Bool {
+        name.hasPrefix("com.apple.TimeMachine.")
+    }
 
     /// 来源识别(petal kind,disk.rs:62-69):TM / macOS 更新 / CCC / 其他 App。
     public var kindTitle: String {
@@ -217,7 +226,7 @@ public enum DiskSnapshotRecord {
     private static let timeOffset = nameReferenceOffset + MemoryLayout<attrreference_t>.size
 
     /// 解析单条记录;截断/越界记录返回 nil(跳过,不误读,petal 同款)。
-    public static func parse<S: Sequence>(_ record: S) -> DiskSnapshot? where S.Element == UInt8 {
+    public static func parse(_ record: some Sequence<UInt8>) -> DiskSnapshot? {
         let bytes = Array(record)
         guard bytes.count >= minimumLength else { return nil }
         return bytes.withUnsafeBufferPointer { buffer in
@@ -244,13 +253,13 @@ public enum DiskSnapshotRecord {
     public static func parseBuffer(_ buffer: [UInt8], count: Int) -> [DiskSnapshot] {
         var snapshots: [DiskSnapshot] = []
         var at = 0
-        for _ in 0..<max(0, count) {
+        for _ in 0 ..< max(0, count) {
             guard at + 4 <= buffer.count else { break }
             let length = Int(buffer.withUnsafeBytes {
                 $0.loadUnaligned(fromByteOffset: at, as: UInt32.self)
             })
             guard length >= minimumLength, at + length <= buffer.count else { break }
-            if let snapshot = parse(buffer[at..<(at + length)]) {
+            if let snapshot = parse(buffer[at ..< (at + length)]) {
                 snapshots.append(snapshot)
             }
             at += length
@@ -339,15 +348,14 @@ public enum DiskThroughputDiffer {
         guard let previous else { return .zero } // 首读:立基线,不出速率
         // 计数回退(重置/换盘/回绕)→ 本轮 0,基线以本轮为准(见 Accumulator)。
         guard current.readBytes >= previous.readBytes,
-              current.writeBytes >= previous.writeBytes
-        else { return .zero }
-        guard current.atUptimeNanos > previous.atUptimeNanos else { return .zero }
+              current.writeBytes >= previous.writeBytes,
+              current.atUptimeNanos > previous.atUptimeNanos else { return .zero }
         let elapsed = Double(current.atUptimeNanos - previous.atUptimeNanos) / 1_000_000_000
         guard elapsed > 0, elapsed.isFinite else { return .zero }
         let read = Double(current.readBytes - previous.readBytes) / elapsed
         let write = Double(current.writeBytes - previous.writeBytes) / elapsed
-        guard read.isFinite, write.isFinite else { return .zero }
-        guard read <= maximumBytesPerSecond, write <= maximumBytesPerSecond else { return .zero }
+        guard read.isFinite, write.isFinite, read <= maximumBytesPerSecond,
+              write <= maximumBytesPerSecond else { return .zero }
         return DiskRates(readBytesPerSecond: read, writeBytesPerSecond: write)
     }
 }
@@ -439,7 +447,9 @@ public struct RusageSumDiskThroughputSource: DiskThroughputSource {
     }
 
     /// 低频档(工单原文预案;30 点 × 30s = 15 分钟走势)。
-    public var cadenceSeconds: TimeInterval { 30 }
+    public var cadenceSeconds: TimeInterval {
+        30
+    }
 
     public func readCounters() -> DiskIOCounters? {
         guard let latest = heartbeat.latest() else { return nil }
@@ -491,7 +501,7 @@ public final class DiskThroughputAccumulator: @unchecked Sendable {
         let writes = writeRates.values
         return DiskThroughputReading(
             current: rates,
-            trend: (0..<reads.count).map { DiskRatePoint(read: reads[$0], write: writes[$0]) },
+            trend: (0 ..< reads.count).map { DiskRatePoint(read: reads[$0], write: writes[$0]) },
             readBytesDelta: readBytesDelta,
             writeBytesDelta: writeBytesDelta
         )

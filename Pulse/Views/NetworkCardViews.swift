@@ -1,7 +1,8 @@
-import SwiftUI
 import PulseCore
+import SwiftUI
 
 // MARK: - 网络卡明细视图(工单 06):Today/7 天累计的分方向明细
+
 // 数据形状(差分/接口选择/累计聚合)在核心层 NetworkModel 与 HistoryEngine(纯逻辑,
 // 单测覆盖);本文件只做 SwiftUI 外观,与磁盘各卷明细卡同层——tab 主卡之下的
 // 补充卡,走预览 + 手动验收(spec 测试决策)。

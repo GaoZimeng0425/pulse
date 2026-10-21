@@ -30,7 +30,8 @@ func mediaBSDNames(_ driver: io_registry_entry_t) -> [String] {
     var child = IOIteratorNext(it)
     while child != 0 {
         if IOObjectConformsTo(child, mediaClass) != 0,
-           let prop = IORegistryEntryCreateCFProperty(child, "BSD Name" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? String {
+           let prop = IORegistryEntryCreateCFProperty(child, "BSD Name" as CFString, kCFAllocatorDefault, 0)?
+               .takeRetainedValue() as? String {
             out.append(prop)
         }
         IOObjectRelease(child)
@@ -54,14 +55,18 @@ func counters(_ driver: io_registry_entry_t) -> [String: UInt64] {
         .takeRetainedValue() as? [String: Any] else { return [:] }
     var out: [String: UInt64] = [:]
     for (k, v) in dict where k == bytesReadKey || k == bytesWrittenKey {
-        if let n = v as? NSNumber { out[k] = n.uint64Value }
+        if let n = v as? NSNumber {
+            out[k] = n.uint64Value
+        }
     }
     return out
 }
 
-func gb(_ b: UInt64) -> String { String(format: "%.2f GB", Double(b) / 1e9) }
+func gb(_ b: UInt64) -> String {
+    String(format: "%.2f GB", Double(b) / 1e9)
+}
 
-// 根卷的 BSD 名,用于指认「哪条 driver 覆盖了启动盘」
+/// 根卷的 BSD 名,用于指认「哪条 driver 覆盖了启动盘」
 func rootBSDName() -> String {
     var st = statfs()
     guard statfs("/", &st) == 0 else { return "?" }
@@ -73,8 +78,10 @@ func rootBSDName() -> String {
 let match = IOServiceMatching(driverClass)
 var iterator: io_iterator_t = 0
 guard IOServiceGetMatchingServices(kIOMainPortDefault, match, &iterator) == KERN_SUCCESS else {
-    print("IOServiceGetMatchingServices 失败"); exit(1)
+    print("IOServiceGetMatchingServices 失败")
+    exit(1)
 }
+
 defer { IOObjectRelease(iterator) }
 
 print("uid=\(getuid())(非 root)  探针③:IORegistry 块存储驱动统计覆盖(根卷 BSD=\(rootBSDName()))")
@@ -84,10 +91,11 @@ while entry != 0 {
     drivers.append((entry, className(entry), mediaBSDNames(entry)))
     entry = IOIteratorNext(iterator)
 }
+
 print("共 \(drivers.count) 个 \(driverClass) 实例")
 
 func snapshotAll() -> [(idx: Int, cls: String, media: [String], parent: String, c: [String: UInt64])] {
-    drivers.enumerated().map { (i, d) in
+    drivers.enumerated().map { i, d in
         (i, d.cls, d.media, parentClass(d.entry), counters(d.entry))
     }
 }
@@ -111,21 +119,26 @@ for s in second {
     guard let p = first.first(where: { $0.idx == s.idx }) else { continue }
     let dr = s.c[bytesReadKey].flatMap { c -> UInt64? in p.c[bytesReadKey].map { c >= $0 ? c - $0 : 0 } }
     let dw = s.c[bytesWrittenKey].flatMap { c -> UInt64? in p.c[bytesWrittenKey].map { c >= $0 ? c - $0 : 0 } }
-    if (dr ?? 0) + (dw ?? 0) > 0 { anyDelta = true }
+    if (dr ?? 0) + (dw ?? 0) > 0 {
+        anyDelta = true
+    }
     print("  [\(s.idx)] \(s.cls): Δread=\(dr.map { String($0) } ?? "?")B  Δwrite=\(dw.map { String($0) } ?? "?")B")
 }
+
 print(anyDelta ? "\n计数器在走:IORegistry 路径可作系统级吞吐源(含内核 IO)。" : "\n2s 内无增量(机器空闲也常见),但累计值非零即说明路径可用;差分逻辑见 stats:248-257。")
 
-// stats 同款第二段:从启动卷 IOMedia(BSD=disk3s1s1)沿父链向上找 IOBlockStorageDriver,
-// 验证"卷 → driver → Statistics"的实装遍历(stats-ref Modules/Disk/readers.swift:284-321 简化版)
+/// stats 同款第二段:从启动卷 IOMedia(BSD=disk3s1s1)沿父链向上找 IOBlockStorageDriver,
+/// 验证"卷 → driver → Statistics"的实装遍历(stats-ref Modules/Disk/readers.swift:284-321 简化版)
 func findDriverForBSD(_ bsd: String) -> io_registry_entry_t? {
     var it: io_iterator_t = 0
-    guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching(mediaClass), &it) == KERN_SUCCESS else { return nil }
+    guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching(mediaClass), &it) == KERN_SUCCESS
+    else { return nil }
     defer { IOObjectRelease(it) }
     var media: io_registry_entry_t = 0
     var m = IOIteratorNext(it)
     while m != 0 {
-        if (IORegistryEntryCreateCFProperty(m, "BSD Name" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? String) == bsd {
+        if (IORegistryEntryCreateCFProperty(m, "BSD Name" as CFString, kCFAllocatorDefault, 0)?
+            .takeRetainedValue() as? String) == bsd {
             media = m
             break
         }
@@ -141,20 +154,24 @@ func findDriverForBSD(_ bsd: String) -> io_registry_entry_t? {
     defer { frontier.forEach { IOObjectRelease($0) } }
     var i = 0
     while i < frontier.count {
-        let e = frontier[i]; i += 1
+        let e = frontier[i]
+        i += 1
         var id: UInt64 = 0
         guard IORegistryEntryGetRegistryEntryID(e, &id) == KERN_SUCCESS else { return nil }
         guard visited.insert(id).inserted, visited.count <= 256 else { continue }
         if IOObjectConformsTo(e, driverClass) != 0 {
             IOObjectRetain(e)
             driver = e
-            continue   // 不 break:确认唯一后仍要遍历完(与 stats 一致)
+            continue // 不 break:确认唯一后仍要遍历完(与 stats 一致)
         }
         var pit: io_iterator_t = 0
         guard IORegistryEntryGetParentIterator(e, kIOServicePlane, &pit) == KERN_SUCCESS else { return nil }
         defer { IOObjectRelease(pit) }
         var p = IOIteratorNext(pit)
-        while p != 0 { frontier.append(p); p = IOIteratorNext(pit) }
+        while p != 0 {
+            frontier.append(p)
+            p = IOIteratorNext(pit)
+        }
     }
     return driver
 }

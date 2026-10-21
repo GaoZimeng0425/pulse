@@ -1,5 +1,5 @@
-import SwiftUI
 import PulseCore
+import SwiftUI
 
 // MARK: - 指标卡内容模型(工单 P0.6-05,参考文档 §2.2 / OG 左图)
 
@@ -12,7 +12,9 @@ struct MetricCardStat: Identifiable {
     let value: String
     var dot: Color?
 
-    var id: String { label }
+    var id: String {
+        label
+    }
 }
 
 /// 状态 chip(Vitals 的 `✓ Normal`):全圆 pill,tint 14% 底 + 同色文字。
@@ -53,7 +55,9 @@ struct MetricCardModel {
     /// 走势归一上限:CPU 固定 0–100,内存 = 物理总量。
     let domainMax: Double
 
-    var tint: Color { metric.accentColor }
+    var tint: Color {
+        metric.accentColor
+    }
 }
 
 extension MetricCardModel {
@@ -171,6 +175,7 @@ extension MetricCardModel {
             domainMax: 100
         )
     }
+
     /// 磁盘卡(工单 05):大数字 = 容器已用(十进制 GB,Finder 口径),四列小统计 =
     /// 实际可用(Finder「可用」importantUsage 口径)/ 可清除(两 key 差值,与
     /// 「实际可用」分开文案)/ 读取速率 / 写入速率;走势 = 读写合计流量。
@@ -230,6 +235,7 @@ extension MetricCardModel {
             domainMax: max(1, trendValues.max() ?? 1)
         )
     }
+
     /// 网络卡(工单 06):大数字 = 下行速率(十进制 MB/s 口径),四列小统计 =
     /// 上行速率 / Today 合计 / 7 天合计 / 锁定接口(VPN 自动降级后的物理口);
     /// 走势 = 上 + 下合计流量。读数缺失(首轮前)与累计缺失(库缺席)显示

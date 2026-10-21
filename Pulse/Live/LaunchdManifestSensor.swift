@@ -42,7 +42,9 @@ final class LaunchdManifestProvider: SensorProvider, @unchecked Sendable {
     private var healthLog = LaunchdManifestHealthLog()
     private let slot = SensorLastGoodBox<Set<String>>()
 
-    var lastGood: Set<String>? { slot.current }
+    var lastGood: Set<String>? {
+        slot.current
+    }
 
     init(
         source: any LaunchdPlistSource = LiveLaunchdPlistSource(),
@@ -55,7 +57,7 @@ final class LaunchdManifestProvider: SensorProvider, @unchecked Sendable {
     ) {
         self.source = source
         self.log = log
-        self.assembler = LaunchdManifestAssembler(
+        assembler = LaunchdManifestAssembler(
             sealedDirectories: sealedDirectories,
             mutableDirectories: mutableDirectories,
             resolveSymlinks: resolveSymlinks

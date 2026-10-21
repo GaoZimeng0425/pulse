@@ -1,5 +1,5 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 主窗口搜索过滤(纯逻辑):名字包含 + 纯数字查询的 pid 前缀,组级与行级口径。
 /// 期望值全部为独立字面量;搜索框 UI(⌘F / Esc / 摆位)按 spec 测试决策以手动验收。
@@ -135,7 +135,8 @@ final class ProcessSearchFilterTests: XCTestCase {
             ["Safari"]
         )
         XCTAssertEqual(
-            ProcessSearchFilter.filteredGroups(groups, filter: ProcessSearchFilter(query: "x")) { $0.name == "Safari" ? [] : nil }
+            ProcessSearchFilter
+                .filteredGroups(groups, filter: ProcessSearchFilter(query: "x")) { $0.name == "Safari" ? [] : nil }
                 .map(\.name),
             ["Xcode"],
             "行可知但为空且组名不匹配 → 淘汰(Safari);行 nil → 按组名兜底(Xcode 因名命中)"

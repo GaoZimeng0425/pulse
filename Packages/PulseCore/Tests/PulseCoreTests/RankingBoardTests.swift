@@ -1,5 +1,5 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 模块排行纯值内核(RankingBoard):最新一轮的组 + 三份最新读数 → 按组聚合的排行行。
 /// 钉的是「同轮出行」的接线口径(聚合本身的口径由 ModuleRankingAggregatorTests 钉):
@@ -67,7 +67,7 @@ final class RankingBoardTests: XCTestCase {
             groups: [xcode([10]), demo([20])],
             rankings: ProcessRankingRound(
                 energyImpacts: [10: energy(cpuSeconds: 3)],
-                diskRates: [20: ProcessDiskRates(readBytesPerSec: 2_048, writeBytesPerSec: 1_024)]
+                diskRates: [20: ProcessDiskRates(readBytesPerSec: 2048, writeBytesPerSec: 1024)]
             )
         )
         XCTAssertEqual(board.energyRows.map(\.id), [xcodeID])
@@ -78,7 +78,7 @@ final class RankingBoardTests: XCTestCase {
         XCTAssertEqual(board.energyRows.map(\.id), [demoID])
         XCTAssertEqual(board.energyRows.first?.primary ?? 0, 3.0, accuracy: 1e-9)
         XCTAssertEqual(board.diskRows.map(\.id), [xcodeID])
-        XCTAssertEqual(board.diskRows.first?.primary ?? 0, 3_072, accuracy: 1e-9)
+        XCTAssertEqual(board.diskRows.first?.primary ?? 0, 3072, accuracy: 1e-9)
     }
 
     // MARK: nettop 轮间交付
@@ -89,9 +89,9 @@ final class RankingBoardTests: XCTestCase {
         var board = RankingBoard()
         board.recordRound(groups: [xcode([10])], rankings: .empty)
 
-        board.recordNetworkRates([10: ProcessNetworkRates(downBytesPerSec: 1_000, upBytesPerSec: 500)])
+        board.recordNetworkRates([10: ProcessNetworkRates(downBytesPerSec: 1000, upBytesPerSec: 500)])
         XCTAssertEqual(board.networkRows.map(\.id), [xcodeID])
-        XCTAssertEqual(board.networkRows.first?.primary ?? 0, 1_500, accuracy: 1e-9)
+        XCTAssertEqual(board.networkRows.first?.primary ?? 0, 1500, accuracy: 1e-9)
 
         // 第二轮:pid 10 挪进 demo、pid 20 新进 Xcode;nettop 尚未再交付。
         board.recordRound(groups: [xcode([20]), demo([10])], rankings: .empty)
@@ -99,14 +99,14 @@ final class RankingBoardTests: XCTestCase {
 
         // 轮间交付:按第二轮的组归属(20 → Xcode 4000,10 → demo 1500)。
         board.recordNetworkRates([
-            10: ProcessNetworkRates(downBytesPerSec: 1_000, upBytesPerSec: 500),
-            20: ProcessNetworkRates(downBytesPerSec: 4_000, upBytesPerSec: 0),
+            10: ProcessNetworkRates(downBytesPerSec: 1000, upBytesPerSec: 500),
+            20: ProcessNetworkRates(downBytesPerSec: 4000, upBytesPerSec: 0),
         ])
         XCTAssertEqual(board.networkRows.map(\.id), [xcodeID, demoID])
-        XCTAssertEqual(board.networkRows.map(\.primary), [4_000, 1_500])
+        XCTAssertEqual(board.networkRows.map(\.primary), [4000, 1500])
 
         board.recordNetworkRates(nil)
-        XCTAssertEqual(board.networkRows.map(\.primary), [4_000, 1_500])
+        XCTAssertEqual(board.networkRows.map(\.primary), [4000, 1500])
     }
 
     // MARK: 组外 pid 入桶

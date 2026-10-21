@@ -2,6 +2,7 @@ import Foundation
 import GRDB
 
 // MARK: - 历史页查询(工单 04)
+
 // 时间范围 → ts 界与桶网格、降采样分桶、空段留缺不补零、五指标与库六表
 // 的取数口径,全部钉在这一份里(单测见 HistoryQueryTests,真 SQLite);
 // 历史页 UI 只消费 HistorySeries,不碰 SQL。
@@ -16,7 +17,9 @@ public enum HistoryRange: String, CaseIterable, Identifiable, Sendable {
     case days7
     case days30
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var title: String {
         switch self {
@@ -55,7 +58,9 @@ public enum HistoryRange: String, CaseIterable, Identifiable, Sendable {
     }
 
     /// 桶数(= 曲线点数上限)。
-    public var bucketCount: Int { spanSeconds / bucketSeconds }
+    public var bucketCount: Int {
+        spanSeconds / bucketSeconds
+    }
 
     /// 查询 ts 界 `[start, end)`:end 对齐桶边界向下取整(now 所在的未满桶
     /// 不画半桶),start = end − span(整倍数 → start 也对齐)。
@@ -85,7 +90,9 @@ public enum HistoryMetricKey: String, CaseIterable, Identifiable, Sendable {
     case network
     case disk
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var title: String {
         switch self {
@@ -150,12 +157,18 @@ public struct HistorySeries: Equatable, Sendable {
     /// 桶值,长度恒 = range.bucketCount。
     public let values: [Double?]
 
-    public var endSeconds: Int { startSeconds + values.count * bucketSeconds }
+    public var endSeconds: Int {
+        startSeconds + values.count * bucketSeconds
+    }
 
     /// 有数据的桶数。
-    public var filledCount: Int { values.lazy.compactMap { $0 }.count }
+    public var filledCount: Int {
+        values.lazy.compactMap(\.self).count
+    }
 
-    public var isEmpty: Bool { filledCount == 0 }
+    public var isEmpty: Bool {
+        filledCount == 0
+    }
 
     /// 连续非空段(曲线分笔绘制用):段间空桶断线,不跨缺连线。
     public func segments() -> [[Double]] {
@@ -169,13 +182,15 @@ public struct HistorySeries: Equatable, Sendable {
                 current = []
             }
         }
-        if !current.isEmpty { segments.append(current) }
+        if !current.isEmpty {
+            segments.append(current)
+        }
         return segments
     }
 
     /// 窗口统计(仅非空桶):均值 / 峰值;全空 → nil。
     public func statistics() -> (average: Double, peak: Double)? {
-        let filled = values.compactMap { $0 }
+        let filled = values.compactMap(\.self)
         guard !filled.isEmpty else { return nil }
         let total = filled.reduce(0.0, +)
         return (total / Double(filled.count), filled.max() ?? 0)
@@ -218,38 +233,38 @@ public enum HistoryQuery {
         switch metric {
         case .systemLoad:
             sql = """
-                SELECT ts / \(bucket) * \(bucket) AS bucket, AVG(load_avg) AS value
-                FROM \(table) WHERE ts >= ? AND ts < ?
-                GROUP BY bucket ORDER BY bucket
-                """
+            SELECT ts / \(bucket) * \(bucket) AS bucket, AVG(load_avg) AS value
+            FROM \(table) WHERE ts >= ? AND ts < ?
+            GROUP BY bucket ORDER BY bucket
+            """
         case .network:
             sql = """
-                SELECT ts / \(bucket) * \(bucket) AS bucket, SUM(net_rx + net_tx) AS value
-                FROM \(table) WHERE ts >= ? AND ts < ?
-                GROUP BY bucket ORDER BY bucket
-                """
+            SELECT ts / \(bucket) * \(bucket) AS bucket, SUM(net_rx + net_tx) AS value
+            FROM \(table) WHERE ts >= ? AND ts < ?
+            GROUP BY bucket ORDER BY bucket
+            """
         case .disk:
             sql = """
-                SELECT ts / \(bucket) * \(bucket) AS bucket,
-                       SUM(disk_read + disk_written) AS value
-                FROM \(table) WHERE ts >= ? AND ts < ?
-                GROUP BY bucket ORDER BY bucket
-                """
+            SELECT ts / \(bucket) * \(bucket) AS bucket,
+                   SUM(disk_read + disk_written) AS value
+            FROM \(table) WHERE ts >= ? AND ts < ?
+            GROUP BY bucket ORDER BY bucket
+            """
         case .cpu, .memory:
             // 组级指标两级聚合:内层按 ts 对全组求和(每分钟/每小时一行),
             // 外层桶内取均——桶内各分钟组数不同也不会歪。组级磁盘两列本阶段
             // 恒空,不在查询面里。
             let column = metric == .cpu ? "cpu_avg" : "mem_max"
             sql = """
-                SELECT ts / \(bucket) * \(bucket) AS bucket, AVG(per_period.total) AS value
-                FROM (
-                    SELECT ts, SUM(\(column)) AS total
-                    FROM \(table) WHERE ts >= ? AND ts < ?
-                    GROUP BY ts
-                ) AS per_period
-                GROUP BY ts / \(bucket) * \(bucket)
-                ORDER BY bucket
-                """
+            SELECT ts / \(bucket) * \(bucket) AS bucket, AVG(per_period.total) AS value
+            FROM (
+                SELECT ts, SUM(\(column)) AS total
+                FROM \(table) WHERE ts >= ? AND ts < ?
+                GROUP BY ts
+            ) AS per_period
+            GROUP BY ts / \(bucket) * \(bucket)
+            ORDER BY bucket
+            """
         }
 
         var values = [Double?](repeating: nil, count: range.bucketCount)
@@ -262,10 +277,9 @@ public enum HistoryQuery {
             let index = offset / bucket
             // 网络/磁盘:桶内字节合计 ÷ 桶宽 = 平均速率(字节/秒),跨范围语义
             // 一致;其余口径原值(负载/CPU 百分比、内存字节)。
-            let value: Double
-            switch metric {
-            case .network, .disk: value = raw / Double(bucket)
-            default: value = raw
+            let value: Double = switch metric {
+            case .network, .disk: raw / Double(bucket)
+            default: raw
             }
             values[index] = value
         }
@@ -281,12 +295,12 @@ public enum HistoryQuery {
 
 // MARK: - 引擎入口(actor 后台执行,工单 04 验收:查询走后台队列不掉帧)
 
-extension HistoryEngine {
+public extension HistoryEngine {
     /// 历史页查询:引擎 actor 上执行 = 不占主线程(spec User Story 10);
     /// 失败返回 nil(历史是旁路,查询失败也不打断页面),日志走读路径健康状态沿
     /// (只在翻转时记,arch-review-2026-10-18/03 乙6)——页面每分钟重查,逐次记会刷屏。
     /// 库不可用同样返回 nil,页面按占位处理。
-    public func series(
+    func series(
         metric: HistoryMetricKey,
         range: HistoryRange,
         now: Date

@@ -1,6 +1,6 @@
 import AppKit
-import SwiftUI
 import PulseCore
+import SwiftUI
 
 // 菜单栏徽标可配置(p1-history/09)的参数化位图渲染器。渲染先例的血泪教训沿用——MenuBarExtra 的 label 里
 // 多张位图 Image 只渲染第一张,双徽标必须一次 ImageRenderer 合成**单张**
@@ -27,7 +27,9 @@ enum MenuBarBadgeRenderer {
 
     static func image(for contents: [MenuBarBadgeContent], colorScheme: ColorScheme) -> NSImage {
         let key = cacheKey(for: contents, colorScheme: colorScheme)
-        if let cached = cache.hit(key) { return cached }
+        if let cached = cache.hit(key) {
+            return cached
+        }
 
         let ink = colorScheme == .dark ? Color.white : Color.black
         let renderer = ImageRenderer(

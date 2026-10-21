@@ -1,5 +1,5 @@
-import SwiftUI
 import PulseCore
+import SwiftUI
 
 // MARK: - dev server 卡(工单 p1-history/08,总览页;2026-10-20 起弹窗同内容,紧凑档)
 

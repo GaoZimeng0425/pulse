@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 import PulseCore
 
 // MARK: - 主机信息(工单 P0.6-05:主窗口副标题 / 弹窗运行时长)

@@ -1,7 +1,8 @@
-import SwiftUI
 import PulseCore
+import SwiftUI
 
 // MARK: - 应用内告警提示(工单 P1-07)
+
 //
 // 两个角色:①通知授权被拒时的降级出口(spec:拒绝后规则照常判定、降级为
 // 应用内提示);②常态的"触发中"状态展示(授权正常时也如实显示,不打扰)。
@@ -90,7 +91,7 @@ struct AlertBannerView: View {
             subjectName: nil,
             value: 18.2 * 1_073_741_824,
             firedAt: Date()
-        )
+        ),
     ]
     return VStack(spacing: 16) {
         AlertBannerView(center: center)
@@ -101,8 +102,17 @@ struct AlertBannerView: View {
 
 /// 预览用假 sender(拒绝授权,呈现降级提示)。
 private struct PreviewDeniedAlertSender: AlertNotificationSending {
-    func requestAuthorization() async -> Bool { false }
-    func authorizationStatus() async -> NotificationAuthorization { .denied }
-    func authorizationDiagnostics() async -> String { "preview" }
+    func requestAuthorization() async -> Bool {
+        false
+    }
+
+    func authorizationStatus() async -> NotificationAuthorization {
+        .denied
+    }
+
+    func authorizationDiagnostics() async -> String {
+        "preview"
+    }
+
     func send(_ payload: AlertNotificationPayload) async {}
 }

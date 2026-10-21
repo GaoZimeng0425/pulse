@@ -1,11 +1,11 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 接缝:DrilldownState(工单 06)——最近一轮采样留下的下钻视图输入(纯值)。
 /// 覆盖:进程行的字段映射与既定顺序、新出生 CPU% 按 0 计、详情组装(原始记录 + 面包屑)。
 /// 期望值全部为独立字面量。
 final class DrilldownStateTests: XCTestCase {
-    private let now = Date(timeIntervalSinceReferenceDate: 1_000)
+    private let now = Date(timeIntervalSinceReferenceDate: 1000)
 
     // MARK: 进程行
 

@@ -1,6 +1,6 @@
 import GRDB
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 历史库层(工单 03):真 SQLite 断言——文件库 WAL、六张表、迁移幂等、
 /// 内存库同构。Testing Decisions:历史库不设缝,直接对真库测。

@@ -1,11 +1,10 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 接缝:采样历史环形缓冲(工单 P0.6-01,纯逻辑)。
 /// 固定容量、随采样轮推进、时间序读取、avg/peak/min 按需折叠——
 /// 期望值全部是手工推演的字面量;组消失即停止追加并逐出的口径也在本接缝验证。
 final class SampleHistoryTests: XCTestCase {
-
     // MARK: - RingSeries:容量与时间序
 
     func testEmptySeriesHasNoValuesAndNoStatistics() {
@@ -38,7 +37,7 @@ final class SampleHistoryTests: XCTestCase {
     func testLongSequenceKeepsOnlyRecentWindow() {
         // 追加 1...8、容量 5:窗口 = [4, 5, 6, 7, 8],旧值整体滚出。
         var series = RingSeries<Double>(capacity: 5)
-        (1...8).forEach { series.append(Double($0)) }
+        (1 ... 8).forEach { series.append(Double($0)) }
 
         XCTAssertEqual(series.values, [4, 5, 6, 7, 8])
     }

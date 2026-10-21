@@ -1,6 +1,6 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 接缝:ParentChainQuery 父链面包屑(工单 06)。合成进程树驱动的纯查询:
 /// 从进程自身沿活链追溯到有归属的祖先(App 归属的 bundle 祖先 / launchd),
@@ -49,7 +49,7 @@ final class ParentChainQueryTests: XCTestCase {
     }
 
     private func snapshot(_ processes: [RawProcess]) -> ProcessSnapshot {
-        ProcessSnapshot(takenAt: Date(timeIntervalSinceReferenceDate: 1_000), processes: processes)
+        ProcessSnapshot(takenAt: Date(timeIntervalSinceReferenceDate: 1000), processes: processes)
     }
 
     /// 历史快照(全树)逐轮登记出的出生表:与采样管线同构。
@@ -67,18 +67,24 @@ final class ParentChainQueryTests: XCTestCase {
     func testLiveChainWalksFromSelfToBundleAncestor() {
         let current = snapshot([zcode(), node(), cargo(), rustc()])
 
-        XCTAssertEqual(names(for: 100, snapshot: current, lineage: LineageRegistry()),
-                       ["rustc", "cargo", "node", "Zcode"])
-        XCTAssertEqual(names(for: 11, snapshot: current, lineage: LineageRegistry()),
-                       ["node", "Zcode"])
+        XCTAssertEqual(
+            names(for: 100, snapshot: current, lineage: LineageRegistry()),
+            ["rustc", "cargo", "node", "Zcode"]
+        )
+        XCTAssertEqual(
+            names(for: 11, snapshot: current, lineage: LineageRegistry()),
+            ["node", "Zcode"]
+        )
     }
 
     /// 宿主 App 自身:出生即在 launchd 之下 → 面包屑止于 launchd(后台服务口径)。
     func testChainBornUnderLaunchdEndsWithLaunchd() {
         let current = snapshot([launchd(), zcode()])
 
-        XCTAssertEqual(names(for: 10, snapshot: current, lineage: lineage(after: [current])),
-                       ["Zcode", "launchd"])
+        XCTAssertEqual(
+            names(for: 10, snapshot: current, lineage: lineage(after: [current])),
+            ["Zcode", "launchd"]
+        )
     }
 
     // MARK: 断链回查出生登记
@@ -112,8 +118,10 @@ final class ParentChainQueryTests: XCTestCase {
     func testBrokenChainWithoutBirthRecordsEndsAtSelf() {
         let current = snapshot([rustc()])
 
-        XCTAssertEqual(names(for: 100, snapshot: current, lineage: LineageRegistry()),
-                       ["rustc"])
+        XCTAssertEqual(
+            names(for: 100, snapshot: current, lineage: LineageRegistry()),
+            ["rustc"]
+        )
     }
 
     // MARK: 退化与安全
@@ -125,8 +133,10 @@ final class ParentChainQueryTests: XCTestCase {
             RawProcess(pid: 21, parentPID: 20, executablePath: "/usr/local/bin/b"),
         ])
 
-        XCTAssertEqual(names(for: 20, snapshot: current, lineage: LineageRegistry()),
-                       ["a", "b"])
+        XCTAssertEqual(
+            names(for: 20, snapshot: current, lineage: LineageRegistry()),
+            ["a", "b"]
+        )
     }
 
     /// 可执行路径受限的进程:名字退用 argv[0] basename(与进程行同口径)。
@@ -135,8 +145,10 @@ final class ParentChainQueryTests: XCTestCase {
             RawProcess(pid: 30, parentPID: 1, argv: ["vitest", "run"]),
         ])
 
-        XCTAssertEqual(names(for: 30, snapshot: current, lineage: LineageRegistry()),
-                       ["vitest", "launchd"])
+        XCTAssertEqual(
+            names(for: 30, snapshot: current, lineage: LineageRegistry()),
+            ["vitest", "launchd"]
+        )
     }
 
     /// 查询的 pid 不在快照里(下钻期间进程退出、采样已刷新):返回空,不崩。

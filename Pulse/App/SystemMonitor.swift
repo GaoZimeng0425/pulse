@@ -1,7 +1,7 @@
-import Foundation
-import Observation
 import AppKit
 import Darwin
+import Foundation
+import Observation
 import PulseCore
 
 /// 呈现层模型(spec 命名 SystemMonitor):持有采样管线,把每轮采样变成可观察状态。
@@ -40,22 +40,42 @@ final class SystemMonitor {
     private(set) var drilldown: DrilldownState?
     /// 模块排行(工单 module-rankings/01,MonitorFeature):电池/磁盘/网络三页的排行行
     /// 与主干同轮出,自带 nettop 传感器与采样成本闸门。主窗口排行卡直读这里。
-    var rankings: RankingsFeature { features.rankings }
+    var rankings: RankingsFeature {
+        features.rankings
+    }
+
     /// 历史功能模块(工单 p1-history/03、04、06,ADR-0003):每轮落库(串行写入)、出生
     /// 登记回灌、网络 Today/7 天累计与历史页查询都在它那里。库打开失败(引擎缺席)
     /// 时整体降级,实时页不受影响。
-    var history: HistoryFeature { features.history }
+    var history: HistoryFeature {
+        features.history
+    }
+
     /// 告警编排(工单 p1-history/07,MonitorFeature:AlertCenter 薄壳 + AlertEngine 内核)。
     /// 设置页也读它(alerts.store)。
-    var alerts: AlertCenter { features.alerts }
+    var alerts: AlertCenter {
+        features.alerts
+    }
+
     /// 网络页读数与走势(工单 p1-history/06)。
-    var network: NetworkFeature { features.network }
+    var network: NetworkFeature {
+        features.network
+    }
+
     /// 磁盘容量与吞吐(工单 p1-history/05)。
-    var disk: DiskFeature { features.disk }
+    var disk: DiskFeature {
+        features.disk
+    }
+
     /// 电池读数(工单 p1-history/02)。
-    var battery: BatteryFeature { features.battery }
+    var battery: BatteryFeature {
+        features.battery
+    }
+
     /// dev server 盘点(工单 p1-history/08)。
-    var devServers: DevServerFeature { features.devServers }
+    var devServers: DevServerFeature {
+        features.devServers
+    }
 
     private let sampler: Sampler
     /// 唤醒通知观察者(与 app 同寿命,start 建立一次;monitor 是 app 唯一的
@@ -87,21 +107,21 @@ final class SystemMonitor {
     /// 测试 / 预览误连生产库,见 0c892c1)。真实装配 = `live(projectRoots:)`,
     /// 预览 = `preview(...)`(MonitorAssembly / InertSources)。
     init(sources: MonitorSources, projectRoots: [String], features: MonitorFeatures) {
-        self.sampler = Sampler(
+        sampler = Sampler(
             source: sources.process,
             coreTicks: sources.coreTicks,
             memoryStats: sources.memoryStats,
             networkCounters: sources.networkCounters,
             heartbeatRelay: sources.heartbeatRelay
         )
-        self.birthScanner = BirthScanner(source: sources.birthScan)
-        self.spine = RoundSpine(
+        birthScanner = BirthScanner(source: sources.birthScan)
+        spine = RoundSpine(
             configuration: GroupingConfiguration(
                 projectRoots: projectRoots,
                 bundleDisplayName: BundleDisplayNameReader.shared.displayName
             )
         )
-        self.killService = sources.killService
+        killService = sources.killService
         self.features = features
         self.projectRoots = projectRoots
     }
@@ -134,7 +154,7 @@ final class SystemMonitor {
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
         ) { [weak self] _ in
             guard let self else { return }
-            let sampler = self.sampler
+            let sampler = sampler
             Task { await sampler.invalidateDeltas() }
         }
     }
@@ -154,7 +174,7 @@ final class SystemMonitor {
     }
 
     private func startSampling() {
-        let sampler = self.sampler
+        let sampler = sampler
         samplingTask = Task { [weak self] in
             await sampler.run { [weak self] update in
                 guard let self else { return }
@@ -191,7 +211,7 @@ final class SystemMonitor {
                 guard let self else { return }
                 rankingsGateGeneration &+= 1
                 let generation = rankingsGateGeneration
-                let sampler = self.sampler
+                let sampler = sampler
                 Task { await sampler.setRankingsActive(active, generation: generation) }
             },
             broadcast: { [weak self] event in
@@ -224,7 +244,7 @@ final class SystemMonitor {
     /// (工单 module-rankings/01)的可见性信号之一:弹窗在场即开闸(RankingsFeature.visibilityChanged)。
     func setPopoverVisible(_ visible: Bool) {
         updateVisibility(MonitorVisibility(popover: visible, moduleRankings: visibility.moduleRankings))
-        let sampler = self.sampler
+        let sampler = sampler
         Task { await sampler.setPopoverVisible(visible) }
     }
 
@@ -259,7 +279,7 @@ final class SystemMonitor {
     /// 诊断报告取数(工单 11):按需向采样器要一份累计统计快照
     /// (运行起点/轮数/均值/峰值),不做常驻观察。
     func samplingStats() async -> SamplingStats {
-        let sampler = self.sampler
+        let sampler = sampler
         return await sampler.samplingStats()
     }
 

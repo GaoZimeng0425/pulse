@@ -1,5 +1,5 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 接缝:采样节奏决策(纯逻辑)。GLOSSARY:采样节奏 = 弹窗关闭 5s / 打开 1s。
 /// 全部用合成时间轴推演,不真睡(spec 测试决策:注入时钟,不写 sleep 测试)。

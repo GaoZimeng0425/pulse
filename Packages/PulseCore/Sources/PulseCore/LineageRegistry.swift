@@ -18,11 +18,19 @@ public struct LineageRegistry: Equatable, Sendable {
         public let identity: ProcessIdentity
 
         /// 可执行路径(身份三元组的直读视图,查询层的既有通道)。
-        public var executablePath: String? { identity.executablePath }
+        public var executablePath: String? {
+            identity.executablePath
+        }
+
         /// 工作目录(身份三元组的直读视图)。
-        public var cwd: String? { identity.cwd }
+        public var cwd: String? {
+            identity.cwd
+        }
+
         /// 完整 argv(身份三元组的直读视图)。
-        public var argv: [String] { identity.argv }
+        public var argv: [String] {
+            identity.argv
+        }
 
         public init(parentPID: pid_t, identity: ProcessIdentity) {
             self.parentPID = parentPID

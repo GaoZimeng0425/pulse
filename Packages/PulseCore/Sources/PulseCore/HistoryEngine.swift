@@ -32,7 +32,7 @@ public struct LineageRow: Decodable, FetchableRecord, TableRecord {
 
     public static func argvJSON(_ argv: [String]) -> String {
         guard let data = try? JSONEncoder().encode(argv),
-            let text = String(data: data, encoding: .utf8)
+              let text = String(data: data, encoding: .utf8)
         else { return "[]" }
         return text
     }
@@ -70,8 +70,7 @@ public struct HistoryHealthEdge {
         return !healthy
     }
 
-    public init() {
-    }
+    public init() {}
 }
 
 /// 一轮落库的结果:只进了内存缓冲 / 冲刷写了分钟行 / 落库失败。网络累计只在库真变了
@@ -143,7 +142,7 @@ public actor HistoryEngine {
     /// 默认引擎:打开应用库;失败返回 nil(SystemMonitor 降级为无历史)。
     public static func openDefault() -> HistoryEngine? {
         do {
-            return HistoryEngine(database: try HistoryDatabase.open())
+            return try HistoryEngine(database: HistoryDatabase.open())
         } catch {
             CoreLog.error("历史库打开失败,历史管线停用:\(error)", category: "History")
             return nil
@@ -258,17 +257,17 @@ public actor HistoryEngine {
                 let weekStartSeconds = weekStart.map { HistoryWindows.epochSeconds(of: $0) }
                     ?? dayStartSeconds
 
-                /// net 两列的窗口求和(rx = 下行,tx = 上行):`[lower, upper)`。
-                /// upper = nil = 不封顶(当前小时未卷积段,行只可能 ≤ now);
-                /// 表名/边界都是本文件字面量整数,无注入面。
+                // net 两列的窗口求和(rx = 下行,tx = 上行):`[lower, upper)`。
+                // upper = nil = 不封顶(当前小时未卷积段,行只可能 ≤ now);
+                // 表名/边界都是本文件字面量整数,无注入面。
                 func sum(table: String, lower: Int, upper: Int?) throws -> (rx: Int64, tx: Int64) {
                     let bound = upper.map { "AND ts < \(Int($0))" } ?? ""
                     let row = try Row.fetchOne(
                         db,
                         sql: """
-                            SELECT COALESCE(SUM(net_rx), 0) AS rx, COALESCE(SUM(net_tx), 0) AS tx
-                            FROM \(table) WHERE ts >= \(Int(lower)) \(bound)
-                            """
+                        SELECT COALESCE(SUM(net_rx), 0) AS rx, COALESCE(SUM(net_tx), 0) AS tx
+                        FROM \(table) WHERE ts >= \(Int(lower)) \(bound)
+                        """
                     )
                     let rx: Int64 = row?["rx"] ?? 0
                     let tx: Int64 = row?["tx"] ?? 0
@@ -351,7 +350,7 @@ public actor HistoryEngine {
 
     /// 组身份按一处根迁移换键:旧根下的项目组(含 worktree)换到新根,其余不动。
     private static func moved(_ identity: GroupIdentity, by move: ProjectRootMigration.Move) -> GroupIdentity {
-        guard case .project(let root, let worktree) = identity, root == move.from else { return identity }
+        guard case let .project(root, worktree) = identity, root == move.from else { return identity }
         return .project(root: move.to, worktreeName: worktree)
     }
 
@@ -375,9 +374,9 @@ public actor HistoryEngine {
         }
         try db.execute(
             sql: """
-                UPDATE OR IGNORE groups SET group_id = ? || substr(group_id, ?), project_root = ?
-                WHERE \(match)
-                """,
+            UPDATE OR IGNORE groups SET group_id = ? || substr(group_id, ?), project_root = ?
+            WHERE \(match)
+            """,
             arguments: [newPrefix, tailStart, move.to, oldPrefix, worktreePrefix.unicodeScalars.count, worktreePrefix]
         )
     }
@@ -421,10 +420,10 @@ public actor HistoryEngine {
             guard let restored = restoredLineage[pid], !current.isSameProcess(as: restored) else { continue }
             try db.execute(
                 sql: """
-                    INSERT OR REPLACE INTO lineage
-                        (pid, parent_pid, executable_path, cwd, argv, first_seen)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
+                INSERT OR REPLACE INTO lineage
+                    (pid, parent_pid, executable_path, cwd, argv, first_seen)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
                 arguments: [
                     pid,
                     current.parentPID,
@@ -439,10 +438,10 @@ public actor HistoryEngine {
         for (pid, entry) in lineage.entries where !persistedLineagePIDs.contains(pid) {
             try db.execute(
                 sql: """
-                    INSERT OR IGNORE INTO lineage
-                        (pid, parent_pid, executable_path, cwd, argv, first_seen)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
+                INSERT OR IGNORE INTO lineage
+                    (pid, parent_pid, executable_path, cwd, argv, first_seen)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
                 arguments: [
                     pid,
                     entry.parentPID,
@@ -479,9 +478,9 @@ public actor HistoryEngine {
             guard persistedGroupNames[key] != name else { continue }
             try db.execute(
                 sql: """
-                    INSERT OR REPLACE INTO groups (group_id, name, category, project_root)
-                    VALUES (?, ?, ?, ?)
-                    """,
+                INSERT OR REPLACE INTO groups (group_id, name, category, project_root)
+                VALUES (?, ?, ?, ?)
+                """,
                 arguments: [
                     key,
                     name,
@@ -495,7 +494,9 @@ public actor HistoryEngine {
 
     /// 项目组的项目根;其余类别为 NULL。
     private static func projectRoot(of identity: GroupIdentity) -> String? {
-        if case .project(let root, _) = identity { return root }
+        if case let .project(root, _) = identity {
+            return root
+        }
         return nil
     }
 
@@ -518,10 +519,10 @@ public actor HistoryEngine {
         for group in aggregate.groups {
             try db.execute(
                 sql: """
-                    INSERT OR REPLACE INTO sample_min
-                        (ts, group_id, cpu_avg, cpu_max, mem_max, procs)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
+                INSERT OR REPLACE INTO sample_min
+                    (ts, group_id, cpu_avg, cpu_max, mem_max, procs)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
                 arguments: [
                     ts,
                     group.identity.stableKey,
@@ -534,10 +535,10 @@ public actor HistoryEngine {
         }
         try db.execute(
             sql: """
-                INSERT OR REPLACE INTO system_min
-                    (ts, load_avg, load_max, net_rx, net_tx, disk_read, disk_written)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
+            INSERT OR REPLACE INTO system_min
+                (ts, load_avg, load_max, net_rx, net_tx, disk_read, disk_written)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
             arguments: [
                 ts,
                 aggregate.systemLoadAverage,
@@ -558,28 +559,28 @@ public actor HistoryEngine {
         guard upper > lower else { return }
         try db.execute(
             sql: """
-                INSERT OR REPLACE INTO sample_hour
-                    (ts, group_id, cpu_avg, cpu_max, mem_max, procs, disk_r, disk_w)
-                SELECT ts / 3600 * 3600, group_id,
-                       AVG(cpu_avg), MAX(cpu_max), MAX(mem_max), MAX(procs),
-                       MAX(disk_r), MAX(disk_w)
-                FROM sample_min
-                WHERE ts >= ? AND ts < ?
-                GROUP BY ts / 3600 * 3600, group_id
-                """,
+            INSERT OR REPLACE INTO sample_hour
+                (ts, group_id, cpu_avg, cpu_max, mem_max, procs, disk_r, disk_w)
+            SELECT ts / 3600 * 3600, group_id,
+                   AVG(cpu_avg), MAX(cpu_max), MAX(mem_max), MAX(procs),
+                   MAX(disk_r), MAX(disk_w)
+            FROM sample_min
+            WHERE ts >= ? AND ts < ?
+            GROUP BY ts / 3600 * 3600, group_id
+            """,
             arguments: [lower, upper]
         )
         try db.execute(
             sql: """
-                INSERT OR REPLACE INTO system_hour
-                    (ts, load_avg, load_max, net_rx, net_tx, disk_read, disk_written)
-                SELECT ts / 3600 * 3600,
-                       AVG(load_avg), MAX(load_max),
-                       SUM(net_rx), SUM(net_tx), SUM(disk_read), SUM(disk_written)
-                FROM system_min
-                WHERE ts >= ? AND ts < ?
-                GROUP BY ts / 3600 * 3600
-                """,
+            INSERT OR REPLACE INTO system_hour
+                (ts, load_avg, load_max, net_rx, net_tx, disk_read, disk_written)
+            SELECT ts / 3600 * 3600,
+                   AVG(load_avg), MAX(load_max),
+                   SUM(net_rx), SUM(net_tx), SUM(disk_read), SUM(disk_written)
+            FROM system_min
+            WHERE ts >= ? AND ts < ?
+            GROUP BY ts / 3600 * 3600
+            """,
             arguments: [lower, upper]
         )
     }

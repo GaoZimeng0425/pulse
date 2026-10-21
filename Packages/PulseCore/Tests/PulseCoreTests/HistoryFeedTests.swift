@@ -1,12 +1,12 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 历史喂料纯内核(HistoryFeed):每轮主干上下文 + 两轮之间交付的磁盘吞吐读数 →
 /// 一笔落库入参(HistoryIngest)。上下文经真主干(RoundSpine)从合成快照推进得到;
 /// 只经公开接口断言,期望值全部为独立字面量(手算的工作示例)。
 final class HistoryFeedTests: XCTestCase {
-    private let base = Date(timeIntervalSinceReferenceDate: 1_000)
-    private let ingestAt = Date(timeIntervalSinceReferenceDate: 1_005)
+    private let base = Date(timeIntervalSinceReferenceDate: 1000)
+    private let ingestAt = Date(timeIntervalSinceReferenceDate: 1005)
 
     // MARK: 夹具
 
@@ -81,28 +81,28 @@ final class HistoryFeedTests: XCTestCase {
     /// driver 读失败时重投上次好值(标 stale):只记新读数那一次。
     func testStaleRedeliveryOfTheLastGoodDiskReadingIsNotCounted() {
         var feed = HistoryFeed()
-        let reading = diskReading(read: 4_096, write: 1_024, rate: 800)
+        let reading = diskReading(read: 4096, write: 1024, rate: 800)
 
         feed.recordDiskThroughput(.fresh(reading))
         feed.recordDiskThroughput(.stale(reading))
         let ingest = feed.takeIngest(from: context(), at: ingestAt)
 
-        XCTAssertEqual(ingest.diskReadBytes, 4_096)
-        XCTAssertEqual(ingest.diskWriteBytes, 1_024)
+        XCTAssertEqual(ingest.diskReadBytes, 4096)
+        XCTAssertEqual(ingest.diskWriteBytes, 1024)
     }
 
     /// 两份新读数逐字段全等(同速率、同增量)也各记一次——新鲜度看标记,不看值
     /// (此前按值去重时这是已知边界)。
     func testTwoFreshReadingsWithIdenticalValuesAreBothCounted() {
         var feed = HistoryFeed()
-        let reading = diskReading(read: 4_096, write: 1_024, rate: 800)
+        let reading = diskReading(read: 4096, write: 1024, rate: 800)
 
         feed.recordDiskThroughput(.fresh(reading))
         feed.recordDiskThroughput(.fresh(reading))
         let ingest = feed.takeIngest(from: context(), at: ingestAt)
 
-        XCTAssertEqual(ingest.diskReadBytes, 8_192)
-        XCTAssertEqual(ingest.diskWriteBytes, 2_048)
+        XCTAssertEqual(ingest.diskReadBytes, 8192)
+        XCTAssertEqual(ingest.diskWriteBytes, 2048)
     }
 
     /// 两轮心跳之间来了两份不同读数(4096/1024 与 8192/2048):这一笔带走合计
@@ -110,13 +110,13 @@ final class HistoryFeedTests: XCTestCase {
     func testDistinctDiskReadingsAccumulateAndTheNextIngestDrainsThem() {
         var feed = HistoryFeed()
 
-        feed.recordDiskThroughput(.fresh(diskReading(read: 4_096, write: 1_024, rate: 800)))
-        feed.recordDiskThroughput(.fresh(diskReading(read: 8_192, write: 2_048, rate: 1_600)))
+        feed.recordDiskThroughput(.fresh(diskReading(read: 4096, write: 1024, rate: 800)))
+        feed.recordDiskThroughput(.fresh(diskReading(read: 8192, write: 2048, rate: 1600)))
         let first = feed.takeIngest(from: context(), at: ingestAt)
         let second = feed.takeIngest(from: context(), at: ingestAt.addingTimeInterval(5))
 
-        XCTAssertEqual(first.diskReadBytes, 12_288)
-        XCTAssertEqual(first.diskWriteBytes, 3_072)
+        XCTAssertEqual(first.diskReadBytes, 12288)
+        XCTAssertEqual(first.diskWriteBytes, 3072)
         XCTAssertEqual(second.diskReadBytes, 0)
         XCTAssertEqual(second.diskWriteBytes, 0)
     }
@@ -124,14 +124,14 @@ final class HistoryFeedTests: XCTestCase {
     /// 清账之后 driver 又重投了同一份上次好值(读失败轮):已经记过,不再记。
     func testDiskReadingRedeliveredAfterTheDrainIsNotCountedAgain() {
         var feed = HistoryFeed()
-        let reading = diskReading(read: 4_096, write: 1_024, rate: 800)
+        let reading = diskReading(read: 4096, write: 1024, rate: 800)
 
         feed.recordDiskThroughput(.fresh(reading))
         let drained = feed.takeIngest(from: context(), at: ingestAt)
         feed.recordDiskThroughput(.stale(reading))
         let afterRedelivery = feed.takeIngest(from: context(), at: ingestAt.addingTimeInterval(5))
 
-        XCTAssertEqual(drained.diskReadBytes, 4_096)
+        XCTAssertEqual(drained.diskReadBytes, 4096)
         XCTAssertEqual(afterRedelivery.diskReadBytes, 0)
         XCTAssertEqual(afterRedelivery.diskWriteBytes, 0)
     }
@@ -145,12 +145,12 @@ final class HistoryFeedTests: XCTestCase {
             interface: "en0",
             rates: NetworkRates(upBytesPerSecond: 60, downBytesPerSecond: 300),
             upBytesDelta: 300,
-            downBytesDelta: 1_500
+            downBytesDelta: 1500
         )
 
         let ingest = feed.takeIngest(from: context(network: network), at: ingestAt)
 
-        XCTAssertEqual(ingest.netRxBytes, 1_500)
+        XCTAssertEqual(ingest.netRxBytes, 1500)
         XCTAssertEqual(ingest.netTxBytes, 300)
     }
 

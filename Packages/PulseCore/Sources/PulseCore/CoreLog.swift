@@ -19,13 +19,15 @@ public enum CoreLog {
         private let lock = NSLock()
         private var handler: Handler?
 
-        public func set(_ handler: Handler?) {
-            lock.lock(); defer { lock.unlock() }
+        func set(_ handler: Handler?) {
+            lock.lock()
+            defer { lock.unlock() }
             self.handler = handler
         }
 
-        public var current: Handler? {
-            lock.lock(); defer { lock.unlock() }
+        var current: Handler? {
+            lock.lock()
+            defer { lock.unlock() }
             return handler
         }
     }

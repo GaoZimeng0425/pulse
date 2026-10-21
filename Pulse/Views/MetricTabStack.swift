@@ -1,5 +1,5 @@
-import SwiftUI
 import PulseCore
+import SwiftUI
 
 // MARK: - 每个 tab 的内容栈(主窗口与弹窗共用,2026-10-20 用户拍板:每个 tab 两处一致)
 
@@ -122,7 +122,7 @@ struct MetricTabStack<Ranking: View>: View {
 
     /// 两卡一组:主窗口并排(顶对齐,卡间距 16),弹窗上下排(卡间距 8)。
     @ViewBuilder
-    private func pair<Content: View>(@ViewBuilder _ cards: () -> Content) -> some View {
+    private func pair(@ViewBuilder _ cards: () -> some View) -> some View {
         if isCompact {
             VStack(spacing: 8) { cards() }
         } else {

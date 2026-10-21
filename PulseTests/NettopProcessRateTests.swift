@@ -1,13 +1,12 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 工单 01 模块排行·网络每进程(nettop)数据层:CSV 解析器用合成夹具覆盖
 /// 正常行 / 缺列 / 非数字 / 怪名称(含点)/ 空输出 / 只有表头 / 负数——
 /// 解析全程容错,坏行跳过不中断;provider 用合成 CSV 源驱动差分与门控,
 /// 零真实子进程(格式事实由真机探针钉死,见 NettopSource.swift 文件头)。
 final class NettopProcessRateTests: XCTestCase {
-
     // MARK: - 测试替身
 
     /// 脚本化 nettop CSV 源:按序吐出注入文本(nil = 起不来 / 运行失败),
@@ -50,7 +49,7 @@ final class NettopProcessRateTests: XCTestCase {
         private var index = 0
 
         init(epochSeconds: [TimeInterval]) {
-            self.dates = epochSeconds.map { Date(timeIntervalSinceReferenceDate: $0) }
+            dates = epochSeconds.map { Date(timeIntervalSinceReferenceDate: $0) }
         }
 
         func now() -> Date {
@@ -62,7 +61,7 @@ final class NettopProcessRateTests: XCTestCase {
         }
     }
 
-    private let takenAt = Date(timeIntervalSinceReferenceDate: 1_000)
+    private let takenAt = Date(timeIntervalSinceReferenceDate: 1000)
 
     // MARK: - CSV 解析(合成夹具)
 
@@ -76,7 +75,7 @@ final class NettopProcessRateTests: XCTestCase {
         let table = NettopCSVParser.parse(csv, takenAt: takenAt)
         XCTAssertEqual(table.takenAt, takenAt)
         XCTAssertEqual(table.bytes[1234], NettopProcessBytes(downBytes: 100, upBytes: 200))
-        XCTAssertEqual(table.bytes[380], NettopProcessBytes(downBytes: 6864, upBytes: 157295))
+        XCTAssertEqual(table.bytes[380], NettopProcessBytes(downBytes: 6864, upBytes: 157_295))
         XCTAssertEqual(table.bytes.count, 2)
     }
 

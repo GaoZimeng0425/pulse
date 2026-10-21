@@ -17,7 +17,7 @@ public struct DrilldownState: Equatable, Sendable {
     public init(snapshot: ProcessSnapshot, lineage: LineageRegistry, processCPU: [ProcessCPU]) {
         self.snapshot = snapshot
         self.lineage = lineage
-        self.cpuPercentByPID = processCPU.cpuPercentByPID
+        cpuPercentByPID = processCPU.cpuPercentByPID
     }
 
     /// 组内进程行(展开列表):保持组的既定顺序(引擎契约:进程 CPU% 降序、次键 pid 升序)。
@@ -64,7 +64,9 @@ public struct ProcessRowModel: Equatable, Sendable, Identifiable {
     /// 物理足迹字节(活动监视器"内存"列口径)。
     public let memoryBytes: UInt64
 
-    public var id: pid_t { pid }
+    public var id: pid_t {
+        pid
+    }
 
     public init(pid: pid_t, name: String, cpuPercent: Double, memoryBytes: UInt64) {
         self.pid = pid

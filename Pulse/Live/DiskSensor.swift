@@ -23,7 +23,7 @@ private let ATTR_CMN_RETURNED_ATTRS: attrgroup_t = 0x8000_0000
 private let ATTR_VOL_INFO: attrgroup_t = 0x8000_0000
 private let ATTR_VOL_SPACEUSED: attrgroup_t = 0x0080_0000
 
-// sys/snapshot.h 不在 Swift Darwin 模块面里,手写声明(探针②同款)。
+/// sys/snapshot.h 不在 Swift Darwin 模块面里,手写声明(探针②同款)。
 @_silgen_name("fs_snapshot_list")
 private func fs_snapshot_list(
     _ dirfd: Int32, _ alist: UnsafeMutablePointer<attrlist>?,
@@ -69,8 +69,8 @@ struct LiveDiskCapacitySource: DiskCapacitySource {
         rootURL.removeAllCachedResourceValues()
         let freeValues = try? rootURL.resourceValues(forKeys: [.volumeAvailableCapacityKey])
         let importantValues = try? rootURL.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-        let free = freeValues.flatMap { $0.volumeAvailableCapacity }.map(Int64.init)
-        let important = importantValues.flatMap { $0.volumeAvailableCapacityForImportantUsage }
+        let free = freeValues.flatMap(\.volumeAvailableCapacity).map(Int64.init)
+        let important = importantValues.flatMap(\.volumeAvailableCapacityForImportantUsage)
         let volumeName: String? = (try? rootURL.resourceValues(forKeys: [.volumeLocalizedNameKey]))?
             .volumeLocalizedName ?? nil
 
@@ -87,7 +87,7 @@ struct LiveDiskCapacitySource: DiskCapacitySource {
     }
 
     /// C 定长字符数组(f_mntonname/f_mntfromname/f_fstypename)→ String。
-    private static func cString<T>(_ chars: T) -> String {
+    private static func cString(_ chars: some Any) -> String {
         withUnsafeBytes(of: chars) {
             String(cString: $0.bindMemory(to: CChar.self).baseAddress!)
         }
@@ -145,7 +145,9 @@ enum DiskSnapshotLister {
                 .prefix(Int(lastResult))
             collected.append(contentsOf: DiskSnapshotRecord.parseBuffer(Array(bytes), count: Int(lastResult)))
         }
-        if lastResult < 0, collected.isEmpty { return .unavailable }
+        if lastResult < 0, collected.isEmpty {
+            return .unavailable
+        }
         return .listing(collected)
     }
 }
@@ -158,7 +160,9 @@ enum DiskSnapshotLister {
 /// 系统级内核账:短命进程与内核回写都在,免 root。
 struct IORegistryDiskThroughputSource: DiskThroughputSource {
     /// 短档:差分窗口 5s,走势 60 点 = 5 分钟。
-    var cadenceSeconds: TimeInterval { 5 }
+    var cadenceSeconds: TimeInterval {
+        5
+    }
 
     // 键名照探针③结论(= SDK IOKit/storage/IOBlockStorageDriver.h 的
     // kIOBlockStorageDriverStatisticsBytesReadKey/WrittenKey 字面量)。
@@ -243,7 +247,8 @@ struct IORegistryDiskThroughputSource: DiskThroughputSource {
                 continue // 不提前停:确认唯一仍要遍历完(与 stats 一致)
             }
             var parentIterator: io_iterator_t = 0
-            guard IORegistryEntryGetParentIterator(entry, kIOServicePlane, &parentIterator) == KERN_SUCCESS else { return nil }
+            guard IORegistryEntryGetParentIterator(entry, kIOServicePlane, &parentIterator) == KERN_SUCCESS
+            else { return nil }
             defer { IOObjectRelease(parentIterator) }
             var parent = IOIteratorNext(parentIterator)
             while parent != 0 {
@@ -265,7 +270,9 @@ enum LiveDiskThroughputSource {
     ) -> any DiskThroughputSource {
         let registry = IORegistryDiskThroughputSource()
         // 探针读(结果丢弃):只判路径可用性,基线由首轮正式读另立。
-        if registry.readCounters() != nil { return registry }
+        if registry.readCounters() != nil {
+            return registry
+        }
         return RusageSumDiskThroughputSource(heartbeat: fallbackHeartbeat)
     }
 }
@@ -283,7 +290,9 @@ final class DiskCapacityProvider: SensorProvider {
     private let source: any DiskCapacitySource
     private let slot = SensorLastGoodBox<DiskCapacityReading>()
 
-    var lastGood: DiskCapacityReading? { slot.current }
+    var lastGood: DiskCapacityReading? {
+        slot.current
+    }
 
     init(source: any DiskCapacitySource = LiveDiskCapacitySource()) {
         self.source = source
@@ -302,13 +311,17 @@ final class DiskCapacityProvider: SensorProvider {
 final class DiskThroughputProvider: SensorProvider {
     typealias Reading = DiskThroughputReading
 
-    var cadence: SensorCadence { .every(seconds: source.cadenceSeconds) }
+    var cadence: SensorCadence {
+        .every(seconds: source.cadenceSeconds)
+    }
 
     private let source: any DiskThroughputSource
     private let accumulator = DiskThroughputAccumulator()
     private let slot = SensorLastGoodBox<DiskThroughputReading>()
 
-    var lastGood: DiskThroughputReading? { slot.current }
+    var lastGood: DiskThroughputReading? {
+        slot.current
+    }
 
     /// 源由调用方选定(SystemMonitor 经 adoptingBestPath 带心跳中继构造)。
     init(source: any DiskThroughputSource) {
@@ -322,4 +335,3 @@ final class DiskThroughputProvider: SensorProvider {
         return reading
     }
 }
-

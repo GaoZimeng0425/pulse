@@ -22,7 +22,7 @@ struct MenuBarBadgeContent: Equatable {
     /// 不被挤动(2026-10-17 用户反馈"menu 有时宽度会变")。网络槽不定宽:
     /// 速率单位跨档(KB/MB/GB)文本长度本就跨档,按最坏情形钉死会长期大片
     /// 留白,得不偿失。
-    var slotWidth: CGFloat? = nil
+    var slotWidth: CGFloat?
     /// 版式:小标签 + 数字(默认),或不带标签的上下两行小字(网络上下行)。
     var layout: Layout = .captioned
 
@@ -97,11 +97,10 @@ enum MenuBarBadgeComposer {
     /// 磁盘剩余:实际可用(important 口径)占容器总容量的百分比(2026-10-20 用户
     /// 拍板,替代 GB 整数);任一读数未到或总量为 0 占位 "—"。槽位同 CPU 按 "100%" 定宽。
     static func diskContent(availableBytes: Int64?, totalBytes: UInt64?) -> MenuBarBadgeContent {
-        let text: String
-        if let availableBytes, let totalBytes, totalBytes > 0 {
-            text = PulseFormat.cpuPercent(Double(max(0, availableBytes)) / Double(totalBytes) * 100)
+        let text: String = if let availableBytes, let totalBytes, totalBytes > 0 {
+            PulseFormat.cpuPercent(Double(max(0, availableBytes)) / Double(totalBytes) * 100)
         } else {
-            text = "—"
+            "—"
         }
         return MenuBarBadgeContent(
             caption: "磁盘",

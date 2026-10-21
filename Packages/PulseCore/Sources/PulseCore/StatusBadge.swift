@@ -27,8 +27,12 @@ public enum StatusBadgeRules {
 
     /// 系统负载徽章:> 70% → .high;< 30% → .normal;中间静默(nil,不挂 chip)。
     public static func systemBadge(load: Double) -> StatusBadge? {
-        if load > systemHighLoadThreshold { return .high }
-        if load < systemIdleLoadThreshold { return .normal }
+        if load > systemHighLoadThreshold {
+            return .high
+        }
+        if load < systemIdleLoadThreshold {
+            return .normal
+        }
         return nil
     }
 

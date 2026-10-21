@@ -1,6 +1,6 @@
-import XCTest
 import Darwin
 @testable import PulseCore
+import XCTest
 
 /// 接缝:处置文案(工单 08)——确认对话框与结果汇总的纯函数文案构造。
 /// 单进程确认必须列出 name+pid、整组确认必须列出进程数(工单验收点);

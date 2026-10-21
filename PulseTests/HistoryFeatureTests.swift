@@ -1,7 +1,7 @@
 import GRDB
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 历史功能模块薄壳(HistoryFeature)唯一的壳层测试:真 SQLite 内存库(绝不开生产库)
 /// + 注入时钟,钉住逐轮落库经单一串行写入者、严格按轮次顺序生效,累计在每笔落库之后
@@ -30,7 +30,8 @@ final class HistoryFeatureTests: XCTestCase {
         }
 
         func next() -> Date {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             return times.removeFirst()
         }
     }
@@ -66,7 +67,12 @@ final class HistoryFeatureTests: XCTestCase {
         try queue.read { db in
             try Row.fetchAll(db, sql: "SELECT ts, load_avg, load_max, net_rx FROM system_min ORDER BY ts")
                 .map { row in
-                    SystemMinuteRow(ts: row["ts"], loadAverage: row["load_avg"], loadPeak: row["load_max"], netRx: row["net_rx"])
+                    SystemMinuteRow(
+                        ts: row["ts"],
+                        loadAverage: row["load_avg"],
+                        loadPeak: row["load_max"],
+                        netRx: row["net_rx"]
+                    )
                 }
         }
     }
@@ -104,14 +110,14 @@ final class HistoryFeatureTests: XCTestCase {
         for (load, down) in zip([10.0, 20, 30, 50, 70], [UInt64(100), 200, 300, 400, 500]) {
             feature.onRound(round(load: load, netDown: down))
         }
-        await waitUntil("五笔落库后的累计") { feature.networkTotals?.todayDownBytes == 1_000 }
+        await waitUntil("五笔落库后的累计") { feature.networkTotals?.todayDownBytes == 1000 }
 
         let minute0Seconds = HistoryWindows.epochSeconds(of: minute0)
         XCTAssertEqual(try systemMinuteRows(in: queue), [
             SystemMinuteRow(ts: minute0Seconds, loadAverage: 20, loadPeak: 30, netRx: 600),
             SystemMinuteRow(ts: minute0Seconds + 60, loadAverage: 50, loadPeak: 50, netRx: 400),
         ])
-        XCTAssertEqual(feature.networkTotals?.weekDownBytes, 1_000)
+        XCTAssertEqual(feature.networkTotals?.weekDownBytes, 1000)
         XCTAssertEqual(feature.networkTotals?.todayUpBytes, 0)
     }
 }

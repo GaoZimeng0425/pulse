@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 
 // MARK: - 模块排行纯值内核(RankingsFeature 的值核)
 
@@ -62,6 +62,5 @@ public struct RankingBoard: Sendable {
         ModuleRankingAggregator.networkRows(rates: networkRates, groups: groups)
     }
 
-    public init() {
-    }
+    public init() {}
 }

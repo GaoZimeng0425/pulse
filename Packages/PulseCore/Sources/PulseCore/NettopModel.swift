@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 
 // 每进程网络(nettop)的纯值层:表形状、CSV 解析、差分账本、源接缝与健康状态沿。子进程适配器 LiveNettopCSVSource 在 app target。
 
@@ -126,15 +126,14 @@ public struct NettopHealthLog {
     private static func describe(_ outcome: NettopRunOutcome) -> String {
         switch outcome {
         case .completed: "正常"
-        case .launchFailed(let reason): "nettop 起不来:\(reason)"
+        case let .launchFailed(reason): "nettop 起不来:\(reason)"
         case .terminated: "nettop 超时,SIGTERM 收尾"
         case .killed: "nettop 超时且不响应 SIGTERM,SIGKILL 收尾"
-        case .exitedAbnormally(let status): "nettop 异常退出(状态 \(status))"
+        case let .exitedAbnormally(status): "nettop 异常退出(状态 \(status))"
         }
     }
 
-    public init() {
-    }
+    public init() {}
 }
 
 /// 单进程网络速率(字节/秒;一轮差分对两趟墙钟间隔折算)。

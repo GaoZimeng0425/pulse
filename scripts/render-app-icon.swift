@@ -23,23 +23,28 @@ struct IconRenderer {
     let srgb = CGColorSpace(name: CGColorSpace.sRGB)!
 
     // 令牌(DESIGN.md 深色值):底色取 surface 两档上下各推一点拉开层次,脉搏线取两枚指标色
-    let surfaceTop: UInt32 = 0x2A2A2E      // surface-card-high 深色 #27272b 略提亮
-    let surfaceBottom: UInt32 = 0x121214   // surface-window 深色 #1a1a1d 略压暗
-    let cpuBlue: UInt32 = 0x3987E5         // accent-cpu 深色
-    let memoryViolet: UInt32 = 0x9085E9    // accent-memory 深色
+    let surfaceTop: UInt32 = 0x2A2A2E // surface-card-high 深色 #27272b 略提亮
+    let surfaceBottom: UInt32 = 0x121214 // surface-window 深色 #1a1a1d 略压暗
+    let cpuBlue: UInt32 = 0x3987E5 // accent-cpu 深色
+    let memoryViolet: UInt32 = 0x9085E9 // accent-memory 深色
 
-    // 1024 基准坐标(CoreGraphics 原点在左下)
+    /// 1024 基准坐标(CoreGraphics 原点在左下)
     enum Geometry {
         static let lineStart: CGFloat = 150
         static let lineEnd: CGFloat = 874
-        static let baseline: CGFloat = 482   // 尖峰高于深谷,基线下压 30 让整体视觉居中
+        static let baseline: CGFloat = 482 // 尖峰高于深谷,基线下压 30 让整体视觉居中
     }
 
     struct Slot {
         let points: Int
         let scale: Int
-        var pixels: Int { points * scale }
-        var filename: String { "icon_\(points)x\(points)\(scale == 2 ? "@2x" : "").png" }
+        var pixels: Int {
+            points * scale
+        }
+
+        var filename: String {
+            "icon_\(points)x\(points)\(scale == 2 ? "@2x" : "").png"
+        }
     }
 
     let slots: [Slot] = [16, 32, 128, 256, 512].flatMap {
@@ -68,8 +73,10 @@ struct IconRenderer {
     /// 小尺寸去掉小波并把尖峰拉宽,否则在 16px 下糊成一团。
     func pulsePath(scale s: CGFloat, compact: Bool) -> CGPath {
         func pt(_ t: CGFloat, _ dy: CGFloat) -> CGPoint {
-            CGPoint(x: (Geometry.lineStart + t * (Geometry.lineEnd - Geometry.lineStart)) * s,
-                    y: (Geometry.baseline + dy) * s)
+            CGPoint(
+                x: (Geometry.lineStart + t * (Geometry.lineEnd - Geometry.lineStart)) * s,
+                y: (Geometry.baseline + dy) * s
+            )
         }
         let path = CGMutablePath()
         path.move(to: pt(0, 0))
@@ -94,16 +101,25 @@ struct IconRenderer {
     /// 在 size×size 位图上画完整图标。
     func draw(in ctx: CGContext, size: CGFloat) {
         let s = size / 1024
-        let tiny = size <= 32    // 16/32:只留主脉冲
-        let small = size < 128   // <128:不画网格、线更粗
+        let tiny = size <= 32 // 16/32:只留主脉冲
+        let small = size < 128 // <128:不画网格、线更粗
 
         // 底:深色 surface 竖向渐变 + 中心偏上的 CPU 蓝光晕
-        ctx.drawLinearGradient(gradient([(surfaceTop, 1), (surfaceBottom, 1)]),
-                               start: CGPoint(x: 0, y: size), end: .zero, options: [])
+        ctx.drawLinearGradient(
+            gradient([(surfaceTop, 1), (surfaceBottom, 1)]),
+            start: CGPoint(x: 0, y: size),
+            end: .zero,
+            options: []
+        )
         let glowCenter = CGPoint(x: 512 * s, y: 540 * s)
-        ctx.drawRadialGradient(gradient([(cpuBlue, 0.30), (cpuBlue, 0)]),
-                               startCenter: glowCenter, startRadius: 0,
-                               endCenter: glowCenter, endRadius: 600 * s, options: [])
+        ctx.drawRadialGradient(
+            gradient([(cpuBlue, 0.30), (cpuBlue, 0)]),
+            startCenter: glowCenter,
+            startRadius: 0,
+            endCenter: glowCenter,
+            endRadius: 600 * s,
+            options: []
+        )
 
         // 网格:呼应 AreaTrendChartView 的 8% 网格线,只在大尺寸可见
         if !small {
@@ -139,10 +155,12 @@ struct IconRenderer {
         ctx.saveGState()
         ctx.addPath(shape)
         ctx.clip()
-        ctx.drawLinearGradient(gradient([(cpuBlue, 1), (memoryViolet, 1)]),
-                               start: CGPoint(x: Geometry.lineStart * s, y: 0),
-                               end: CGPoint(x: Geometry.lineEnd * s, y: 0),
-                               options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+        ctx.drawLinearGradient(
+            gradient([(cpuBlue, 1), (memoryViolet, 1)]),
+            start: CGPoint(x: Geometry.lineStart * s, y: 0),
+            end: CGPoint(x: Geometry.lineEnd * s, y: 0),
+            options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+        )
         ctx.restoreGState()
 
         // 末端"实时"圆点:紫色 + 柔光环
@@ -156,9 +174,15 @@ struct IconRenderer {
     }
 
     func image(size pixels: Int) -> CGImage {
-        let ctx = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8,
-                            bytesPerRow: 0, space: srgb,
-                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        let ctx = CGContext(
+            data: nil,
+            width: pixels,
+            height: pixels,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: srgb,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
         ctx.setShouldAntialias(true)
         ctx.interpolationQuality = .high
         draw(in: ctx, size: CGFloat(pixels))
@@ -199,11 +223,17 @@ struct IconRenderer {
         let pad: CGFloat = 64, gap: CGFloat = 48
         let halfWidth = pad * 2 + sizes.reduce(0) { $0 + CGFloat($1) } + gap * CGFloat(sizes.count - 1)
         let height = 256 + pad * 2
-        let ctx = CGContext(data: nil, width: Int(halfWidth * 2), height: Int(height), bitsPerComponent: 8,
-                            bytesPerRow: 0, space: srgb,
-                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        let ctx = CGContext(
+            data: nil,
+            width: Int(halfWidth * 2),
+            height: Int(height),
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: srgb,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
         ctx.interpolationQuality = .high
-        let backgrounds: [UInt32] = [0xF5F5F7, 0x1A1A1D]  // surface-card 浅 / surface-window 深
+        let backgrounds: [UInt32] = [0xF5F5F7, 0x1A1A1D] // surface-card 浅 / surface-window 深
         for (half, background) in backgrounds.enumerated() {
             let originX = CGFloat(half) * halfWidth
             ctx.setFillColor(color(background))
@@ -213,8 +243,12 @@ struct IconRenderer {
                 let side = CGFloat(size)
                 let rect = CGRect(x: x, y: (height - side) / 2, width: side, height: side)
                 ctx.saveGState()
-                ctx.addPath(CGPath(roundedRect: rect, cornerWidth: side * 0.2237, cornerHeight: side * 0.2237,
-                                   transform: nil))
+                ctx.addPath(CGPath(
+                    roundedRect: rect,
+                    cornerWidth: side * 0.2237,
+                    cornerHeight: side * 0.2237,
+                    transform: nil
+                ))
                 ctx.clip()
                 ctx.draw(image(size: size), in: rect)
                 ctx.restoreGState()

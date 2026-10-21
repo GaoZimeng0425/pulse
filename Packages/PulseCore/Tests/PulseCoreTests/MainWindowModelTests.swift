@@ -1,5 +1,5 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 主窗口模型(工单 P0.5-01):窗口与弹窗共用同一条采样管线,
 /// 区别只在截取——弹窗取 Top-5,主窗口要**全部组**。此文件测两个纯逻辑接缝:
@@ -7,14 +7,14 @@ import XCTest
 /// 2. ProcessTableOrder 进程表排序(主窗口进程表 CPU%/内存两列可排序)。
 /// 期望值全部为独立字面量;窗口 UI 按 spec 测试决策以手动验收。
 final class MainWindowModelTests: XCTestCase {
-    private let base = Date(timeIntervalSinceReferenceDate: 1_000)
+    private let base = Date(timeIntervalSinceReferenceDate: 1000)
 
     // MARK: 全组列表(截取之前的完整榜单)
 
     /// 7 个 App 组 + 1 个系统组:弹窗截 Top-5,主窗口拿全部 8 组,
     /// 两者同序(组 CPU% 降序)——窗口列表只是弹窗榜单去截断,不是另一套归组。
     func testAllGroupsKeepsFullRankingBeyondTopCut() {
-        let apps = (1...7).map { index in
+        let apps = (1 ... 7).map { index in
             RawProcess(
                 pid: pid_t(200 + index),
                 parentPID: 1,
@@ -27,7 +27,7 @@ final class MainWindowModelTests: XCTestCase {
             executablePath: "/System/Library/CoreServices/WindowServer.app/Contents/MacOS/WindowServer"
         )
         let processCPU =
-            (1...7).map { index in
+            (1 ... 7).map { index in
                 ProcessCPU(pid: pid_t(200 + index), cpuPercent: Double(index * 10))
             } + [ProcessCPU(pid: 1, cpuPercent: 1)]
         var pipeline = GroupingPipeline()
@@ -67,7 +67,10 @@ final class MainWindowModelTests: XCTestCase {
         }
         let source = SyntheticProcessSource(snapshots: [
             ProcessSnapshot(takenAt: base, processes: tree(a20CPU: 0, a80CPU: 0)),
-            ProcessSnapshot(takenAt: base.addingTimeInterval(5), processes: tree(a20CPU: 250_000_000, a80CPU: 500_000_000)),
+            ProcessSnapshot(
+                takenAt: base.addingTimeInterval(5),
+                processes: tree(a20CPU: 250_000_000, a80CPU: 500_000_000)
+            ),
         ])
         var pipeline = GroupingPipeline()
 

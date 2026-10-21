@@ -1,6 +1,6 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// p1-history/02 电池卡的 app 侧:BatterySensorProvider 的 lastGood、driver 交付与事件
 /// 唤醒(spec 测试决策:事件挂接与通知只做冒烟)。纯逻辑在核心包 BatteryModelTests。
@@ -63,7 +63,10 @@ final class BatterySensorTests: XCTestCase {
         // 电源状态变化 → 唤醒 → 读一次并交付:事件驱动档的冒烟验证。
         let (stream, continuation) = AsyncStream.makeStream(of: Void.self)
         let provider = BatterySensorProvider(
-            source: ScriptedBatterySource([BatteryFixture.raw(capacity: 40), BatteryFixture.raw(capacity: 90, isCharging: true)]),
+            source: ScriptedBatterySource([
+                BatteryFixture.raw(capacity: 40),
+                BatteryFixture.raw(capacity: 90, isCharging: true),
+            ]),
             wakeups: { stream }
         )
         let box = ReadingBox()

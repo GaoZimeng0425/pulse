@@ -1,11 +1,10 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 工单 08:argv 分类器(模式 + 误报负例)、闲置环(注入时刻)、盘点编排
 /// (端口扫描只对候选——成本约束)、闲置 24h 告警规则经合成快照真实触发。
 final class DevServerFinderTests: XCTestCase {
-
     // MARK: - argv 分类器:已知模式清单
 
     /// 每种 dev server 至少一条真实形态 argv 命中。
@@ -136,7 +135,7 @@ final class DevServerFinderTests: XCTestCase {
 
     /// 冒烟(真机口径,OS 边界走一次真路径):本进程内开一个真实 TCP 监听
     /// socket,libproc 扫描应读到同一端口——钉死 struct 路径与网络序换算。
-    func testLivePortScannerReadsRealListeningSocket() throws {
+    func testLivePortScannerReadsRealListeningSocket() {
         let fd = Darwin.socket(AF_INET, SOCK_STREAM, 0)
         guard fd >= 0 else { return XCTFail("socket() 失败 errno \(errno)") }
         defer { Darwin.close(fd) }
@@ -188,10 +187,11 @@ final class DevServerFinderTests: XCTestCase {
     }
 
     /// 十个进程里一个候选:libproc 逐 fd 的扫描只发生一次(票面"成本约束有测试体现")。
-    func testPortScanOnlyRunsForCandidates() {        let scanner = RecordingScanner(portsByPID: [300: [5173]])
+    func testPortScanOnlyRunsForCandidates() {
+        let scanner = RecordingScanner(portsByPID: [300: [5173]])
         var finder = DevServerFinder(portScanner: scanner)
         let now = Date(timeIntervalSince1970: 1_000_000)
-        let processes = (0..<9).map { index in
+        let processes = (0 ..< 9).map { index in
             RawProcess(
                 pid: pid_t(100 + index),
                 parentPID: 1,
@@ -227,7 +227,12 @@ final class DevServerFinderTests: XCTestCase {
     func testReusedPIDWithDifferentArgvIsReclassified() {
         var finder = DevServerFinder(portScanner: RecordingScanner(portsByPID: [:]))
         let now = Date(timeIntervalSince1970: 1_000_000)
-        let vite = RawProcess(pid: 300, parentPID: 1, executablePath: "/x/node", argv: ["node", "/x/node_modules/.bin/vite"])
+        let vite = RawProcess(
+            pid: 300,
+            parentPID: 1,
+            executablePath: "/x/node",
+            argv: ["node", "/x/node_modules/.bin/vite"]
+        )
         let script = RawProcess(pid: 300, parentPID: 1, executablePath: "/x/node", argv: ["node", "/x/build.js"])
 
         let first = finder.update(snapshot: ProcessSnapshot(takenAt: now, processes: [vite]), processCPU: [:], now: now)
@@ -320,7 +325,7 @@ final class DevServerFinderTests: XCTestCase {
         XCTAssertEqual(resolved, [.resolved(kind: .devServerIdle, subjectKey: "devserver|300")])
 
         // 重新出现且再次闲置:独立主体重新走完进入路径(冷却锚点随消失清空)。
-        for round in 0..<3 {
+        for round in 0 ..< 3 {
             now.addTimeInterval(5)
             let events = engine.record(.devServers([server]), now: now, settings: settings)
             if round == 2 {
@@ -342,7 +347,7 @@ final class DevServerFinderTests: XCTestCase {
         let idle = AlertDevServerSnapshot(pid: 7, name: "next dev", idleSeconds: 30 * 3600)
 
         // 前两轮立进入计数,第三轮真实发出。
-        for _ in 0..<2 {
+        for _ in 0 ..< 2 {
             now.addTimeInterval(5)
             _ = engine.record(.devServers([idle]), now: now, settings: settings)
         }
@@ -352,7 +357,7 @@ final class DevServerFinderTests: XCTestCase {
         // 活动恢复:闲置秒回 0(安全侧),连续 6 轮后解除。
         let active = AlertDevServerSnapshot(pid: 7, name: "next dev", idleSeconds: 0)
         var events: [AlertEvent] = []
-        for round in 0..<6 {
+        for round in 0 ..< 6 {
             now.addTimeInterval(5)
             events = engine.record(.devServers([active]), now: now, settings: settings)
             if round < 5 {
@@ -365,6 +370,12 @@ final class DevServerFinderTests: XCTestCase {
     // MARK: 工具
 
     private func fired(_ events: [AlertEvent]) -> AlertOccurrence? {
-        events.compactMap { if case .fired(let occurrence) = $0 { return occurrence } else { return nil } }.first
+        events.compactMap {
+            if case let .fired(occurrence) = $0 {
+                return occurrence
+            } else {
+                return nil
+            }
+        }.first
     }
 }

@@ -1,7 +1,8 @@
-import SwiftUI
 import PulseCore
+import SwiftUI
 
 // MARK: - 磁盘卡明细视图(工单 05):各卷对账明细 + 本地快照列表
+
 // 内容模型(容器对账/快照识别)在核心层 DiskModel(纯逻辑,单测覆盖);本文件只做
 // SwiftUI 外观,与 Memory by App 环形卡同层——tab 主卡之下的补充卡,走预览 +
 // 手动验收(spec 测试决策)。
@@ -100,7 +101,7 @@ struct DiskSnapshotsCardView: View {
     @ViewBuilder
     private var content: some View {
         switch listing {
-        case .listing(let snapshots) where !snapshots.isEmpty:
+        case let .listing(snapshots) where !snapshots.isEmpty:
             ForEach(snapshots.prefix(Self.visibleLimit)) { snapshot in
                 snapshotRow(snapshot)
             }
@@ -161,7 +162,7 @@ struct DiskSnapshotsCardView: View {
             ),
         ])
     )
-    let rates = (0..<56).map { i in DiskRatePoint(read: Double(i % 9) * 3e6, write: Double(i % 5) * 2e6) }
+    let rates = (0 ..< 56).map { i in DiskRatePoint(read: Double(i % 9) * 3e6, write: Double(i % 5) * 2e6) }
     let throughput = DiskThroughputReading(
         current: DiskRates(readBytesPerSecond: 12e6, writeBytesPerSecond: 4e6),
         trend: rates

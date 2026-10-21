@@ -1,5 +1,5 @@
-import SwiftUI
 import PulseCore
+import SwiftUI
 
 // MARK: - 总览指标卡(工单 P0.6-05,参考文档 §2.2 / OG 左图)
 
@@ -187,7 +187,7 @@ struct SectionTitle: View {
 
 #Preview("指标卡") {
     let host = HostInfo(chipName: "Apple M4 Pro", coreCount: 12, physicalMemoryBytes: 51_539_607_552)
-    let trend: [Double] = (0..<44).map { Double(($0 * 7) % 40 + 10) }
+    let trend: [Double] = (0 ..< 44).map { Double(($0 * 7) % 40 + 10) }
     let memory = MemoryBreakdown(
         totalBytes: 51_539_607_552, appBytes: 21_000_000_000, wiredBytes: 6_000_000_000,
         compressedBytes: 9_000_000_000, cachedBytes: 8_000_000_000, pressure: .normal

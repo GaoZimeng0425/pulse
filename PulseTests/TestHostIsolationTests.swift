@@ -1,7 +1,7 @@
 import Darwin
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 // 测试宿主隔离(2026-10-19 架构讨论实测的回归钉):
 // 单元测试托管在 app 内(TEST_HOST),宿主若走完整 PulseApp 装配,拉起即
@@ -20,7 +20,7 @@ final class TestHostIsolationTests: XCTestCase {
     private func openFilePaths() -> [String] {
         var paths: [String] = []
         var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
-        for fd in 0..<getdtablesize() {
+        for fd in 0 ..< getdtablesize() {
             let found = buffer.withUnsafeMutableBytes { raw in
                 fcntl(fd, F_GETPATH, raw.baseAddress!) != -1
             }

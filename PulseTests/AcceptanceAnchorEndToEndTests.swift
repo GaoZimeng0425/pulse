@@ -1,7 +1,7 @@
-import XCTest
 import Darwin
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// P0 验收锚点端到端(工单 09):spec 锚点是"某项目门禁(rustc×N ← cargo ← node ←
 /// 拉起会话)"——本机不可召唤那条确切链,用**同构的真实负载**做可复现代理:
@@ -28,7 +28,9 @@ final class AcceptanceAnchorEndToEndTests: XCTestCase {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             let snapshot = source.snapshot()
-            if predicate(snapshot) { return snapshot }
+            if predicate(snapshot) {
+                return snapshot
+            }
             Thread.sleep(forTimeInterval: 0.2)
         }
         return nil
@@ -44,8 +46,7 @@ final class AcceptanceAnchorEndToEndTests: XCTestCase {
         lookup.standardOutput = pipe
         lookup.standardError = Pipe()
         if let _ = try? lookup.run(), lookup.waitUntilExitWithTimeout(5),
-           lookup.terminationStatus == 0
-        {
+           lookup.terminationStatus == 0 {
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             let path = String(data: data, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -66,7 +67,9 @@ final class AcceptanceAnchorEndToEndTests: XCTestCase {
         ).sorted(by: { $0.lastPathComponent > $1.lastPathComponent }) {
             for version in versions {
                 let node = version.appendingPathComponent("installation/bin/node")
-                if FileManager.default.isExecutableFile(atPath: node.path) { return node }
+                if FileManager.default.isExecutableFile(atPath: node.path) {
+                    return node
+                }
             }
         }
         throw XCTSkip("本机找不到 node——验收锚点 E2E 需要一个 dev 名单里的真实可执行文件")
@@ -132,7 +135,9 @@ final class AcceptanceAnchorEndToEndTests: XCTestCase {
             for pid in loopPIDs where pid != getpid() {
                 kill(pid, SIGTERM)
             }
-            if shell.isRunning { shell.terminate() }
+            if shell.isRunning {
+                shell.terminate()
+            }
             shell.waitUntilExit()
         }
 
@@ -244,7 +249,7 @@ private extension Process {
     /// 带超时的 waitUntilExit(防登录 shell PATH 查询挂死测试)。
     func waitUntilExitWithTimeout(_ timeout: TimeInterval) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
-        while isRunning && Date() < deadline {
+        while isRunning, Date() < deadline {
             Thread.sleep(forTimeInterval: 0.05)
         }
         return !isRunning

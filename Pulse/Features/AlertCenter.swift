@@ -138,9 +138,11 @@ final class AlertCenter {
                 .map(AlertNotificationContent.make(for:))
                 .filter { !skipped.contains($0.identifier) }
             if !backlog.isEmpty {
-                let sender = self.sender
+                let sender = sender
                 Task {
-                    for payload in backlog { await sender.send(payload) }
+                    for payload in backlog {
+                        await sender.send(payload)
+                    }
                 }
             }
         }
@@ -164,7 +166,7 @@ final class AlertCenter {
         var payloads: [AlertNotificationPayload] = []
         for event in events {
             switch event {
-            case .fired(let occurrence):
+            case let .fired(occurrence):
                 activeAlerts.removeAll {
                     $0.kind == occurrence.kind && $0.subjectKey == occurrence.subjectKey
                 }
@@ -176,7 +178,7 @@ final class AlertCenter {
                     category: "Alert"
                 )
                 payloads.append(AlertNotificationContent.make(for: occurrence))
-            case .resolved(let kind, let subjectKey):
+            case let .resolved(kind, subjectKey):
                 activeAlerts.removeAll {
                     $0.kind == kind && $0.subjectKey == subjectKey
                 }
@@ -187,12 +189,14 @@ final class AlertCenter {
         // 一轮一批:发送前现查一次授权(系统设置里打开 / 关闭即时生效,无需重启),
         // 现查顺带补发此前未能送达的触发中告警(本批自己发,不重复);按序逐条发。
         let batch = payloads
-        let sender = self.sender
+        let sender = sender
         Task { [weak self] in
             guard let self else { return }
-            let status = await self.recordStatus(resendingExcept: Set(batch.map(\.identifier)))
+            let status = await recordStatus(resendingExcept: Set(batch.map(\.identifier)))
             guard status == .authorized else { return }
-            for payload in batch { await sender.send(payload) }
+            for payload in batch {
+                await sender.send(payload)
+            }
         }
     }
 }
@@ -221,11 +225,11 @@ extension AlertCenter: MonitorFeature {
     /// 闲置的(未闲置 = idleSeconds 为 nil)。
     func onEvent(_ event: FeatureEvent) {
         switch event {
-        case .diskCapacity(let reading):
+        case let .diskCapacity(reading):
             if let available = reading.availableForImportantUsageBytes {
                 ingestDisk(availableBytes: available)
             }
-        case .devServers(let servers):
+        case let .devServers(servers):
             ingestDevServers(servers.compactMap { server in
                 server.idleSeconds.map {
                     AlertDevServerSnapshot(pid: server.pid, name: server.displayName, idleSeconds: $0)

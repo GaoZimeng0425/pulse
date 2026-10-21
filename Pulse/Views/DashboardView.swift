@@ -1,6 +1,6 @@
-import SwiftUI
 import AppKit
 import PulseCore
+import SwiftUI
 
 /// 弹窗主页(工单 P0.6-05 对齐 OG 左图):图标 tab → "页名 / 已运行时长" 头 →
 /// 各 tab 内容(与主窗口同一份 MetricTabStack,紧凑档)→ 底部操作排(打开主窗口 +
@@ -241,7 +241,11 @@ struct KillFailureAlert: ViewModifier {
             report?.failureAlertTitle ?? "",
             isPresented: Binding(
                 get: { report?.hasFailures == true },
-                set: { if !$0 { report = nil } }
+                set: {
+                    if !$0 {
+                        report = nil
+                    }
+                }
             )
         ) {
             Button("知道了") { report = nil }
@@ -294,7 +298,7 @@ struct KillFailureAlert: ViewModifier {
                 argv: ["waifud"],
                 cpuTimeNanoseconds: waifud,
                 physicalFootprintBytes: 30_000_000,
-                startTime: now.addingTimeInterval(-3 * 86_400)
+                startTime: now.addingTimeInterval(-3 * 86400)
             ),
         ]
     }

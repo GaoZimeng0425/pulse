@@ -1,5 +1,5 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 采样 → 组卡呈现的粘合逻辑(工单 05):合成快照序列按采样循环的组法
 /// (source → CPUDiffer → pipeline.update)驱动,断言 Top 组的外部行为。
@@ -12,7 +12,7 @@ final class GroupingPipelineTests: XCTestCase {
         octokRoot + "/.worktrees/" + name
     }
 
-    private let base = Date(timeIntervalSinceReferenceDate: 1_000)
+    private let base = Date(timeIntervalSinceReferenceDate: 1000)
 
     // MARK: 测试替身:按采样循环的组法驱动一轮
 
@@ -67,7 +67,7 @@ final class GroupingPipelineTests: XCTestCase {
                 physicalFootprintBytes: 50_000_000
             ),
         ]
-        for index in 0..<5 {
+        for index in 0 ..< 5 {
             processes.append(
                 RawProcess(
                     pid: pid_t(100 + index),
@@ -85,7 +85,7 @@ final class GroupingPipelineTests: XCTestCase {
                 pid: 128,
                 parentPID: 1,
                 executablePath:
-                    "/System/Library/CoreServices/WindowServer.app/Contents/MacOS/WindowServer",
+                "/System/Library/CoreServices/WindowServer.app/Contents/MacOS/WindowServer",
                 cpuTimeNanoseconds: windowServerCPU,
                 physicalFootprintBytes: 90_000_000
             )
@@ -151,14 +151,14 @@ final class GroupingPipelineTests: XCTestCase {
 
     /// 7 个互不相干的 App 组、CPU 各异:只保留 Top-5,严格按组 CPU% 降序。
     func testTopGroupsAreLimitedToFiveByDescendingCPU() {
-        let apps = (1...7).map { index in
+        let apps = (1 ... 7).map { index in
             RawProcess(
                 pid: pid_t(200 + index),
                 parentPID: 1,
                 executablePath: "/Applications/A\(index * 10).app/Contents/MacOS/A\(index * 10)"
             )
         }
-        let processCPU = (1...7).map { index in
+        let processCPU = (1 ... 7).map { index in
             ProcessCPU(pid: pid_t(200 + index), cpuPercent: Double(index * 10))
         }
         var pipeline = GroupingPipeline()
@@ -234,7 +234,7 @@ final class GroupingPipelineTests: XCTestCase {
         let tree = gateTree(zcodeCPU: 0, nodeCPU: 0, cargoCPU: 0, rustcCPU: 0, windowServerCPU: 0)
         let configuration = GroupingConfiguration(projectRoots: [octokRoot])
         var cached = GroupingPipeline(configuration: configuration)
-        for offset in 0..<3 {
+        for offset in 0 ..< 3 {
             _ = cached.update(
                 snapshot: ProcessSnapshot(takenAt: base.addingTimeInterval(Double(offset) * 5), processes: tree),
                 processCPU: []
@@ -244,7 +244,10 @@ final class GroupingPipelineTests: XCTestCase {
         _ = fresh.update(snapshot: ProcessSnapshot(takenAt: base, processes: tree), processCPU: [])
 
         XCTAssertEqual(cached.allGroups.map(\.id), fresh.allGroups.map(\.id))
-        XCTAssertEqual(cached.allGroups.map { $0.processes.map(\.pid) }, fresh.allGroups.map { $0.processes.map(\.pid) })
+        XCTAssertEqual(
+            cached.allGroups.map { $0.processes.map(\.pid) },
+            fresh.allGroups.map { $0.processes.map(\.pid) }
+        )
     }
 
     // MARK: 项目根热更新(工单 07:设置窗增删 ≤1 轮采样生效)

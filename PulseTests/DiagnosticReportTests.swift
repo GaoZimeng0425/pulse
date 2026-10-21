@@ -1,6 +1,6 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 接缝(工单 11:诊断报告一键复制):
 /// - `SamplingStats` 采样累计统计(纯值类型, Sampler 每轮推进);
@@ -18,6 +18,7 @@ final class DiagnosticReportTests: XCTestCase {
         comps.hour = 13
         return Calendar.current.date(from: comps)!
     }()
+
     private var tempDirectory: String!
 
     override func setUpWithError() throws {
@@ -78,7 +79,7 @@ final class DiagnosticReportTests: XCTestCase {
             chipName: "Apple M4 Pro",
             stats: sampledStats,
             logTail: "2026/10/16 13:07:01:123 [App] Pulse 启动",
-            now: base.addingTimeInterval(5_400)
+            now: base.addingTimeInterval(5400)
         )
 
         // 标题 + 本地生成时间(注入时钟)。

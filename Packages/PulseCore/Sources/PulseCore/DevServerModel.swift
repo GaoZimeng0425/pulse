@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 
 // dev server 盘点的纯逻辑:argv 分类器、闲置环、盘点编排与端口扫描接缝。libproc 端口扫描适配器在 app target(DevServerFinder.swift)。
 
@@ -164,7 +164,9 @@ public struct DevServerIdleTracker: Sendable {
     /// 喂一轮观察。cpuPercent = 本轮差分 CPU%(nil = 新出生进程,尚无差分,
     /// 只立首见基线不判活动——不伪造 0)。
     public mutating func observe(pid: pid_t, cpuPercent: Double?, now: Date) {
-        if firstSeen[pid] == nil { firstSeen[pid] = now }
+        if firstSeen[pid] == nil {
+            firstSeen[pid] = now
+        }
         if let cpuPercent, cpuPercent >= Self.activityCPUThreshold {
             lastActivity[pid] = now
         }
@@ -183,8 +185,7 @@ public struct DevServerIdleTracker: Sendable {
         lastActivity = lastActivity.filter { alive.contains($0.key) }
     }
 
-    public init() {
-    }
+    public init() {}
 }
 
 /// 卡片的一行 dev server:闲置时长 / 内存 / 监听端口。
@@ -199,9 +200,14 @@ public struct DevServerStatus: Identifiable, Equatable, Sendable {
     /// 监听中的 TCP 端口(升序去重;扫描失败/受限为空,不伪造)。
     public let listeningPorts: [UInt16]
 
-    public var id: pid_t { pid }
+    public var id: pid_t {
+        pid
+    }
+
     /// "闲置"标签:最近 10 分钟 CPU≈0(GLOSSARY)。
-    public var isIdle: Bool { idleSeconds != nil }
+    public var isIdle: Bool {
+        idleSeconds != nil
+    }
 
     public init(
         pid: pid_t,
@@ -240,11 +246,10 @@ public struct DevServerFinder: Sendable {
         var nextClassifications: [pid_t: (argv: [String], match: DevServerMatch?)] = [:]
         nextClassifications.reserveCapacity(snapshot.processes.count)
         for process in snapshot.processes {
-            let match: DevServerMatch?
-            if let cached = classifications[process.pid], cached.argv == process.argv {
-                match = cached.match
+            let match: DevServerMatch? = if let cached = classifications[process.pid], cached.argv == process.argv {
+                cached.match
             } else {
-                match = DevServerClassifier.classify(argv: process.argv)
+                DevServerClassifier.classify(argv: process.argv)
             }
             nextClassifications[process.pid] = (process.argv, match)
             if let match {

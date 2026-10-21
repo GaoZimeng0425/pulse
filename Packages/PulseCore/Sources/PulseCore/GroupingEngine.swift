@@ -43,7 +43,9 @@ public enum GroupIdentity: Hashable, Sendable, Comparable {
 
     /// App 组的 .app bundle 目录;其余种类为 nil。
     public var bundlePath: String? {
-        if case .app(let bundlePath) = self { return bundlePath }
+        if case let .app(bundlePath) = self {
+            return bundlePath
+        }
         return nil
     }
 
@@ -51,8 +53,8 @@ public enum GroupIdentity: Hashable, Sendable, Comparable {
     /// 将来的持久化键,不再充当身份本身——字符串造不出组身份。
     public var stableKey: String {
         switch self {
-        case .app(let bundlePath): "bundle:" + bundlePath
-        case .project(let root, let worktreeName):
+        case let .app(bundlePath): "bundle:" + bundlePath
+        case let .project(root, worktreeName):
             "project:" + root + (worktreeName.map { "@\($0)" } ?? "")
         case .system: "system"
         case .backgroundService: "background-service"
@@ -75,9 +77,15 @@ public struct ProcessGroup: Identifiable, Equatable, Sendable {
     /// 显示名(bundle 显示名 / "项目名 @ worktree" / 兜底类别名)。
     public let name: String
     /// 组类别:身份种类的 1:1 派生(图例 / 图标样式等展示口径)。
-    public var category: GroupCategory { id.category }
+    public var category: GroupCategory {
+        id.category
+    }
+
     /// App 组的 .app bundle 目录,供 UI 取应用图标(工单 05);其余类别为 nil。
-    public var bundlePath: String? { id.bundlePath }
+    public var bundlePath: String? {
+        id.bundlePath
+    }
+
     /// 组内进程,按进程 CPU% 降序(次键 pid 升序)——下钻列表的既定顺序。
     public let processes: [RawProcess]
     /// 组 CPU%(GLOSSARY):组内全部进程 CPU% 之和,单核 100% 累加,可超过 100%。
@@ -237,7 +245,9 @@ public enum GroupingEngine {
         for component in path.split(separator: "/") {
             accumulated += "/" + component
             if component.hasSuffix(".app") {
-                if strict { return (accumulated, true) }
+                if strict {
+                    return (accumulated, true)
+                }
                 if accumulated.hasPrefix("/Applications/") || accumulated.hasPrefix("/Users/") {
                     return (accumulated, false)
                 }
@@ -268,8 +278,7 @@ public enum GroupingEngine {
             || path.hasPrefix("/Library/PrivilegedHelperTools/")
             || path.hasPrefix("/Library/Developer/")
             || path.hasPrefix("/usr/sbin/")
-            || path.hasPrefix("/usr/libexec/")
-        {
+            || path.hasPrefix("/usr/libexec/") {
             return true
         }
         // 用户级 LaunchAgent 域:任意家目录(/Users/<名>/Library/LaunchAgents)。
@@ -281,8 +290,8 @@ public enum GroupingEngine {
 
 /// 单进程的归属判定结果(聚合前):身份 + 显示名;类别与 bundle 目录由身份派生。
 private struct Attribution: Equatable {
-    public let id: GroupIdentity
-    public let name: String
+    let id: GroupIdentity
+    let name: String
 }
 
 extension Attribution {
@@ -299,8 +308,8 @@ extension Attribution {
 /// 收缩。由 GroupingPipeline 跨轮持有;不传则逐轮从头算(引擎仍是纯函数)。
 public final class SelfAttributionCache {
     fileprivate struct Slot {
-        public let identity: ProcessIdentity
-        public let attribution: Attribution?
+        let identity: ProcessIdentity
+        let attribution: Attribution?
     }
 
     private var previous: [pid_t: Slot] = [:]
@@ -320,12 +329,13 @@ public final class SelfAttributionCache {
         identity: ProcessIdentity,
         compute: () -> Attribution?
     ) -> Attribution? {
-        if let slot = current[pid], slot.identity == identity { return slot.attribution }
-        let slot: Slot
-        if let cached = previous[pid], cached.identity == identity {
-            slot = cached
+        if let slot = current[pid], slot.identity == identity {
+            return slot.attribution
+        }
+        let slot: Slot = if let cached = previous[pid], cached.identity == identity {
+            cached
         } else {
-            slot = Slot(identity: identity, attribution: compute())
+            Slot(identity: identity, attribution: compute())
         }
         current[pid] = slot
         return slot.attribution
@@ -354,21 +364,21 @@ private final class Resolver {
 
     /// 三层归属的解析结果 + 活链是否途经存活的 launchd(后台服务判定信号)。
     private struct LayerResolution {
-        public let attribution: Attribution?
-        public let reachedLiveLaunchd: Bool
+        let attribution: Attribution?
+        let reachedLiveLaunchd: Bool
     }
 
-    public init(
+    init(
         snapshot: ProcessSnapshot,
         lineage: LineageRegistry,
         configuration: GroupingConfiguration,
         cache: SelfAttributionCache?
     ) {
         self.configuration = configuration
-        self.normalizedRoots = configuration.projectRoots
+        normalizedRoots = configuration.projectRoots
             .map(PathNormalization.normalize)
             .sorted { $0.count > $1.count }
-        self.processesByPID = snapshot.processesByPID
+        processesByPID = snapshot.processesByPID
         self.lineage = lineage
         self.cache = cache
         cache?.prepare(roots: normalizedRoots)
@@ -376,11 +386,10 @@ private final class Resolver {
 
     // MARK: 最终归属(三层 + 兜底)
 
-    public func finalAttribution(for process: RawProcess) -> Attribution {
+    func finalAttribution(for process: RawProcess) -> Attribution {
         // 系统判定优先于 App 归属:WindowServer 的路径本身就在 .app bundle 里。
         if configuration.systemExecutableNames
-            .contains(executableName(executablePath: process.executablePath, argv: process.argv))
-        {
+            .contains(executableName(executablePath: process.executablePath, argv: process.argv)) {
             return .systemGroup
         }
         let resolution = layerResolution(for: process.pid)
@@ -412,7 +421,9 @@ private final class Resolver {
     /// launchd 服务清单(全等匹配;字面与 realpath 两种形态都已在清单里,引擎不解
     /// 符号链接——那是 IO,ADR-0005)。清单为空集时与引入前逐位一致。
     private func isLaunchdServiceExecutable(_ executablePath: String?) -> Bool {
-        if GroupingEngine.isLaunchdDomainExecutablePath(executablePath) { return true }
+        if GroupingEngine.isLaunchdDomainExecutablePath(executablePath) {
+            return true
+        }
         guard let executablePath else { return false }
         return configuration.launchdServiceExecutablePaths.contains(executablePath)
     }
@@ -528,8 +539,8 @@ private final class Resolver {
 
     /// 项目根命中:root + worktree 名(命中 `.worktrees/<名>` 时非 nil)。
     private struct ProjectMatch: Equatable {
-        public let root: String
-        public let worktreeName: String?
+        let root: String
+        let worktreeName: String?
     }
 
     /// 项目根前缀匹配(按路径组件对齐;多根命中取最长根)。

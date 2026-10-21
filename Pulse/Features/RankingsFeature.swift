@@ -1,6 +1,6 @@
+import Darwin
 import Foundation
 import Observation
-import Darwin
 import PulseCore
 
 /// 模块排行功能模块(工单 module-rankings/01;ADR-0003 MonitorFeature):电池 / 磁盘 / 网络三页的
@@ -38,7 +38,7 @@ final class RankingsFeature: MonitorFeature {
     @ObservationIgnored private var gateOpen = false
 
     init(nettopSource: any NettopCSVSource) {
-        self.networkRateProvider = ProcessNetworkRateProvider(source: nettopSource)
+        networkRateProvider = ProcessNetworkRateProvider(source: nettopSource)
     }
 
     // MARK: - MonitorFeature
@@ -100,11 +100,17 @@ final class RankingsFeature: MonitorFeature {
     /// 只在行真变化时写入(卡片不空转重画)。Swift 6.2+ 的 @Observable 宏对 Equatable
     /// 同值写入本已不通知(shouldNotifyObservers);显式比较让这条契约不依赖宏的版本。
     private func publish(energy: [ModuleRankingRow], disk: [ModuleRankingRow]) {
-        if energy != energyRows { energyRows = energy }
-        if disk != diskRows { diskRows = disk }
+        if energy != energyRows {
+            energyRows = energy
+        }
+        if disk != diskRows {
+            diskRows = disk
+        }
     }
 
     private func publish(network: [ModuleRankingRow]) {
-        if network != networkRows { networkRows = network }
+        if network != networkRows {
+            networkRows = network
+        }
     }
 }

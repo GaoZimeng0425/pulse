@@ -1,12 +1,12 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 接缝:每核 tick 差分器(评审 S6,纯逻辑)。系统 CPU 负载 =
 /// 相邻两样本的忙 tick 差 ÷ 总 tick 差(总含 idle),与活动监视器 / Stats
 /// 同源——kernel_task 与 root 属主进程的 CPU 时间也计入,修复进程累加口径
 /// 的结构性少计。期望值全部是手工推演的字面量。
 final class CoreTickDifferTests: XCTestCase {
-    private let base = Date(timeIntervalSinceReferenceDate: 1_000)
+    private let base = Date(timeIntervalSinceReferenceDate: 1000)
 
     private func sample(
         busy: [UInt64],

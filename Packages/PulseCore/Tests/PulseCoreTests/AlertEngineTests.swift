@@ -1,12 +1,11 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 接缝:告警规则状态机(spec 纯逻辑测试清单:阈值/持续/迟滞/冷却,注入时钟)。
 /// 全合成序列 + 注入 Date,零真实等待、零真实负载(工单纪律:真负载属工单 12
 /// 验收走查)。覆盖:进入(连续 3 次 + 持续时长)/退出(连续 6 次安全侧)/
 /// 迟滞带内两不靠/冷却期抑制重触发/组消失自动解除/新组出生窗/设置变更重置。
 final class AlertEngineTests: XCTestCase {
-
     // MARK: - 合成夹具
 
     /// 注入时钟的固定起点。
@@ -30,7 +29,9 @@ final class AlertEngineTests: XCTestCase {
         return settings
     }
 
-    private var emptyGroups: [AlertGroupSnapshot] { [] }
+    private var emptyGroups: [AlertGroupSnapshot] {
+        []
+    }
 
     private func group(
         _ id: GroupIdentity, name: String = "组", cpu: Double = 0, memoryGB: Double = 0
@@ -48,7 +49,7 @@ final class AlertEngineTests: XCTestCase {
         var engine = AlertEngine()
         let settings = policies(.systemLoad, threshold: 70, sustain: 300)
 
-        for round in 0..<59 {
+        for round in 0 ..< 59 {
             let events = engine.record(
                 .sampling(systemCPULoad: 71, groups: emptyGroups),
                 now: t0.addingTimeInterval(Double(round) * 5),
@@ -61,7 +62,7 @@ final class AlertEngineTests: XCTestCase {
             now: t0.addingTimeInterval(300),
             settings: settings
         )
-        guard case .fired(let occurrence) = events.only else {
+        guard case let .fired(occurrence) = events.only else {
             return XCTFail("持续时长满足的当轮应触发,实际 \(events)")
         }
         XCTAssertEqual(occurrence.kind, .systemLoad)
@@ -86,7 +87,7 @@ final class AlertEngineTests: XCTestCase {
         let threshold = Double(20 * 1_073_741_824)
         let settings = policies(.diskAvailable, threshold: threshold)
 
-        for round in 0..<3 {
+        for round in 0 ..< 3 {
             let events = engine.record(
                 .disk(availableBytes: Int64(threshold)),
                 now: t0.addingTimeInterval(Double(round) * 30),
@@ -108,8 +109,10 @@ final class AlertEngineTests: XCTestCase {
         let inBand = Int64(22 * 1_073_741_824)
 
         XCTAssertNil(engine.record(.disk(availableBytes: breach), now: t0, settings: settings).only)
-        XCTAssertNil(engine.record(.disk(availableBytes: inBand), now: t0.addingTimeInterval(30), settings: settings).only)
-        XCTAssertNil(engine.record(.disk(availableBytes: breach), now: t0.addingTimeInterval(60), settings: settings).only)
+        XCTAssertNil(engine.record(.disk(availableBytes: inBand), now: t0.addingTimeInterval(30), settings: settings)
+            .only)
+        XCTAssertNil(engine.record(.disk(availableBytes: breach), now: t0.addingTimeInterval(60), settings: settings)
+            .only)
         let events = engine.record(.disk(availableBytes: breach), now: t0.addingTimeInterval(90), settings: settings)
         XCTAssertTrue(events.isEmpty, "带内打断连续计数:重计后仅 2 次,不触发")
     }
@@ -126,27 +129,30 @@ final class AlertEngineTests: XCTestCase {
         var now = t0
         var firedAt: Date?
 
-        for _ in 1...3 {
+        for _ in 1 ... 3 {
             let events = engine.record(.disk(availableBytes: breach), now: now, settings: settings)
-            if case .fired = events.only { firedAt = now }
+            if case .fired = events.only {
+                firedAt = now
+            }
             now = now.addingTimeInterval(30)
         }
         let fired = try XCTUnwrap(firedAt, "前置:第 3 次连续应触发")
 
         // 5 次带内:不得解除。
-        for _ in 0..<5 {
+        for _ in 0 ..< 5 {
             let events = engine.record(.disk(availableBytes: inBand), now: now, settings: settings)
             XCTAssertTrue(events.isEmpty, "带内值不推进退出计数")
             now = now.addingTimeInterval(30)
         }
         // 5 次真安全:尚不足 6 次。
-        for _ in 0..<5 {
+        for _ in 0 ..< 5 {
             let events = engine.record(.disk(availableBytes: safe), now: now, settings: settings)
             XCTAssertTrue(events.isEmpty, "第 \(now.timeIntervalSince(fired))s:安全不足 6 次")
             now = now.addingTimeInterval(30)
         }
         // 第 6 次安全解除。
-        guard case .resolved(let kind, _) = engine.record(.disk(availableBytes: safe), now: now, settings: settings).only
+        guard case let .resolved(kind, _) = engine.record(.disk(availableBytes: safe), now: now, settings: settings)
+            .only
         else { return XCTFail("第 6 次安全应解除") }
         XCTAssertEqual(kind, .diskAvailable)
     }
@@ -164,16 +170,18 @@ final class AlertEngineTests: XCTestCase {
         var firedAt: Date?
 
         func rounds(_ value: Int64, count: Int) {
-            for _ in 0..<count {
+            for _ in 0 ..< count {
                 let events = engine.record(.disk(availableBytes: value), now: now, settings: settings)
-                if case .fired = events.only { firedAt = now }
+                if case .fired = events.only {
+                    firedAt = now
+                }
                 now = now.addingTimeInterval(30)
             }
         }
 
         rounds(breach, count: 3) // 0–60s:触发
         let fired = try XCTUnwrap(firedAt, "前置:应已触发")
-        rounds(safe, count: 6)   // 90–240s:解除
+        rounds(safe, count: 6) // 90–240s:解除
         rounds(breach, count: 3) // 270–330s:streak 满,但距触发 270s < 600s 冷却
         XCTAssertTrue(now < fired.addingTimeInterval(600))
         let suppressed = engine.record(.disk(availableBytes: breach), now: now, settings: settings)
@@ -203,7 +211,7 @@ final class AlertEngineTests: XCTestCase {
 
         XCTAssertNil(sampling([group(a, name: "A", cpu: 310)]).only)
         XCTAssertNil(sampling([group(a, name: "A", cpu: 310)]).only)
-        guard case .fired(let a1) = sampling([group(a, name: "A", cpu: 310), group(b, name: "B", cpu: 350)]).only else {
+        guard case let .fired(a1) = sampling([group(a, name: "A", cpu: 310), group(b, name: "B", cpu: 350)]).only else {
             return XCTFail("A 第 3 次连续应触发")
         }
         XCTAssertEqual(a1.subjectName, "A")
@@ -225,12 +233,14 @@ final class AlertEngineTests: XCTestCase {
         }
 
         var fired = false
-        for _ in 0..<3 {
-            if case .fired = sampling([group(a, name: "A", cpu: 400)]).only { fired = true }
+        for _ in 0 ..< 3 {
+            if case .fired = sampling([group(a, name: "A", cpu: 400)]).only {
+                fired = true
+            }
         }
         XCTAssertTrue(fired, "前置:A 应已触发")
         // 组消失:立即解除(firing → resolved),状态清空。
-        guard case .resolved(let kind, let subject) = sampling([]).only else {
+        guard case let .resolved(kind, subject) = sampling([]).only else {
             return XCTFail("组消失应解除告警")
         }
         XCTAssertEqual(kind, .groupCPU)
@@ -263,7 +273,7 @@ final class AlertEngineTests: XCTestCase {
         _ = sampling([])
         XCTAssertTrue(sampling([group(big, name: "Big", memoryGB: 5)]).isEmpty)
         XCTAssertTrue(sampling([group(big, name: "Big", memoryGB: 5)]).isEmpty)
-        guard case .fired(let occurrence) = sampling([group(big, name: "Big", memoryGB: 5)]).only else {
+        guard case let .fired(occurrence) = sampling([group(big, name: "Big", memoryGB: 5)]).only else {
             return XCTFail("新组连续 3 轮 >2GB 应触发")
         }
         XCTAssertEqual(occurrence.kind, .newGroupMemory)
@@ -287,14 +297,20 @@ final class AlertEngineTests: XCTestCase {
         var now = t0
 
         func sampling(_ load: Double, settings: AlertEvaluationSettings) -> [AlertEvent] {
-            let events = engine.record(.sampling(systemCPULoad: load, groups: emptyGroups), now: now, settings: settings)
+            let events = engine.record(
+                .sampling(systemCPULoad: load, groups: emptyGroups),
+                now: now,
+                settings: settings
+            )
             now = now.addingTimeInterval(5)
             return events
         }
 
         var fired = false
-        for _ in 0..<3 {
-            if case .fired = sampling(80, settings: old).only { fired = true }
+        for _ in 0 ..< 3 {
+            if case .fired = sampling(80, settings: old).only {
+                fired = true
+            }
         }
         XCTAssertTrue(fired, "前置:应已触发")
 
@@ -314,7 +330,7 @@ final class AlertEngineTests: XCTestCase {
         var engine = AlertEngine()
         let settings = policies(.systemLoad, enabled: false, threshold: 70, sustain: 0)
         var now = t0
-        for _ in 0..<5 {
+        for _ in 0 ..< 5 {
             let events = engine.record(
                 .sampling(systemCPULoad: 99, groups: emptyGroups), now: now, settings: settings
             )
@@ -356,5 +372,7 @@ final class AlertEngineTests: XCTestCase {
 
 private extension Array {
     /// 单事件断言用:恰一个元素返回它,否则 nil(让 XCTAssertNil/XCTUnwrap 直读)。
-    var only: Element? { count == 1 ? first : nil }
+    var only: Element? {
+        count == 1 ? first : nil
+    }
 }

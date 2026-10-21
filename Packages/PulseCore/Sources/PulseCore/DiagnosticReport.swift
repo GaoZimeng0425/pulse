@@ -88,9 +88,13 @@ public enum DiagnosticReport {
             }
             var lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
             // 文件以换行结尾时 split 留下尾部空串,丢掉这一行尾哨兵。
-            if lines.last == "" { lines.removeLast() }
+            if lines.last == "" {
+                lines.removeLast()
+            }
             collected = lines + collected
-            if collected.count >= maxLines { break }
+            if collected.count >= maxLines {
+                break
+            }
         }
         let tail = collected.suffix(maxLines)
         return tail.isEmpty ? nil : tail.joined(separator: "\n")

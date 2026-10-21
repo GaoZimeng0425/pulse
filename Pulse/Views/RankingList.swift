@@ -1,8 +1,9 @@
-import SwiftUI
 import AppKit
 import PulseCore
+import SwiftUI
 
 // MARK: - 排行列表通用组件(2026-10-20 用户拍板:各 tab 的排序列表一个样)
+
 //
 // 组排行(当前最忙,可展开 / 可结束)与模块排行(能耗影响 / 读写最多 / 每进程流量,
 // 只读)共用同一张卡与同一行配方:卡内标题(12.5 semibold,所在页指标色)→ 表头
@@ -18,10 +19,21 @@ enum RankingListMetrics {
     /// 行内水平内距(表头与之对齐)。
     static let rowInset: CGFloat = 6
 
-    static func spacing(compact: Bool) -> CGFloat { compact ? 8 : 10 }
-    static func iconSize(compact: Bool) -> CGFloat { compact ? 18 : 22 }
-    static func meterWidth(compact: Bool) -> CGFloat { compact ? 52 : 110 }
-    static func valueFontSize(compact: Bool) -> CGFloat { compact ? 12.5 : 13 }
+    static func spacing(compact: Bool) -> CGFloat {
+        compact ? 8 : 10
+    }
+
+    static func iconSize(compact: Bool) -> CGFloat {
+        compact ? 18 : 22
+    }
+
+    static func meterWidth(compact: Bool) -> CGFloat {
+        compact ? 52 : 110
+    }
+
+    static func valueFontSize(compact: Bool) -> CGFloat {
+        compact ? 12.5 : 13
+    }
 
     /// 数值列**定宽**(全部排行共用):按最宽现实读数 "999.9 MB/s"(速率跨到 GB/s 前的
     /// 最长串)以实际绘制字体量宽 + 2pt 余量。曾是最小宽度 64 / 48,速率文案逐行撑宽、
@@ -149,7 +161,9 @@ struct RankingListRow<Badge: View, Trailing: View>: View {
         .padding(.vertical, isCompact ? 5 : 7)
     }
 
-    private var iconSize: CGFloat { RankingListMetrics.iconSize(compact: isCompact) }
+    private var iconSize: CGFloat {
+        RankingListMetrics.iconSize(compact: isCompact)
+    }
 
     /// App 行取真实应用图标;其余取类别瓦片(外壳底色 + 白符号)。
     @ViewBuilder
@@ -198,7 +212,9 @@ enum AppIconCache {
     private static let cache = NSCache<NSString, NSImage>()
 
     static func icon(forBundle path: String) -> NSImage {
-        if let cached = cache.object(forKey: path as NSString) { return cached }
+        if let cached = cache.object(forKey: path as NSString) {
+            return cached
+        }
         let icon = NSWorkspace.shared.icon(forFile: path)
         cache.setObject(icon, forKey: path as NSString)
         return icon

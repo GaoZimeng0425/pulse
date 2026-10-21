@@ -1,6 +1,6 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 归组引擎(工单 03):三层归属 + 兜底三分类,全部以合成进程树为夹具(spec 测试决策)。
 /// 断言只看外部行为——"这棵树归出这些组";期望值全部为独立字面量,不经实现同源计算。
@@ -125,7 +125,10 @@ final class GroupingEngineTests: XCTestCase {
             .app(bundlePath: "/Applications/B.app"),
             .app(bundlePath: "/Applications/A.app"),
         ]
-        XCTAssertEqual(sameKind.sorted(), [.app(bundlePath: "/Applications/A.app"), .app(bundlePath: "/Applications/B.app")])
+        XCTAssertEqual(
+            sameKind.sorted(),
+            [.app(bundlePath: "/Applications/A.app"), .app(bundlePath: "/Applications/B.app")]
+        )
     }
 
     /// 相等性按种类 + 原始值判定:平行 worktree 是不同身份(旧约定里
@@ -640,11 +643,14 @@ final class GroupingEngineTests: XCTestCase {
         XCTAssertTrue(GroupingEngine.isLaunchdDomainExecutablePath("/usr/libexec/logd"))
         XCTAssertTrue(GroupingEngine.isLaunchdDomainExecutablePath("/usr/sbin/securityd"))
         XCTAssertTrue(GroupingEngine.isLaunchdDomainExecutablePath(
-            "/Library/SystemExtensions/ABC/com.example.ext.systemextension/Contents/MacOS/ext"))
+            "/Library/SystemExtensions/ABC/com.example.ext.systemextension/Contents/MacOS/ext"
+        ))
         XCTAssertTrue(GroupingEngine.isLaunchdDomainExecutablePath(
-            "/Library/PrivilegedHelperTools/com.macpaw.CleanMyMac5.Agent"))
+            "/Library/PrivilegedHelperTools/com.macpaw.CleanMyMac5.Agent"
+        ))
         XCTAssertTrue(GroupingEngine.isLaunchdDomainExecutablePath(
-            "/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/Resources/bin/simdiskimaged"))
+            "/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/Resources/bin/simdiskimaged"
+        ))
         XCTAssertFalse(GroupingEngine.isLaunchdDomainExecutablePath("/usr/bin/ssh"))
         XCTAssertFalse(GroupingEngine.isLaunchdDomainExecutablePath("/usr/local/corplink/corplink-service"))
     }
@@ -655,25 +661,34 @@ final class GroupingEngineTests: XCTestCase {
     func testAppContainerPredicateWidening() {
         // 严格口径回归:嵌套 Helper.app 仍算容器内(归属取最外层宿主)。
         XCTAssertTrue(GroupingEngine.isBundleExecutablePath(
-            "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Helper.app/Contents/MacOS/Helper"))
+            "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Helper.app/Contents/MacOS/Helper"
+        ))
         // 放宽:断链助手的三种典型驻地。
         XCTAssertTrue(GroupingEngine.isBundleExecutablePath(
-            "/Applications/WeChat.app/Contents/Frameworks/crashpad_handler"))
+            "/Applications/WeChat.app/Contents/Frameworks/crashpad_handler"
+        ))
         XCTAssertTrue(GroupingEngine.isBundleExecutablePath(
-            "/Applications/Input Source Pro.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate"))
+            "/Applications/Input Source Pro.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate"
+        ))
         XCTAssertTrue(GroupingEngine.isBundleExecutablePath(
-            "/Applications/Stats.app/Contents/PlugIns/WidgetsExtension.appex/Contents/MacOS/WidgetsExtension"))
+            "/Applications/Stats.app/Contents/PlugIns/WidgetsExtension.appex/Contents/MacOS/WidgetsExtension"
+        ))
         XCTAssertTrue(GroupingEngine.isBundleExecutablePath(
-            "/Applications/Raycast.app/Contents/XPCServices/Raycast Accessibility.xpc/Contents/MacOS/agent"))
+            "/Applications/Raycast.app/Contents/XPCServices/Raycast Accessibility.xpc/Contents/MacOS/agent"
+        ))
         XCTAssertTrue(GroupingEngine.isBundleExecutablePath(
-            "/Users/aa00930/Demo.app/Contents/Resources/helper"))
+            "/Users/aa00930/Demo.app/Contents/Resources/helper"
+        ))
         // 不放宽:系统域与厂商域的容器进程不做 App 归属。
         XCTAssertFalse(GroupingEngine.isBundleExecutablePath(
-            "/System/Library/CoreServices/Foo.xpc/Contents/MacOS/foo"))
+            "/System/Library/CoreServices/Foo.xpc/Contents/MacOS/foo"
+        ))
         XCTAssertFalse(GroupingEngine.isBundleExecutablePath(
-            "/Library/Developer/PrivateFrameworks/CoreDevice.framework/Versions/A/Helper"))
+            "/Library/Developer/PrivateFrameworks/CoreDevice.framework/Versions/A/Helper"
+        ))
         XCTAssertFalse(GroupingEngine.isBundleExecutablePath(
-            "/usr/local/Foo.app/Contents/Resources/helper"))
+            "/usr/local/Foo.app/Contents/Resources/helper"
+        ))
         XCTAssertFalse(GroupingEngine.isBundleExecutablePath("/opt/homebrew/bin/tool"))
         XCTAssertFalse(GroupingEngine.isBundleExecutablePath(nil))
     }
@@ -683,14 +698,14 @@ final class GroupingEngineTests: XCTestCase {
     func testOrphanedHostAppHelperAttributesToHostBundle() {
         let snapshot = ProcessSnapshot(processes: [
             RawProcess(
-                pid: 47_639,
+                pid: 47639,
                 parentPID: 1,
                 executablePath: "/Applications/WeChat.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
                 argv: ["chrome_crashpad_handler"],
                 physicalFootprintBytes: 9_000_000
             ),
         ])
-        let groups = GroupingEngine.groups(from: snapshot, cpuPercentByPID: [47_639: 1])
+        let groups = GroupingEngine.groups(from: snapshot, cpuPercentByPID: [47639: 1])
 
         XCTAssertEqual(groups.count, 1)
         XCTAssertEqual(groups[0].name, "WeChat")

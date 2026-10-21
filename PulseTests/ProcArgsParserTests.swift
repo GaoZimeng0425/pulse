@@ -1,6 +1,6 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 接缝:KERN_PROCARGS2 缓冲解析(纯逻辑)。
 /// 布局口径来自 spec 采集决策与 ps 的既有语义:argc(int32) + execpath + argv[0..argc-1]。

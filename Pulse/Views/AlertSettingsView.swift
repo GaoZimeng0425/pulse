@@ -1,5 +1,5 @@
-import SwiftUI
 import PulseCore
+import SwiftUI
 
 /// 告警设置页(工单 P1-07):五条预设规则逐条开关、阈值可改,改动即时生效
 /// 并持久(AlertSettingsStore 直写;引擎下轮喂食即按新配置评估)。授权时序
@@ -47,7 +47,6 @@ struct AlertSettingsView: View {
     }
 
     /// 单规则一节:开关行 + 阈值行。
-    @ViewBuilder
     private func ruleSection(_ kind: AlertKind) -> some View {
         Section {
             Toggle(isOn: enabledBinding(kind)) {
@@ -81,7 +80,7 @@ struct AlertSettingsView: View {
                 TextField(
                     "阈值",
                     value: percentBinding(kind),
-                    format: .number.precision(.fractionLength(0...1))
+                    format: .number.precision(.fractionLength(0 ... 1))
                 )
                 .multilineTextAlignment(.trailing)
                 .monospacedDigit()
@@ -93,7 +92,7 @@ struct AlertSettingsView: View {
                 TextField(
                     "阈值",
                     value: gigabyteBinding(kind),
-                    format: .number.precision(.fractionLength(0...1))
+                    format: .number.precision(.fractionLength(0 ... 1))
                 )
                 .multilineTextAlignment(.trailing)
                 .monospacedDigit()
@@ -159,8 +158,17 @@ struct AlertSettingsView: View {
 
 /// 预览用假 sender(拒绝授权,呈现降级提示;文件内私有,与其他预览替身互不相干)。
 private struct SettingsPreviewDeniedSender: AlertNotificationSending {
-    func requestAuthorization() async -> Bool { false }
-    func authorizationStatus() async -> NotificationAuthorization { .denied }
-    func authorizationDiagnostics() async -> String { "preview" }
+    func requestAuthorization() async -> Bool {
+        false
+    }
+
+    func authorizationStatus() async -> NotificationAuthorization {
+        .denied
+    }
+
+    func authorizationDiagnostics() async -> String {
+        "preview"
+    }
+
     func send(_ payload: AlertNotificationPayload) async {}
 }

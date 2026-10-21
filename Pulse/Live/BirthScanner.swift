@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 import PulseCore
 
 // MARK: - 出生扫描源(评审 S1)
@@ -27,4 +27,3 @@ struct LiveBirthScanSource: BirthScanSource {
         )
     }
 }
-

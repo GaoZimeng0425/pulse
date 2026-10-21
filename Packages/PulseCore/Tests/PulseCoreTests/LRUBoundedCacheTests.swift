@@ -1,5 +1,5 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 有界 LRU(菜单栏徽标渲染缓存的记账与淘汰规则;评审修复:徽标文案逐轮变新键,
 /// 缓存必须有界)。

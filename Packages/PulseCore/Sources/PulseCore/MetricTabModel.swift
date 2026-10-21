@@ -14,7 +14,9 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
     case battery
     case history
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// 中文标题:药丸 tab 文字、无障碍标签共用。
     public var title: String {
@@ -101,7 +103,7 @@ public struct MetricTabSelection: Equatable, Sendable {
 
     private mutating func move(offset: Int) {
         guard let index = axis.firstIndex(of: current) else { return }
-        current = axis[clamped(index + offset, in: axis.startIndex..<axis.count)]
+        current = axis[clamped(index + offset, in: axis.startIndex ..< axis.count)]
     }
 }
 
@@ -111,13 +113,15 @@ private func clamped(_ value: Int, in range: Range<Int>) -> Int {
 
 // MARK: - 模块排行可见性判据(工单 01)
 
-extension MetricTab {
+public extension MetricTab {
     /// 承载模块排行卡的 tab(电池·能耗影响 / 磁盘·读写最多 / 网络·每进程流量)。
     /// 主窗口可见性接线的判据来源(纯数据,成员资格由单测钉死)。
-    public static let moduleRankingTabs: Set<MetricTab> = [.battery, .disk, .network]
+    static let moduleRankingTabs: Set<MetricTab> = [.battery, .disk, .network]
 
     /// 当前 tab 是否开排行采样闸(工单 01:模块页可见才跑 5s/30s 低频档)。
-    public var hostsModuleRanking: Bool { Self.moduleRankingTabs.contains(self) }
+    var hostsModuleRanking: Bool {
+        Self.moduleRankingTabs.contains(self)
+    }
 }
 
 // MARK: - 组卡读数口径(工单 03 纠偏:应用行回紧凑形态)
@@ -142,10 +146,12 @@ public struct MemoryRingSegment: Identifiable, Equatable, Sendable {
     public var bundlePath: String? {
         id?.bundlePath
     }
+
     /// 组类别(图例兜底符号);"其他"段为 nil。
     public var category: GroupCategory? {
         id?.category
     }
+
     public let bytes: UInt64
     /// 0–1,占全部组内存合计的比例。
     public let fraction: Double

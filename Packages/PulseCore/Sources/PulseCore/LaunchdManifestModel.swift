@@ -53,8 +53,7 @@ public enum LaunchdServiceManifest {
             return program
         }
         if let arguments = dictionary["ProgramArguments"] as? [String],
-           let first = arguments.first, !first.isEmpty
-        {
+           let first = arguments.first, !first.isEmpty {
             return first
         }
         return nil
@@ -123,7 +122,7 @@ public struct LaunchdManifestAssembler: Sendable {
         for directory in sealedDirectories where !frozenSealedDirectories.contains(directory) {
             attempted += 1
             switch source.read(directory: directory) {
-            case .plists(let plists):
+            case let .plists(plists):
                 sealedPaths.formUnion(executablePaths(from: plists))
                 frozenSealedDirectories.insert(directory)
             case .absent, .unreadable:
@@ -136,7 +135,7 @@ public struct LaunchdManifestAssembler: Sendable {
         for directory in mutableDirectories {
             attempted += 1
             switch source.read(directory: directory) {
-            case .plists(let plists):
+            case let .plists(plists):
                 mutablePaths.formUnion(executablePaths(from: plists))
             case .absent:
                 break
@@ -203,13 +202,13 @@ public struct LaunchdManifestHealthLog: Sendable {
                 level: .info,
                 message: "launchd 服务清单恢复正常(上一态:\(Self.describe(previous)))"
             )
-        case .degraded(let unreadable):
+        case let .degraded(unreadable):
             return Entry(
                 level: .warn,
                 message: "launchd 服务清单降级:目录不可读 \(Self.list(unreadable))"
                     + "——其中声明的服务将落孤儿进程(此后同态静默,恢复再记)"
             )
-        case .failed(let unreadable):
+        case let .failed(unreadable):
             return Entry(
                 level: .error,
                 message: "launchd 服务清单读取失败:尝试的目录全部不可读 \(Self.list(unreadable))"
@@ -221,8 +220,8 @@ public struct LaunchdManifestHealthLog: Sendable {
     private static func describe(_ health: LaunchdManifestHealth) -> String {
         switch health {
         case .healthy: "正常"
-        case .degraded(let unreadable): "降级,不可读 \(list(unreadable))"
-        case .failed(let unreadable): "失败,不可读 \(list(unreadable))"
+        case let .degraded(unreadable): "降级,不可读 \(list(unreadable))"
+        case let .failed(unreadable): "失败,不可读 \(list(unreadable))"
         }
     }
 

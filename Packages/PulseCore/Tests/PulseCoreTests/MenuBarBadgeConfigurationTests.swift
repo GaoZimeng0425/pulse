@@ -1,5 +1,5 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 菜单栏徽标槽位配置(p1-history/09,纯值):默认态、四项可同时上屏、非法配置回默认、
 /// rawValue 往返。配置 → 渲染输入的映射在 PulseTests/MenuBarBadgeTests。
@@ -31,7 +31,9 @@ final class MenuBarBadgeConfigurationTests: XCTestCase {
     /// 合法配置 rawValue 往返:设置页写什么,重启读回就是什么。
     func testRawValueRoundTrip() {
         let configuration = MenuBarBadgeConfiguration(slots: [.ram, .diskRemaining, .networkRate])
-        XCTAssertEqual(MenuBarBadgeConfiguration(rawValue: configuration.rawValue)?.slots,
-                       [.ram, .diskRemaining, .networkRate])
+        XCTAssertEqual(
+            MenuBarBadgeConfiguration(rawValue: configuration.rawValue)?.slots,
+            [.ram, .diskRemaining, .networkRate]
+        )
     }
 }

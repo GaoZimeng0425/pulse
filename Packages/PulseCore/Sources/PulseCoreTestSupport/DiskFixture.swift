@@ -25,7 +25,7 @@ public enum DiskFixture {
             volume("/", rootDevice, used: macOSUsed),
             volume("/System/Volumes/VM", "/dev/disk3s3", used: vmUsed),
             volume("/System/Volumes/Preboot", "/dev/disk3s2", used: prebootUsed),
-            volume("/Volumes/外置", "/dev/disk5s1", used: 999),        // 异容器:过滤
+            volume("/Volumes/外置", "/dev/disk5s1", used: 999), // 异容器:过滤
             volume("/opt/homebrew", "map auto_home", fs: "autofs", used: nil), // 非 apfs:过滤
             volume("/System/Volumes/Update", "/dev/disk3s4", used: nil), // 同容器读失败:跳过
         ]

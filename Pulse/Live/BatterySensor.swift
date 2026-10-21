@@ -93,7 +93,9 @@ struct LiveBatterySource: BatterySource {
     /// 裸字节存——按小端整数解(字节可能不对齐,用 loadUnaligned);
     /// 解不出 = nil,交给占位,不崩。
     private static func intValue(_ value: Any?) -> Int? {
-        if let number = value as? NSNumber { return number.intValue }
+        if let number = value as? NSNumber {
+            return number.intValue
+        }
         if let data = value as? Data {
             switch data.count {
             case 4: return data.withUnsafeBytes { Int($0.loadUnaligned(as: Int32.self)) }
@@ -167,14 +169,16 @@ final class BatterySensorProvider: SensorProvider {
     private let makeWakeups: @Sendable () -> AsyncStream<Void>?
     private let slot = SensorLastGoodBox<BatteryReading>()
 
-    var lastGood: BatteryReading? { slot.current }
+    var lastGood: BatteryReading? {
+        slot.current
+    }
 
     init(
         source: any BatterySource = LiveBatterySource(),
         wakeups: @escaping @Sendable () -> AsyncStream<Void>? = { IOPSWakeupStream.make() }
     ) {
         self.source = source
-        self.makeWakeups = wakeups
+        makeWakeups = wakeups
     }
 
     func snapshot() async -> BatteryReading? {
@@ -184,5 +188,7 @@ final class BatterySensorProvider: SensorProvider {
         return reading
     }
 
-    func wakeups() -> AsyncStream<Void>? { makeWakeups() }
+    func wakeups() -> AsyncStream<Void>? {
+        makeWakeups()
+    }
 }

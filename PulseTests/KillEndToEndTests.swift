@@ -1,7 +1,7 @@
-import XCTest
 import Darwin
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 端到端(工单 08 验收锚点):自造一个真实 sleep 进程组(一个 zsh 宿主 +
 /// 3 个 sleep 300 子进程),走**完全真实的代码路径**——LiveProcessSource 采样
@@ -17,7 +17,7 @@ final class KillEndToEndTests: XCTestCase {
     ) -> ProcessSnapshot {
         let deadline = Date().addingTimeInterval(timeout)
         var snapshot = source.snapshot()
-        while !predicate(snapshot) && Date() < deadline {
+        while !predicate(snapshot), Date() < deadline {
             Thread.sleep(forTimeInterval: 0.2)
             snapshot = source.snapshot()
         }
@@ -32,7 +32,9 @@ final class KillEndToEndTests: XCTestCase {
         XCTAssertNoThrow(try shell.run())
         let shellPID = shell.processIdentifier
         defer {
-            if shell.isRunning { shell.terminate() }
+            if shell.isRunning {
+                shell.terminate()
+            }
         }
 
         // 2. 等真实采样看到它们(Pulse 的 live 路径):宿主 + 以它为父的 3 个 sleep。

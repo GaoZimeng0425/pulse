@@ -1,6 +1,6 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 接缝:LiveBatterySource 冒烟(spec 测试决策:OS 边界只证明真实可用,
 /// 不深测——纯逻辑已在核心包 BatteryModelTests 钉死)。只读观察,真机走查用;
@@ -8,23 +8,23 @@ import XCTest
 final class LiveBatterySourceSmokeTests: XCTestCase {
     private let source = LiveBatterySource()
 
-    func testLiveReadDeliversSixReadingsOnBatteryMachines() async throws {
+    func testLiveReadDeliversSixReadingsOnBatteryMachines() throws {
         guard let raw = source.read() else {
             throw XCTSkip("本机无内建电池(台式机):电池页整页隐藏口径,跳过真读冒烟")
         }
         let reading = BatteryReading.make(from: raw)
         print(
             "[smoke] battery: \(reading.capacityPercent)% \(reading.status.title)"
-            + " 剩余=\(reading.timeToEmptyMinutes.map(String.init) ?? "—")min"
-            + " 充满=\(reading.timeToFullMinutes.map(String.init) ?? "—")min"
-            + " 健康=\(reading.healthPercent.map(String.init) ?? "—")%"
-            + " 循环=\(reading.cycleCount.map(String.init) ?? "—")"
-            + " 功率=\(reading.powerWatts.map { PulseFormat.watts($0) } ?? "—")"
+                + " 剩余=\(reading.timeToEmptyMinutes.map(String.init) ?? "—")min"
+                + " 充满=\(reading.timeToFullMinutes.map(String.init) ?? "—")min"
+                + " 健康=\(reading.healthPercent.map(String.init) ?? "—")%"
+                + " 循环=\(reading.cycleCount.map(String.init) ?? "—")"
+                + " 功率=\(reading.powerWatts.map { PulseFormat.watts($0) } ?? "—")"
         )
-        XCTAssertTrue((0...100).contains(reading.capacityPercent), "电量应为 0–100")
+        XCTAssertTrue((0 ... 100).contains(reading.capacityPercent), "电量应为 0–100")
         // 健康度可占位,但凡读到了就应在合法域内(除零防护不产生伪数)。
         if let health = reading.healthPercent {
-            XCTAssertTrue((0...100).contains(health), "健康度应为 0–100,实际 \(health)")
+            XCTAssertTrue((0 ... 100).contains(health), "健康度应为 0–100,实际 \(health)")
         }
     }
 

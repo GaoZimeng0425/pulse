@@ -90,7 +90,10 @@ public struct SamplingUpdate: Sendable {
     public let snapshot: ProcessSnapshot
     public let diff: CPUDiffResult
     /// 系统 CPU 负载,0–100%,每核 tick 口径(CoreTickDiffer)。
-    public var systemCPULoad: Double { cpu.total }
+    public var systemCPULoad: Double {
+        cpu.total
+    }
+
     /// 负载及用户/系统拆分(工单 P0.6-05 总览 CPU 卡)。
     public let cpu: CPULoadBreakdown
     /// 系统内存构成(工单 P0.6-05 总览内存卡);读失败为 nil。

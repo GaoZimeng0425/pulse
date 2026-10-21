@@ -1,5 +1,5 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 身份缓存决策单测(工单 10):命中 / exec·pid 复用失配 / cwd 低频校正 /
 /// 消失裁剪四条策略边界,全部合成注入、零真实系统调用。
@@ -73,7 +73,12 @@ final class ProcessIdentityCacheTests: XCTestCase {
             "校正期一满必须重读,cwd 漂移的可见上界即 refreshInterval"
         )
         // 校正回填后周期重启。
-        cache.record(pid: 9, identity: identity(cwd: "/tmp/elsewhere"), commandName: "swift", at: t0.addingTimeInterval(60))
+        cache.record(
+            pid: 9,
+            identity: identity(cwd: "/tmp/elsewhere"),
+            commandName: "swift",
+            at: t0.addingTimeInterval(60)
+        )
         XCTAssertEqual(
             cache.identity(pid: 9, commandName: "swift", now: t0.addingTimeInterval(119.9)),
             identity(cwd: "/tmp/elsewhere"),
@@ -111,11 +116,19 @@ final class ProcessIdentityCacheTests: XCTestCase {
         var cache = ProcessIdentityCache()
         cache.record(pid: 100, identity: identity(cwd: "/tmp/old-owner"), commandName: "python3", at: t0)
         cache.prune(keeping: []) // 旧主退场,缓存清空
-        cache.record(pid: 100, identity: identity(cwd: "/tmp/new-owner"), commandName: "ruby", at: t0.addingTimeInterval(1))
+        cache.record(
+            pid: 100,
+            identity: identity(cwd: "/tmp/new-owner"),
+            commandName: "ruby",
+            at: t0.addingTimeInterval(1)
+        )
         XCTAssertNil(
             cache.identity(pid: 100, commandName: "python3", now: t0.addingTimeInterval(2)),
             "复用后 p_comm 已变,旧身份不可命中"
         )
-        XCTAssertEqual(cache.identity(pid: 100, commandName: "ruby", now: t0.addingTimeInterval(2)), identity(cwd: "/tmp/new-owner"))
+        XCTAssertEqual(
+            cache.identity(pid: 100, commandName: "ruby", now: t0.addingTimeInterval(2)),
+            identity(cwd: "/tmp/new-owner")
+        )
     }
 }

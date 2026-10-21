@@ -1,6 +1,6 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 接缝:指标 tab 内容模型(工单 P0.6-03,纯逻辑)。
 /// 弹窗图标 tab / 主窗口药丸 tab 共用的"哪个 tab 展示什么"在此钉死:
@@ -8,7 +8,6 @@ import XCTest
 /// 内存环形分段(top5 + 其他)。SwiftUI 外观(图标/药丸/选中胶囊)属预览 +
 /// 手动验收,不在此接缝。
 final class MetricTabModelTests: XCTestCase {
-
     // MARK: - MetricTab:顺序与文案
 
     func testTabsAreOrderedOverviewCPUMemoryDiskNetworkBatteryHistory() {
@@ -114,7 +113,9 @@ final class MetricTabModelTests: XCTestCase {
     func testKeyboardMovesFollowAxisWithoutBattery() {
         // 无电池机器:轴不含电池页,→ 依次走到历史右端夹紧停下(不跳空)。
         var selection = MetricTabSelection(axis: MetricTab.displayAxis(hasBattery: false))
-        for _ in 0..<5 { selection.moveRight() }
+        for _ in 0 ..< 5 {
+            selection.moveRight()
+        }
         XCTAssertEqual(selection.current, .history)
         selection.moveRight()
         XCTAssertEqual(selection.current, .history, "轴右端 = 历史(工单 04),再 → 不动")
@@ -201,9 +202,9 @@ final class MetricTabModelTests: XCTestCase {
     func testMemoryTabRanksByMemoryDescending() {
         // 内存 tab:内存降序重排,组卡换内存大数字口径。
         let groups = [
-            group("hot", cpu: 445, mem: 500),   // CPU 榜首但内存垫底
-            group("fat", cpu: 3, mem: 9_000),
-            group("mid", cpu: 30, mem: 4_000),
+            group("hot", cpu: 445, mem: 500), // CPU 榜首但内存垫底
+            group("fat", cpu: 3, mem: 9000),
+            group("mid", cpu: 30, mem: 4000),
         ]
 
         let content = MetricTabContent.build(groups: groups, tab: .memory)
@@ -214,9 +215,9 @@ final class MetricTabModelTests: XCTestCase {
     func testRankingTiesBreakByGroupIDAscending() {
         // 同值次键 id 升序(与引擎口径一致):排序跨采样轮稳定。
         let groups = [
-            group("c", cpu: 50, mem: 1_000),
-            group("a", cpu: 50, mem: 1_000),
-            group("b", cpu: 50, mem: 1_000),
+            group("c", cpu: 50, mem: 1000),
+            group("a", cpu: 50, mem: 1000),
+            group("b", cpu: 50, mem: 1000),
         ]
 
         XCTAssertEqual(
@@ -233,13 +234,13 @@ final class MetricTabModelTests: XCTestCase {
         // meter 归一榜首(工单 02 口径)取全部组的最大值,与榜单同源。
         let groups = [
             group("a", cpu: 12, mem: 100),
-            group("b", cpu: 445, mem: 2_400),
-            group("c", cpu: 89, mem: 9_999),
+            group("b", cpu: 445, mem: 2400),
+            group("c", cpu: 89, mem: 9999),
         ]
 
         let content = MetricTabContent.build(groups: groups, tab: .overview)
         XCTAssertEqual(content.cpuLeader, 445)
-        XCTAssertEqual(content.memoryLeaderBytes, 9_999)
+        XCTAssertEqual(content.memoryLeaderBytes, 9999)
     }
 
     // MARK: - MetricTabContent:内存环形分段(top5 + 其他)

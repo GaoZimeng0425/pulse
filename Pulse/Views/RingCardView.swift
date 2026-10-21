@@ -1,7 +1,7 @@
-import SwiftUI
-import Charts
 import AppKit
+import Charts
 import PulseCore
+import SwiftUI
 
 // MARK: - 环形卡(工单 P0.6-05,参考文档 §2.2 "Right Now" / §3-4 donut)
 
@@ -108,7 +108,11 @@ struct RingCardView: View {
         .frame(width: isCompact ? 104 : 124, height: isCompact ? 104 : 124)
         .overlay {
             VStack(spacing: 2) {
-                FigureText(value: centerValue, unit: centerUnit, size: isCompact ? FigureSize.ringCompact : FigureSize.ring)
+                FigureText(
+                    value: centerValue,
+                    unit: centerUnit,
+                    size: isCompact ? FigureSize.ringCompact : FigureSize.ring
+                )
                 Text(centerCaption)
                     .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
@@ -143,11 +147,11 @@ struct RingCardView: View {
     @ViewBuilder
     private func legendIcon(_ slice: RingSlice) -> some View {
         switch slice.icon {
-        case .app(let path):
+        case let .app(path):
             Image(nsImage: AppIconCache.icon(forBundle: path))
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-        case .symbol(let name, let color):
+        case let .symbol(name, color):
             CategoryIconTile(symbolName: name, color: color, size: 16)
         case .dot:
             Circle()
@@ -174,7 +178,11 @@ extension RingCardView {
     }
 
     /// Memory by App 卡:环心 = 全部组内存合计。
-    static func memoryByApp(segments: [MemoryRingSegment], totalBytes: UInt64, isCompact: Bool = false) -> RingCardView {
+    static func memoryByApp(
+        segments: [MemoryRingSegment],
+        totalBytes: UInt64,
+        isCompact: Bool = false
+    ) -> RingCardView {
         let figure = PulseFormat.systemMemoryFigure(totalBytes)
         return RingCardView(
             title: "按应用",

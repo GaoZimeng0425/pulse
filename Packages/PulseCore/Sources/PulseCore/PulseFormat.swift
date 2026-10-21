@@ -101,7 +101,9 @@ public enum PulseFormat {
     /// 十进制口径,Today/7 天累计列共用。
     public static func networkTotal(_ bytes: UInt64) -> String {
         let (value, unit) = decimalByteScale(Double(bytes))
-        if value >= 100 { return "\(Int(value.rounded())) \(unit)" }
+        if value >= 100 {
+            return "\(Int(value.rounded())) \(unit)"
+        }
         return "\(oneDecimal(value)) \(unit)"
     }
 
@@ -111,10 +113,16 @@ public enum PulseFormat {
     /// 与网络累计(工单 06)共用同一套口径;速率层级里 TB 段物理不可达,入表
     /// 只为与累计同源(阶梯唯一出处)。
     private static func decimalByteScale(_ bytes: Double) -> (value: Double, unit: String) {
-        if bytes >= 1_000_000_000_000 { return (bytes / 1_000_000_000_000, "TB") }
-        if bytes >= 1_000_000_000 { return (bytes / 1_000_000_000, "GB") }
-        if bytes >= 1_000_000 { return (bytes / 1_000_000, "MB") }
-        return (bytes / 1_000, "KB")
+        if bytes >= 1_000_000_000_000 {
+            return (bytes / 1_000_000_000_000, "TB")
+        }
+        if bytes >= 1_000_000_000 {
+            return (bytes / 1_000_000_000, "GB")
+        }
+        if bytes >= 1_000_000 {
+            return (bytes / 1_000_000, "MB")
+        }
+        return (bytes / 1000, "KB")
     }
 
     /// 十进制一位小数拼串(十分位手算,不受系统区域影响)。
@@ -126,18 +134,22 @@ public enum PulseFormat {
     /// 主窗口副标题(工单 P0.6-05):"Apple M4 Pro · 12 核 · 48 GB";芯片名未知则省略。
     public static func hostSummary(chipName: String?, coreCount: Int, physicalMemoryBytes: UInt64) -> String {
         let parts = [chipName, "\(coreCount) 核", physicalMemoryTotal(physicalMemoryBytes)]
-        return parts.compactMap { $0 }.joined(separator: " · ")
+        return parts.compactMap(\.self).joined(separator: " · ")
     }
 
     /// 系统运行时长(弹窗头部,Vitals 的 "Up 6d 4h"):取最大两级单位,
     /// 不足 1 分钟按 1 分钟。
     public static func systemUptime(seconds: TimeInterval) -> String {
         let total = max(0, Int(seconds))
-        let days = total / 86_400
-        let hours = total % 86_400 / 3600
+        let days = total / 86400
+        let hours = total % 86400 / 3600
         let minutes = total % 3600 / 60
-        if days > 0 { return "已运行 \(days) 天 \(hours) 小时" }
-        if hours > 0 { return "已运行 \(hours) 小时 \(minutes) 分" }
+        if days > 0 {
+            return "已运行 \(days) 天 \(hours) 小时"
+        }
+        if hours > 0 {
+            return "已运行 \(hours) 小时 \(minutes) 分"
+        }
         return "已运行 \(max(minutes, 1)) 分钟"
     }
 
@@ -168,8 +180,7 @@ public enum PulseFormat {
     /// "pid N"(两者都拿不到时)。面包屑与进程行共用同一口径。
     public static func processName(executablePath: String?, argv: [String], pid: pid_t) -> String {
         if let name = basename(ofPath: executablePath) ?? argv.first.flatMap(basename(ofPath:)),
-           !name.isEmpty
-        {
+           !name.isEmpty {
             return name
         }
         return "pid \(pid)"
@@ -210,21 +221,29 @@ public enum PulseFormat {
     /// 与 systemUptime 同取级策略,但不带"已运行"前缀——报告里它只是字段值。
     public static func duration(seconds: TimeInterval) -> String {
         let total = max(0, Int(seconds))
-        let days = total / 86_400
-        let hours = total % 86_400 / 3_600
-        let minutes = total % 3_600 / 60
+        let days = total / 86400
+        let hours = total % 86400 / 3600
+        let minutes = total % 3600 / 60
         let secs = total % 60
-        if days > 0 { return "\(days) 天 \(hours) 小时" }
-        if hours > 0 { return "\(hours) 小时 \(minutes) 分" }
-        if minutes > 0 { return "\(minutes) 分 \(secs) 秒" }
+        if days > 0 {
+            return "\(days) 天 \(hours) 小时"
+        }
+        if hours > 0 {
+            return "\(hours) 小时 \(minutes) 分"
+        }
+        if minutes > 0 {
+            return "\(minutes) 分 \(secs) 秒"
+        }
         return "\(secs) 秒"
     }
 
     /// 毫秒(工单 11 诊断报告"平均轮耗时"):一位小数;过小但非零如实标下限,
     /// 不圆整成 0。十分位手算拼串,写法不随系统区域漂移(与 memory 同因)。
     public static func milliseconds(_ seconds: TimeInterval) -> String {
-        let value = seconds * 1_000
-        if value == 0 { return "0 ms" }
+        let value = seconds * 1000
+        if value == 0 {
+            return "0 ms"
+        }
         guard value >= 0.1 else { return "<0.1 ms" }
         let tenths = Int((value * 10).rounded())
         return "\(tenths / 10).\(tenths % 10) ms"

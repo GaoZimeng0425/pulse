@@ -1,7 +1,7 @@
-import XCTest
-import SwiftUI
 @testable import Pulse
 @testable import PulseCore
+import SwiftUI
+import XCTest
 
 /// 组卡类别样式表(工单 05;评审 T6 收敛为每类别一份完整样式)。
 /// 像素层面工单 09 手动验收;这里保障映射全且互不相同——
@@ -20,7 +20,7 @@ final class GroupCategoryDisplayTests: XCTestCase {
         // 孤儿瓦片取类别身份色表(唯一出处),浅色外观下即系统橙 #ff9500。
         XCTAssertEqual(GroupCategory.orphan.cardStyle.tileColor, GroupCategory.orphan.identityColor)
         let resolved = GroupCategory.orphan.identityColor.resolve(in: EnvironmentValues())
-        XCTAssertEqual(Int((resolved.red * 255).rounded()), 0xff)
+        XCTAssertEqual(Int((resolved.red * 255).rounded()), 0xFF)
         XCTAssertEqual(Int((resolved.green * 255).rounded()), 0x95)
         XCTAssertEqual(Int((resolved.blue * 255).rounded()), 0x00)
     }

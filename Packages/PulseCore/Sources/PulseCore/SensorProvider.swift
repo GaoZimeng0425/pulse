@@ -34,8 +34,10 @@ public protocol SensorProvider: Sendable {
     func wakeups() -> AsyncStream<Void>?
 }
 
-extension SensorProvider {
-    public func wakeups() -> AsyncStream<Void>? { nil }
+public extension SensorProvider {
+    func wakeups() -> AsyncStream<Void>? {
+        nil
+    }
 }
 
 // MARK: - lastGood 保留槽
@@ -126,28 +128,30 @@ public enum SensorDelivery<Reading: Sendable>: Sendable {
 
     public var reading: Reading {
         switch self {
-        case .fresh(let reading), .stale(let reading): reading
+        case let .fresh(reading), let .stale(reading): reading
         }
     }
 
     public var isFresh: Bool {
-        if case .fresh = self { return true }
+        if case .fresh = self {
+            return true
+        }
         return false
     }
 }
 
 extension SensorDelivery: Equatable where Reading: Equatable {}
 
-extension SensorProvider {
+public extension SensorProvider {
     /// 把 provider 折叠成调度登记项;deliver 在调度上下文被调用,
     /// 消费方自行跳回 MainActor(SystemMonitor 同款粘合)。
-    public func driver(deliver: @escaping @Sendable (Reading?) -> Void) -> SensorDriver {
+    func driver(deliver: @escaping @Sendable (Reading?) -> Void) -> SensorDriver {
         markedDriver { deliver($0?.reading) }
     }
 
     /// 同 `driver`,但交付带新鲜度标记:读成功 = `.fresh`,读失败重投上次好值 =
     /// `.stale`,两者皆无 = nil。
-    public func markedDriver(deliver: @escaping @Sendable (SensorDelivery<Reading>?) -> Void) -> SensorDriver {
+    func markedDriver(deliver: @escaping @Sendable (SensorDelivery<Reading>?) -> Void) -> SensorDriver {
         let provider = self
         let tick: @Sendable () async -> Void = {
             if let reading = await provider.snapshot() {
@@ -202,7 +206,7 @@ public actor SensorScheduler {
             // 心跳型指标住 Sampler 单一循环节拍(ADR-0004):登记到调度器
             // 属编程错误,安静忽略——不产生读数、不等待。
             return
-        case .every(let interval):
+        case let .every(interval):
             while !Task.isCancelled {
                 await driver.tick()
                 do {
@@ -217,7 +221,9 @@ public actor SensorScheduler {
                 return
             }
             for await _ in wakeups {
-                if Task.isCancelled { return }
+                if Task.isCancelled {
+                    return
+                }
                 await driver.tick()
             }
             // 流非取消地结束 = 事件源死了,此后该传感器不再更新:记一条终态,不再静默

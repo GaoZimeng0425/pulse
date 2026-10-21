@@ -1,6 +1,6 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 架构审查票 A 中6:nettop 子进程健壮性。
 /// ①看门狗升级链(真实子进程,/bin/sh 扮 nettop):超时 SIGTERM → 宽限期后仍在跑
@@ -8,7 +8,6 @@ import XCTest
 /// ②状态沿日志(纯逻辑):收尾方式变化才记一条,持续同态静默
 ///   (transition-not-tick,沿 HistoryEngine.databaseHealthy 惯例)。
 final class NettopWatchdogTests: XCTestCase {
-
     // MARK: - ① 看门狗升级链(真实子进程)
 
     /// Live 源:/bin/sh -c 脚本扮演 nettop。时限逐例给——只放宽不触发的那一级
@@ -95,7 +94,7 @@ final class NettopWatchdogTests: XCTestCase {
         // 真机冒烟:默认命令(/usr/bin/nettop -P -L 1)正常亚秒返回、不触发看门狗,
         // 首行是解析器约定的表头。
         let run = await LiveNettopCSVSource().run()
-        if case .launchFailed(let reason) = run.outcome {
+        if case let .launchFailed(reason) = run.outcome {
             throw XCTSkip("本机 nettop 起不来:\(reason)")
         }
         XCTAssertEqual(run.outcome, .completed)

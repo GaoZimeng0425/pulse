@@ -56,7 +56,9 @@ public struct MemoryBreakdown: Equatable, Sendable {
     public let cachedBytes: UInt64
     public let pressure: MemoryPressure
 
-    public var usedBytes: UInt64 { appBytes + wiredBytes + compressedBytes }
+    public var usedBytes: UInt64 {
+        appBytes + wiredBytes + compressedBytes
+    }
 
     public var freeBytes: UInt64 {
         let occupied = usedBytes + cachedBytes
@@ -108,7 +110,9 @@ public protocol MemoryStatsSource: Sendable {
 public struct SyntheticMemoryStatsSource: MemoryStatsSource {
     public let breakdown: MemoryBreakdown?
 
-    public func sample() -> MemoryBreakdown? { breakdown }
+    public func sample() -> MemoryBreakdown? {
+        breakdown
+    }
 
     public init(breakdown: MemoryBreakdown? = nil) {
         self.breakdown = breakdown

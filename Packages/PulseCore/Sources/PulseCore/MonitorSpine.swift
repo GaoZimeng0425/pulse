@@ -16,7 +16,9 @@ public struct RoundContext: Sendable {
     public let drilldown: DrilldownState
 
     /// 本轮采样时刻(快照时间轴):模块的盘点 / 闲置计时以它为准,不另取钟。
-    public var takenAt: Date { update.snapshot.takenAt }
+    public var takenAt: Date {
+        update.snapshot.takenAt
+    }
 
     public init(
         update: SamplingUpdate,
@@ -106,7 +108,9 @@ public struct MonitorVisibility: Equatable, Sendable {
     public var moduleRankings = false
 
     /// 任一窗口可见。
-    public var anyWindow: Bool { popover || moduleRankings }
+    public var anyWindow: Bool {
+        popover || moduleRankings
+    }
 
     public init(popover: Bool = false, moduleRankings: Bool = false) {
         self.popover = popover
@@ -191,12 +195,15 @@ public protocol MonitorFeature: AnyObject {
     func stop()
 }
 
-extension MonitorFeature {
-    public func onRound(_ context: RoundContext) {}
-    public func visibilityChanged(_ visibility: MonitorVisibility) {}
-    public func onEvent(_ event: FeatureEvent) {}
-    public func projectRootsChanged(_ roots: [String]) {}
-    public func sensorDrivers() -> [SensorDriver] { [] }
-    public func start(_ host: MonitorHost) {}
-    public func stop() {}
+public extension MonitorFeature {
+    func onRound(_ context: RoundContext) {}
+    func visibilityChanged(_ visibility: MonitorVisibility) {}
+    func onEvent(_ event: FeatureEvent) {}
+    func projectRootsChanged(_ roots: [String]) {}
+    func sensorDrivers() -> [SensorDriver] {
+        []
+    }
+
+    func start(_ host: MonitorHost) {}
+    func stop() {}
 }

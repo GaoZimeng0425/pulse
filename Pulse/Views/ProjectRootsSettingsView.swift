@@ -1,6 +1,6 @@
-import SwiftUI
 import AppKit
 import PulseCore
+import SwiftUI
 
 /// 设置窗内容(工单 07):项目根(GLOSSARY)目录列表的图形化增删——
 /// 添加用文件夹选择器(NSOpenPanel,选择目录),行内删除。

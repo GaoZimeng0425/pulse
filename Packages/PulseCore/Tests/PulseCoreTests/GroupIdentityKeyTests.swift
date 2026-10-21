@@ -1,5 +1,5 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// stableKey 逆映射(工单 03):历史库 group_id(字符串)读回重建类型化身份
 /// ——往返恒等,非法字符串拒绝而不是硬造身份。

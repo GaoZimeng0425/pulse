@@ -1,12 +1,12 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 接缝:Sampler 采样 actor——驱动 ProcessSource(进程明细)与
 /// CoreTickSource(每核 tick,评审 S6 的系统负载口径)、按节奏等待、产出差分。
 /// 时钟与睡眠全部注入假实现(推进即瞬时),整条管线确定性跑完,零真实等待;
 /// 假 sleep 在预算耗尽时抛错结束循环,测试 await 任务值即拿到自然终止的完整结果。
 final class SamplerTests: XCTestCase {
-    private let base = Date(timeIntervalSinceReferenceDate: 1_000)
+    private let base = Date(timeIntervalSinceReferenceDate: 1000)
 
     // MARK: 测试替身
 
@@ -25,14 +25,16 @@ final class SamplerTests: XCTestCase {
 
         var clock: @Sendable () -> Date {
             { [self] in
-                lock.lock(); defer { lock.unlock() }
+                lock.lock()
+                defer { lock.unlock() }
                 return current
             }
         }
 
         /// 同步临界区:锁不落在 async 词法上下文里(NSLock 在 async 中禁用)。
         private func recordAndAdvance(_ seconds: TimeInterval) throws {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             guard requests.count < budget else { throw Exhausted() }
             requests.append(seconds)
             current = current.addingTimeInterval(seconds)
@@ -47,7 +49,8 @@ final class SamplerTests: XCTestCase {
         }
 
         var sleepRequests: [TimeInterval] {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             return requests
         }
     }
@@ -59,12 +62,14 @@ final class SamplerTests: XCTestCase {
         private var updates: [SamplingUpdate] = []
 
         func append(_ update: SamplingUpdate) {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             updates.append(update)
         }
 
         var delivered: [SamplingUpdate] {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             return updates
         }
     }

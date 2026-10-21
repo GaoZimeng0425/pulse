@@ -1,7 +1,8 @@
-import SwiftUI
 import PulseCore
+import SwiftUI
 
 // MARK: - 卡片家族共用零件(arch-review-2026-10-18/02 中4)
+
 //
 // 卡壳 / 卡头 / 副卡头 / 统计值 / 空态的唯一实现——此前各手抄 4~9 份,细节已互相漂移。
 // 数值全部出自 DESIGN.md 令牌:卡壳 = {colors.surface-card} + {rounded.card} 18 /
@@ -11,8 +12,13 @@ import PulseCore
 
 /// 卡片两档的尺寸令牌。
 enum CardMetrics {
-    static func padding(compact: Bool) -> CGFloat { compact ? 12 : 16 }
-    static func cornerRadius(compact: Bool) -> CGFloat { compact ? 12 : 18 }
+    static func padding(compact: Bool) -> CGFloat {
+        compact ? 12 : 16
+    }
+
+    static func cornerRadius(compact: Bool) -> CGFloat {
+        compact ? 12 : 18
+    }
 }
 
 extension View {

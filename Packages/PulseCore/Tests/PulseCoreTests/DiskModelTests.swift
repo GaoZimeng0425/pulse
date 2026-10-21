@@ -1,6 +1,6 @@
-import XCTest
 @testable import PulseCore
 import PulseCoreTestSupport
+import XCTest
 
 /// p1-history/05 磁盘卡:核心层 DiskModel 的合成夹具单测(spec 测试决策)。核心断言四组:
 /// ①容器对账不变式——各卷已用之和 + 其他卷 == 容器总量(petal 同款断言);
@@ -12,9 +12,9 @@ final class DiskModelTests: XCTestCase {
 
     // MARK: - ① 容器对账不变式(petal 同款断言)
 
-    func testContainerReconciliationInvariantVolumesSumToContainer() {
+    func testContainerReconciliationInvariantVolumesSumToContainer() throws {
         // 核心不变式:各卷已用之和 + 其他卷 == 容器总量(240+15+25+10 + 兜底 10)。
-        let reading = DiskCapacity.make(from: DiskFixture.raw())!
+        let reading = try XCTUnwrap(DiskCapacity.make(from: DiskFixture.raw()))
         XCTAssertEqual(reading.accountedBytes, reading.containerUsedBytes)
         XCTAssertEqual(reading.dataVolume.usedBytes, 240_000_000_000)
         // 有差额 → "其他卷"行 = 未挂载卷 + 容器元数据。
@@ -23,25 +23,25 @@ final class DiskModelTests: XCTestCase {
         XCTAssertEqual(reading.otherVolumes.map(\.label), ["macOS", "虚拟内存", "Preboot"])
     }
 
-    func testReconciliationWithoutRemainderOmitsOtherVolumesRow() {
+    func testReconciliationWithoutRemainderOmitsOtherVolumesRow() throws {
         // 各卷之和恰等于容器已用:不造"其他卷"行,不变式仍成立。
-        let reading = DiskCapacity.make(from: DiskFixture.raw(containerUsed: 290_000_000_000))!
+        let reading = try XCTUnwrap(DiskCapacity.make(from: DiskFixture.raw(containerUsed: 290_000_000_000)))
         XCTAssertNil(reading.unaccounted)
         XCTAssertEqual(reading.accountedBytes, reading.containerUsedBytes)
     }
 
-    func testReconciliationWhenVolumesExceedContainerMakesNoNegativeRow() {
+    func testReconciliationWhenVolumesExceedContainerMakesNoNegativeRow() throws {
         // 超额(计时缝隙可致 accounted > used):不造负行(petal 只在
         // container_used > accounted 时兜底),不变式锚点如实反映超额。
-        let reading = DiskCapacity.make(from: DiskFixture.raw(containerUsed: 100_000_000_000))!
+        let reading = try XCTUnwrap(DiskCapacity.make(from: DiskFixture.raw(containerUsed: 100_000_000_000)))
         XCTAssertNil(reading.unaccounted)
         XCTAssertGreaterThan(reading.accountedBytes, reading.containerUsedBytes)
     }
 
-    func testReconciliationFiltersForeignFilesystemsAndFailedVolumes() {
+    func testReconciliationFiltersForeignFilesystemsAndFailedVolumes() throws {
         // 异容器 apfs 卷、非 apfs 挂载、同容器 getattrlist 失败卷:全部不入明细
         // (999 字节与 map auto_home 不出现;失败卷不伪造 0)。
-        let reading = DiskCapacity.make(from: DiskFixture.raw())!
+        let reading = try XCTUnwrap(DiskCapacity.make(from: DiskFixture.raw()))
         XCTAssertFalse(reading.otherVolumes.contains { $0.mountPoint == "/Volumes/外置" })
         XCTAssertFalse(reading.otherVolumes.contains { $0.mountPoint == "/opt/homebrew" })
         XCTAssertFalse(reading.otherVolumes.contains { $0.mountPoint == "/System/Volumes/Update" })
@@ -77,12 +77,12 @@ final class DiskModelTests: XCTestCase {
 
     // MARK: - ② 可清除(purgeable 两 key 差值)
 
-    func testPurgeableIsImportantMinusFreeClampedAtZero() {
+    func testPurgeableIsImportantMinusFreeClampedAtZero() throws {
         // petal disk.rs:158-161:important − free,max(0)。
-        let reading = DiskCapacity.make(from: DiskFixture.raw(important: 6_610_000_000, free: 0))!
+        let reading = try XCTUnwrap(DiskCapacity.make(from: DiskFixture.raw(important: 6_610_000_000, free: 0)))
         XCTAssertEqual(reading.purgeableBytes, 6_610_000_000)
         // free > important(瞬时口径翻转):钳 0,不出负可清除。
-        let clamped = DiskCapacity.make(from: DiskFixture.raw(important: 100, free: 500))!
+        let clamped = try XCTUnwrap(DiskCapacity.make(from: DiskFixture.raw(important: 100, free: 500)))
         XCTAssertEqual(clamped.purgeableBytes, 0)
     }
 
@@ -102,22 +102,22 @@ final class DiskModelTests: XCTestCase {
         let nameBytes = Array(name.utf8) + [0] // 内核含结尾 NUL
         var bytes = [UInt8](repeating: 0, count: timeOffset + 16 + nameBytes.count)
         let length = UInt32(bytes.count)
-        bytes.replaceSubrange(0..<4, with: withUnsafeBytes(of: length) { Array($0) })
+        bytes.replaceSubrange(0 ..< 4, with: withUnsafeBytes(of: length) { Array($0) })
         // attrreference_t:offset(i32,相对 attrreference_t 起始)+ length(u32)。
         let offset = Int32(timeOffset + 16 - nameRef)
         bytes.replaceSubrange(
-            nameRef..<nameRef + 4,
+            nameRef ..< nameRef + 4,
             with: withUnsafeBytes(of: offset) { Array($0) }
         )
         bytes.replaceSubrange(
-            nameRef + 4..<nameRef + 8,
+            nameRef + 4 ..< nameRef + 8,
             with: withUnsafeBytes(of: UInt32(nameBytes.count)) { Array($0) }
         )
         // timespec 16B:秒(i64)+ 纳秒(i64,置 0)——只写 8 字节会把数组缩掉一半。
         var timespec = withUnsafeBytes(of: created) { Array($0) }
         timespec.append(contentsOf: [UInt8](repeating: 0, count: 8))
-        bytes.replaceSubrange(timeOffset..<timeOffset + 16, with: timespec)
-        bytes.replaceSubrange((timeOffset + 16)..<bytes.count, with: nameBytes)
+        bytes.replaceSubrange(timeOffset ..< timeOffset + 16, with: timespec)
+        bytes.replaceSubrange((timeOffset + 16) ..< bytes.count, with: nameBytes)
         return bytes
     }
 
@@ -140,7 +140,7 @@ final class DiskModelTests: XCTestCase {
         let nameRef = 4 + MemoryLayout<attribute_set_t>.size
         let bogus = UInt32(1 << 30)
         escaping.replaceSubrange(
-            nameRef + 4..<nameRef + 8, with: withUnsafeBytes(of: bogus) { Array($0) }
+            nameRef + 4 ..< nameRef + 8, with: withUnsafeBytes(of: bogus) { Array($0) }
         )
         XCTAssertNil(DiskSnapshotRecord.parse(escaping))
     }
@@ -184,7 +184,10 @@ final class DiskModelTests: XCTestCase {
     func testThroughputFirstReadEstablishesBaselineAtZeroRates() {
         // 首读置零(只立基线,不出速率)。
         XCTAssertEqual(
-            DiskThroughputDiffer.rates(previous: nil, current: DiskFixture.counters(read: 1000, write: 500, uptime: 1_000_000_000)),
+            DiskThroughputDiffer.rates(
+                previous: nil,
+                current: DiskFixture.counters(read: 1000, write: 500, uptime: 1_000_000_000)
+            ),
             .zero
         )
     }
@@ -193,7 +196,7 @@ final class DiskModelTests: XCTestCase {
         // 正常差分:Δread=600B / 2s = 300 B/s;Δwrite=300B / 2s = 150 B/s。
         let rates = DiskThroughputDiffer.rates(
             previous: DiskFixture.counters(read: 400, write: 200, uptime: 3_000_000_000),
-            current: DiskFixture.counters(read: 1_000, write: 500, uptime: 5_000_000_000)
+            current: DiskFixture.counters(read: 1000, write: 500, uptime: 5_000_000_000)
         )
         XCTAssertEqual(rates.readBytesPerSecond, 300, accuracy: 1e-9)
         XCTAssertEqual(rates.writeBytesPerSecond, 150, accuracy: 1e-9)
@@ -203,7 +206,7 @@ final class DiskModelTests: XCTestCase {
         // 计数回退/重置:本轮 0(不把回退当巨大 IO);基线以本轮为准,
         // 下一轮自动恢复速率(Accumulator.record 语义,见下)。
         let rates = DiskThroughputDiffer.rates(
-            previous: DiskFixture.counters(read: 5_000, write: 5_000, uptime: 1_000_000_000),
+            previous: DiskFixture.counters(read: 5000, write: 5000, uptime: 1_000_000_000),
             current: DiskFixture.counters(read: 100, write: 200, uptime: 6_000_000_000)
         )
         XCTAssertEqual(rates, .zero)
@@ -223,8 +226,8 @@ final class DiskModelTests: XCTestCase {
     func testThroughputIdenticalCountersYieldZeroRatesWithoutBaselineReset() {
         // 计数原地(无 IO):速率 0,基线照常推进(与回退不同路径)。
         let rates = DiskThroughputDiffer.rates(
-            previous: DiskFixture.counters(read: 1_000, write: 1_000, uptime: 1_000_000_000),
-            current: DiskFixture.counters(read: 1_000, write: 1_000, uptime: 6_000_000_000)
+            previous: DiskFixture.counters(read: 1000, write: 1000, uptime: 1_000_000_000),
+            current: DiskFixture.counters(read: 1000, write: 1000, uptime: 6_000_000_000)
         )
         XCTAssertEqual(rates, .zero)
     }
@@ -255,7 +258,7 @@ final class DiskModelTests: XCTestCase {
         let next = accumulator.record(DiskFixture.counters(read: 900_000_003_000, write: 0, uptime: 32_000_000_000))
 
         XCTAssertEqual(dropped.readBytesDelta, 0)
-        XCTAssertEqual(next.readBytesDelta, 3_000, "基线已推进到跳变后的计数")
+        XCTAssertEqual(next.readBytesDelta, 3000, "基线已推进到跳变后的计数")
     }
 
     // MARK: - 吞吐 Accumulator(基线推进 + 走势环形窗)
@@ -263,24 +266,28 @@ final class DiskModelTests: XCTestCase {
     func testAccumulatorRecoversRatesAfterRollback() {
         // 回退后基线已重立:下一轮差分从新基线起算(stats samples 同款)。
         let accumulator = DiskThroughputAccumulator()
-        _ = accumulator.record(DiskFixture.counters(read: 5_000, write: 0, uptime: 1_000_000_000)) // 首读
-        _ = accumulator.record(DiskFixture.counters(read: 100, write: 0, uptime: 2_000_000_000))   // 回退 → 0
-        let recovered = accumulator.record(DiskFixture.counters(read: 1_100, write: 0, uptime: 3_000_000_000))
-        XCTAssertEqual(recovered.current.readBytesPerSecond, 1_000, accuracy: 1e-9)
+        _ = accumulator.record(DiskFixture.counters(read: 5000, write: 0, uptime: 1_000_000_000)) // 首读
+        _ = accumulator.record(DiskFixture.counters(read: 100, write: 0, uptime: 2_000_000_000)) // 回退 → 0
+        let recovered = accumulator.record(DiskFixture.counters(read: 1100, write: 0, uptime: 3_000_000_000))
+        XCTAssertEqual(recovered.current.readBytesPerSecond, 1000, accuracy: 1e-9)
         // 走势三点齐全(首读 0 / 回退 0 / 恢复 1000)。
         XCTAssertEqual(recovered.trend.count, 3)
-        XCTAssertEqual(recovered.trend.last?.read ?? -1, 1_000, accuracy: 1e-9)
+        XCTAssertEqual(recovered.trend.last?.read ?? -1, 1000, accuracy: 1e-9)
     }
 
     func testAccumulatorTrendCapsAtCapacityAndKeepsNewest() {
         // 走势窗 60 点:超过容量丢最旧(环形),时间序保持旧 → 新。
         let accumulator = DiskThroughputAccumulator()
-        for tick in 0...70 {
-            _ = accumulator.record(DiskFixture.counters(read: UInt64(tick) * 1_000, write: 0, uptime: UInt64(tick) * 1_000_000_000))
+        for tick in 0 ... 70 {
+            _ = accumulator.record(DiskFixture.counters(
+                read: UInt64(tick) * 1000,
+                write: 0,
+                uptime: UInt64(tick) * 1_000_000_000
+            ))
         }
-        let reading = accumulator.record(DiskFixture.counters(read: 72_000, write: 0, uptime: 72_000_000_000))
+        let reading = accumulator.record(DiskFixture.counters(read: 72000, write: 0, uptime: 72_000_000_000))
         XCTAssertEqual(reading.trend.count, DiskThroughputAccumulator.trendCapacity)
-        XCTAssertEqual(reading.trend.last?.read ?? -1, 1_000, accuracy: 1e-9) // 第 72 点:Δ1000/1s
+        XCTAssertEqual(reading.trend.last?.read ?? -1, 1000, accuracy: 1e-9) // 第 72 点:Δ1000/1s
     }
 
     // MARK: - 吞吐记账增量(评审接线:历史落库消费,与网络增量同口径)
@@ -289,7 +296,7 @@ final class DiskModelTests: XCTestCase {
         // 成功轮:速率非零时增量 = 计数差(600B/300B)。
         let accumulator = DiskThroughputAccumulator()
         _ = accumulator.record(DiskFixture.counters(read: 400, write: 200, uptime: 1_000_000_000)) // 首读
-        let good = accumulator.record(DiskFixture.counters(read: 1_000, write: 500, uptime: 6_000_000_000))
+        let good = accumulator.record(DiskFixture.counters(read: 1000, write: 500, uptime: 6_000_000_000))
         XCTAssertEqual(good.readBytesDelta, 600)
         XCTAssertEqual(good.writeBytesDelta, 300)
 
@@ -299,19 +306,19 @@ final class DiskModelTests: XCTestCase {
         XCTAssertEqual(rolledBack.writeBytesDelta, 0)
 
         // 恢复轮从新基线起算:增量与速率同真。
-        let recovered = accumulator.record(DiskFixture.counters(read: 1_100, write: 600, uptime: 8_000_000_000))
-        XCTAssertEqual(recovered.readBytesDelta, 1_000)
+        let recovered = accumulator.record(DiskFixture.counters(read: 1100, write: 600, uptime: 8_000_000_000))
+        XCTAssertEqual(recovered.readBytesDelta, 1000)
         XCTAssertEqual(recovered.writeBytesDelta, 500)
 
         // 真无 IO 轮:速率为 0 且增量如实为 0(与丢弃轮同形,语义都正确)。
-        let idle = accumulator.record(DiskFixture.counters(read: 1_100, write: 600, uptime: 9_000_000_000))
+        let idle = accumulator.record(DiskFixture.counters(read: 1100, write: 600, uptime: 9_000_000_000))
         XCTAssertEqual(idle.readBytesDelta, 0)
         XCTAssertEqual(idle.writeBytesDelta, 0)
     }
 
     func testAccumulatorFirstReadingCarriesZeroDeltas() {
         let accumulator = DiskThroughputAccumulator()
-        let first = accumulator.record(DiskFixture.counters(read: 9_999, write: 9_999, uptime: 1_000_000_000))
+        let first = accumulator.record(DiskFixture.counters(read: 9999, write: 9999, uptime: 1_000_000_000))
         XCTAssertEqual(first.readBytesDelta, 0, "首读只立基线,增量 0")
         XCTAssertEqual(first.writeBytesDelta, 0)
     }

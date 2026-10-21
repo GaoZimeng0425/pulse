@@ -1,8 +1,9 @@
-import Foundation
 import Darwin
+import Foundation
 import PulseCore
 
 // MARK: - dev server 盘点(工单 08)
+
 //
 // argv 分类器是纯函数(工单票面):直接吃现有进程快照的 argv(RawProcess 现成
 // 字段,零新采集成本);只有分类命中的候选进程才做端口扫描(PROC_PIDLISTFDS +
@@ -30,7 +31,7 @@ struct LiveDevServerPortScanner: DevServerPortScanning {
         let count = Int(written) / fdStride
 
         var ports = Set<UInt16>()
-        for index in 0..<count {
+        for index in 0 ..< count {
             guard fds[index].proc_fdtype == PROX_FDTYPE_SOCKET else { continue }
             var info = socket_fdinfo()
             let result = proc_pidfdinfo(
@@ -47,7 +48,9 @@ struct LiveDevServerPortScanner: DevServerPortScanning {
             let raw = UInt32(truncatingIfNeeded: info.psi.soi_proto.pri_tcp.tcpsi_ini.insi_lport)
                 & 0xFFFF
             let port = UInt16(bigEndian: UInt16(truncatingIfNeeded: raw))
-            if port != 0 { ports.insert(port) }
+            if port != 0 {
+                ports.insert(port)
+            }
         }
         return ports.sorted()
     }

@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 
 // 网络吞吐的纯值层:计数 / 读数 / 走势环 / 接口选择 / 回包解包 / 差分三件套与源接缝。sysctl / SCDynamicStore / getifaddrs 适配器在 app target(NetworkSensor.swift)。
 
@@ -128,8 +128,7 @@ public struct NetworkTrendBuffer: Equatable, Sendable {
         values.map { $0.upBytesPerSecond + $0.downBytesPerSecond }
     }
 
-    public init() {
-    }
+    public init() {}
 }
 
 /// 一行 getifaddrs 链路状态(选择器的输入;测试注入假链路状态的载体)。
@@ -249,7 +248,7 @@ public enum NetworkRouteRecord {
             guard header.ifm_msglen > 0 else { return nil }
             // IFINFO2 的结构体可能短于消息全长(尾部是 sockaddr 填充):只读结构体范围。
             if Int32(header.ifm_type) == rtmIfInfo2,
-                offset + MemoryLayout<if_msghdr2>.size <= buffer.count {
+               offset + MemoryLayout<if_msghdr2>.size <= buffer.count {
                 let full = buffer.withUnsafeBytes { raw in
                     raw.loadUnaligned(fromByteOffset: offset, as: if_msghdr2.self)
                 }
@@ -284,9 +283,7 @@ public enum NetworkRateDiffer {
         }
         // 计数回退(接口重置/重连清零)→ 本轮 0。
         guard current.upBytes >= previous.upBytes,
-            current.downBytes >= previous.downBytes
-        else { return .dropped(interface: current.interface) }
-        guard current.atUptimeNanos > previous.atUptimeNanos else {
+              current.downBytes >= previous.downBytes, current.atUptimeNanos > previous.atUptimeNanos else {
             return .dropped(interface: current.interface)
         }
         let elapsed = Double(current.atUptimeNanos - previous.atUptimeNanos) / 1_000_000_000
@@ -298,11 +295,10 @@ public enum NetworkRateDiffer {
         // 跳变防护:双向各不得超"协商线速 ×1.5"(50% headroom,stats 同款);
         // 线速未知按 100 Gbps 兜底。0 同样按未知算(隧道口 ifi_baudrate 恒 0,
         // 2026-10-16 实测——按"已知 0 速链路"算上限会把每一轮都打死)。
-        let capBytesPerSecond: Double
-        if let baudrate = current.linkBaudrateBitsPerSecond, baudrate > 0 {
-            capBytesPerSecond = Double(baudrate) / 8 * 1.5
+        let capBytesPerSecond: Double = if let baudrate = current.linkBaudrateBitsPerSecond, baudrate > 0 {
+            Double(baudrate) / 8 * 1.5
         } else {
-            capBytesPerSecond = unknownLinkCapBytesPerSecond
+            unknownLinkCapBytesPerSecond
         }
         let capBytes = capBytesPerSecond * elapsed
         if Double(upDelta) > capBytes || Double(downDelta) > capBytes {

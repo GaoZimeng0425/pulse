@@ -1,6 +1,6 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 指标强调色令牌表(工单 P0.6-02):色值唯一出处是
 /// docs/ui/vitals-style-reference.md §1.1(Vitals 官网 CSS :root)。
@@ -9,12 +9,12 @@ import XCTest
 final class MetricAccentTests: XCTestCase {
     /// 令牌表逐项对文档:浅/深双套 hex 一字不差。
     func testAccentHexValuesMatchReferenceDoc() {
-        XCTAssertEqual(Metric.cpu.accent, MetricAccentToken(light: 0x2a78d6, dark: 0x3987e5))
-        XCTAssertEqual(Metric.memory.accent, MetricAccentToken(light: 0x4a3aa7, dark: 0x9085e9))
-        XCTAssertEqual(Metric.disk.accent, MetricAccentToken(light: 0xeda100, dark: 0xc98500))
-        XCTAssertEqual(Metric.network.accent, MetricAccentToken(light: 0x1baf7a, dark: 0x199e70))
+        XCTAssertEqual(Metric.cpu.accent, MetricAccentToken(light: 0x2A78D6, dark: 0x3987E5))
+        XCTAssertEqual(Metric.memory.accent, MetricAccentToken(light: 0x4A3AA7, dark: 0x9085E9))
+        XCTAssertEqual(Metric.disk.accent, MetricAccentToken(light: 0xEDA100, dark: 0xC98500))
+        XCTAssertEqual(Metric.network.accent, MetricAccentToken(light: 0x1BAF7A, dark: 0x199E70))
         // 电池(工单 02):§1.1 Battery 行 = Surface.positive 同源的"正常态绿"。
-        XCTAssertEqual(Metric.battery.accent, MetricAccentToken(light: 0x008300, dark: 0x2fa83a))
+        XCTAssertEqual(Metric.battery.accent, MetricAccentToken(light: 0x008300, dark: 0x2FA83A))
     }
 
     /// "双套"的前提:同一指标的浅色与深色必须互异(相同即退化为单套)。

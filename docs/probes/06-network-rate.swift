@@ -13,12 +13,14 @@ let listSource = GetifaddrsInterfaceListSource()
 let source = LiveNetworkCountersSource()
 
 print("主接口(SCDynamicStore): \(primarySource.primaryInterfaceName() ?? "nil")")
-print("utun/虚拟口在册: \(listSource.interfaces().map(\.name).filter { NetworkInterfaceSelector.isVirtual($0) }.joined(separator: ","))")
+print(
+    "utun/虚拟口在册: \(listSource.interfaces().map(\.name).filter { NetworkInterfaceSelector.isVirtual($0) }.joined(separator: ","))"
+)
 print("---")
 
 var previous: NetworkCounters?
 var trafficTask: Process?
-for round in 1...max(1, rounds) {
+for round in 1 ... max(1, rounds) {
     if round == 2, let url, let out = URL(string: url) {
         // 造流量:curl 拉一段公开文件到 /dev/null。
         trafficTask = Process()
@@ -40,12 +42,13 @@ for round in 1...max(1, rounds) {
     print(String(
         format: "轮 %d: 接口=%@ 上=%.1f KB/s 下=%.1f KB/s (增量 上%llu B 下%llu B, 线速 %@)",
         round, counters.interface,
-        rates.upBytesPerSecond / 1_000,
-        rates.downBytesPerSecond / 1_000,
+        rates.upBytesPerSecond / 1000,
+        rates.downBytesPerSecond / 1000,
         result.upBytesDelta, result.downBytesDelta,
         counters.linkBaudrateBitsPerSecond.map { "\($0 / 1_000_000) Mbps" } ?? "未知"
     ))
     sleep(5)
 }
+
 trafficTask?.waitUntilExit()
 print("done")

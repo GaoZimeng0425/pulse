@@ -17,7 +17,7 @@ final class BatteryFeature: MonitorFeature {
     private let provider: BatterySensorProvider
 
     init(source: any BatterySource) {
-        self.provider = BatterySensorProvider(source: source)
+        provider = BatterySensorProvider(source: source)
     }
 
     func sensorDrivers() -> [SensorDriver] {

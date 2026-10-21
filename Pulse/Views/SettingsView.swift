@@ -1,5 +1,5 @@
-import SwiftUI
 import PulseCore
+import SwiftUI
 
 /// 设置窗外壳(2026-10-16,形态参考 NemoNotch 的 SettingsView / 系统设置):
 /// `NavigationSplitView` 双栏——左侧分组列表 + 系统设置风格彩色渐变图标,
@@ -32,7 +32,11 @@ struct SettingsView: View {
     private var sidebarColumn: some View {
         List(selection: Binding(
             get: { SettingsPage(rawValue: selectedPageRaw) ?? .general },
-            set: { if let page = $0 { selectedPageRaw = page.rawValue } }
+            set: {
+                if let page = $0 {
+                    selectedPageRaw = page.rawValue
+                }
+            }
         )) {
             // 页面尚少,P1 的菜单栏/告警页暂仍单节直列;分组待 P1 页并齐后统一做。
             ForEach(SettingsPage.allCases) { page in
@@ -73,7 +77,9 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     case projectRoots
     case menuBar
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var label: String {
         switch self {

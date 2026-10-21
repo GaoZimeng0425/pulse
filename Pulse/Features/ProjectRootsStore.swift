@@ -20,7 +20,7 @@ final class ProjectRootsStore {
 
     /// 注入读写闭包的构造(测试 / 预览):load 决定启动初值,persist 决定落盘副作用。
     init(load: () -> [String], persist: @escaping ([String]) -> Void) {
-        self.projectRoots = load().map(PathNormalization.normalize)
+        projectRoots = load().map(PathNormalization.normalize)
         self.persist = persist
     }
 

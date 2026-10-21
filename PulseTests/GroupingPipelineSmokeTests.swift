@@ -1,6 +1,6 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 真机冒烟(工单 05):两轮 Live 采集 → 差分 → 归组,弹窗首屏数据路径的
 /// 真实可用性。与 LiveProcessSourceSmokeTests 同一决策口径:证明可用,不深测。
@@ -33,7 +33,9 @@ final class GroupingPipelineSmokeTests: XCTestCase {
         print(
             "[smoke] 真机 Top-\(topGroups.count) 组:\n"
                 + topGroups
-                .map { "  \($0.name) [\($0.category.rawValue)] \($0.processes.count) 进程 \(Int($0.cpuPercent.rounded()))% \(PulseFormat.memory($0.memoryBytes))" }
+                .map {
+                    "  \($0.name) [\($0.category.rawValue)] \($0.processes.count) 进程 \(Int($0.cpuPercent.rounded()))% \(PulseFormat.memory($0.memoryBytes))"
+                }
                 .joined(separator: "\n")
         )
 

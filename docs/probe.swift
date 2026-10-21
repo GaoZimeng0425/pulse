@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 
 // 探针:验证 vitals-clone-tech-design.md §4 采集层的关键 API 在 Swift 下直接可用
 struct Probe {
@@ -11,8 +11,8 @@ struct Probe {
         return n > 0 ? String(cString: buf) : "<denied>"
     }
 
-    // 注意(工单 04 实测):pti_total_user/system 是 mach_absolute_time 原始 tick
-    // 而非纳秒(Apple Silicon timebase 125/3 ns/tick),换算见 LiveProcessSource.nanoseconds(fromTicks:)。
+    /// 注意(工单 04 实测):pti_total_user/system 是 mach_absolute_time 原始 tick
+    /// 而非纳秒(Apple Silicon timebase 125/3 ns/tick),换算见 LiveProcessSource.nanoseconds(fromTicks:)。
     func taskInfo() -> String {
         var t = proc_taskinfo()
         let n = proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &t, Int32(MemoryLayout<proc_taskinfo>.size))
@@ -41,11 +41,14 @@ struct Probe {
         }
         var args: [String] = []
         var i = 4
-        while args.count < Int(argc) && i < len {
+        while args.count < Int(argc), i < len {
             let start = i
-            while i < len && buf[i] != 0 { i += 1 }
+            while i < len, buf[i] != 0 {
+                i += 1
+            }
             if i > start {
-                var s = Array(buf[start..<i]); s.append(0)
+                var s = Array(buf[start ..< i])
+                s.append(0)
                 args.append(String(cString: s))
             }
             i += 1
@@ -53,7 +56,7 @@ struct Probe {
         return args
     }
 
-    // PROC_PIDVNODEPATHINFO 返回 vnode_info_path;探针阶段直接抽取缓冲区里的路径字符串
+    /// PROC_PIDVNODEPATHINFO 返回 vnode_info_path;探针阶段直接抽取缓冲区里的路径字符串
     func cwdCandidates() -> [String] {
         var buf = [UInt8](repeating: 0, count: 8192)
         let n = proc_pidinfo(pid, PROC_PIDVNODEPATHINFO, 0, &buf, Int32(buf.count))
@@ -61,10 +64,14 @@ struct Probe {
         var out: [String] = []
         var i = 0
         while i < n {
-            while i < n && (buf[i] == 0 || buf[i] < 32 || buf[i] > 126) { i += 1 }
+            while i < n, buf[i] == 0 || buf[i] < 32 || buf[i] > 126 {
+                i += 1
+            }
             let start = i
-            while i < n && buf[i] != 0 && buf[i] >= 32 && buf[i] <= 126 { i += 1 }
-            if i - start >= 2, let s = String(bytes: buf[start..<i], encoding: .ascii), s.hasPrefix("/") {
+            while i < n, buf[i] != 0, buf[i] >= 32, buf[i] <= 126 {
+                i += 1
+            }
+            if i - start >= 2, let s = String(bytes: buf[start ..< i], encoding: .ascii), s.hasPrefix("/") {
                 out.append(s)
             }
             i += 1
@@ -109,7 +116,7 @@ print("child argv:", c.argv())
 print("child cwd:", c.cwdCandidates())
 print("child ppid:", c.ppid() ?? -1)
 
-// root 进程(预期部分受限,符合方案"自有进程全够"的假设)
+/// root 进程(预期部分受限,符合方案"自有进程全够"的假设)
 let root = Probe(pid: 1)
 print("== pid1 (root-owned) ==")
 print("pid1 exe:", root.exePath())

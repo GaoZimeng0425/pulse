@@ -28,16 +28,16 @@ public struct MetricAccentToken: Equatable, Sendable {
     }
 }
 
-extension Metric {
+public extension Metric {
     /// 令牌表:整个 app 取指标色的唯一入口。switch 穷举保证"每指标必有双套"
     /// (新增 case 不补行即编译失败);浅深互异、指标间互异由单测守护。
-    public var accent: MetricAccentToken {
+    var accent: MetricAccentToken {
         switch self {
-        case .cpu: MetricAccentToken(light: 0x2a78d6, dark: 0x3987e5)
-        case .memory: MetricAccentToken(light: 0x4a3aa7, dark: 0x9085e9)
-        case .disk: MetricAccentToken(light: 0xeda100, dark: 0xc98500)
-        case .network: MetricAccentToken(light: 0x1baf7a, dark: 0x199e70)
-        case .battery: MetricAccentToken(light: 0x008300, dark: 0x2fa83a)
+        case .cpu: MetricAccentToken(light: 0x2A78D6, dark: 0x3987E5)
+        case .memory: MetricAccentToken(light: 0x4A3AA7, dark: 0x9085E9)
+        case .disk: MetricAccentToken(light: 0xEDA100, dark: 0xC98500)
+        case .network: MetricAccentToken(light: 0x1BAF7A, dark: 0x199E70)
+        case .battery: MetricAccentToken(light: 0x008300, dark: 0x2FA83A)
         }
     }
 }

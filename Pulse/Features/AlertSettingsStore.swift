@@ -31,7 +31,7 @@ final class AlertSettingsStore {
         load: () -> [AlertKind: AlertRuleConfig],
         persist: @escaping ([AlertKind: AlertRuleConfig]) -> Void
     ) {
-        self.configs = Self.mergingPresets(load())
+        configs = Self.mergingPresets(load())
         self.persist = persist
     }
 
@@ -56,7 +56,7 @@ final class AlertSettingsStore {
 
     /// 开关某规则(设置页 Toggle;改动即落盘)。
     func setEnabled(_ enabled: Bool, for kind: AlertKind) {
-        var config = self.config(for: kind)
+        var config = config(for: kind)
         config.isEnabled = enabled
         configs[kind] = config
         persist(configs)
@@ -65,7 +65,7 @@ final class AlertSettingsStore {
     /// 改阈值(设置页输入框;改动即落盘即生效)。非正数拒绝(除零/无意义防线)。
     func setThreshold(_ threshold: Double, for kind: AlertKind) {
         guard threshold > 0, threshold.isFinite else { return }
-        var config = self.config(for: kind)
+        var config = config(for: kind)
         config.threshold = threshold
         configs[kind] = config
         persist(configs)
@@ -95,8 +95,7 @@ final class AlertSettingsStore {
     }
 
     static func decode(_ data: Data?) -> [AlertKind: AlertRuleConfig] {
-        guard let data else { return [:] }
-        guard let raw = try? JSONDecoder().decode([String: AlertRuleConfig].self, from: data) else {
+        guard let data, let raw = try? JSONDecoder().decode([String: AlertRuleConfig].self, from: data) else {
             return [:]
         }
         return raw.reduce(into: [AlertKind: AlertRuleConfig]()) { result, entry in

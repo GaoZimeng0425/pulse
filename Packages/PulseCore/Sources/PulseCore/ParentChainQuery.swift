@@ -31,7 +31,7 @@ public enum ParentChainQuery {
                 executablePath: process.executablePath,
                 argv: process.argv,
                 pid: process.pid
-            )
+            ),
         ]
         var visited: Set<pid_t> = [pid]
 
@@ -48,8 +48,7 @@ public enum ParentChainQuery {
                 // 现父是 launchd:真出生在 launchd 之下则以它为终点;
                 // 出生记录另有亲父(中间父死后的重挂)则由出生链接管,不把 launchd 计入。
                 if let record = lineage.entries[currentPID],
-                   record.parentPID != 1, record.parentPID != 0
-                {
+                   record.parentPID != 1, record.parentPID != 0 {
                     liveChainBroken = true
                 } else {
                     names.append(launchdName(in: processesByPID))
@@ -78,7 +77,9 @@ public enum ParentChainQuery {
 
         while let record = lineage.entries[currentPID] {
             let parentPID = record.parentPID
-            if parentPID == 0 { break }
+            if parentPID == 0 {
+                break
+            }
             if parentPID == 1 {
                 names.append(launchdName(in: processesByPID)) // 出生即在 launchd 之下
                 break

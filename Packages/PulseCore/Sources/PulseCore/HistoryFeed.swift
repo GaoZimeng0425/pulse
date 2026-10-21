@@ -45,10 +45,10 @@ public struct HistoryIngest: Equatable, Sendable {
     }
 }
 
-extension HistoryEngine {
+public extension HistoryEngine {
     /// 一笔落库入参整包进引擎(参数逐一展开给既有入口);返回落库结果。
     @discardableResult
-    public func ingest(_ round: HistoryIngest) -> HistoryIngestOutcome {
+    func ingest(_ round: HistoryIngest) -> HistoryIngestOutcome {
         ingest(
             at: round.at,
             systemLoad: round.systemLoad,
@@ -77,7 +77,7 @@ public struct HistoryFeed: Sendable {
     private var pendingDiskWriteBytes: UInt64 = 0
     /// 磁盘吞吐交付进账本:新读数的增量逐笔 &+ 累计;重投的上次好值跳过。
     public mutating func recordDiskThroughput(_ delivery: SensorDelivery<DiskThroughputReading>) {
-        guard case .fresh(let reading) = delivery else { return }
+        guard case let .fresh(reading) = delivery else { return }
         pendingDiskReadBytes &+= reading.readBytesDelta
         pendingDiskWriteBytes &+= reading.writeBytesDelta
     }
@@ -104,6 +104,5 @@ public struct HistoryFeed: Sendable {
         return ingest
     }
 
-    public init() {
-    }
+    public init() {}
 }

@@ -1,6 +1,6 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 接缝:SyntheticProcessSource——合成采集源,03/05 工单与 SwiftUI 预览的测试地基。
 /// 期望值全部来自注入的字面量夹具,不经实现同源计算。
@@ -53,8 +53,14 @@ final class SyntheticProcessSourceTests: XCTestCase {
     }
 
     func testSequenceClampsAtLastSnapshotOnceExhausted() {
-        let first = ProcessSnapshot(takenAt: Date(timeIntervalSince1970: 0), processes: [RawProcess(pid: 1, parentPID: 0)])
-        let last = ProcessSnapshot(takenAt: Date(timeIntervalSince1970: 5), processes: [RawProcess(pid: 1, parentPID: 0)])
+        let first = ProcessSnapshot(
+            takenAt: Date(timeIntervalSince1970: 0),
+            processes: [RawProcess(pid: 1, parentPID: 0)]
+        )
+        let last = ProcessSnapshot(
+            takenAt: Date(timeIntervalSince1970: 5),
+            processes: [RawProcess(pid: 1, parentPID: 0)]
+        )
         let source = SyntheticProcessSource(snapshots: [first, last])
 
         _ = source.snapshot()

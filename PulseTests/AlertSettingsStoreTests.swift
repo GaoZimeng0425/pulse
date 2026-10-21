@@ -1,13 +1,12 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 接缝:告警规则配置持久层(UserDefaults 注入独立 suite,ProjectRootsStore 同款)。
 /// 钉死:预设默认值、编解码往返、缺项/坏数据回落预设、改动即写即生效、
 /// isAnyEnabled 的 0→1 迁移(授权时序锚点)。
 @MainActor
 final class AlertSettingsStoreTests: XCTestCase {
-
     /// 每测独立的 UserDefaults suite;测试结束清理持久域,不留垃圾 plist。
     private func makeDefaults() -> UserDefaults {
         let suiteName = "AlertSettingsStoreTests-\(UUID().uuidString)"

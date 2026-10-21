@@ -38,10 +38,14 @@ public struct ProcessTableOrder: Equatable, Sendable {
         rows.sorted { lhs, rhs in
             switch key {
             case .cpu:
-                if lhs.cpuPercent == rhs.cpuPercent { return lhs.pid < rhs.pid }
+                if lhs.cpuPercent == rhs.cpuPercent {
+                    return lhs.pid < rhs.pid
+                }
                 return ascending ? lhs.cpuPercent < rhs.cpuPercent : lhs.cpuPercent > rhs.cpuPercent
             case .memory:
-                if lhs.memoryBytes == rhs.memoryBytes { return lhs.pid < rhs.pid }
+                if lhs.memoryBytes == rhs.memoryBytes {
+                    return lhs.pid < rhs.pid
+                }
                 return ascending ? lhs.memoryBytes < rhs.memoryBytes : lhs.memoryBytes > rhs.memoryBytes
             }
         }

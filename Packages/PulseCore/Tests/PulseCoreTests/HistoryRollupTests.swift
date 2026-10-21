@@ -1,5 +1,5 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 分钟卷积与留存计划(工单 03,纯逻辑 + 注入时间):聚合口径、跨窗冲刷、
 /// 空窗不产出(不补零)、时钟回拨防护、按当地日的留存触发。
@@ -38,12 +38,12 @@ final class HistoryRollupTests: XCTestCase {
         buffer.ingest(
             at: seconds(0),
             systemLoad: 10,
-            groups: [group(app("A"), cpu: 10, mem: 1_000, procs: 2)]
+            groups: [group(app("A"), cpu: 10, mem: 1000, procs: 2)]
         )
         buffer.ingest(
             at: seconds(20),
             systemLoad: 30,
-            groups: [group(app("A"), cpu: 30, mem: 3_000, procs: 4)]
+            groups: [group(app("A"), cpu: 30, mem: 3000, procs: 4)]
         )
 
         let aggregate = buffer.ingest(
@@ -58,7 +58,7 @@ final class HistoryRollupTests: XCTestCase {
         XCTAssertEqual(flushed?.groups.first?.identity, app("A"))
         XCTAssertEqual(flushed?.groups.first?.cpuAverage ?? -1, 20, accuracy: 0.0001)
         XCTAssertEqual(flushed?.groups.first?.cpuPeak ?? -1, 30, accuracy: 0.0001)
-        XCTAssertEqual(flushed?.groups.first?.memoryPeak, 3_000)
+        XCTAssertEqual(flushed?.groups.first?.memoryPeak, 3000)
         XCTAssertEqual(flushed?.groups.first?.processPeak, 4)
         XCTAssertEqual(flushed?.systemLoadAverage ?? -1, 20, accuracy: 0.0001)
         XCTAssertEqual(flushed?.systemLoadPeak ?? -1, 30, accuracy: 0.0001)
@@ -90,7 +90,7 @@ final class HistoryRollupTests: XCTestCase {
         buffer.ingest(at: seconds(5), systemLoad: 10, groups: [], diskReadBytes: 300, diskWriteBytes: 20)
 
         let flushed = try? XCTUnwrap(buffer.ingest(at: seconds(60), systemLoad: 1, groups: []))
-        XCTAssertEqual(flushed?.diskReadBytes, 1_000)
+        XCTAssertEqual(flushed?.diskReadBytes, 1000)
         XCTAssertEqual(flushed?.diskWriteBytes, 50)
 
         // 下一窗从头累计:上一窗的量不泄漏。
@@ -183,12 +183,17 @@ final class HistoryRollupTests: XCTestCase {
     // MARK: 留存计划
 
     /// 留存触发:从未清理或当地日变更才触发;同日不重复触发。
-    func testRetentionIsDueOnDayChangeOnly() {
+    func testRetentionIsDueOnDayChangeOnly() throws {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "Asia/Shanghai")!
-        let day1Noon = calendar.date(bySettingHour: 12, minute: 0, second: 0, of: Date(timeIntervalSince1970: 1_789_000_000))!
-        let day1Later = calendar.date(byAdding: .hour, value: 3, to: day1Noon)!
-        let day2 = calendar.date(byAdding: .day, value: 1, to: day1Later)!
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Asia/Shanghai"))
+        let day1Noon = try XCTUnwrap(calendar.date(
+            bySettingHour: 12,
+            minute: 0,
+            second: 0,
+            of: Date(timeIntervalSince1970: 1_789_000_000)
+        ))
+        let day1Later = try XCTUnwrap(calendar.date(byAdding: .hour, value: 3, to: day1Noon))
+        let day2 = try XCTUnwrap(calendar.date(byAdding: .day, value: 1, to: day1Later))
         let day1Start = calendar.startOfDay(for: day1Noon)
 
         XCTAssertTrue(HistoryRetention.isDue(lastRunDayStart: nil, now: day1Noon, calendar: calendar))

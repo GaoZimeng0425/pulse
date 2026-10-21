@@ -1,5 +1,5 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 接缝:PulseFormat 纯显示格式化(本工单唯一可单测的纯逻辑,UI 不写单元测试)。
 /// 期望值是独立约定的显示文案字面量,不经过实现同源计算。
@@ -79,8 +79,8 @@ final class PulseFormatTests: XCTestCase {
 
     func testUptimeAtOneDayOrAboveShowsWholeDays() {
         // 用户故事 13:"常驻 3 天"的遗忘进程。
-        XCTAssertEqual(PulseFormat.uptime(startedAt: started(3 * 86_400 + 4 * 3600), now: now), "已 3 天")
-        XCTAssertEqual(PulseFormat.uptime(startedAt: started(30 * 86_400), now: now), "已 30 天")
+        XCTAssertEqual(PulseFormat.uptime(startedAt: started(3 * 86400 + 4 * 3600), now: now), "已 3 天")
+        XCTAssertEqual(PulseFormat.uptime(startedAt: started(30 * 86400), now: now), "已 30 天")
     }
 
     func testUptimeWithUnknownStartTimeShowsPlaceholder() {
@@ -121,8 +121,8 @@ final class PulseFormatTests: XCTestCase {
         // 与 systemUptime 同一取级策略(最大两级),但不带"已运行"前缀(报告字段值)。
         XCTAssertEqual(PulseFormat.duration(seconds: 40), "40 秒")
         XCTAssertEqual(PulseFormat.duration(seconds: 90), "1 分 30 秒")
-        XCTAssertEqual(PulseFormat.duration(seconds: 5_400), "1 小时 30 分")
-        XCTAssertEqual(PulseFormat.duration(seconds: 3 * 86_400 + 2 * 3_600), "3 天 2 小时")
+        XCTAssertEqual(PulseFormat.duration(seconds: 5400), "1 小时 30 分")
+        XCTAssertEqual(PulseFormat.duration(seconds: 3 * 86400 + 2 * 3600), "3 天 2 小时")
     }
 
     func testDurationClampsNegativeToZero() {

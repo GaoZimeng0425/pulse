@@ -48,14 +48,24 @@ public struct RawProcess: Identifiable, Equatable, Sendable {
     /// 启动时刻(KERN_PROC 的 p_starttime);查不到 → nil。
     public let startTime: Date?
 
-    public var id: pid_t { pid }
+    public var id: pid_t {
+        pid
+    }
 
     /// 可执行路径(身份三元组的直读视图,采集与展示层的既有通道)。
-    public var executablePath: String? { identity.executablePath }
+    public var executablePath: String? {
+        identity.executablePath
+    }
+
     /// 完整 argv(身份三元组的直读视图)。
-    public var argv: [String] { identity.argv }
+    public var argv: [String] {
+        identity.argv
+    }
+
     /// 工作目录(身份三元组的直读视图)。
-    public var cwd: String? { identity.cwd }
+    public var cwd: String? {
+        identity.cwd
+    }
 
     /// 采集层构造口径不变:字段平铺入参,内部归拢进 ProcessIdentity。
     public init(
@@ -75,7 +85,7 @@ public struct RawProcess: Identifiable, Equatable, Sendable {
     ) {
         self.pid = pid
         self.parentPID = parentPID
-        self.identity = ProcessIdentity(
+        identity = ProcessIdentity(
             executablePath: executablePath,
             cwd: cwd,
             argv: argv

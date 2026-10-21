@@ -1,6 +1,6 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// p1-history/05 磁盘卡的 app 侧:容量 / 吞吐 Provider 的节奏、lastGood 与标记交付,
 /// Live 源只做构造冒烟,不打真实磁盘语义断言。纯逻辑在核心包 DiskModelTests。
@@ -15,8 +15,14 @@ final class DiskSensorTests: XCTestCase {
         // 容量 provider 走低频档(30s),不进 1s 心跳;吞吐节奏随源路径
         // (主路径 5s 短档 / rusage 回退 30s 低频档)——调度器体现分档。
         XCTAssertEqual(DiskCapacityProvider(source: NilCapacitySource()).cadence, .every(seconds: 30))
-        XCTAssertEqual(DiskThroughputProvider(source: NilThroughputSource(cadenceSeconds: 5)).cadence, .every(seconds: 5))
-        XCTAssertEqual(DiskThroughputProvider(source: NilThroughputSource(cadenceSeconds: 30)).cadence, .every(seconds: 30))
+        XCTAssertEqual(
+            DiskThroughputProvider(source: NilThroughputSource(cadenceSeconds: 5)).cadence,
+            .every(seconds: 5)
+        )
+        XCTAssertEqual(
+            DiskThroughputProvider(source: NilThroughputSource(cadenceSeconds: 30)).cadence,
+            .every(seconds: 30)
+        )
     }
 
     func testCapacityProviderKeepsLastGoodOnFailure() async {
@@ -94,25 +100,31 @@ private final class MarkedDeliveryBox: @unchecked Sendable {
     private var stored: [SensorDelivery<DiskThroughputReading>?] = []
 
     func append(_ delivery: SensorDelivery<DiskThroughputReading>?) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         stored.append(delivery)
     }
 
     var deliveries: [SensorDelivery<DiskThroughputReading>?] {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return stored
     }
 }
 
 /// 恒 nil 容量源(节奏断言用)。
 private struct NilCapacitySource: DiskCapacitySource {
-    func read() -> DiskCapacityRawReading? { nil }
+    func read() -> DiskCapacityRawReading? {
+        nil
+    }
 }
 
 /// 恒 nil 吞吐源(节奏断言用,cadenceSeconds 可注入)。
 private struct NilThroughputSource: DiskThroughputSource {
     let cadenceSeconds: TimeInterval
-    func readCounters() -> DiskIOCounters? { nil }
+    func readCounters() -> DiskIOCounters? {
+        nil
+    }
 }
 
 /// 脚本化容量源:按序吐出注入读数,耗尽后停在 nil(读失败路径)。

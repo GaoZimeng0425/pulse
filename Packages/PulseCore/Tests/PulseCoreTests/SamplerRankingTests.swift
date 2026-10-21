@@ -1,14 +1,14 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 架构审查票 A 高2:模块排行两本账本住心跳循环(Sampler),可见性门控降级为
 /// 「推进 / 暂停差分」——门关不推进、关即清账,唤醒清基线同轨;每轮快照发布到
 /// 心跳中继(求和回退源的唯一取数口)。门闩时间轴逐轮放行,零真实等待。
 final class SamplerRankingTests: XCTestCase {
-    private let base = Date(timeIntervalSinceReferenceDate: 1_000)
+    private let base = Date(timeIntervalSinceReferenceDate: 1000)
 
     /// p10 每 5s 烧 0.5s CPU、唤醒 +10(五张快照,5s 间隔)。
-    private lazy var snapshots: [ProcessSnapshot] = (0..<5).map { round in
+    private lazy var snapshots: [ProcessSnapshot] = (0 ..< 5).map { round in
         ProcessSnapshot(
             takenAt: base.addingTimeInterval(TimeInterval(round) * 5),
             processes: [
@@ -64,7 +64,7 @@ final class SamplerRankingTests: XCTestCase {
     /// 轮询等待交付数达标(真实挂起点让 actor 推进);超时返回 false。
     private func waitFor(_ box: SamplerTests.DeliveryBox, count target: Int) async -> Bool {
         let deadline = Date().addingTimeInterval(5)
-        while box.delivered.count < target && Date() < deadline {
+        while box.delivered.count < target, Date() < deadline {
             try? await Task.sleep(nanoseconds: 5_000_000)
         }
         return box.delivered.count >= target
@@ -108,12 +108,12 @@ final class SamplerRankingTests: XCTestCase {
         defer { harness.stop() }
         let firstReady = await waitFor(harness.box, count: 1)
         XCTAssertTrue(firstReady)
-        await nextRound(harness, expecting: 2)                 // 5s:出数
+        await nextRound(harness, expecting: 2) // 5s:出数
         await harness.sampler.setRankingsActive(false, generation: 2)
-        await nextRound(harness, expecting: 3)                 // 10s:门关
+        await nextRound(harness, expecting: 3) // 10s:门关
         await harness.sampler.setRankingsActive(true, generation: 3)
-        await nextRound(harness, expecting: 4)                 // 15s:重开基线
-        await nextRound(harness, expecting: 5)                 // 20s:恢复
+        await nextRound(harness, expecting: 4) // 15s:重开基线
+        await nextRound(harness, expecting: 5) // 20s:恢复
 
         let rankings = harness.box.delivered.map(\.rankings)
         XCTAssertNotNil(rankings[1].energyImpacts)

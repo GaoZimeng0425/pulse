@@ -105,14 +105,14 @@ public struct MinuteAggregate: Equatable, Sendable {
 public struct MinuteRollupBuffer: Sendable, Equatable {
     /// 单组窗内累计。
     private struct GroupAccumulator: Equatable, Sendable {
-        public var cpuSum = 0.0
-        public var cpuPeak = -Double.infinity
-        public var memoryPeak = UInt64(0)
-        public var processPeak = 0
-        public var count = 0
+        var cpuSum = 0.0
+        var cpuPeak = -Double.infinity
+        var memoryPeak = UInt64(0)
+        var processPeak = 0
+        var count = 0
 
         /// 两份同窗累计并成一份(改根换键撞上已有新键时)。
-        public func merged(with other: GroupAccumulator) -> GroupAccumulator {
+        func merged(with other: GroupAccumulator) -> GroupAccumulator {
             GroupAccumulator(
                 cpuSum: cpuSum + other.cpuSum,
                 cpuPeak: max(cpuPeak, other.cpuPeak),
@@ -249,8 +249,7 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
         )
     }
 
-    public init() {
-    }
+    public init() {}
 }
 
 // MARK: - 留存计划(纯逻辑)

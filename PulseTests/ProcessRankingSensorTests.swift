@@ -1,7 +1,7 @@
 import Darwin
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 工单 01 模块排行(数据层)+ 架构审查票 A 高2(rusage 采集通道合一):
 /// 能耗影响 / 磁盘每进程两本差分账本直接吃心跳快照(全进程 rusage 循环只剩
@@ -16,7 +16,6 @@ import XCTest
 /// ⑤快照 → rusage 表映射(计数读失败的 pid 跳过不填 0)与心跳中继;
 /// ⑥求和回退源:消费中继快照求和,计数时刻取发布时刻,首轮前如实 nil。
 final class ProcessRankingSensorTests: XCTestCase {
-
     // MARK: - 夹具
 
     /// 合成一张心跳快照:takenAt 用合成时间轴(seconds),供差分确定性编排。
@@ -54,7 +53,7 @@ final class ProcessRankingSensorTests: XCTestCase {
 
     func testEnergyFirstRoundEstablishesBaselineWithoutNumbers() {
         // 首见 pid(整表首趟)只记基线:两窗都不出数。
-        let rounds = feed([snapshot(at: 0, (100, 1_000, 5, 0, 0))])
+        let rounds = feed([snapshot(at: 0, (100, 1000, 5, 0, 0))])
         XCTAssertEqual(rounds, [.empty], "基线轮不出数")
     }
 
@@ -74,7 +73,7 @@ final class ProcessRankingSensorTests: XCTestCase {
     func testEnergyNegativeDeltaClampsToZero() {
         // 计数回退(回绕/重置):两项负差分都钳 0,复合分随之 0。
         let rounds = feed([
-            snapshot(at: 0, (100, 5_000, 50, 0, 0)),
+            snapshot(at: 0, (100, 5000, 50, 0, 0)),
             snapshot(at: 5, (100, 100, 7, 0, 0)),
         ])
         let impact = rounds[1].energyImpacts?[100]
@@ -87,10 +86,10 @@ final class ProcessRankingSensorTests: XCTestCase {
         // 新 pid 记基线不出数;消失 pid 丢弃;基线整表以满窗轮为准——
         // 复现的 pid 按新面孔重记基线(pid 复用安全)。
         let rounds = feed([
-            snapshot(at: 0, (100, 1_000, 1, 0, 0)),
-            snapshot(at: 5, (100, 2_000, 2, 0, 0), (200, 5_000, 1, 0, 0)),  // 200 新面孔
-            snapshot(at: 10, (200, 6_000, 2, 0, 0)),                        // 100 消失
-            snapshot(at: 15, (200, 7_000, 3, 0, 0), (100, 9_000, 9, 0, 0)), // 100 复现
+            snapshot(at: 0, (100, 1000, 1, 0, 0)),
+            snapshot(at: 5, (100, 2000, 2, 0, 0), (200, 5000, 1, 0, 0)), // 200 新面孔
+            snapshot(at: 10, (200, 6000, 2, 0, 0)), // 100 消失
+            snapshot(at: 15, (200, 7000, 3, 0, 0), (100, 9000, 9, 0, 0)), // 100 复现
         ])
         XCTAssertEqual(rounds[1].energyImpacts.map { Array($0.keys).sorted() }, [100], "新 pid 200 记基线,不出数")
         XCTAssertEqual(rounds[2].energyImpacts.map { Array($0.keys).sorted() }, [200], "消失的 100 丢弃;200 出差分")
@@ -112,7 +111,7 @@ final class ProcessRankingSensorTests: XCTestCase {
             snapshot(at: 5, (100, 500, 0, 0, 0)),
             snapshot(at: 6, (100, 600, 0, 0, 0)),
         ])
-        for index in 1...4 {
+        for index in 1 ... 4 {
             XCTAssertNil(rounds[index].energyImpacts, "第 \(index)s 未满窗不出数")
         }
         XCTAssertEqual(rounds[5].energyImpacts?[100]?.cpuNanosDelta, 500, "满窗差分跨整窗")
@@ -137,10 +136,10 @@ final class ProcessRankingSensorTests: XCTestCase {
         let rounds = feed(stride(from: 0, through: 30, by: 5).map { second in
             snapshot(at: TimeInterval(second), (100, UInt64(second) * 10, 0, UInt64(second) * 100, 0))
         })
-        for index in 1...6 {
+        for index in 1 ... 6 {
             XCTAssertNotNil(rounds[index].energyImpacts, "第 \(index * 5)s 能耗满窗")
         }
-        for index in 1...5 {
+        for index in 1 ... 5 {
             XCTAssertNil(rounds[index].diskRates, "第 \(index * 5)s 磁盘未满 30s 窗")
         }
         XCTAssertEqual(rounds[6].diskRates?[100]?.readBytesPerSec ?? -1, 100, accuracy: 1e-9)
@@ -150,9 +149,9 @@ final class ProcessRankingSensorTests: XCTestCase {
         // 墙钟回拨(NTP 校时):间隔为负,两窗以本轮重立基线不出数;
         // 此后按新基线正常满窗。
         let rounds = feed([
-            snapshot(at: 100, (100, 1_000, 0, 0, 0)),
-            snapshot(at: 50, (100, 2_000, 0, 0, 0)),
-            snapshot(at: 55, (100, 2_500, 0, 0, 0)),
+            snapshot(at: 100, (100, 1000, 0, 0, 0)),
+            snapshot(at: 50, (100, 2000, 0, 0, 0)),
+            snapshot(at: 55, (100, 2500, 0, 0, 0)),
         ])
         XCTAssertEqual(rounds[1], .empty, "回拨轮不出数")
         XCTAssertEqual(rounds[2].energyImpacts?[100]?.cpuNanosDelta, 500, "按回拨后的基线差分")
@@ -173,8 +172,8 @@ final class ProcessRankingSensorTests: XCTestCase {
         // 上限,以本轮重立基线不出数——不把 1h 累计当 5s 能耗显示;下一窗正常。
         let rounds = feed([
             snapshot(at: 0, (100, 0, 0, 0, 0)),
-            snapshot(at: 3_600, (100, 900_000_000_000, 0, 9_000_000, 0)),
-            snapshot(at: 3_605, (100, 900_000_000_500, 0, 9_000_000, 0)),
+            snapshot(at: 3600, (100, 900_000_000_000, 0, 9_000_000, 0)),
+            snapshot(at: 3605, (100, 900_000_000_500, 0, 9_000_000, 0)),
         ])
         XCTAssertEqual(rounds[1], .empty, "断档轮不出数(两窗皆然)")
         XCTAssertEqual(rounds[2].energyImpacts?[100]?.cpuNanosDelta, 500, "按断档后的基线差分")
@@ -204,7 +203,7 @@ final class ProcessRankingSensorTests: XCTestCase {
         // Δread 3_200 / 32s = 100 B/s;Δwrite 1_600 / 32s = 50 B/s。
         let rounds = feed([
             snapshot(at: 0, (100, 0, 0, 400, 200)),
-            snapshot(at: 32, (100, 0, 0, 3_600, 1_800)),
+            snapshot(at: 32, (100, 0, 0, 3600, 1800)),
         ])
         XCTAssertEqual(rounds[1].diskRates?[100]?.readBytesPerSec ?? -1, 100, accuracy: 1e-9)
         XCTAssertEqual(rounds[1].diskRates?[100]?.writeBytesPerSec ?? -1, 50, accuracy: 1e-9)
@@ -213,7 +212,7 @@ final class ProcessRankingSensorTests: XCTestCase {
     func testDiskRollbackClampsToZeroAndVanishedPIDDrops() {
         // 计数回退:速率钳 0;消失 pid 不出现在读数里。
         let rounds = feed([
-            snapshot(at: 0, (100, 0, 0, 5_000, 5_000), (200, 0, 0, 100, 100)),
+            snapshot(at: 0, (100, 0, 0, 5000, 5000), (200, 0, 0, 100, 100)),
             snapshot(at: 30, (100, 0, 0, 100, 200)),
         ])
         XCTAssertEqual(rounds[1].diskRates.map { Array($0.keys).sorted() }, [100])
@@ -227,14 +226,14 @@ final class ProcessRankingSensorTests: XCTestCase {
         // 隐藏/唤醒清账:重开首轮重新记基线(不出数),再满窗恢复正常差分——
         // 不出横跨隐藏期的巨差(隐藏期计数照旧累计)。
         var ledgers = ProcessRankingLedgers()
-        _ = ledgers.record(snapshot(at: 0, (100, 1_000, 0, 0, 0)))
-        XCTAssertEqual(ledgers.record(snapshot(at: 5, (100, 2_000, 0, 0, 0))).energyImpacts?[100]?.cpuNanosDelta, 1_000)
+        _ = ledgers.record(snapshot(at: 0, (100, 1000, 0, 0, 0)))
+        XCTAssertEqual(ledgers.record(snapshot(at: 5, (100, 2000, 0, 0, 0))).energyImpacts?[100]?.cpuNanosDelta, 1000)
 
         ledgers.reset()
-        XCTAssertEqual(ledgers.record(snapshot(at: 3_600, (100, 3_000, 0, 0, 0))), .empty, "重开首轮只记基线")
+        XCTAssertEqual(ledgers.record(snapshot(at: 3600, (100, 3000, 0, 0, 0))), .empty, "重开首轮只记基线")
         XCTAssertEqual(
-            ledgers.record(snapshot(at: 3_605, (100, 4_000, 0, 0, 0))).energyImpacts?[100]?.cpuNanosDelta,
-            1_000,
+            ledgers.record(snapshot(at: 3605, (100, 4000, 0, 0, 0))).energyImpacts?[100]?.cpuNanosDelta,
+            1000,
             "恢复轮按正常 5s 窗差分"
         )
     }
@@ -242,11 +241,11 @@ final class ProcessRankingSensorTests: XCTestCase {
     // MARK: - ⑤ 快照 → rusage 表与心跳中继
 
     func testRusageTableMapsSnapshotFields() {
-        let table = ProcessRusageTable(snapshot: snapshot(at: 7, (100, 1_234, 56, 789, 10)))
+        let table = ProcessRusageTable(snapshot: snapshot(at: 7, (100, 1234, 56, 789, 10)))
         XCTAssertEqual(table.takenAt, Date(timeIntervalSinceReferenceDate: 7))
         XCTAssertEqual(
             table.samples[100],
-            ProcessRusageSample(cpuNanoseconds: 1_234, wakeups: 56, diskBytesRead: 789, diskBytesWritten: 10)
+            ProcessRusageSample(cpuNanoseconds: 1234, wakeups: 56, diskBytesRead: 789, diskBytesWritten: 10)
         )
     }
 

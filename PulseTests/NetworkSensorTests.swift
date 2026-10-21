@@ -1,6 +1,6 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// p1-history/06 网络卡的 app 侧:LiveNetworkCountersSource 的入向死表回退编排(注入假
 /// 主接口 / 候选列表 / 读数)与 Live 源构造冒烟。纯逻辑在核心包 NetworkModelTests。
@@ -10,12 +10,16 @@ final class NetworkSensorTests: XCTestCase {
     /// 假主接口 / 假候选列表(钉死 LiveNetworkCountersSource 的回退编排)。
     private struct FixedPrimarySource: NetworkPrimaryInterfaceSource {
         let name: String?
-        func primaryInterfaceName() -> String? { name }
+        func primaryInterfaceName() -> String? {
+            name
+        }
     }
 
     private struct FixedListSource: NetworkInterfaceListSource {
         let states: [NetworkInterfaceState]
-        func interfaces() -> [NetworkInterfaceState] { states }
+        func interfaces() -> [NetworkInterfaceState] {
+            states
+        }
     }
 
     private func fakeSource(
@@ -32,7 +36,9 @@ final class NetworkSensorTests: XCTestCase {
 
     private func state(_ name: String, running: Bool = true) -> NetworkInterfaceState {
         var flags: Int32 = NetworkInterfaceSelector.iffUp
-        if running { flags |= NetworkInterfaceSelector.iffRunning }
+        if running {
+            flags |= NetworkInterfaceSelector.iffRunning
+        }
         return NetworkInterfaceState(name: name, flags: flags, addressFamily: 2)
     }
 
@@ -42,13 +48,20 @@ final class NetworkSensorTests: XCTestCase {
             primary: "en0",
             candidates: [state("en0"), state("utun4")],
             table: [
-                "en0": NetworkFixture.counters("en0", up: 9_000, down: 0, upPackets: 44_000, downPackets: 0, at: 1),
-                "utun4": NetworkFixture.counters("utun4", up: 500, down: 4_000, upPackets: 700, downPackets: 2_100, at: 1),
+                "en0": NetworkFixture.counters("en0", up: 9000, down: 0, upPackets: 44000, downPackets: 0, at: 1),
+                "utun4": NetworkFixture.counters(
+                    "utun4",
+                    up: 500,
+                    down: 4000,
+                    upPackets: 700,
+                    downPackets: 2100,
+                    at: 1
+                ),
             ]
         )
         let sampled = source.sample()
         XCTAssertEqual(sampled?.interface, "utun4")
-        XCTAssertEqual(sampled?.downBytes, 4_000)
+        XCTAssertEqual(sampled?.downBytes, 4000)
     }
 
     /// 多个活口取累计入向字节最多者(闲置 utun 的历史零星包抢不走主隧道)。
@@ -57,9 +70,16 @@ final class NetworkSensorTests: XCTestCase {
             primary: "en0",
             candidates: [state("en0"), state("utun0"), state("utun4")],
             table: [
-                "en0": NetworkFixture.counters("en0", up: 9_000, down: 0, upPackets: 44_000, downPackets: 0, at: 1),
+                "en0": NetworkFixture.counters("en0", up: 9000, down: 0, upPackets: 44000, downPackets: 0, at: 1),
                 "utun0": NetworkFixture.counters("utun0", up: 0, down: 300, upPackets: 2, downPackets: 3, at: 1),
-                "utun4": NetworkFixture.counters("utun4", up: 500, down: 1_900_000_000, upPackets: 700, downPackets: 2_100_000, at: 1),
+                "utun4": NetworkFixture.counters(
+                    "utun4",
+                    up: 500,
+                    down: 1_900_000_000,
+                    upPackets: 700,
+                    downPackets: 2_100_000,
+                    at: 1
+                ),
             ]
         )
         XCTAssertEqual(source.sample()?.interface, "utun4")
@@ -72,7 +92,7 @@ final class NetworkSensorTests: XCTestCase {
             primary: "en0",
             candidates: [state("en0"), state("lo0", running: true)],
             table: [
-                "en0": NetworkFixture.counters("en0", up: 9_000, down: 0, upPackets: 44_000, downPackets: 0, at: 1),
+                "en0": NetworkFixture.counters("en0", up: 9000, down: 0, upPackets: 44000, downPackets: 0, at: 1),
             ]
         )
         let sampled = source.sample()
@@ -87,7 +107,7 @@ final class NetworkSensorTests: XCTestCase {
             candidates: [state("en0"), state("utun4")],
             table: [
                 "en0": NetworkFixture.counters("en0", up: 100, down: 200, upPackets: 10, downPackets: 20, at: 1),
-                "utun4": NetworkFixture.counters("utun4", up: 0, down: 9_999, upPackets: 0, downPackets: 99, at: 1),
+                "utun4": NetworkFixture.counters("utun4", up: 0, down: 9999, upPackets: 0, downPackets: 99, at: 1),
             ]
         )
         let sampled = source.sample()

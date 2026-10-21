@@ -1,6 +1,6 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 状态徽章的 app 侧缝:chip 映射(SwiftUI 外观 = 05 的 MetricCardChip)与
 /// 高负载线 = 菜单栏红线的同口径断言。阈值规则本身在核心包 StatusBadgeTests。

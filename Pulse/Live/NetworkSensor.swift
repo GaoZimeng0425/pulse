@@ -1,7 +1,7 @@
 import Darwin
 import Foundation
-import SystemConfiguration
 import PulseCore
+import SystemConfiguration
 
 // 网络计数与接口选择算法移植自 stats(MIT)Modules/Net/readers.swift(调研
 // docs/research/sensor-impl-comparison.md §2.2 逐条钉死;依 spec 移植代码纪律
@@ -85,10 +85,8 @@ enum NetworkCountersReader {
         var size: size_t = 0
         guard sysctl(&mib, u_int(mib.count), nil, &size, nil, 0) == 0, size > 0 else { return nil }
         var buffer = [UInt8](repeating: 0, count: size)
-        guard sysctl(&mib, u_int(mib.count), &buffer, &size, nil, 0) == 0 else { return nil }
-
-        guard
-            let parsed = NetworkRouteRecord.parse(Array(buffer.prefix(Int(size))), expectingIndex: index)
+        guard sysctl(&mib, u_int(mib.count), &buffer, &size, nil, 0) == 0,
+              let parsed = NetworkRouteRecord.parse(Array(buffer.prefix(Int(size))), expectingIndex: index)
         else { return nil }
         return NetworkCounters(
             interface: name,
@@ -138,9 +136,9 @@ struct LiveNetworkCountersSource: NetworkCountersSource {
         // 包数在场;取累计入向字节最多者(宁多读几口 sysctl,仍是便宜路径)。
         var best: NetworkCounters?
         for candidate in candidates
-        where NetworkInterfaceSelector.isLiveCandidate(candidate) && candidate.name != name {
+            where NetworkInterfaceSelector.isLiveCandidate(candidate) && candidate.name != name {
             guard let candidateCounters = read(candidate.name),
-                candidateCounters.downPackets > 0
+                  candidateCounters.downPackets > 0
             else { continue }
             if best == nil || candidateCounters.downBytes > best?.downBytes ?? 0 {
                 best = candidateCounters
@@ -149,4 +147,3 @@ struct LiveNetworkCountersSource: NetworkCountersSource {
         return best ?? counters
     }
 }
-

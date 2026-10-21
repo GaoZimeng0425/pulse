@@ -1,6 +1,7 @@
 import Foundation
 
 // MARK: - 模块排行聚合(工单 01 UI 层):每 pid 读数字典 → 按组聚合的排行行
+
 // 数据层只交每 pid 的差分/速率字典;展示要的是"按组聚合"的榜。pid → 组走
 // 最新一轮归组结果(RankingBoard 传入主干同轮的 groups,组内成员即 pid 清单)——不重跑归组
 // 引擎:归组需要 cwd / argv / 父链全套输入,主窗口采样循环已经算好,这里只查表。
@@ -54,10 +55,10 @@ public enum ModuleRankingAggregator {
     /// 文案在归组**之后**从合计值格式化——组行数值必须等于成员之和,
     /// 先格式化再拼字符串就加不回去了。
     private struct Readings: Sendable {
-        public var rankValue: Double
-        public var primary: Double
-        public var secondaryA: Double
-        public var secondaryB: Double = 0
+        var rankValue: Double
+        var primary: Double
+        var secondaryA: Double
+        var secondaryB: Double = 0
     }
 
     /// 电池页·能耗影响行(工单 01):主值 = 本档 CPU 时间(秒,一位小数),

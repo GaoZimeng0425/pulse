@@ -1,11 +1,11 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 真机冒烟(评审 S6):LiveCoreTickSource 真实可用;每核 tick 口径 ≥
 /// 旧进程累加口径(后者看不见 kernel_task / root 时间),静息态两者接近。
 final class LiveCoreTickSourceSmokeTests: XCTestCase {
-    func testLiveTickLoadIsSaneAndNotBelowProcessSummation() throws {
+    func testLiveTickLoadIsSaneAndNotBelowProcessSummation() {
         let tickSource = LiveCoreTickSource()
         let processSource = LiveProcessSource()
 
@@ -42,7 +42,9 @@ final class LiveCoreTickSourceSmokeTests: XCTestCase {
         )
 
         guard secondTicks.busyTicks.count >= 1, secondTicks.totalTicks.count >= 1 else {
-            return XCTFail("每核 tick 样本应至少有一核,实际 busy \(secondTicks.busyTicks.count) / total \(secondTicks.totalTicks.count)")
+            return XCTFail(
+                "每核 tick 样本应至少有一核,实际 busy \(secondTicks.busyTicks.count) / total \(secondTicks.totalTicks.count)"
+            )
         }
         XCTAssertGreaterThanOrEqual(
             secondTicks.totalTicks[0], secondTicks.busyTicks[0],

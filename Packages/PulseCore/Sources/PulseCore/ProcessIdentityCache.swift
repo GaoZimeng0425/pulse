@@ -42,8 +42,8 @@ public struct ProcessIdentityCache: Sendable {
     /// 命中 = 已缓存 ∧ p_comm 一致 ∧ 未过校正期;未命中返回 nil,调用方重读。
     public func identity(pid: pid_t, commandName: String, now: Date) -> ProcessIdentity? {
         guard let entry = entries[pid],
-            entry.commandName == commandName,
-            now.timeIntervalSince(entry.readAt) < Self.refreshInterval
+              entry.commandName == commandName,
+              now.timeIntervalSince(entry.readAt) < Self.refreshInterval
         else { return nil }
         return entry.identity
     }

@@ -1,8 +1,9 @@
-import SwiftUI
 import AppKit
 import PulseCore
+import SwiftUI
 
 // MARK: - 主窗口(工单 P0.5-01):全部组列表 + 三层下钻
+
 // P0.6-05 对齐 SHOT1:药丸 tab 进标题栏工具栏、齿轮在右;内容头 = 页名大标题 +
 // "芯片 · 核数 · 内存";总览 = 指标卡网格 + "此刻"环形卡 + "当前最忙"排行卡;
 // CPU / 内存 tab = 指标主卡 + 排行卡(内存再加按应用环形)。
@@ -143,7 +144,10 @@ struct MainWindowView: View {
             $0.identifier?.rawValue == MainWindowSceneID.value || $0.title == "Pulse"
         }
         guard let window else {
-            LogService.info("离屏守卫:未找到主窗口(windows=\(NSApp.windows.map { "\($0.title)|\($0.identifier?.rawValue ?? "-")" }.joined(separator: ",")))", category: "MainWindow")
+            LogService.info(
+                "离屏守卫:未找到主窗口(windows=\(NSApp.windows.map { "\($0.title)|\($0.identifier?.rawValue ?? "-")" }.joined(separator: ",")))",
+                category: "MainWindow"
+            )
             return
         }
         var onlineCount: UInt32 = 0
@@ -156,9 +160,8 @@ struct MainWindowView: View {
         // 目标屏 = 光标所在屏;光标落点无归属(极端)则内建屏,再退最大在线屏。
         let target = online.first { $0.1.contains(cursor) }?.1
             ?? online.first { CGDisplayIsBuiltin($0.0) != 0 }?.1
-            ?? online.map { $0.1 }.max { $0.width < $1.width }
-        guard let target else { return }
-        guard !target.intersects(window.frame) else { return }
+            ?? online.map(\.1).max { $0.width < $1.width }
+        guard let target, !target.intersects(window.frame) else { return }
         var origin = CGPoint(
             x: target.midX - window.frame.width / 2,
             y: target.midY - window.frame.height / 2
@@ -388,11 +391,11 @@ struct SortableProcessTableView: View {
 
 // MARK: - 预览(Synthetic 源,spec 测试决策:UI 以预览 + 手动下钻验收)
 
-/// 预览树:7 个 App 组 + 1 个系统组 = 8 组,弹窗只显示 Top-5,
-/// 主窗口全显示——预览即"超出 Top-5 仍可见"的验收锚点。
+// 预览树:7 个 App 组 + 1 个系统组 = 8 组,弹窗只显示 Top-5,
+// 主窗口全显示——预览即"超出 Top-5 仍可见"的验收锚点。
 #Preview("主窗口:全部 8 组(弹窗只装下 5 组)") {
     let now = Date()
-    let apps = (1...7).map { index in
+    let apps = (1 ... 7).map { index in
         RawProcess(
             pid: pid_t(200 + index),
             parentPID: 1,

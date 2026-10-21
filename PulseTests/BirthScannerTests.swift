@@ -1,13 +1,13 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 接缝:出生扫描(评审 S1,spec"每 2s 扫描新出现的 pid")——
 /// 独立于采样节奏的登记来源。时钟与睡眠注入假实现(与 SamplerTests 同法),
 /// 源注入脚本化假源:新 pid 差分、登记内容、幂等、节奏全部确定性覆盖;
 /// LiveBirthScanSource 另做真机冒烟。
 final class BirthScannerTests: XCTestCase {
-    private let base = Date(timeIntervalSinceReferenceDate: 1_000)
+    private let base = Date(timeIntervalSinceReferenceDate: 1000)
 
     // MARK: 测试替身
 
@@ -30,20 +30,23 @@ final class BirthScannerTests: XCTestCase {
         }
 
         func pids() -> [pid_t] {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             let list = pidLists[min(listIndex, pidLists.count - 1)]
             listIndex += 1
             return list
         }
 
         func birthInfo(for pid: pid_t) -> LineageRegistry.Entry? {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             queries.append(pid)
             return entryFor(pid)
         }
 
         var birthQueries: [pid_t] {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             return queries
         }
     }
@@ -63,7 +66,8 @@ final class BirthScannerTests: XCTestCase {
 
         var clock: @Sendable () -> Date {
             { [self] in
-                lock.lock(); defer { lock.unlock() }
+                lock.lock()
+                defer { lock.unlock() }
                 return start
             }
         }
@@ -77,13 +81,15 @@ final class BirthScannerTests: XCTestCase {
 
         /// 同步临界区:锁不落在 async 词法上下文里(NSLock 在 async 中禁用)。
         private func record(_ seconds: TimeInterval) throws {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             guard requests.count < budget else { throw Exhausted() }
             requests.append(seconds)
         }
 
         var sleepRequests: [TimeInterval] {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             return requests
         }
     }
@@ -94,12 +100,14 @@ final class BirthScannerTests: XCTestCase {
         private var registries: [LineageRegistry] = []
 
         func append(_ registry: LineageRegistry) {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             registries.append(registry)
         }
 
         var delivered: [LineageRegistry] {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             return registries
         }
     }
@@ -178,7 +186,8 @@ final class BirthScannerTests: XCTestCase {
             private let lock = NSLock()
             private var count = 0
             func next() -> Int {
-                lock.lock(); defer { lock.unlock() }
+                lock.lock()
+                defer { lock.unlock() }
                 count += 1
                 return count
             }
@@ -227,7 +236,7 @@ final class BirthScannerTests: XCTestCase {
         let delivered = await drain(makeScanner(source: source, timeline: timeline), timeline: timeline)
 
         XCTAssertEqual(delivered.count, 3)
-        XCTAssertTrue(delivered.allSatisfy { $0.entries.isEmpty })
+        XCTAssertTrue(delivered.allSatisfy(\.entries.isEmpty))
         XCTAssertEqual(source.birthQueries, [5], "查询失败的 pid 不逐轮重试")
     }
 
@@ -247,10 +256,19 @@ final class BirthScannerTests: XCTestCase {
 
     func testRegistryMergingKeepsOwnRecordsAndFillsGaps() {
         var own = LineageRegistry()
-        own.register(pid: 10, entry: LineageRegistry.Entry(parentPID: 1, identity: ProcessIdentity(executablePath: "/a")))
+        own.register(
+            pid: 10,
+            entry: LineageRegistry.Entry(parentPID: 1, identity: ProcessIdentity(executablePath: "/a"))
+        )
         var other = LineageRegistry()
-        other.register(pid: 10, entry: LineageRegistry.Entry(parentPID: 2, identity: ProcessIdentity(executablePath: "/b")))
-        other.register(pid: 11, entry: LineageRegistry.Entry(parentPID: 3, identity: ProcessIdentity(executablePath: "/c")))
+        other.register(
+            pid: 10,
+            entry: LineageRegistry.Entry(parentPID: 2, identity: ProcessIdentity(executablePath: "/b"))
+        )
+        other.register(
+            pid: 11,
+            entry: LineageRegistry.Entry(parentPID: 3, identity: ProcessIdentity(executablePath: "/c"))
+        )
 
         let merged = own.merging(other)
 

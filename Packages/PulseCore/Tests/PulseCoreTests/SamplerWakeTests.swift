@@ -1,11 +1,11 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// 唤醒处理(工单 03,spec 唤醒处理):睡眠唤醒后第一轮差分作废。
 /// 门闩时间轴让测试在采样轮之间插入 `invalidateDeltas()`——交付序列
 /// 确定性,零真实等待。
 final class SamplerWakeTests: XCTestCase {
-    private let base = Date(timeIntervalSinceReferenceDate: 1_000)
+    private let base = Date(timeIntervalSinceReferenceDate: 1000)
 
     /// 门闩时间轴:sleep 挂起到测试放行为止(放行同时推进时钟)——用于在
     /// 采样轮之间插入 actor 消息(唤醒清基线)。流关闭视为停机信号。
@@ -78,7 +78,7 @@ final class SamplerWakeTests: XCTestCase {
     /// 交付箱复用 SamplerTests.DeliveryBox(target 内 internal)。
     private func waitFor(_ box: SamplerTests.DeliveryBox, count target: Int) async -> Bool {
         let deadline = Date().addingTimeInterval(5)
-        while box.delivered.count < target && Date() < deadline {
+        while box.delivered.count < target, Date() < deadline {
             try? await Task.sleep(nanoseconds: 5_000_000)
         }
         return box.delivered.count >= target
@@ -155,9 +155,9 @@ final class SamplerWakeTests: XCTestCase {
             ]),
             memoryStats: SyntheticMemoryStatsSource(),
             networkCounters: ScriptedNetworkCountersSource(samples: [
-                counters(up: 1_000, down: 2_000, at: 0),                    // 首读:立基线
-                counters(up: 6_000, down: 7_000, at: 5_000_000_000),        // 5s 差分
-                counters(up: 9_000, down: 12_000, at: 10_000_000_000),      // 唤醒后首轮
+                counters(up: 1000, down: 2000, at: 0), // 首读:立基线
+                counters(up: 6000, down: 7000, at: 5_000_000_000), // 5s 差分
+                counters(up: 9000, down: 12000, at: 10_000_000_000), // 唤醒后首轮
             ]),
             clock: timeline.clock,
             sleep: timeline.sleeper,
@@ -179,8 +179,8 @@ final class SamplerWakeTests: XCTestCase {
         timeline.pass(seconds: 5)
         let secondReady = await waitFor(box, count: 2)
         XCTAssertTrue(secondReady)
-        XCTAssertEqual(box.delivered[1].network?.rates.upBytesPerSecond ?? -1, 1_000, accuracy: 0.0001)
-        XCTAssertEqual(box.delivered[1].network?.rates.downBytesPerSecond ?? -1, 1_000, accuracy: 0.0001)
+        XCTAssertEqual(box.delivered[1].network?.rates.upBytesPerSecond ?? -1, 1000, accuracy: 0.0001)
+        XCTAssertEqual(box.delivered[1].network?.rates.downBytesPerSecond ?? -1, 1000, accuracy: 0.0001)
 
         // 模拟唤醒:基线作废 → 第 3 轮丢弃,睡眠期累计不出速率。
         await sampler.invalidateDeltas()
@@ -203,9 +203,9 @@ final class SamplerWakeTests: XCTestCase {
             ]),
             memoryStats: SyntheticMemoryStatsSource(),
             networkCounters: ScriptedNetworkCountersSource(samples: [
-                unknownLink(up: 1_000, down: 1_000, at: 0),                 // 首读
-                nil,                                                        // 读缺失
-                unknownLink(up: 6_000, down: 6_000, at: 10_000_000_000),    // 恢复
+                unknownLink(up: 1000, down: 1000, at: 0), // 首读
+                nil, // 读缺失
+                unknownLink(up: 6000, down: 6000, at: 10_000_000_000), // 恢复
             ]),
             clock: timeline.clock,
             sleep: timeline.sleeper,
@@ -241,8 +241,8 @@ private func counters(up: UInt64, down: UInt64, at: UInt64) -> NetworkCounters {
         interface: "en0",
         upBytes: up,
         downBytes: down,
-        upPackets: 1_000,
-        downPackets: 1_000,
+        upPackets: 1000,
+        downPackets: 1000,
         linkBaudrateBitsPerSecond: 1_000_000_000,
         atUptimeNanos: at
     )
@@ -254,8 +254,8 @@ private func unknownLink(up: UInt64, down: UInt64, at: UInt64) -> NetworkCounter
         interface: "en0",
         upBytes: up,
         downBytes: down,
-        upPackets: 1_000,
-        downPackets: 1_000,
+        upPackets: 1000,
+        downPackets: 1000,
         linkBaudrateBitsPerSecond: nil,
         atUptimeNanos: at
     )

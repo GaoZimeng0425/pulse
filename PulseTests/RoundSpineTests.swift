@@ -1,6 +1,6 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 主干纯内核(RoundSpine,ADR-0003 扩展点兑现):每轮心跳「并入出生登记 → 归组 →
 /// 下钻」,产出全部功能模块同轮共读的一份 RoundContext。合成快照按 Sampler 的组法
@@ -8,8 +8,11 @@ import XCTest
 final class RoundSpineTests: XCTestCase {
     private let octokRoot = "/Users/x/work/octok-client"
     private let projectGroupName = "octok-client @ skill-manage-read-and-index"
-    private var worktree: String { octokRoot + "/.worktrees/skill-manage-read-and-index" }
-    private let base = Date(timeIntervalSinceReferenceDate: 1_000)
+    private var worktree: String {
+        octokRoot + "/.worktrees/skill-manage-read-and-index"
+    }
+
+    private let base = Date(timeIntervalSinceReferenceDate: 1000)
 
     // MARK: 测试替身
 
@@ -174,7 +177,7 @@ final class RoundSpineTests: XCTestCase {
     /// 照旧;无关的死进程记录被丢掉。
     func testEachAdvancePrunesTheRegistryToLiveProcessesAndTheirAncestors() {
         var restored = brokenChainBirths
-        for pid in pid_t(5_000)..<pid_t(5_200) {
+        for pid in pid_t(5000) ..< pid_t(5200) {
             restored.register(pid: pid, entry: LineageRegistry.Entry(
                 parentPID: 1, identity: ProcessIdentity(executablePath: "/usr/bin/dead\(pid)")
             ))
@@ -183,7 +186,10 @@ final class RoundSpineTests: XCTestCase {
         spine.restoreBirths(restored)
 
         let first = spine.advance(round(brokenChainLive(at: base)))
-        let second = spine.advance(round(brokenChainLive(at: base.addingTimeInterval(5)), after: brokenChainLive(at: base)))
+        let second = spine.advance(round(
+            brokenChainLive(at: base.addingTimeInterval(5)),
+            after: brokenChainLive(at: base)
+        ))
 
         XCTAssertEqual(first.lineage.entries.keys.sorted(), [11, 12, 100])
         XCTAssertEqual(categoryOfRustc(in: second), .project, "已死祖先 cargo 留在表里,断链归组不受修剪影响")
@@ -283,7 +289,7 @@ final class RoundSpineTests: XCTestCase {
     /// (弹窗 displayLimit 是 5),组 CPU% 降序。
     func testContextCarriesEveryGroupNotJustThePopoverTopFive() {
         let apps = { (round: UInt64) in
-            (1...7).map { index in
+            (1 ... 7).map { index in
                 RawProcess(
                     pid: pid_t(200 + index),
                     parentPID: 1,

@@ -1,6 +1,6 @@
-import SwiftUI
 import AppKit
 import PulseCore
+import SwiftUI
 
 // MARK: - 指标强调色令牌(工单 P0.6-02):Pulse 从"全灰"到"每指标一色"的色源
 
@@ -19,22 +19,22 @@ extension Metric {
 /// "窗 > 卡 > 卡内元素"三级:卡与窗底只差一档,不描边不投影(§1.4)。
 enum Surface {
     /// 窗口 / 弹窗本体底(`--raised`)。
-    static let window = Color.dynamic(light: 0xffffff, dark: 0x1a1a1d)
+    static let window = Color.dynamic(light: 0xFFFFFF, dark: 0x1A1A1D)
     /// 卡片底(`--card`)。
-    static let card = Color.dynamic(light: 0xf5f5f7, dark: 0x1f1f22)
+    static let card = Color.dynamic(light: 0xF5F5F7, dark: 0x1F1F22)
     /// 卡内强调底、环形"其他/空闲"段(`--card-hi`)。
-    static let cardHigh = Color.dynamic(light: 0xe8e8ed, dark: 0x27272b)
+    static let cardHigh = Color.dynamic(light: 0xE8E8ED, dark: 0x27272B)
     /// 三级墨色(`--ink-3`):环形"缓存"段。
-    static let inkTertiary = Color.dynamic(light: 0xa1a1a6, dark: 0x6e6e73)
+    static let inkTertiary = Color.dynamic(light: 0xA1A1A6, dark: 0x6E6E73)
     /// Projects 指标色:内存构成环的"联动"段(§2.2 by Type 配色)。
-    static let projectsAccent = Color.dynamic(light: 0xeb6834, dark: 0xd95926)
+    static let projectsAccent = Color.dynamic(light: 0xEB6834, dark: 0xD95926)
     /// 正常态绿 = Battery 指标色(§1.1):内存压力 "正常" chip 与电池卡状态
     /// chip 同源(工单 02 起 Metric.battery 入表,此处改为别名,不再抄第二份 hex)。
     static let positive = Metric.battery.accentColor
     /// 危险色(参考文档 §1.1 `--red`):内存压力 "紧张"、高负载警示 chip、
     /// 结束整组图标等"值得注意的负面偏差"的唯一出处(深色补系统红暗色变体,
     /// 参考文档未给暗色值)。
-    static let negative = Color.dynamic(light: 0xe0352b, dark: 0xff453a)
+    static let negative = Color.dynamic(light: 0xE0352B, dark: 0xFF453A)
     /// 警示色(`{colors.state-warning}`,琥珀):内存压力"偏高"、优化充电介入、触发中
     /// 告警横幅等"值得留意但未到危险"的唯一出处——取 Disk 指标色的别名,不抄第二份 hex。
     static let warning = Metric.disk.accentColor
@@ -57,9 +57,9 @@ extension GroupCategory {
     }
 
     /// app 组渲染走真实应用图标,此色仅样式表完备性的理论兜底。
-    private static let appIdentity = Color.dynamic(light: 0xa2845e, dark: 0xac8e68)
-    private static let systemIdentity = Color.dynamic(light: 0x8e8e93, dark: 0x98989d)
-    private static let orphanIdentity = Color.dynamic(light: 0xff9500, dark: 0xff9f0a)
+    private static let appIdentity = Color.dynamic(light: 0xA2845E, dark: 0xAC8E68)
+    private static let systemIdentity = Color.dynamic(light: 0x8E8E93, dark: 0x98989D)
+    private static let orphanIdentity = Color.dynamic(light: 0xFF9500, dark: 0xFF9F0A)
 }
 
 // MARK: - 内存构成单表(工单 P0.6-05,评审 F5 去重)
@@ -75,7 +75,9 @@ enum MemoryCompositionKey: String, CaseIterable, Identifiable, Sendable {
     case cached
     case free
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     /// 中文段名:内存卡统计点标签与环形图例共用。
     var title: String {

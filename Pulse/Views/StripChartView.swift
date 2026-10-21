@@ -1,5 +1,5 @@
-import SwiftUI
 import PulseCore
+import SwiftUI
 
 // MARK: - strip 微柱走势图(工单 P0.6-01)
 
@@ -60,7 +60,7 @@ struct StripChartView: View {
         let window = Array(values.suffix(slots))
         let normalizer: Double = domainMax ?? max(window.max() ?? 0, 1)
 
-        for slot in 0..<slots {
+        for slot in 0 ..< slots {
             let dataIndex = slot - (slots - window.count)
             let fraction: CGFloat
             if dataIndex >= 0 {
@@ -92,7 +92,7 @@ struct StripChartView: View {
 #Preview("44 柱形态") {
     VStack(spacing: 12) {
         // 满窗:形态即数据(最新在右)。手写锯齿序列,预览形态稳定。
-        StripChartView(values: (0..<44).map { i in
+        StripChartView(values: (0 ..< 44).map { i in
             let ramp = Double(i) / 43 * 80
             let saw = Double(i % 7) * 6
             return min(ramp + saw, 100)

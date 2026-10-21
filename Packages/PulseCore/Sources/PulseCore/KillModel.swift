@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 
 // 结束进程的纯逻辑:处置接缝、编排、目标 / 结果 / 文案。发信号的 LiveKillService 在 app target(KillService.swift)。
 
@@ -32,7 +32,7 @@ public enum KillSignalFailure: Equatable, Sendable {
         switch self {
         case .permissionDenied: "无权限结束(可能属于 root)"
         case .noSuchProcess: "进程已退出"
-        case .other(let errno): "系统调用失败(errno \(errno))"
+        case let .other(errno): "系统调用失败(errno \(errno))"
         }
     }
 }
@@ -43,7 +43,9 @@ public struct KillTarget: Equatable, Hashable, Sendable, Identifiable {
     public let pid: pid_t
     public let name: String
 
-    public var id: pid_t { pid }
+    public var id: pid_t {
+        pid
+    }
 
     public init(pid: pid_t, name: String) {
         self.pid = pid
@@ -80,7 +82,9 @@ public struct KillOutcome: Equatable, Sendable, Identifiable {
     public let target: KillTarget
     public let result: KillSignalResult
 
-    public var id: pid_t { target.pid }
+    public var id: pid_t {
+        target.pid
+    }
 
     public var succeeded: Bool {
         result == .delivered
@@ -89,7 +93,7 @@ public struct KillOutcome: Equatable, Sendable, Identifiable {
     public var message: String {
         switch result {
         case .delivered: "已发送结束信号"
-        case .failed(let failure): failure.message
+        case let .failed(failure): failure.message
         }
     }
 
@@ -99,9 +103,9 @@ public struct KillOutcome: Equatable, Sendable, Identifiable {
     }
 }
 
-extension RawProcess {
+public extension RawProcess {
     /// 单进程处置目标:显示名与下钻行同口径(可执行 basename → argv[0] → "pid N")。
-    public var killTarget: KillTarget {
+    var killTarget: KillTarget {
         KillTarget(
             pid: pid,
             name: PulseFormat.processName(executablePath: executablePath, argv: argv, pid: pid)
@@ -109,9 +113,9 @@ extension RawProcess {
     }
 }
 
-extension ProcessGroup {
+public extension ProcessGroup {
     /// 整组处置目标清单:组内全部存活成员(引擎契约:组来自最近一轮采样)。
-    public var killTargets: [KillTarget] {
+    var killTargets: [KillTarget] {
         processes.map(\.killTarget)
     }
 }

@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 
 // 出生扫描的纯逻辑:扫描源接缝与扫描 actor。Darwin 适配器 LiveBirthScanSource 在 app target(BirthScanner.swift)。
 

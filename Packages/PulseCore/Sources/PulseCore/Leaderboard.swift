@@ -13,15 +13,17 @@ import Foundation
 public enum Leaderboard {
     /// 榜单序:值降序;同值按身份升序破平——身份全序即结果与输入序无关,
     /// 同一组读数跨采样轮排出同一张榜。
-    public static func ranked<Item, Value: Comparable, ID: Comparable>(
+    public static func ranked<Item>(
         _ items: some Sequence<Item>,
-        by value: (Item) -> Value,
-        id: (Item) -> ID
+        by value: (Item) -> some Comparable,
+        id: (Item) -> some Comparable
     ) -> [Item] {
         items.sorted { lhs, rhs in
             let lhsValue = value(lhs)
             let rhsValue = value(rhs)
-            if lhsValue != rhsValue { return lhsValue > rhsValue }
+            if lhsValue != rhsValue {
+                return lhsValue > rhsValue
+            }
             return id(lhs) < id(rhs)
         }
     }

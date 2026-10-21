@@ -1,5 +1,5 @@
-import XCTest
 @testable import PulseCore
+import XCTest
 
 /// launchd 服务清单的纯逻辑(launchd-attribution/01,ADR-0005):单 plist 解析四态、
 /// 组装器的两层缓存(密封层只读一次、补缺重试、可变层每轮重读)、字面 ∪ realpath、
@@ -23,6 +23,8 @@ final class LaunchdManifestTests: XCTestCase {
     }
 
     private func plist(_ dictionary: [String: Any]) -> Data {
+        // 测试夹具:字典字面量序列化不会失败,失败即崩是期望行为
+        // swiftlint:disable:next force_try
         try! PropertyListSerialization.data(fromPropertyList: dictionary, format: .xml, options: 0)
     }
 
@@ -75,9 +77,9 @@ final class LaunchdManifestTests: XCTestCase {
         XCTAssertNil(LaunchdServiceManifest.executablePath(fromPlist: plist(["ProgramArguments": [String]()])))
     }
 
-    func testMalformedBytesAndNonDictionaryRootYieldNil() {
+    func testMalformedBytesAndNonDictionaryRootYieldNil() throws {
         XCTAssertNil(LaunchdServiceManifest.executablePath(fromPlist: Data("not a plist".utf8)))
-        let array = try! PropertyListSerialization.data(fromPropertyList: ["/x"], format: .xml, options: 0)
+        let array = try PropertyListSerialization.data(fromPropertyList: ["/x"], format: .xml, options: 0)
         XCTAssertNil(LaunchdServiceManifest.executablePath(fromPlist: array))
     }
 
@@ -192,7 +194,11 @@ final class LaunchdManifestTests: XCTestCase {
 
     func testMalformedPlistSkippedOthersKept() {
         let source = CountingPlistSource([
-            mutableA: .plists([Data("garbage".utf8), programPlist("/usr/local/bin/good"), plist(["Label": "no program"])]),
+            mutableA: .plists([
+                Data("garbage".utf8),
+                programPlist("/usr/local/bin/good"),
+                plist(["Label": "no program"]),
+            ]),
         ])
         var assembler = LaunchdManifestAssembler(
             sealedDirectories: [], mutableDirectories: [mutableA], resolveSymlinks: { $0 }

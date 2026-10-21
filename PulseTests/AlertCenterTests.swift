@@ -1,6 +1,6 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 接缝:AlertCenter 编排(注入假 sender 与时钟)。钉死工单的授权时序与降级:
 /// 授权以系统三态为准(没问过 / 已拒绝 / 已授权)——有规则开着而系统没问过
@@ -9,7 +9,6 @@ import XCTest
 /// AlertEngineTests 钉死,这里只测编排。
 @MainActor
 final class AlertCenterTests: XCTestCase {
-
     // MARK: - 测试替身
 
     /// 假 sender:模拟系统授权三态——请求前为 `status`(默认没问过),请求后按
@@ -29,19 +28,27 @@ final class AlertCenterTests: XCTestCase {
         var holdRequests = false
 
         var authorizationRequestCount: Int {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             return requests
         }
 
         var sent: [AlertNotificationPayload] {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             return delivered
         }
 
         /// 系统侧现状(测试可直接改:模拟用户在系统设置里开关通知)。
         var status: NotificationAuthorization {
-            get { lock.lock(); defer { lock.unlock() }; return current }
-            set { lock.lock(); defer { lock.unlock() }; current = newValue }
+            get { lock.lock()
+                defer { lock.unlock() }
+                return current
+            }
+            set { lock.lock()
+                defer { lock.unlock() }
+                current = newValue
+            }
         }
 
         func requestAuthorization() async -> Bool {
@@ -76,18 +83,21 @@ final class AlertCenterTests: XCTestCase {
         }
 
         private func countRequest() {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             requests += 1
         }
 
         private func hold(_ continuation: CheckedContinuation<Void, Never>) {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             held.append(continuation)
         }
 
         /// 没问过才"弹窗"并按 grantResult 落定;抛错收场则保持没问过;已落定原样返回。
         private func settleRequest() -> Bool {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             if current == .notDetermined, !requestFails {
                 current = grantResult ? .authorized : .denied
             }
@@ -95,7 +105,8 @@ final class AlertCenterTests: XCTestCase {
         }
 
         private func record(_ payload: AlertNotificationPayload) {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             delivered.append(payload)
         }
     }
@@ -104,16 +115,23 @@ final class AlertCenterTests: XCTestCase {
     private final class MutableClock: @unchecked Sendable {
         private let lock = NSLock()
         private var current: Date
-        init(_ start: Date) { current = start }
+        init(_ start: Date) {
+            current = start
+        }
+
         var now: Date {
             readNow()
         }
+
         func advance(_ seconds: TimeInterval) {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             current = current.addingTimeInterval(seconds)
         }
+
         private func readNow() -> Date {
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             return current
         }
     }
@@ -141,7 +159,9 @@ final class AlertCenterTests: XCTestCase {
 
     /// 让 setEnabled 里授权 Task 跑完(同 actor yield 数次足够)。
     private func settle() async {
-        for _ in 0..<10 { await Task.yield() }
+        for _ in 0 ..< 10 {
+            await Task.yield()
+        }
     }
 
     // MARK: - 授权时序
@@ -183,7 +203,7 @@ final class AlertCenterTests: XCTestCase {
         XCTAssertTrue(center.authorizationDenied, "拒绝 → 明确降级提示")
 
         // 规则照常判定:负载 80% 持续过 5 分钟(sustain 300s)→ 触发。
-        for _ in 0..<63 {
+        for _ in 0 ..< 63 {
             center.ingestSampling(systemCPULoad: 80, groups: [])
             clock.advance(5)
         }
@@ -272,7 +292,7 @@ final class AlertCenterTests: XCTestCase {
         await center.refreshAuthorization()
         sender.status = .authorized
 
-        for _ in 0..<AlertEngine.minimumConsecutiveEnter {
+        for _ in 0 ..< AlertEngine.minimumConsecutiveEnter {
             center.ingestDisk(availableBytes: 1_073_741_824)
         }
         await settle()
@@ -294,7 +314,7 @@ final class AlertCenterTests: XCTestCase {
 
     /// 磁盘读数连续越阈到触发(无持续时长要求,连续 3 次即入)。
     private func fireDiskAlert(_ center: AlertCenter) {
-        for _ in 0..<AlertEngine.minimumConsecutiveEnter {
+        for _ in 0 ..< AlertEngine.minimumConsecutiveEnter {
             center.ingestDisk(availableBytes: 1_073_741_824)
         }
     }
@@ -395,7 +415,7 @@ final class AlertCenterTests: XCTestCase {
         center.store.setThreshold(100, for: .groupCPU)
         await center.refreshAuthorization()
         // 两组同轮越阈并持续过 10 分钟 → 同一轮各触发一条。
-        for _ in 0..<123 {
+        for _ in 0 ..< 123 {
             center.ingestSampling(systemCPULoad: 10, groups: [
                 group(.app(bundlePath: "/Applications/A.app"), name: "A", cpu: 150),
                 group(.app(bundlePath: "/Applications/B.app"), name: "B", cpu: 150),
@@ -432,7 +452,7 @@ final class AlertCenterTests: XCTestCase {
         center.setEnabled(true, for: .systemLoad)
         await settle()
 
-        for _ in 0..<63 {
+        for _ in 0 ..< 63 {
             center.ingestSampling(systemCPULoad: 80, groups: [])
             clock.advance(5)
         }
@@ -442,7 +462,7 @@ final class AlertCenterTests: XCTestCase {
         XCTAssertEqual(sender.sent.first?.identifier, "systemLoad|system")
 
         // 解除:应用内列表清空(通知本身不撤,系统横幅语义)。
-        for _ in 0..<6 {
+        for _ in 0 ..< 6 {
             center.ingestSampling(systemCPULoad: 10, groups: [])
             clock.advance(5)
         }
@@ -465,7 +485,7 @@ final class AlertCenterTests: XCTestCase {
 
         // 阈值改动即时生效(经 store → 引擎):阈值改成 100GB,19GB 必然越阈。
         center.setThreshold(100 * 1_073_741_824, for: .diskAvailable)
-        for _ in 0..<3 {
+        for _ in 0 ..< 3 {
             center.ingestDisk(availableBytes: 19 * 1_073_741_824)
             clock.advance(30)
         }
@@ -488,7 +508,7 @@ final class AlertCenterTests: XCTestCase {
 
         let id = GroupIdentity.app(bundlePath: "/Applications/X.app")
         // preset sustain 600s:时钟快进满足时长。
-        for _ in 0..<125 {
+        for _ in 0 ..< 125 {
             center.ingestSampling(systemCPULoad: 20, groups: [group(id, name: "Xcode", cpu: 320)])
             clock.advance(5)
         }
@@ -509,7 +529,7 @@ final class AlertCenterTests: XCTestCase {
             clock: { clock.now }
         )
         await center.refreshAuthorization()
-        for _ in 0..<20 {
+        for _ in 0 ..< 20 {
             center.ingestSampling(systemCPULoad: 100, groups: [group(GroupIdentity.system, cpu: 999, memoryGB: 99)])
             center.ingestDisk(availableBytes: 0)
             clock.advance(300)

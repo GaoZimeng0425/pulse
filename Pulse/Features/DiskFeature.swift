@@ -24,8 +24,8 @@ final class DiskFeature: MonitorFeature {
     /// `throughputSource` 由工厂选定(Live = adoptingBestPath,回退档带上与 Sampler
     /// 同一个心跳中继——arch-review-2026-10-18/01 高2)。
     init(capacitySource: any DiskCapacitySource, throughputSource: any DiskThroughputSource) {
-        self.capacityProvider = DiskCapacityProvider(source: capacitySource)
-        self.throughputProvider = DiskThroughputProvider(source: throughputSource)
+        capacityProvider = DiskCapacityProvider(source: capacitySource)
+        throughputProvider = DiskThroughputProvider(source: throughputSource)
     }
 
     // MARK: - MonitorFeature

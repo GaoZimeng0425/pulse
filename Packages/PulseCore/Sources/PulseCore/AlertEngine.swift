@@ -1,6 +1,7 @@
 import Foundation
 
 // MARK: - 告警规则引擎(工单 P1-07,纯逻辑)
+
 //
 // 五元组(spec Implementation Decisions「告警」):匹配器 × 指标 × 阈值 ×
 // 持续时长 × 冷却期。状态机全纯:观察序列 + 注入时刻 → 事件流,单测见
@@ -23,7 +24,9 @@ public enum AlertKind: String, CaseIterable, Codable, Identifiable, Sendable {
     /// dev server 闲置 >24h(工单 08:数据源 = dev server finder 闲置环)。
     case devServerIdle
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// 固定预设(用户可改的只有开关与阈值;持续时长/冷却期随种类定型)。
     public var preset: AlertKindPreset {
@@ -55,7 +58,9 @@ public enum AlertKind: String, CaseIterable, Codable, Identifiable, Sendable {
 
     /// 数据源是否已接线(设置页只展示已接线的)。五条已全部接线:dev server
     /// 闲置的喂食随工单 08 落地(dev server finder 每轮盘点)。
-    public var isDataSourceWired: Bool { true }
+    public var isDataSourceWired: Bool {
+        true
+    }
 
     /// 点通知直达的视图(spec:系统负载→总览、组 CPU→CPU 页、磁盘→磁盘页;
     /// 新组内存同构延伸落内存页)。
@@ -136,8 +141,7 @@ public struct AlertEvaluationSettings: Equatable, Sendable {
         return settings
     }
 
-    public init() {
-    }
+    public init() {}
 }
 
 /// 引擎眼里一条规则的可执行策略。
@@ -270,25 +274,25 @@ public struct AlertEngine: Sendable {
 
     /// 单主体状态(主体 = 规则种类 × 对象键)。
     private struct SubjectState {
-        public var streakBreach = 0
-        public var streakSafe = 0
+        var streakBreach = 0
+        var streakSafe = 0
         /// 本轮连续越阈的起点(持续时长由此起算)。
-        public var firstBreachAt: Date?
-        public var phase: Phase = .idle
+        var firstBreachAt: Date?
+        var phase: Phase = .idle
         /// 上次实际发出的时刻(冷却期锚点)。
-        public var lastFiredAt: Date?
+        var lastFiredAt: Date?
         /// 组主体的观察序龄(出生=0,每喂一轮 +1);系统/磁盘主体不用。
-        public var age = 0
+        var age = 0
 
-        public enum Phase: Equatable {
+        enum Phase: Equatable {
             case idle
             case firing
         }
     }
 
     private struct SubjectRef: Hashable, Sendable {
-        public let kind: AlertKind
-        public let subjectKey: String
+        let kind: AlertKind
+        let subjectKey: String
     }
 
     private var subjects: [SubjectRef: SubjectState] = [:]
@@ -321,7 +325,7 @@ public struct AlertEngine: Sendable {
         lastAppliedSettings = settings
 
         switch feed {
-        case .sampling(let systemCPULoad, let groups):
+        case let .sampling(systemCPULoad, groups):
             events += ingestGroups(groups, now: now, settings: settings)
             if let policy = settings[.systemLoad], policy.isEnabled {
                 events += evaluate(
@@ -330,7 +334,7 @@ public struct AlertEngine: Sendable {
                     ageWindow: nil
                 )
             }
-        case .disk(let availableBytes):
+        case let .disk(availableBytes):
             if let policy = settings[.diskAvailable], policy.isEnabled {
                 events += evaluate(
                     kind: .diskAvailable, subjectKey: Self.diskSubject, subjectName: nil,
@@ -338,7 +342,7 @@ public struct AlertEngine: Sendable {
                     ageWindow: nil
                 )
             }
-        case .devServers(let servers):
+        case let .devServers(servers):
             events += ingestDevServers(servers, now: now, settings: settings)
         }
         return events
@@ -481,7 +485,9 @@ public struct AlertEngine: Sendable {
             // 带内(safe == false 且非 breach)两侧都不计;越阈侧推进进入、清退出。
             let countsTowardEnter = ageWindow.map { state.age < $0 } ?? true
             if countsTowardEnter {
-                if state.streakBreach == 0 { state.firstBreachAt = now }
+                if state.streakBreach == 0 {
+                    state.firstBreachAt = now
+                }
                 state.streakBreach += 1
             } else {
                 state.streakBreach = 0
@@ -548,6 +554,5 @@ public struct AlertEngine: Sendable {
         }
     }
 
-    public init() {
-    }
+    public init() {}
 }

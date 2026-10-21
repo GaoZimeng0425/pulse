@@ -1,12 +1,12 @@
-import XCTest
 @testable import Pulse
 @testable import PulseCore
+import XCTest
 
 /// 接缝(工单 P0.6-05):总览指标卡新增的系统级实时口径——CPU 用户/系统拆分、
 /// 内存构成与压力等级、内存已用历史序列、主机信息与运行时长文案。
 /// 期望值全部是手工推演的字面量,不经过实现同源计算。
 final class SystemStatsTests: XCTestCase {
-    private let base = Date(timeIntervalSinceReferenceDate: 1_000)
+    private let base = Date(timeIntervalSinceReferenceDate: 1000)
     private let gib: Double = 1_073_741_824
 
     // MARK: CPU 用户/系统拆分(CoreTickDiffer.breakdown)
@@ -70,7 +70,7 @@ final class SystemStatsTests: XCTestCase {
         // 已用 = App + 联动 + 压缩 = 1200 页 = 19_660_800 字节。
         let breakdown = MemoryBreakdown.make(
             pages: VMPageCounts(internal: 1000, purgeable: 200, external: 400, wired: 300, compressor: 100),
-            pageSize: 16_384,
+            pageSize: 16384,
             totalBytes: 40_000_000,
             pressure: .normal
         )
@@ -117,12 +117,12 @@ final class SystemStatsTests: XCTestCase {
 
     func testHistoryRecordsMemoryUsedWhenProvided() {
         var store = SampleHistoryStore(capacity: 3)
-        store.advance(systemCPULoad: 10, memoryUsedBytes: 5_000, groups: [])
+        store.advance(systemCPULoad: 10, memoryUsedBytes: 5000, groups: [])
         store.advance(systemCPULoad: 20, memoryUsedBytes: nil, groups: [])
-        store.advance(systemCPULoad: 30, memoryUsedBytes: 7_000, groups: [])
+        store.advance(systemCPULoad: 30, memoryUsedBytes: 7000, groups: [])
 
         // 缺读数的轮次不追加(不伪造 0 拉低走势)。
-        XCTAssertEqual(store.memoryUsed.values, [5_000, 7_000])
+        XCTAssertEqual(store.memoryUsed.values, [5000, 7000])
         XCTAssertEqual(store.systemCPULoad.values, [10, 20, 30])
     }
 
@@ -156,8 +156,8 @@ final class SystemStatsTests: XCTestCase {
     /// 字段一一对应(统计点与 by-Type 环共用此映射,漂移由本断言拦截)。
     func testMemoryCompositionTableMapsKeysToFields() {
         let breakdown = MemoryBreakdown(
-            totalBytes: 40_000_000, appBytes: 1_100, wiredBytes: 2_200,
-            compressedBytes: 3_300, cachedBytes: 4_400, pressure: .normal
+            totalBytes: 40_000_000, appBytes: 1100, wiredBytes: 2200,
+            compressedBytes: 3300, cachedBytes: 4400, pressure: .normal
         )
         XCTAssertEqual(MemoryCompositionKey.allCases.count, 5)
         XCTAssertEqual(MemoryCompositionKey.allCases.map(\.title), ["App", "联动", "压缩", "缓存", "空闲"])
@@ -174,7 +174,7 @@ final class SystemStatsTests: XCTestCase {
         XCTAssertEqual(PulseFormat.systemUptime(seconds: 45), "已运行 1 分钟")
         XCTAssertEqual(PulseFormat.systemUptime(seconds: 25 * 60), "已运行 25 分钟")
         XCTAssertEqual(PulseFormat.systemUptime(seconds: 3 * 3600 + 12 * 60), "已运行 3 小时 12 分")
-        XCTAssertEqual(PulseFormat.systemUptime(seconds: 6 * 86_400 + 4 * 3600 + 59), "已运行 6 天 4 小时")
+        XCTAssertEqual(PulseFormat.systemUptime(seconds: 6 * 86400 + 4 * 3600 + 59), "已运行 6 天 4 小时")
     }
 
     /// 负时长(时钟回拨)防御:按 0 夹紧,最少显示 1 分钟(迁自 EnvironmentInfoTests)。

@@ -2,6 +2,7 @@ import Foundation
 import PulseCore
 
 // MARK: - 装配(SystemMonitor 的构造入参与真实装配工厂)
+
 //
 // SystemMonitor.init 只收两样东西:主干的采集源(MonitorSources)与功能模块注册列表
 // (MonitorFeatures)。各模块在工厂里只用自己的采集源构造,对主干 / 心跳 / 其他模块的

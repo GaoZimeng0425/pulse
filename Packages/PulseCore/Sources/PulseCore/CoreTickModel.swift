@@ -68,7 +68,7 @@ public enum CoreTickDiffer {
         )
         var busyDelta: UInt64 = 0
         var totalDelta: UInt64 = 0
-        for core in 0..<coreCount {
+        for core in 0 ..< coreCount {
             let busy = Self.clampedDelta(
                 previous: previous.busyTicks[core], current: current.busyTicks[core]
             )
@@ -96,7 +96,7 @@ public enum CoreTickDiffer {
         var totalDelta: UInt64 = 0
         var userDelta: UInt64 = 0
         var systemDelta: UInt64 = 0
-        for core in 0..<coreCount {
+        for core in 0 ..< coreCount {
             totalDelta += clampedDelta(previous: previous.totalTicks[core], current: current.totalTicks[core])
             userDelta += clampedDelta(previous: previous.userTicks[core], current: current.userTicks[core])
             systemDelta += clampedDelta(previous: previous.systemTicks[core], current: current.systemTicks[core])

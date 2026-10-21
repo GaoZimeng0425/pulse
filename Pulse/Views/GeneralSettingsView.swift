@@ -1,7 +1,7 @@
 import AppKit
+import PulseCore
 import ServiceManagement
 import SwiftUI
-import PulseCore
 
 /// 通用设置(2026-10-16,用户反馈"开机自启这类设置应该进 Settings"):
 /// 登录自启 + 日志入口 + 版本信息。设置窗由此从单一"项目根"扩为
@@ -136,12 +136,12 @@ struct GeneralSettingsView: View {
     private func copyDiagnosticReport() {
         let monitor = monitor
         Task {
-            let report = DiagnosticReport.assemble(
+            let report = await DiagnosticReport.assemble(
                 version: bundleValue("CFBundleShortVersionString"),
                 build: bundleValue("CFBundleVersion"),
                 macOSVersion: ProcessInfo.processInfo.operatingSystemVersionString,
                 chipName: HostInfo.current.chipName,
-                stats: await monitor.samplingStats(),
+                stats: monitor.samplingStats(),
                 logTail: DiagnosticReport.logTail(directory: LogService.logDirectory),
                 now: Date()
             )

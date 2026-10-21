@@ -163,10 +163,20 @@ public struct BatteryReading: Equatable, Sendable {
     /// 充电状态映射(stats-ref :148-158):已充满 > 充电中 >
     /// 未充电且 NotChargingReason ≠ 0 = 优化充电已介入(接着电但不充,电量未满)
     /// > 使用电池。
-    public static func chargeStatus(isCharging: Bool, isCharged: Bool, notChargingReasonRaw: Int?) -> BatteryChargeStatus {
-        if isCharged { return .charged }
-        if isCharging { return .charging }
-        if (notChargingReasonRaw ?? 0) != 0 { return .optimizedCharging }
+    public static func chargeStatus(
+        isCharging: Bool,
+        isCharged: Bool,
+        notChargingReasonRaw: Int?
+    ) -> BatteryChargeStatus {
+        if isCharged {
+            return .charged
+        }
+        if isCharging {
+            return .charging
+        }
+        if (notChargingReasonRaw ?? 0) != 0 {
+            return .optimizedCharging
+        }
         return .discharging
     }
 
@@ -209,9 +219,9 @@ public protocol BatterySource: Sendable {
     func read() -> BatteryRawReading?
 }
 
-extension BatteryRawReading {
+public extension BatteryRawReading {
     /// IORegistry AppleSmartBattery 的单字段集合(内部:read 与读数装配的中转)。
-    public struct SmartBatteryValues {
+    struct SmartBatteryValues {
         public let designCapacity: Int?
         public let appleRawMaxCapacity: Int?
         public let nominalChargeCapacity: Int?

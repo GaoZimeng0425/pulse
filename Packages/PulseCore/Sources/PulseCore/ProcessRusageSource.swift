@@ -42,16 +42,16 @@ public struct ProcessRusageTable: Sendable {
     }
 }
 
-extension ProcessRusageTable {
+public extension ProcessRusageTable {
     /// 心跳快照 → rusage 表:字段与 RawProcess 一一对应;重复 pid 保留首个
     /// (与 ProcessSnapshot.processesByPID 同口径)。计数没读到的 pid 跳过
     /// (不以 0 入表):基线轮缺席 = 下一窗按新面孔记基线,瞬时读失败恢复时
     /// 不会把终身累计当一窗增量。
-    public init(snapshot: ProcessSnapshot) {
+    init(snapshot: ProcessSnapshot) {
         var samples: [pid_t: ProcessRusageSample] = [:]
         samples.reserveCapacity(snapshot.processes.count)
         for process in snapshot.processes
-        where process.countersAvailable && samples[process.pid] == nil {
+            where process.countersAvailable && samples[process.pid] == nil {
             samples[process.pid] = ProcessRusageSample(
                 cpuNanoseconds: process.cpuTimeNanoseconds,
                 wakeups: process.wakeups,
@@ -204,26 +204,26 @@ public struct ProcessRankingRound: Equatable, Sendable {
 private struct RusageWindow: Sendable {
     /// 满窗容差:吸收轮距略短于窗长的抖动。远小于最短心跳 1s——1s 心跳下
     /// 仍在第 5 轮满窗;5s 心跳下轮距若因调度改动短了几毫秒也不至于整窗翻倍。
-    public static let tolerance: TimeInterval = 0.25
+    static let tolerance: TimeInterval = 0.25
     /// 窗长上限倍数:弹窗开合让心跳在窗中途 1s → 5s 切换,单窗最长约 9s,
     /// 3 倍窗长留足余量;超出即视为断档。
-    public static let maximumSpan: Double = 3
+    static let maximumSpan: Double = 3
 
-    public let seconds: TimeInterval
+    let seconds: TimeInterval
     private var baseline: ProcessRusageTable?
 
-    public init(seconds: TimeInterval) {
+    init(seconds: TimeInterval) {
         self.seconds = seconds
     }
 
     /// 推进一趟;满窗返回 (基线, 实际间隔),否则 nil。表惰性取用:未满窗
     /// 的轮不建表(1s 心跳下五轮只建一次)。
-    public mutating func advance(
+    mutating func advance(
         at time: Date,
         table: () -> ProcessRusageTable
     ) -> (baseline: ProcessRusageTable, elapsed: TimeInterval)? {
         guard let baseline else {
-            self.baseline = table()
+            baseline = table()
             return nil
         }
         let elapsed = time.timeIntervalSince(baseline.takenAt)
@@ -236,7 +236,7 @@ private struct RusageWindow: Sendable {
         return (baseline, elapsed)
     }
 
-    public mutating func reset() {
+    mutating func reset() {
         baseline = nil
     }
 }
@@ -257,7 +257,9 @@ public struct ProcessRankingLedgers: Sendable {
     public mutating func record(_ snapshot: ProcessSnapshot) -> ProcessRankingRound {
         var built: ProcessRusageTable?
         let table = {
-            if let built { return built }
+            if let built {
+                return built
+            }
             let fresh = ProcessRusageTable(snapshot: snapshot)
             built = fresh
             return fresh
@@ -281,6 +283,5 @@ public struct ProcessRankingLedgers: Sendable {
         disk.reset()
     }
 
-    public init() {
-    }
+    public init() {}
 }

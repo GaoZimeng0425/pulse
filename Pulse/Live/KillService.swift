@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 import PulseCore
 
 // MARK: - 处置接缝(工单 08)
@@ -26,4 +26,3 @@ struct LiveKillService: KillService {
         }
     }
 }
-
