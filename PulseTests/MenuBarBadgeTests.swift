@@ -243,6 +243,18 @@ final class MenuBarBadgeTests: XCTestCase {
         XCTAssertLessThanOrEqual(network.size.height, cpu.size.height)
     }
 
+    // MARK: - 设置页槽位行(2026-10-21 删槽位闪退回归钉)
+
+    /// 删槽位那一帧 SwiftUI 仍按旧下标求值被删行的 Picker:下标越界必须回落到末槽
+    /// 而不是崩;合法下标照常取值。
+    func testSettingsSlotRowFallsBackToLastSlotWhenIndexIsStale() {
+        let slots: [MenuBarBadgeMetric] = [.cpu, .ram, .diskRemaining]
+        XCTAssertEqual(MenuBarBadgeSettingsView.displayedSlot(slots, at: 1), .ram)
+        XCTAssertEqual(MenuBarBadgeSettingsView.displayedSlot(slots, at: 3), .diskRemaining)
+        XCTAssertEqual(MenuBarBadgeSettingsView.displayedSlot(slots, at: 99), .diskRemaining)
+        XCTAssertEqual(MenuBarBadgeSettingsView.displayedSlot([], at: 0), .cpu)
+    }
+
     // MARK: - 夹具
 
     /// 合成数据(单测不制造真实负载):CPU 42.6% → "43%",RAM 恰好 50%。
