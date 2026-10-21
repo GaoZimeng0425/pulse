@@ -84,11 +84,9 @@ struct PulseApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            DashboardView(monitor: monitor)
-                // 弹窗开/关 = 采样节奏 1s/5s 的切换信号(合盖省电)。
-                .onAppear { monitor.setPopoverVisible(true) }
-                .onDisappear { monitor.setPopoverVisible(false) }
-                .task { monitor.start() }
+            // 弹窗内容经可见性门控(popover-leak/01):关闭后视图树不再逐轮重算;
+            // onAppear/onDisappear(采样节奏 1s/5s)与 .task(start)都在门控根上。
+            MenuBarPopoverGate(monitor: monitor)
         } label: {
             MenuBarLoadLabel(display: badgeDisplay)
                 // 菜单栏标签常驻:app 拉起即开始采样(start 幂等)。
