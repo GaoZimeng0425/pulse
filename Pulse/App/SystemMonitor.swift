@@ -245,6 +245,12 @@ final class SystemMonitor {
         wakeObserver = nil
     }
 
+    /// 弹窗是否在场(popover-leak/01 视图门控的唯一读数):单一事实源 =
+    /// visibility(MonitorVisibility),写路径仍是 setPopoverVisible。
+    var popoverVisible: Bool {
+        visibility.popover
+    }
+
     /// 弹窗可见性变化:采样节奏在 5s/1s 间切换(合盖省电,spec)。
     /// 出生扫描不受弹窗影响:登记的完整性不依赖观看。弹窗也是模块排行
     /// (工单 module-rankings/01)的可见性信号之一:弹窗在场即开闸(RankingsFeature.visibilityChanged)。

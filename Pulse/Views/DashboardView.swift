@@ -26,10 +26,20 @@ struct DashboardView: View {
     /// 当前 tab(工单 03):图标 tab 点击或 ←/→ 切换,内容模型由此折叠;
     /// 初始 tab 可注入(走查 / 深链预留),默认总览。
     @State private var tabSelection: MetricTabSelection
+    /// tab 变更回报(popover-leak/01):弹窗门控层持有 tab 记忆,重开还原。
+    private let onTabChange: ((MetricTab) -> Void)?
 
-    init(monitor: SystemMonitor, initialTab: MetricTab = .overview) {
+    init(
+        monitor: SystemMonitor,
+        initialTab: MetricTab = .overview,
+        model: DashboardModel? = nil,
+        onTabChange: ((MetricTab) -> Void)? = nil
+    ) {
         self.monitor = monitor
-        _model = State(initialValue: DashboardModel(monitor: monitor))
+        self.onTabChange = onTabChange
+        // model 可注入(弹窗门控层常驻持有,关闭销毁视图不丢会话状态);默认自建
+        // (走查 / 预览等独立实例场景)。
+        _model = State(initialValue: model ?? DashboardModel(monitor: monitor))
         // 展示轴随电池可用性(工单 p1-history/02),与主窗口同轴(含历史页)。
         _tabSelection = State(initialValue: MetricTabSelection(
             current: initialTab,
@@ -71,6 +81,10 @@ struct DashboardView: View {
         // 首次电池读数落地 → 电池页入轴(工单 02);被隐藏的当前 tab 回落总览。
         .onChange(of: monitor.battery.hasBattery) { _, hasBattery in
             tabSelection.setAxis(MetricTab.displayAxis(hasBattery: hasBattery))
+        }
+        // tab 变更单点回报(图标条 / ←/→ / 内容切换都汇到这里)。
+        .onChange(of: tabSelection.current) { _, tab in
+            onTabChange?(tab)
         }
         .modifier(KillFailureAlert(report: $model.killFailureReport))
     }

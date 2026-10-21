@@ -28,6 +28,7 @@
 		20550F03DAEF45E3DEBE36E7 /* AlertSettingsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24703C16273CB98970E4297 /* AlertSettingsStoreTests.swift */; };
 		25710F4D00266A1760713D57 /* AlertCenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71178307830FDF67F93A9523 /* AlertCenterTests.swift */; };
 		26CA5B5B1921FF464893439C /* MenuBarBadgeDisplayModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D074B7F60170564351BEE7F /* MenuBarBadgeDisplayModelTests.swift */; };
+		28E10F6A5444AE34BD9A17C5 /* MenuBarPopoverGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61B8D8E52DBAB492B5EDA31E /* MenuBarPopoverGate.swift */; };
 		294EBD9BB566F85D7B9E80A6 /* MemoryStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6CB838FAB56E49D3DB8D34D /* MemoryStats.swift */; };
 		2C1C4AA05A53133216CF1E3B /* ProcArgsParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A311BFB8099AF93518F47C9B /* ProcArgsParser.swift */; };
 		2CCCA9B897A9A569F82F95BB /* LiveProcessSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06A4CAD37F3D2BE0A494F9DA /* LiveProcessSource.swift */; };
@@ -189,6 +190,7 @@
 		5A686C29DAEAD2AC1D94E833 /* HistoryFeatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryFeatureTests.swift; sourceTree = "<group>"; };
 		5D074B7F60170564351BEE7F /* MenuBarBadgeDisplayModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarBadgeDisplayModelTests.swift; sourceTree = "<group>"; };
 		5E7F860EECC5F68388BB8FC6 /* AlertSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSettingsView.swift; sourceTree = "<group>"; };
+		61B8D8E52DBAB492B5EDA31E /* MenuBarPopoverGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarPopoverGate.swift; sourceTree = "<group>"; };
 		660FB2721DCBDC67C5B3E98A /* LineagePruningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineagePruningTests.swift; sourceTree = "<group>"; };
 		689A729F03DE35CA0C9E3D5D /* MainWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowView.swift; sourceTree = "<group>"; };
 		6A98A79159A39E317CC43DA0 /* NettopProcessRateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NettopProcessRateTests.swift; sourceTree = "<group>"; };
@@ -413,6 +415,7 @@
 				0C38D7DFC6277C706723DEF7 /* MenuBarBadgeComposer.swift */,
 				073B425254E4BAF7B7E3744F /* MenuBarBadgeDisplayModel.swift */,
 				D24F280DF9DF1C4BD1AE2729 /* MenuBarBadgeSettingsView.swift */,
+				61B8D8E52DBAB492B5EDA31E /* MenuBarPopoverGate.swift */,
 				726DD15D946CA1C40E9B17F9 /* MeterBar.swift */,
 				D764FB1CFE74208F7730C4FA /* MetricAccent.swift */,
 				53973290E8EB9138A67B958C /* MetricCardModel.swift */,
@@ -670,6 +673,7 @@
 				4956480A7F13BF6F4CC7215F /* MenuBarBadgeComposer.swift in Sources */,
 				3871E7D6449E0799D45D40DD /* MenuBarBadgeDisplayModel.swift in Sources */,
 				6F81F0419525B5BABE9C8885 /* MenuBarBadgeSettingsView.swift in Sources */,
+				28E10F6A5444AE34BD9A17C5 /* MenuBarPopoverGate.swift in Sources */,
 				D397A1C4ABDB5AE7AB188061 /* MeterBar.swift in Sources */,
 				1069B0AC6FD05BFF476483F6 /* MetricAccent.swift in Sources */,
 				005D31D5A553D3A1105FF607 /* MetricCardModel.swift in Sources */,
