@@ -49,7 +49,9 @@ struct DiskVolumeBreakdownView: View {
 
     private func row(_ label: String, usedBytes: UInt64, totalBytes: UInt64, prominent: Bool = false)
         -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        // 标签行 → 比例条:{spacing.inline}(2 的最紧档视觉上贴死,2026-10-21 用户目验);
+        // 行间 8({spacing.gap})大于行内 6,层级保持。
+        VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 Text(label)
                     .font(.system(size: 12, weight: prominent ? .medium : .regular))
