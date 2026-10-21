@@ -5,17 +5,18 @@ import Foundation
 /// 归组引擎每轮消费的正是快照里的这份三元组,缓存值即快照值。
 ///
 /// 失配与校正策略(工单拍板二选一:**采样轮低频校正**,不做失配检测):
-/// - **exec / pid 复用即时捕获**:每轮反正要读一次 KERN_PROC(父链 + 启动
-///   时刻),顺带比对 p_comm——exec 即换名,内核保证;不一致立即重读整组
-///   身份,零额外系统调用。
+/// - **exec / pid 复用即时捕获**:每轮反正要读一次进程表(resident-cost/01 3a
+///   起为一趟 KERN_PROC_ALL,此前为逐 pid KERN_PROC),顺带比对 p_comm——
+///   exec 即换名,内核保证;不一致立即重读整组身份,零额外系统调用。
 /// - **cwd 低频校正**:chdir 没有任何免费失配信号,任何"检测"都得先读一次
 ///   VNODEPATHINFO,与直接重读同价——故不做检测,按 `refreshInterval`
 ///   低频重读。校正重读整组三元组(同一条读取路径),顺带把"同前缀改名
 ///   exec"这一 p_comm 残余盲区也钉进同一个可见上界。
 ///
-/// 账目:稳态轮每进程 3 次调用(KERN_PROC + PROC_PIDTASKINFO + rusage),
-/// 校正轮 +3;5s 节奏下平均约 3.25 次/轮(改动前恒为 6 次)。纯值类型,
-/// 决策可单测;宿主(LiveProcessSource)负责真实读取与加锁。
+/// 账目(resident-cost/01 3a 后):稳态轮每进程 2 次调用(PROC_PIDTASKINFO +
+/// rusage)+ 每轮一趟 KERN_PROC_ALL 全表(ppid / p_comm / 启动时刻全在手);
+/// 校正轮该进程 +3 次身份调用。纯值类型,决策可单测;宿主(LiveProcessSource)
+/// 负责真实读取与加锁。
 public struct ProcessIdentityCache: Sendable {
     /// 一条缓存:身份三元组 + exec 指纹 + 校准时刻。
     public struct Entry: Sendable {
