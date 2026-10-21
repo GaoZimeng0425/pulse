@@ -169,7 +169,7 @@ struct RankingListRow<Badge: View, Trailing: View>: View {
     @ViewBuilder
     private var icon: some View {
         if let bundlePath {
-            Image(nsImage: AppIconCache.icon(forBundle: bundlePath))
+            Image(nsImage: AppIconCache.icon(forBundle: bundlePath, pointSize: iconSize))
                 .resizable()
                 .aspectRatio(contentMode: .fit)
         } else {
@@ -202,21 +202,51 @@ extension RankingListRow where Badge == EmptyView, Trailing == EmptyView {
     }
 }
 
-// MARK: - 应用图标缓存(arch-review-2026-10-18/04)
+// MARK: - 应用图标缓存(arch-review-2026-10-18/04;resident-cost/01 3c 预栅格化)
 
-/// 应用图标按 bundle 路径缓存:排行行与环形图例每次重绘都要图标,`NSWorkspace.icon`
-/// 每次都走 LaunchServices 查询(主窗口开着时是采样里的显眼热点)。图标在进程生命期内
-/// 几乎不变;NSCache 在内存吃紧时自行回收。
+/// 应用图标按(bundle 路径, 显示点尺寸)缓存并**预栅格化**:排行行与环形图例每次重绘
+/// 都要图标,`NSWorkspace.icon` 的原图带多档大尺寸表示,直接绘制每次都要把大图缩到
+/// 16–22pt(真机探针 ~118µs/次;LaunchServices 查询另付 0.7–2.5ms/miss)——主窗口
+/// 开着时是采样里的显眼热点。取图后按显示尺寸(点 × 屏幕缩放)栅格化成小位图
+/// (~135µs 一次),此后每次绘制 ~8µs(15 倍);首次解码 ~3ms 一次性。图标在进程
+/// 生命期内几乎不变;NSCache 在内存吃紧时自行回收。栅格化失败退回原图,行为同改前。
 @MainActor
 enum AppIconCache {
     private static let cache = NSCache<NSString, NSImage>()
 
-    static func icon(forBundle path: String) -> NSImage {
-        if let cached = cache.object(forKey: path as NSString) {
+    static func icon(forBundle path: String, pointSize: CGFloat) -> NSImage {
+        let scale = NSScreen.main?.backingScaleFactor ?? 2
+        let key = "\(path)@\(Int((pointSize * scale).rounded()))" as NSString
+        if let cached = cache.object(forKey: key) {
             return cached
         }
-        let icon = NSWorkspace.shared.icon(forFile: path)
-        cache.setObject(icon, forKey: path as NSString)
+        let source = NSWorkspace.shared.icon(forFile: path)
+        let icon = rasterized(source: source, pointSize: pointSize, scale: scale) ?? source
+        cache.setObject(icon, forKey: key)
         return icon
+    }
+
+    /// 按显示尺寸栅格化:像素 = 点 × 屏幕缩放(位图 rep 先设点尺寸再建上下文,
+    /// CTM 才按缩放折算);高质量插值从原图一次降采样。
+    private static func rasterized(source: NSImage, pointSize: CGFloat, scale: CGFloat) -> NSImage? {
+        let pixels = Int((pointSize * scale).rounded())
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels,
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+        ) else { return nil }
+        rep.size = NSSize(width: pointSize, height: pointSize)
+        guard let context = NSGraphicsContext(bitmapImageRep: rep) else { return nil }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        context.imageInterpolation = .high
+        source.draw(
+            in: NSRect(x: 0, y: 0, width: pointSize, height: pointSize),
+            from: .zero, operation: .sourceOver, fraction: 1
+        )
+        NSGraphicsContext.restoreGraphicsState()
+        let image = NSImage(size: NSSize(width: pointSize, height: pointSize))
+        image.addRepresentation(rep)
+        return image
     }
 }
