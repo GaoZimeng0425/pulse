@@ -63,11 +63,19 @@ struct MenuBarBadgeSettingsView: View {
 
     private func slotBinding(_ index: Int) -> Binding<MenuBarBadgeMetric> {
         Binding(
-            get: { configuration.slots[index] },
+            get: { Self.displayedSlot(configuration.slots, at: index) },
             set: { newValue in
                 configurationRaw = configuration.replacingSlot(at: index, with: newValue).rawValue
             }
         )
+    }
+
+    /// 槽位行的显示值:ForEach 按下标标识行,**删槽位的那一帧 SwiftUI 仍按旧下标求值
+    /// 被删行的 Picker**(行求值先于数组收缩),直接下标越界即崩(2026-10-21 用户删槽位
+    /// 闪退)。越界回落到末槽——该行下一帧即消失,回落值只撑那一帧的显示,不写回配置
+    /// (写路径 replacingSlot 自带下标守卫)。配置恒 ≥1 槽,`last` 必有值。
+    static func displayedSlot(_ slots: [MenuBarBadgeMetric], at index: Int) -> MenuBarBadgeMetric {
+        slots.indices.contains(index) ? slots[index] : (slots.last ?? .cpu)
     }
 
     /// 上移/下移:交换相邻槽位;首行无上移、末行无下移。
