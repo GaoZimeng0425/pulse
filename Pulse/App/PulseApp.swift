@@ -34,6 +34,9 @@ struct PulseApp: App {
     /// 采样管线持有者:app 生命周期内常驻(@State 在 App 中只创建一次)。
     /// 拉起即喂入已持久化的项目根——重启后项目归因即刻可用。
     @State private var monitor: SystemMonitor
+    /// 菜单栏徽标显示快照(badge-hysteresis/01):标签唯一数据源,原始读数折算
+    /// 出这里(迟滞后值不变不赋值,标签属性图不逐轮翻搅)。观察在 `.task` 里启动。
+    @State private var badgeDisplay: MenuBarBadgeDisplayModel
     /// 告警通知路由(工单 07):UNUserNotificationCenter delegate,点通知直达。
     @State private var alertRouter: AlertNotificationRouter
     /// 开窗环境(点通知广播的响应点在标签视图修饰链上)。
@@ -43,7 +46,19 @@ struct PulseApp: App {
         _ = LogService.shared // 拉起即建文件日志通道(~/.Pulse/logs,含退出留痕观察者)
         let store = ProjectRootsStore()
         _rootsStore = State(initialValue: store)
-        _monitor = State(initialValue: SystemMonitor.live(projectRoots: store.projectRoots))
+        let monitor = SystemMonitor.live(projectRoots: store.projectRoots)
+        _monitor = State(initialValue: monitor)
+        // 原始读数折叠与标签旧 body 同源同口径(CPU / 内存 / 磁盘容量 / 网络速率);
+        // 读数源的每次变化都驱动一次折算,折算结果不变就不发布。
+        _badgeDisplay = State(initialValue: MenuBarBadgeDisplayModel {
+            MenuBarBadgeData(
+                cpuLoadPercent: monitor.systemCPULoad,
+                memory: monitor.memory,
+                diskAvailableBytes: monitor.disk.capacity?.availableForImportantUsageBytes,
+                diskTotalBytes: monitor.disk.capacity?.containerTotalBytes,
+                networkRate: monitor.network.reading?.rates
+            )
+        })
         // delegate 必须在通知到达前挂上(app 拉起即挂;点开横幅 → 路由到主窗口)。
         let router = AlertNotificationRouter()
         UNUserNotificationCenter.current().delegate = router
@@ -75,7 +90,7 @@ struct PulseApp: App {
                 .onDisappear { monitor.setPopoverVisible(false) }
                 .task { monitor.start() }
         } label: {
-            MenuBarLoadLabel(monitor: monitor)
+            MenuBarLoadLabel(display: badgeDisplay)
                 // 菜单栏标签常驻:app 拉起即开始采样(start 幂等)。
                 .task { monitor.start() }
                 // 设置窗(唯一的项目根编辑入口)增删后,标签视图在此捕获变更,
@@ -121,8 +136,11 @@ struct PulseApp: App {
 
 /// 菜单栏标签:槽位可配置(工单 09)——默认 CPU / RAM,小标签在数字上方;
 /// 槽位顺序、四选一从设置「菜单栏」页来(@AppStorage 同键共享,配置改动
-/// 即时生效、重启保留)。CPU 超 70% 变红,RAM 联动内存压力变色。独立成
-/// View,保证 @Observable 的读取落在视图 body 内——负载变化即时刷新菜单栏。
+/// 即时生效、重启保留)。CPU 超 70% 变红,RAM 联动内存压力变色。
+///
+/// 数据源 = 显示快照模型(badge-hysteresis/01):迟滞后的读数是唯一输入,
+/// 原始读数每轮在模型内折算、值不变不赋值——本视图的属性图不再逐轮重评估,
+/// 位图缓存键随之稳定。colorScheme 与槽位配置两个低频依赖仍由视图直接观察。
 ///
 /// 位图路径的由来(工单 09 实机走查修正):MenuBarExtra 的 label 会被系统重绘成
 /// NSStatusItem 内容,SwiftUI 的 foregroundStyle / AttributedString 颜色一律被
@@ -130,25 +148,17 @@ struct PulseApp: App {
 /// 用 ImageRenderer 预绘成**带颜色的位图**,以 `.renderingMode(.original)` 交给
 /// 系统——这是 SwiftUI 栈下唯一可靠的方式。渲染器见 MenuBarBadge.swift,合成逻辑见 MenuBarBadgeComposer.swift。
 struct MenuBarLoadLabel: View {
-    let monitor: SystemMonitor
+    /// 显示快照模型(badge-hysteresis/01):见上方"数据源"说明;`.task` 启动观察。
+    let display: MenuBarBadgeDisplayModel
     /// 菜单栏深浅外观:正常态文字用白/黑随外观,警示态固定系统色。
     @Environment(\.colorScheme) private var colorScheme
     /// 槽位配置(工单 09):与设置页同键共享,非法值回默认。
     @AppStorage("settings.menuBarBadge") private var badgeConfigRaw = MenuBarBadgeConfiguration.default.rawValue
 
     var body: some View {
-        // 用户拍板(2026-10-15):菜单栏双读数——CPU / RAM,小标签在数字上方。
-        // 工单 p1-history/09 起读数清单可配置(1–4 槽,四项可同时上屏),默认 [CPU, RAM] 与该形态
-        // 逐像素一致;数据快照在此从 SystemMonitor 折叠,映射在纯函数层。
         let contents = MenuBarBadgeComposer.compose(
             MenuBarBadgeConfiguration(rawValue: badgeConfigRaw) ?? .default,
-            data: MenuBarBadgeData(
-                cpuLoadPercent: monitor.systemCPULoad,
-                memory: monitor.memory,
-                diskAvailableBytes: monitor.disk.capacity?.availableForImportantUsageBytes,
-                diskTotalBytes: monitor.disk.capacity?.containerTotalBytes,
-                networkRate: monitor.network.reading?.rates
-            )
+            data: display.data
         )
         Image(
             nsImage: MenuBarBadgeRenderer.image(for: contents, colorScheme: colorScheme)
@@ -156,5 +166,6 @@ struct MenuBarLoadLabel: View {
         .renderingMode(.original)
         .accessibilityLabel("系统状态")
         .accessibilityValue(contents.map { "\($0.caption) \($0.text)" }.joined(separator: ","))
+        .task { display.start() }
     }
 }
