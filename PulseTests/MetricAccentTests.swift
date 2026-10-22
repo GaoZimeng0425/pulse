@@ -18,6 +18,8 @@ final class MetricAccentTests: XCTestCase {
         // 声音/蓝牙(p2-sensors/05):§1.1 Sound/Bluetooth 现成行,外设页取 Bluetooth 青。
         XCTAssertEqual(Metric.sound.accent, MetricAccentToken(light: 0xC2379B, dark: 0xD955B3))
         XCTAssertEqual(Metric.bluetooth.accent, MetricAccentToken(light: 0x0891B2, dark: 0x22A8CC))
+        // 容器(p2-sensors/07):§1.1 Projects 行(服务负载语义相邻)。
+        XCTAssertEqual(Metric.containers.accent, MetricAccentToken(light: 0xEB6834, dark: 0xD95926))
     }
 
     /// "双套"的前提:同一指标的浅色与深色必须互异(相同即退化为单套)。

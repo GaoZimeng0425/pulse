@@ -55,6 +55,7 @@ struct MonitorFeatures {
     let smc: SmcFeature
     let sound: SoundFeature
     let bluetooth: BluetoothFeature
+    let containers: ContainerFeature
     let launchdManifest: LaunchdManifestFeature
 
     /// 派发顺序:onRound / 广播 / 可见性 / 传感器登记 / 启停都按它走。
@@ -104,6 +105,7 @@ extension SystemMonitor {
                 smc: SmcFeature(source: LiveSmcSource()),
                 sound: SoundFeature(source: LiveSoundSource()),
                 bluetooth: BluetoothFeature(source: LiveBluetoothSource()),
+                containers: ContainerFeature(source: LiveContainerSource()),
                 launchdManifest: LaunchdManifestFeature(provider: LaunchdManifestProvider())
             )
         )

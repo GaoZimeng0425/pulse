@@ -70,12 +70,14 @@ struct MainWindowView: View {
             monitor.setGpuPageVisible(newTab == .gpu)
             monitor.setSensorsPageVisible(newTab == .sensors)
             monitor.setPeripheralsPageVisible(newTab == .peripherals)
+            monitor.setContainersPageVisible(newTab == .containers)
         }
         .onDisappear {
             monitor.setModuleRankingsVisible(false)
             monitor.setGpuPageVisible(false)
             monitor.setSensorsPageVisible(false)
             monitor.setPeripheralsPageVisible(false)
+            monitor.setContainersPageVisible(false)
         }
         // 点开告警通知 → 直达对应 tab(工单 P1-07):窗口存活时响应广播;
         // 窗口刚被 openWindow 拉起时 onAppear 消费落下的 pendingTab。
@@ -97,6 +99,7 @@ struct MainWindowView: View {
             monitor.setGpuPageVisible(tabSelection.current == .gpu)
             monitor.setSensorsPageVisible(tabSelection.current == .sensors)
             monitor.setPeripheralsPageVisible(tabSelection.current == .peripherals)
+            monitor.setContainersPageVisible(tabSelection.current == .containers)
             MainWindowView.repositionIfOffscreen()
             // 系统窗口恢复套旧 frame 发生在 onAppear 之后——补一拍延迟守卫。
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {

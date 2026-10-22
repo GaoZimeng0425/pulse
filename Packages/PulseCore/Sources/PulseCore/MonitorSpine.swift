@@ -122,6 +122,8 @@ public struct MonitorVisibility: Equatable, Sendable {
     /// 不消费本旗标;蓝牙家族(06 票)的"可见 30s / 不可见停"扫描闸消费它。
     /// 旗标随 05 一并落地,页面接线不必二次拆动。
     public var peripheralsPage = false
+    /// 主窗口停在容器页(p2-sensors/07):docker.sock 采样闸消费(弹窗 ∨ 本旗标)。
+    public var containersPage = false
 
     /// 任一(传感意义上的)窗口可见。
     public var anyWindow: Bool {
@@ -134,7 +136,8 @@ public struct MonitorVisibility: Equatable, Sendable {
         mainWindow: Bool = false,
         gpuPage: Bool = false,
         sensorsPage: Bool = false,
-        peripheralsPage: Bool = false
+        peripheralsPage: Bool = false,
+        containersPage: Bool = false
     ) {
         self.popover = popover
         self.moduleRankings = moduleRankings
@@ -142,6 +145,7 @@ public struct MonitorVisibility: Equatable, Sendable {
         self.gpuPage = gpuPage
         self.sensorsPage = sensorsPage
         self.peripheralsPage = peripheralsPage
+        self.containersPage = containersPage
     }
 }
 

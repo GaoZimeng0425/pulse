@@ -70,6 +70,10 @@ struct MetricTabStack<Ranking: View>: View {
                 MetricMainCardView(model: model.aneModel, isCompact: isCompact)
                 PowerDomainsCardView(reading: monitor.power.reading, isCompact: isCompact)
             }
+        case .containers:
+            // 容器页(p2-sensors/07):docker.sock 单发快照表;数据卷占用行
+            // 刻意不做(未拍板,spec Out of Scope)。
+            ContainersCardView(reading: monitor.containers.reading, isCompact: isCompact)
         case .battery:
             // 电池页(工单 p1-history/02):六项读数主卡 + 能耗影响排行
             // (工单 module-rankings/01,只读);组排行与电池无关,不放。
