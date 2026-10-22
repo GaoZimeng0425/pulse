@@ -65,6 +65,16 @@ final class DashboardModel {
         .gpu(monitor.gpu.reading, trend: monitor.gpu.trend)
     }
 
+    /// ANE 卡(p2-sensors/03):功率读 monitor.power,归一化随芯片上限折算;
+    /// 未首读/ANE 通道缺席时全占位(MetricCardModel.ane 兜底)。
+    var aneModel: MetricCardModel {
+        .ane(
+            power: monitor.power.reading,
+            normalizedPercent: monitor.power.aneNormalizedPercent,
+            trend: monitor.power.aneTrend
+        )
+    }
+
     /// 网络卡(工单 06):实时速率读心跳差分(monitor.network.reading,LastGood),
     /// Today/7 天累计读历史库聚合(monitor.history.networkTotals),走势 = 速率环;
     /// 未首读时全占位(MetricCardModel.network 兜底)。

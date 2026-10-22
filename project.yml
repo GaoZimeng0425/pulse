@@ -31,6 +31,10 @@ targets:
       base:
         PRODUCT_NAME: Pulse
         PRODUCT_BUNDLE_IDENTIFIER: com.gaozimeng.pulse
+        # IOReport(Energy Model 订阅,p2-sensors/03)无 SDK 公开头,符号在
+        # /usr/lib/libIOReport.dylib;手工 @_silgen_name 声明 + 显式链接
+        # (探针④同款做法)。
+        OTHER_LDFLAGS: ["-lIOReport"]
         # 图标源 = Pulse/Assets.xcassets/AppIcon.appiconset,由 scripts/render-app-icon.swift
         # 生成;改图标改脚本重跑,不手工替换 png。
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

@@ -225,6 +225,53 @@ extension MetricCardModel {
         )
     }
 
+    /// ANE 卡(p2-sensors/03):大数字 = ANE 瓦数(GLOSSARY「五路功率」之 A 路),
+    /// 四列小统计 = 归一化(芯片上限表,M4=6W)/ 五路合计 / 峰值;走势 = ANE 瓦数环。
+    /// 强调色沿用 GPU 页(ANE 无独立令牌——Neural 与 Memory 同色,独立 tab 时再议,
+    /// 口径记 p2-sensors/03)。读数缺失(订阅缺席/首轮前/通道不在)占位不伪造;
+    /// 首读/断档轮 = 0 W 是差分语义(PowerAccumulator),显示 0 不是坏数。
+    static func ane(
+        power: PowerReading?,
+        normalizedPercent: Double?,
+        trend: [Double]
+    ) -> MetricCardModel {
+        guard let aneWatts = power?.watts[.ane] else {
+            return MetricCardModel(
+                metric: .gpu,
+                title: "ANE",
+                symbolName: "brain.filled",
+                caption: "Neural Engine 功率",
+                figureValue: "—",
+                figureUnit: "W",
+                chip: nil,
+                note: "",
+                stats: [],
+                trend: [],
+                domainMax: 1
+            )
+        }
+        return MetricCardModel(
+            metric: .gpu,
+            title: "ANE",
+            symbolName: "brain.filled",
+            caption: "Neural Engine 功率",
+            figureValue: aneWatts < 10 ? String(format: "%.1f", aneWatts) : String(format: "%.0f", aneWatts),
+            figureUnit: "W",
+            chip: nil,
+            note: normalizedPercent.map { String(format: "归一化 %.0f%%", $0) } ?? "",
+            stats: [
+                MetricCardStat(label: "归一化", value: normalizedPercent.map { String(format: "%.0f%%", $0) } ?? "—"),
+                MetricCardStat(
+                    label: "五路合计",
+                    value: power.map { PowerDomainsCardView.wattsText($0.totalWatts) } ?? "—"
+                ),
+                MetricCardStat(label: "峰值", value: trend.max().map { PowerDomainsCardView.wattsText($0) } ?? "—"),
+            ],
+            trend: trend,
+            domainMax: max(1, trend.max() ?? 1)
+        )
+    }
+
     /// 磁盘卡(工单 05):大数字 = 容器已用(十进制 GB,Finder 口径),四列小统计 =
     /// 实际可用(Finder「可用」importantUsage 口径)/ 可清除(两 key 差值,与
     /// 「实际可用」分开文案)/ 读取速率 / 写入速率;走势 = 读写合计流量。
