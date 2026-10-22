@@ -61,9 +61,11 @@
 		5665FC76EC2418D1B81682B1 /* MenuBarBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABC98F0C4A2054944D3B34AC /* MenuBarBadge.swift */; };
 		5C50195499CD0434F9BB20CB /* OverviewCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FA58858B993A1A243A26B63 /* OverviewCards.swift */; };
 		5E698B91C352218AEC7DF667 /* MetricAccentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD1902314E98C2C8F685D0D9 /* MetricAccentTests.swift */; };
+		5E918F632298B152858E0461 /* BluetoothSensorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A3A11CA7FAC45ECB8511C5B /* BluetoothSensorTests.swift */; };
 		6164A801BF9C51036BBF73BC /* EnergyModelSensorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C01F3A4AB4BC765537F64DA /* EnergyModelSensorTests.swift */; };
 		616D7878CF54B2A29104277C /* ProcArgsParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 922EBEDDF974C9C5C567A5C8 /* ProcArgsParserTests.swift */; };
 		62894C55877E1831EA472420 /* GpuFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4822D29598222B0F5B29959A /* GpuFeature.swift */; };
+		6517E8053877F96B96DB576D /* BluetoothSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931F7070B78C75E7EF03B08A /* BluetoothSensor.swift */; };
 		67564384C3B69AC9097524CE /* MainWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 689A729F03DE35CA0C9E3D5D /* MainWindowView.swift */; };
 		6A5229101F7D0A32D3436F8A /* GeneralSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C9E00667C343ED4FBBFF8AE /* GeneralSettingsView.swift */; };
 		6F81F0419525B5BABE9C8885 /* MenuBarBadgeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D24F280DF9DF1C4BD1AE2729 /* MenuBarBadgeSettingsView.swift */; };
@@ -123,6 +125,7 @@
 		E0391947A668FC976A3C1FEC /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 992920D9BD4AE699DFE1A1B5 /* SettingsView.swift */; };
 		E3B976A319DD3E4CA4DF499F /* AlertSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0853EEEEB0FB9F6834A00E /* AlertSettingsStore.swift */; };
 		E4A99F8C1ACA71DF7876AF70 /* AcceptanceAnchorEndToEndTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C71FCD146BC0C56EF25AEE9 /* AcceptanceAnchorEndToEndTests.swift */; };
+		E4D75C44AC23E2372C3ED09B /* BluetoothCardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84AFAFC8D33B01908457ADE1 /* BluetoothCardViews.swift */; };
 		E51ED75C0AB66949E0707600 /* NettopWatchdogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE62A3533CA867B81B4B903B /* NettopWatchdogTests.swift */; };
 		E559247BAA70D0A1868BD156 /* LiveProcessSourceSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A992F5F503CAD7CB90DD838 /* LiveProcessSourceSmokeTests.swift */; };
 		E714615BB26F05C456D5D362 /* BatteryFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60B90549169579BCCD01677 /* BatteryFeature.swift */; };
@@ -131,6 +134,7 @@
 		EF095DB50F12562588921E86 /* SoundSensorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 126800DC1FC5FCB799DDA633 /* SoundSensorTests.swift */; };
 		F561B3A52AAFFD59A852E1E8 /* DashboardModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA9B6FCA72A37F307AF87A30 /* DashboardModel.swift */; };
 		F63D91DA540721BCDDDDA930 /* LiveCoreTickSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B06E911B136D09E8F6E569D /* LiveCoreTickSource.swift */; };
+		F8BFD73A176A854B22A5F34E /* BluetoothFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFE3997D6A5E04C1873A7645 /* BluetoothFeature.swift */; };
 		F9A396D8A1532DCE83296553 /* LogServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A5BBAE60025E3EB318E411 /* LogServiceTests.swift */; };
 		FA39C087AD11F34D92DFDDFF /* KillEndToEndTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94AE23A1D17532F33018843D /* KillEndToEndTests.swift */; };
 		FDC1890BBEEC4851C1070282 /* AlertViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E21F1F65F4010BF7A6C0C88 /* AlertViews.swift */; };
@@ -203,6 +207,7 @@
 		45E2272104F2DA88C999666C /* NetworkFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkFixture.swift; sourceTree = "<group>"; };
 		4822D29598222B0F5B29959A /* GpuFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GpuFeature.swift; sourceTree = "<group>"; };
 		4A05CDA8C1EBF16044C21BFD /* ParentChainQueryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParentChainQueryTests.swift; sourceTree = "<group>"; };
+		4A3A11CA7FAC45ECB8511C5B /* BluetoothSensorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothSensorTests.swift; sourceTree = "<group>"; };
 		4C9E00667C343ED4FBBFF8AE /* GeneralSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsView.swift; sourceTree = "<group>"; };
 		4FBA30D234A433E58E16508B /* PulseTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PulseTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		53973290E8EB9138A67B958C /* MetricCardModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricCardModel.swift; sourceTree = "<group>"; };
@@ -225,10 +230,12 @@
 		75143473F1438552A6B29F53 /* DiskCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskCardViews.swift; sourceTree = "<group>"; };
 		78EC09371E86E7408FA32ADC /* AppIconCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconCacheTests.swift; sourceTree = "<group>"; };
 		793E152BCFF6DC45BB501438 /* CardFamily.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardFamily.swift; sourceTree = "<group>"; };
+		84AFAFC8D33B01908457ADE1 /* BluetoothCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothCardViews.swift; sourceTree = "<group>"; };
 		8B93B7757A455F9566934A21 /* MainWindowGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowGate.swift; sourceTree = "<group>"; };
 		8C71FCD146BC0C56EF25AEE9 /* AcceptanceAnchorEndToEndTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcceptanceAnchorEndToEndTests.swift; sourceTree = "<group>"; };
 		8D0336878D6164F8E0FA0FCD /* BatterySensorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySensorTests.swift; sourceTree = "<group>"; };
 		922EBEDDF974C9C5C567A5C8 /* ProcArgsParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcArgsParserTests.swift; sourceTree = "<group>"; };
+		931F7070B78C75E7EF03B08A /* BluetoothSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothSensor.swift; sourceTree = "<group>"; };
 		9378B86940EBE30E057F718D /* MetricTabModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricTabModelTests.swift; sourceTree = "<group>"; };
 		9434FBDCD0EABA01ACDC0639 /* MetricTabViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricTabViews.swift; sourceTree = "<group>"; };
 		94AE23A1D17532F33018843D /* KillEndToEndTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KillEndToEndTests.swift; sourceTree = "<group>"; };
@@ -245,6 +252,7 @@
 		A93981AEA461948386E597BB /* SoundSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundSensor.swift; sourceTree = "<group>"; };
 		ABC98F0C4A2054944D3B34AC /* MenuBarBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarBadge.swift; sourceTree = "<group>"; };
 		AD227C96857D63ACF7B5E480 /* KillService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KillService.swift; sourceTree = "<group>"; };
+		AFE3997D6A5E04C1873A7645 /* BluetoothFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothFeature.swift; sourceTree = "<group>"; };
 		B4AD28E35F37C300CAEC8717 /* SmcSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmcSensor.swift; sourceTree = "<group>"; };
 		B4E07450A436F2AE681A8772 /* RingCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RingCardView.swift; sourceTree = "<group>"; };
 		B7B5ADC98A14B764E51366DB /* SystemMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMonitor.swift; sourceTree = "<group>"; };
@@ -362,6 +370,7 @@
 				556E90C2DDB739846AA22485 /* AlertCenter.swift */,
 				BA0853EEEEB0FB9F6834A00E /* AlertSettingsStore.swift */,
 				D60B90549169579BCCD01677 /* BatteryFeature.swift */,
+				AFE3997D6A5E04C1873A7645 /* BluetoothFeature.swift */,
 				41196C89D2456B23F701DF21 /* DevServerFeature.swift */,
 				F5067DB98A38E61400019E48 /* DiskFeature.swift */,
 				4822D29598222B0F5B29959A /* GpuFeature.swift */,
@@ -420,6 +429,7 @@
 				05102129BE186A01609E2D26 /* AlertNotification.swift */,
 				1C592AC26CEC4C7129D0463B /* BatterySensor.swift */,
 				C3ED9E7F6F40FF3D9167EACB /* BirthScanner.swift */,
+				931F7070B78C75E7EF03B08A /* BluetoothSensor.swift */,
 				3B385E37375A17C83745D0C7 /* BundleDisplayNameReader.swift */,
 				318F273F87B0FBA5A9534EAC /* DevServerFinder.swift */,
 				DCF3D2ECCF35087812BF92C5 /* DiskSensor.swift */,
@@ -445,6 +455,7 @@
 			children = (
 				5E7F860EECC5F68388BB8FC6 /* AlertSettingsView.swift */,
 				9E21F1F65F4010BF7A6C0C88 /* AlertViews.swift */,
+				84AFAFC8D33B01908457ADE1 /* BluetoothCardViews.swift */,
 				793E152BCFF6DC45BB501438 /* CardFamily.swift */,
 				CA9B6FCA72A37F307AF87A30 /* DashboardModel.swift */,
 				07AEB236867D309A37AACDA8 /* DashboardView.swift */,
@@ -493,6 +504,7 @@
 				78EC09371E86E7408FA32ADC /* AppIconCacheTests.swift */,
 				8D0336878D6164F8E0FA0FCD /* BatterySensorTests.swift */,
 				B861A747FF3BF8E186AD5FFB /* BirthScannerTests.swift */,
+				4A3A11CA7FAC45ECB8511C5B /* BluetoothSensorTests.swift */,
 				0B5633EC929F85A22B2BB45E /* BundleDisplayNameReaderTests.swift */,
 				DF3E209527FBD12B7B4014D9 /* DevServerFinderTests.swift */,
 				276EA0F7DAC2C0AC558E9614 /* DiagnosticReportTests.swift */,
@@ -644,6 +656,7 @@
 				AA6920C6B25E30AC0A50495C /* BatteryFixture.swift in Sources */,
 				9E646AB14BF339B36602F1B8 /* BatterySensorTests.swift in Sources */,
 				46DBB21B089E14C2B6E39036 /* BirthScannerTests.swift in Sources */,
+				5E918F632298B152858E0461 /* BluetoothSensorTests.swift in Sources */,
 				1A6FBBAA8FFC5AB748E47788 /* BundleDisplayNameReaderTests.swift in Sources */,
 				3DEFB73B1AB0CBBE257F342F /* DevServerFinderTests.swift in Sources */,
 				3A4696425FA64D6D47C5ED02 /* DiagnosticReportTests.swift in Sources */,
@@ -700,6 +713,9 @@
 				E714615BB26F05C456D5D362 /* BatteryFeature.swift in Sources */,
 				CD3119D8DB34CB29A184EFC1 /* BatterySensor.swift in Sources */,
 				D4605E885F98739193E40F49 /* BirthScanner.swift in Sources */,
+				E4D75C44AC23E2372C3ED09B /* BluetoothCardViews.swift in Sources */,
+				F8BFD73A176A854B22A5F34E /* BluetoothFeature.swift in Sources */,
+				6517E8053877F96B96DB576D /* BluetoothSensor.swift in Sources */,
 				4A8D2CF642BAB02C25FEF6C9 /* BundleDisplayNameReader.swift in Sources */,
 				71EB9AFF0FA27487AB7EE515 /* CardFamily.swift in Sources */,
 				F561B3A52AAFFD59A852E1E8 /* DashboardModel.swift in Sources */,
@@ -866,6 +882,7 @@
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Pulse 读取已配对蓝牙设备的连接状态与电量,用于外设页展示。";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -892,6 +909,7 @@
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Pulse 读取已配对蓝牙设备的连接状态与电量,用于外设页展示。";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
