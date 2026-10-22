@@ -100,8 +100,15 @@ fi
 
 # ── SwiftLint(检测;error 级才非零退出,warning 放行)──
 if [ "$mode" = staged ]; then
-  # shellcheck disable=SC2086
-  swiftlint lint --quiet --force-exclude $files || sl_status=1
+  # 暂存文件全部落在 .swiftlint.yml 排除域(如 docs/ 下的探针存档)时,swiftlint
+  # 以 "No lintable files found" 非零退出——那是「无管辖」不是违规,放行;
+  # 真违规(file:line: error)照常透传,不受此守卫影响。
+  sl_out=$(swiftlint lint --quiet --force-exclude $files 2>&1)
+  sl_status=$?
+  if [ "$sl_status" != 0 ] && printf '%s' "$sl_out" | grep -q "No lintable files found"; then
+    sl_status=0
+  fi
+  [ -n "$sl_out" ] && printf '%s\n' "$sl_out"
 else
   swiftlint lint --quiet || sl_status=1
 fi

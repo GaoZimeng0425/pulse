@@ -1,0 +1,11 @@
+/_ping → HTTP 200 body=OK
+/containers/json → HTTP 200(133 ms) 容器数:7
+  /openmaic-openmaic-1  state=running  image=openmaic-openmaic
+  /deeptutor  state=running  image=ghcr.io/hkuds/deeptutor:latest
+  /deeptutor-redis  state=running  image=redis:7.4-alpine
+  /openmaic-postgres-1  state=running  image=postgres:16
+  /open-connector-connector-1  state=exited  image=ghcr.io/oomol-lab/open-connector:latest
+  /searxng-core  state=running  image=docker.io/searxng/searxng:latest
+  /searxng-valkey  state=running  image=docker.io/valkey/valkey:9-alpine
+/stats → HTTP 200(1021 ms)  cpu_usage=7882343000 online_cpus=10 mem_usage=146173952
+✅ 结论:docker.sock 单发 HTTP 三发全通(ping/列表/stats),chunked 去块与 JSON 形状与 docker API 一致,07 票数据路成立

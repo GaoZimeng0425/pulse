@@ -1,0 +1,9 @@
+蓝牙状态: poweredOn
+开始扫描(20s)…
+发现: P08  RSSI=-64  广播服务=[]
+连接 → P08(计时开始)…
+结论:连接超时(设备不可达)—— 如实落档
+
+--- 补充(源①证据,同刻):IORegistry AppleDeviceManagementHIDEventService 读到
+BatteryPercent = 44(妙控板,1 台在场)—— 蓝牙三源之 IORegistry 路开箱即用;
+GATT 路结论维持"按需建连、设备在场才可达",与 06 票设计一致。
