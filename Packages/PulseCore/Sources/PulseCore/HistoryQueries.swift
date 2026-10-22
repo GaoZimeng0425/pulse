@@ -89,6 +89,9 @@ public enum HistoryMetricKey: String, CaseIterable, Identifiable, Sendable {
     case memory
     case network
     case disk
+    case temperature
+    case gpu
+    case power
 
     public var id: String {
         rawValue
@@ -101,6 +104,9 @@ public enum HistoryMetricKey: String, CaseIterable, Identifiable, Sendable {
         case .memory: "内存"
         case .network: "网络"
         case .disk: "磁盘"
+        case .temperature: "温度"
+        case .gpu: "GPU"
+        case .power: "功率"
         }
     }
 
@@ -112,13 +118,16 @@ public enum HistoryMetricKey: String, CaseIterable, Identifiable, Sendable {
         case .memory: .memory
         case .network: .network
         case .disk: .disk
+        case .temperature: .sensors
+        case .gpu: .gpu
+        case .power: .gpu // 五路功率页住在 GPU tab,同源粉色(GPU/功率一族)
         }
     }
 
     /// 读系统级表(system_*)还是组级表(sample_*)。
     public var readsSystemTables: Bool {
         switch self {
-        case .systemLoad, .network, .disk: true
+        case .systemLoad, .network, .disk, .temperature, .gpu, .power: true
         case .cpu, .memory: false
         }
     }
@@ -131,6 +140,9 @@ public enum HistoryMetricKey: String, CaseIterable, Identifiable, Sendable {
         case .memory: "全部组内存峰值之和(App 归因视角;系统级未计入)"
         case .network: "收发合计平均速率;工单 06 起开始记录"
         case .disk: "读写合计平均速率;工单 06 起开始记录"
+        case .temperature: "CPU 均值派生温度(最热见峰值);P2 传感器 08 起记录"
+        case .gpu: "GPU 总利用率(关电归 0 同记);P2 传感器 08 起记录"
+        case .power: "五路功率合计(CPU+GPU+ANE+RAM+SoC 平均瓦数);P2 传感器 08 起记录"
         }
     }
 
@@ -141,6 +153,9 @@ public enum HistoryMetricKey: String, CaseIterable, Identifiable, Sendable {
         case .systemLoad, .cpu: PulseFormat.cpuPercent(value)
         case .memory: PulseFormat.memory(UInt64(value.rounded()))
         case .network, .disk: PulseFormat.diskRate(value)
+        case .temperature: String(format: "%.1f°C", value)
+        case .gpu: PulseFormat.cpuPercent(value)
+        case .power: String(format: "%.1f W", value)
         }
     }
 }
@@ -247,6 +262,26 @@ public enum HistoryQuery {
             sql = """
             SELECT ts / \(bucket) * \(bucket) AS bucket,
                    SUM(disk_read + disk_written) AS value
+            FROM \(table) WHERE ts >= ? AND ts < ?
+            GROUP BY bucket ORDER BY bucket
+            """
+        case .temperature:
+            sql = """
+            SELECT ts / \(bucket) * \(bucket) AS bucket, AVG(temp_avg) AS value
+            FROM \(table) WHERE ts >= ? AND ts < ?
+            GROUP BY bucket ORDER BY bucket
+            """
+        case .gpu:
+            sql = """
+            SELECT ts / \(bucket) * \(bucket) AS bucket, AVG(gpu_util) AS value
+            FROM \(table) WHERE ts >= ? AND ts < ?
+            GROUP BY bucket ORDER BY bucket
+            """
+        case .power:
+            // 五路合计取行级合计的桶均(NULL 传染:任一路缺席该行不计,诚实空段)。
+            sql = """
+            SELECT ts / \(bucket) * \(bucket) AS bucket,
+                   AVG(pow_cpu + pow_gpu + pow_ane + pow_ram + pow_soc) AS value
             FROM \(table) WHERE ts >= ? AND ts < ?
             GROUP BY bucket ORDER BY bucket
             """

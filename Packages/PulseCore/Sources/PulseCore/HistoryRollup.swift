@@ -73,6 +73,13 @@ public struct MinuteAggregate: Equatable, Sendable {
     /// 差分丢弃轮为 0,与网络增量同口径)。
     public let diskReadBytes: UInt64
     public let diskWriteBytes: UInt64
+    /// P2 传感器趋势量(p2-sensors/08,仪表型取窗内均值/峰值;传感器缺席
+    /// 的分钟为 nil → 落库 NULL,查询层如实空段):温度派生(CPU 均值/全机
+    /// 最热,°C)、GPU 利用率(%)、五路功率平均瓦数。
+    public let tempAverage: Double?
+    public let tempMax: Double?
+    public let gpuUtilization: Double?
+    public let powerWatts: PowerDomainWatts?
 
     public init(
         minuteStart: Date,
@@ -82,7 +89,11 @@ public struct MinuteAggregate: Equatable, Sendable {
         netRxBytes: UInt64,
         netTxBytes: UInt64,
         diskReadBytes: UInt64,
-        diskWriteBytes: UInt64
+        diskWriteBytes: UInt64,
+        tempAverage: Double? = nil,
+        tempMax: Double? = nil,
+        gpuUtilization: Double? = nil,
+        powerWatts: PowerDomainWatts? = nil
     ) {
         self.minuteStart = minuteStart
         self.groups = groups
@@ -92,6 +103,33 @@ public struct MinuteAggregate: Equatable, Sendable {
         self.netTxBytes = netTxBytes
         self.diskReadBytes = diskReadBytes
         self.diskWriteBytes = diskWriteBytes
+        self.tempAverage = tempAverage
+        self.tempMax = tempMax
+        self.gpuUtilization = gpuUtilization
+        self.powerWatts = powerWatts
+    }
+}
+
+/// 五路功率的一分钟均值(p2-sensors/08;各域独立计数,缺席域为 nil——
+/// 某域无样本时不参与均值也不伪造 0)。
+public struct PowerDomainWatts: Equatable, Sendable {
+    public var cpu: Double?
+    public var gpu: Double?
+    public var ane: Double?
+    public var ram: Double?
+    public var soc: Double?
+
+    public init(cpu: Double? = nil, gpu: Double? = nil, ane: Double? = nil, ram: Double? = nil, soc: Double? = nil) {
+        self.cpu = cpu
+        self.gpu = gpu
+        self.ane = ane
+        self.ram = ram
+        self.soc = soc
+    }
+
+    public var total: Double? {
+        let values = [cpu, gpu, ane, ram, soc].compactMap(\.self)
+        return values.isEmpty ? nil : values.reduce(0, +)
     }
 }
 
@@ -144,6 +182,13 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
     /// 当前窗的磁盘吞吐增量合计(与网络增量同款记账)。
     private var diskReadBytes: UInt64 = 0
     private var diskWriteBytes: UInt64 = 0
+    /// P2 传感器仪表累计(08):温度均值样本/最热、GPU 利用率样本、五路功率
+    /// 样本(各域独立求和计数;nil 样本不入账)。
+    private var tempSamples: [Double] = []
+    private var tempPeak: Double?
+    private var gpuUtilSamples: [Double] = []
+    private var powerSums: [PowerDomain: Double] = [:]
+    private var powerCounts: [PowerDomain: Int] = [:]
 
     /// 采样进窗。跨入新分钟时返回上一分钟的聚合(该分钟有样本才非 nil);
     /// 时间戳早于当前窗(时钟回拨/乱序迟到)时丢弃该样本,不污染已聚合窗口。
@@ -155,7 +200,11 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
         netRxBytes: UInt64 = 0,
         netTxBytes: UInt64 = 0,
         diskReadBytes: UInt64 = 0,
-        diskWriteBytes: UInt64 = 0
+        diskWriteBytes: UInt64 = 0,
+        tempAverage: Double? = nil,
+        tempMax: Double? = nil,
+        gpuUtilization: Double? = nil,
+        powerWatts: [PowerDomain: Double]? = nil
     ) -> MinuteAggregate? {
         let minute = HistoryWindows.minuteStart(of: now)
         if let current = currentMinuteStart {
@@ -169,13 +218,22 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
                 self.netTxBytes = 0
                 self.diskReadBytes = 0
                 self.diskWriteBytes = 0
+                tempSamples = []
+                tempPeak = nil
+                gpuUtilSamples = []
+                powerSums = [:]
+                powerCounts = [:]
                 accumulate(
                     systemLoad: systemLoad,
                     groups: groups,
                     netRxBytes: netRxBytes,
                     netTxBytes: netTxBytes,
                     diskReadBytes: diskReadBytes,
-                    diskWriteBytes: diskWriteBytes
+                    diskWriteBytes: diskWriteBytes,
+                    tempAverage: tempAverage,
+                    tempMax: tempMax,
+                    gpuUtilization: gpuUtilization,
+                    powerWatts: powerWatts
                 )
                 return flushed
             }
@@ -188,7 +246,11 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
             netRxBytes: netRxBytes,
             netTxBytes: netTxBytes,
             diskReadBytes: diskReadBytes,
-            diskWriteBytes: diskWriteBytes
+            diskWriteBytes: diskWriteBytes,
+            tempAverage: tempAverage,
+            tempMax: tempMax,
+            gpuUtilization: gpuUtilization,
+            powerWatts: powerWatts
         )
         return nil
     }
@@ -199,9 +261,28 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
         netRxBytes: UInt64 = 0,
         netTxBytes: UInt64 = 0,
         diskReadBytes: UInt64 = 0,
-        diskWriteBytes: UInt64 = 0
+        diskWriteBytes: UInt64 = 0,
+        tempAverage: Double? = nil,
+        tempMax: Double? = nil,
+        gpuUtilization: Double? = nil,
+        powerWatts: [PowerDomain: Double]? = nil
     ) {
         systemLoads.append(systemLoad)
+        if let tempAverage {
+            tempSamples.append(tempAverage)
+        }
+        if let tempMax {
+            tempPeak = max(tempPeak ?? -Double.infinity, tempMax)
+        }
+        if let gpuUtilization {
+            gpuUtilSamples.append(gpuUtilization)
+        }
+        if let powerWatts {
+            for (domain, watts) in powerWatts {
+                powerSums[domain, default: 0] += watts
+                powerCounts[domain, default: 0] += 1
+            }
+        }
         // 增量逐轮求和(加法可能进位,用 &+ 防溢出崩溃:历史记账宁绕回不算)。
         self.netRxBytes = self.netRxBytes &+ netRxBytes
         self.netTxBytes = self.netTxBytes &+ netTxBytes
@@ -237,6 +318,15 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
                 )
             }
             .sorted { $0.identity < $1.identity } // stableKey 字典序(Comparable 即此序)
+        let powerWatts: PowerDomainWatts? = powerCounts.isEmpty
+            ? nil
+            : PowerDomainWatts(
+                cpu: powerSums[.cpu].map { $0 / Double(powerCounts[.cpu] ?? 1) },
+                gpu: powerSums[.gpu].map { $0 / Double(powerCounts[.gpu] ?? 1) },
+                ane: powerSums[.ane].map { $0 / Double(powerCounts[.ane] ?? 1) },
+                ram: powerSums[.ram].map { $0 / Double(powerCounts[.ram] ?? 1) },
+                soc: powerSums[.soc].map { $0 / Double(powerCounts[.soc] ?? 1) }
+            )
         return MinuteAggregate(
             minuteStart: currentMinuteStart ?? .distantPast,
             groups: groups,
@@ -245,7 +335,11 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
             netRxBytes: netRxBytes,
             netTxBytes: netTxBytes,
             diskReadBytes: diskReadBytes,
-            diskWriteBytes: diskWriteBytes
+            diskWriteBytes: diskWriteBytes,
+            tempAverage: tempSamples.isEmpty ? nil : tempSamples.reduce(0.0, +) / Double(tempSamples.count),
+            tempMax: tempPeak,
+            gpuUtilization: gpuUtilSamples.isEmpty ? nil : gpuUtilSamples.reduce(0.0, +) / Double(gpuUtilSamples.count),
+            powerWatts: powerWatts
         )
     }
 

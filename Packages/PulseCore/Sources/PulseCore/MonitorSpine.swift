@@ -195,6 +195,13 @@ public enum FeatureEvent {
     case diskCapacity(DiskCapacityReading)
     /// 本轮 dev server 盘点(DevServerFeature,每轮一次)。
     case devServers([DevServerStatus])
+    /// GPU 传感器交付(GpuFeature,可见 5s 档 ∨ 不可见 30s 历史档;带新鲜度,
+    /// 历史记账只认 fresh——p2-sensors/08)。
+    case gpuSample(SensorDelivery<GpuReading>)
+    /// SMC 传感器交付(SmcFeature,温度派生口径在 HistoryFeed 折算)。
+    case smcSample(SensorDelivery<SmcReading>)
+    /// 五路功率传感器交付(PowerFeature)。
+    case powerSample(SensorDelivery<PowerReading>)
 }
 
 /// 功能模块扩展点(ADR-0003 预约「每个服务以独立模块 + 小协议扩展点组织,经注册表

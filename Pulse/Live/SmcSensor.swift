@@ -210,7 +210,14 @@ final class SmcSensorProvider: SensorProvider, @unchecked Sendable {
     }
 
     func snapshot() async -> SmcReading? {
-        guard gate.isVisible, let raw = source.read() else { return nil }
+        guard gate.isVisible else { return nil }
+        return await historySnapshot()
+    }
+
+    /// 历史档读(p2-sensors/08):不看可见性闸;坏值防御的 previous 状态与
+    /// UI 档共用(同一条坏值沿用链,档位切换不断账)。
+    func historySnapshot() async -> SmcReading? {
+        guard let raw = source.read() else { return nil }
         let reading = SmcReadingBuilder.make(from: raw, previous: previous)
         previous = reading
         guard let reading else { return nil }
