@@ -24,6 +24,12 @@ struct PillTabItem {
 ///   (多 tab 竞争宽度时总量恒定的根治法,工单 P1 验收走查拍板)。
 /// - `.always` = 文字恒显(项数少、宽度无竞争的场合,如历史页范围切换)。
 ///
+/// 玻璃外裹(用户拍板 2026-10-22:历史页要与工具栏同款玻璃包裹):工具栏的
+/// 玻璃胶囊是 macOS 26 工具栏自动给 `.principal` 内容套的,不是我们画的;
+/// 内容页没有这层系统包裹,`isGlassContainer = true` 时自备同款——药丸外
+/// 留 4pt 内距再套系统 Liquid Glass(`glassEffect()`,系统材质,不自绘底)。
+/// 工具栏用法保持 false,避免双重玻璃。
+///
 /// 约束:`.selectedOnly` 的每项必须有 `symbol`,否则未选中药丸为空。
 struct PillTabBar<Item: Hashable>: View {
     enum TextVisibility {
@@ -36,6 +42,7 @@ struct PillTabBar<Item: Hashable>: View {
     let items: [Item]
     @Binding var selection: Item
     var textVisibility: TextVisibility = .always
+    var isGlassContainer = false
     let item: (Item) -> PillTabItem
 
     /// 第一参数裸传(items 语义自明),其余带标签;item 映射放尾随闭包。
@@ -43,15 +50,28 @@ struct PillTabBar<Item: Hashable>: View {
         _ items: [Item],
         selection: Binding<Item>,
         textVisibility: TextVisibility = .always,
+        isGlassContainer: Bool = false,
         item: @escaping (Item) -> PillTabItem
     ) {
         self.items = items
         _selection = selection
         self.textVisibility = textVisibility
+        self.isGlassContainer = isGlassContainer
         self.item = item
     }
 
     var body: some View {
+        if isGlassContainer {
+            // 与工具栏同配方:首尾(及上下)药丸离玻璃胶囊边 4pt,不贴边。
+            bar
+                .padding(4)
+                .glassEffect()
+        } else {
+            bar
+        }
+    }
+
+    private var bar: some View {
         HStack(spacing: 4) {
             ForEach(items, id: \.self) { value in
                 pill(for: value)
@@ -105,14 +125,17 @@ struct PillTabBar<Item: Hashable>: View {
     @Previewable @State var metric: HistoryMetricKey = .systemLoad
     @Previewable @State var range: HistoryRange = .hour1
     VStack(alignment: .leading, spacing: 16) {
-        // 工具栏同形态:未选中纯图标、选中展开文字(各指标色)
+        // 工具栏同形态:未选中纯图标、选中展开文字(各指标色)+ 玻璃外裹
         PillTabBar(
-            HistoryMetricKey.allCases, selection: $metric, textVisibility: .selectedOnly
+            HistoryMetricKey.allCases,
+            selection: $metric,
+            textVisibility: .selectedOnly,
+            isGlassContainer: true
         ) { key in
             PillTabItem(title: key.title, symbol: key.symbolName, tint: key.accent.accentColor)
         }
-        // 文字恒显形态:色调跟随所选指标
-        PillTabBar(HistoryRange.allCases, selection: $range) { span in
+        // 文字恒显形态:色调跟随所选指标 + 玻璃外裹
+        PillTabBar(HistoryRange.allCases, selection: $range, isGlassContainer: true) { span in
             PillTabItem(title: span.title, tint: metric.accent.accentColor)
         }
     }
