@@ -103,18 +103,24 @@ public struct RoundSpine {
 
 /// 窗口可见性:功能模块的采样成本闸门信号——弹窗在场 / 主窗口模块排行页在场。
 /// 任一为真即「有窗口在看」(模块排行只在有人看时推进,工单 module-rankings/01)。
+/// `mainWindow` 例外:它只作主窗口**内容门控**的信号(popover-leak/01,Window 场景
+/// 关闭后视图树不销毁的对症读数),不进 `anyWindow`——传感闸门仍由弹窗 / 模块页
+/// 两个更精细的信号驱动,主窗口停在非排行页时不白跑 nettop。
 public struct MonitorVisibility: Equatable, Sendable {
     public var popover = false
     public var moduleRankings = false
+    /// 主窗口整体在场(popover-leak/01 视图门控专用,不参与 anyWindow 传感闸门)。
+    public var mainWindow = false
 
-    /// 任一窗口可见。
+    /// 任一(传感意义上的)窗口可见。
     public var anyWindow: Bool {
         popover || moduleRankings
     }
 
-    public init(popover: Bool = false, moduleRankings: Bool = false) {
+    public init(popover: Bool = false, moduleRankings: Bool = false, mainWindow: Bool = false) {
         self.popover = popover
         self.moduleRankings = moduleRankings
+        self.mainWindow = mainWindow
     }
 }
 

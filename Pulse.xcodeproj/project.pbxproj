@@ -45,6 +45,7 @@
 		46DBB21B089E14C2B6E39036 /* BirthScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B861A747FF3BF8E186AD5FFB /* BirthScannerTests.swift */; };
 		46FA3C977CB5BA520598C04C /* SystemMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7B5ADC98A14B764E51366DB /* SystemMonitor.swift */; };
 		4956480A7F13BF6F4CC7215F /* MenuBarBadgeComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C38D7DFC6277C706723DEF7 /* MenuBarBadgeComposer.swift */; };
+		498BC0DC7F05FF35BF31B569 /* MainWindowGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B93B7757A455F9566934A21 /* MainWindowGate.swift */; };
 		4A70488CB7607A767B604693 /* LogService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C5195738D18D24F08D8281 /* LogService.swift */; };
 		4A8D2CF642BAB02C25FEF6C9 /* BundleDisplayNameReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B385E37375A17C83745D0C7 /* BundleDisplayNameReader.swift */; };
 		4C316564981903520DD003A2 /* NetworkFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30359B7325F49ACFB28D448 /* NetworkFeature.swift */; };
@@ -203,6 +204,7 @@
 		75143473F1438552A6B29F53 /* DiskCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskCardViews.swift; sourceTree = "<group>"; };
 		78EC09371E86E7408FA32ADC /* AppIconCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconCacheTests.swift; sourceTree = "<group>"; };
 		793E152BCFF6DC45BB501438 /* CardFamily.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardFamily.swift; sourceTree = "<group>"; };
+		8B93B7757A455F9566934A21 /* MainWindowGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowGate.swift; sourceTree = "<group>"; };
 		8C71FCD146BC0C56EF25AEE9 /* AcceptanceAnchorEndToEndTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcceptanceAnchorEndToEndTests.swift; sourceTree = "<group>"; };
 		8D0336878D6164F8E0FA0FCD /* BatterySensorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySensorTests.swift; sourceTree = "<group>"; };
 		922EBEDDF974C9C5C567A5C8 /* ProcArgsParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcArgsParserTests.swift; sourceTree = "<group>"; };
@@ -410,6 +412,7 @@
 				75143473F1438552A6B29F53 /* DiskCardViews.swift */,
 				4C9E00667C343ED4FBBFF8AE /* GeneralSettingsView.swift */,
 				7139D7B174756F0CAD5B532C /* HistoryView.swift */,
+				8B93B7757A455F9566934A21 /* MainWindowGate.swift */,
 				689A729F03DE35CA0C9E3D5D /* MainWindowView.swift */,
 				ABC98F0C4A2054944D3B34AC /* MenuBarBadge.swift */,
 				0C38D7DFC6277C706723DEF7 /* MenuBarBadgeComposer.swift */,
@@ -667,6 +670,7 @@
 				F63D91DA540721BCDDDDA930 /* LiveCoreTickSource.swift in Sources */,
 				2CCCA9B897A9A569F82F95BB /* LiveProcessSource.swift in Sources */,
 				4A70488CB7607A767B604693 /* LogService.swift in Sources */,
+				498BC0DC7F05FF35BF31B569 /* MainWindowGate.swift in Sources */,
 				67564384C3B69AC9097524CE /* MainWindowView.swift in Sources */,
 				294EBD9BB566F85D7B9E80A6 /* MemoryStats.swift in Sources */,
 				5665FC76EC2418D1B81682B1 /* MenuBarBadge.swift in Sources */,

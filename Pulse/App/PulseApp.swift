@@ -116,11 +116,10 @@ struct PulseApp: App {
         // 主窗口(工单 P0.5-01):全部组 + 可排序进程表 + 详情下钻。
         // 入口在弹窗底部"打开主窗口"按钮(用户拍板:合并为单一菜单栏项);
         // 窗口内容不触碰 setPopoverVisible:关窗只藏窗,采样节奏不受影响(spec)。
+        // 内容经可见性门控(popover-leak/01 主窗口同病同修):关闭后视图树不再
+        // 逐轮重算;.task(start)在门控根上。
         Window("Pulse", id: MainWindowSceneID.value) {
-            MainWindowView(monitor: monitor, alertRouter: alertRouter)
-                // 菜单栏标签拉起即启动采样(start 幂等);此处再提一次,
-                // 让预览 / 理论上的窗口先行场景同样有数据。
-                .task { monitor.start() }
+            MainWindowGate(monitor: monitor, alertRouter: alertRouter)
         }
         .defaultSize(width: 880, height: 620)
 

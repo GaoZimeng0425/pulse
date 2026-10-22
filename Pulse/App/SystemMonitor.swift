@@ -251,11 +251,21 @@ final class SystemMonitor {
         visibility.popover
     }
 
+    /// 主窗口是否在场(popover-leak/01 主窗口同病同修,视图门控的唯一读数):
+    /// 单一事实源 = visibility;不参与采样节奏与 anyWindow 传感闸门。
+    var mainWindowVisible: Bool {
+        visibility.mainWindow
+    }
+
     /// 弹窗可见性变化:采样节奏在 5s/1s 间切换(合盖省电,spec)。
     /// 出生扫描不受弹窗影响:登记的完整性不依赖观看。弹窗也是模块排行
     /// (工单 module-rankings/01)的可见性信号之一:弹窗在场即开闸(RankingsFeature.visibilityChanged)。
     func setPopoverVisible(_ visible: Bool) {
-        updateVisibility(MonitorVisibility(popover: visible, moduleRankings: visibility.moduleRankings))
+        updateVisibility(MonitorVisibility(
+            popover: visible,
+            moduleRankings: visibility.moduleRankings,
+            mainWindow: visibility.mainWindow
+        ))
         let sampler = sampler
         Task { await sampler.setPopoverVisible(visible) }
     }
@@ -263,7 +273,21 @@ final class SystemMonitor {
     /// 模块排行可见性变化(工单 01):主窗口模块页在场时由 UI 调用。与弹窗
     /// 信号合并门控——任一窗口可见即开闸,全关才停采(采样成本闸门)。
     func setModuleRankingsVisible(_ visible: Bool) {
-        updateVisibility(MonitorVisibility(popover: visibility.popover, moduleRankings: visible))
+        updateVisibility(MonitorVisibility(
+            popover: visibility.popover,
+            moduleRankings: visible,
+            mainWindow: visibility.mainWindow
+        ))
+    }
+
+    /// 主窗口可见性变化(popover-leak/01 主窗口内容门控信号):只驱动
+    /// `mainWindowVisible` 读数,不碰采样节奏与传感闸门(anyWindow 不含 mainWindow)。
+    func setMainWindowVisible(_ visible: Bool) {
+        updateVisibility(MonitorVisibility(
+            popover: visibility.popover,
+            moduleRankings: visibility.moduleRankings,
+            mainWindow: visible
+        ))
     }
 
     /// 可见性落地:值真变化才派发给功能模块(MonitorFeature.visibilityChanged);
