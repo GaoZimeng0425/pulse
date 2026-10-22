@@ -176,6 +176,55 @@ extension MetricCardModel {
         )
     }
 
+    /// GPU 卡(p2-sensors/02):大数字 = 总利用率,四列小统计 = Renderer /
+    /// Tiler / 显存在用 / 显存分配;走势 = 利用率环(0–100 恒定域)。
+    /// 读数缺失(首轮前 / 无加速器)显示占位,不伪造;AGC 关电时 note 注明
+    /// "电源管理已关电"(利用率 0 是正常态,调研 §2.4 防御点)。
+    static func gpu(_ reading: GpuReading?, trend: [Double]) -> MetricCardModel {
+        guard let reading else {
+            return MetricCardModel(
+                metric: .gpu,
+                title: "GPU",
+                symbolName: "circle.hexagongrid.fill",
+                caption: "利用率",
+                figureValue: "—",
+                figureUnit: "%",
+                chip: nil,
+                note: "",
+                stats: [],
+                trend: [],
+                domainMax: 100
+            )
+        }
+        return MetricCardModel(
+            metric: .gpu,
+            title: "GPU",
+            symbolName: "circle.hexagongrid.fill",
+            caption: {
+                let parts = [reading.modelName, reading.coreCount.map { "\($0) 核" }].compactMap(\.self)
+                return parts.isEmpty ? "利用率" : "利用率 · " + parts.joined(separator: " · ")
+            }(),
+            figureValue: PulseFormat.cpuPercentNumber(reading.utilizationPercent),
+            figureUnit: "%",
+            chip: nil,
+            note: reading.poweredOff ? "电源管理已关电" : "",
+            stats: [
+                MetricCardStat(label: "Renderer", value: reading.rendererPercent.map(PulseFormat.cpuPercent) ?? "—"),
+                MetricCardStat(label: "Tiler", value: reading.tilerPercent.map(PulseFormat.cpuPercent) ?? "—"),
+                MetricCardStat(
+                    label: "显存在用",
+                    value: reading.inUseBytes.map { PulseFormat.systemMemory(UInt64(max(0, $0))) } ?? "—"
+                ),
+                MetricCardStat(
+                    label: "显存分配",
+                    value: reading.allocatedBytes.map { PulseFormat.systemMemory(UInt64(max(0, $0))) } ?? "—"
+                ),
+            ],
+            trend: trend,
+            domainMax: 100
+        )
+    }
+
     /// 磁盘卡(工单 05):大数字 = 容器已用(十进制 GB,Finder 口径),四列小统计 =
     /// 实际可用(Finder「可用」importantUsage 口径)/ 可清除(两 key 差值,与
     /// 「实际可用」分开文案)/ 读取速率 / 写入速率;走势 = 读写合计流量。

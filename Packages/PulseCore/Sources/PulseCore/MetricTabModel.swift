@@ -9,6 +9,7 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
     case overview
     case cpu
     case memory
+    case gpu
     case disk
     case network
     case battery
@@ -24,6 +25,7 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .overview: "总览"
         case .cpu: "CPU"
         case .memory: "内存"
+        case .gpu: "GPU"
         case .disk: "磁盘"
         case .network: "网络"
         case .battery: "电池"
@@ -37,6 +39,7 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .overview: "square.grid.2x2"
         case .cpu: "cpu"
         case .memory: "memorychip"
+        case .gpu: "circle.hexagongrid.fill"
         case .disk: "internaldrive"
         case .network: "network"
         case .battery: "battery.100percent"
@@ -53,6 +56,7 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .overview: .cpu
         case .cpu: .cpu
         case .memory: .memory
+        case .gpu: .gpu
         case .disk: .disk
         case .network: .network
         case .battery: .battery
@@ -198,7 +202,7 @@ public struct MetricTabContent: Equatable, Sendable {
         let ranked: [ProcessGroup]
         let metric: GroupCardMetric
         switch tab {
-        case .overview, .cpu, .disk, .network, .battery, .history:
+        case .overview, .cpu, .gpu, .disk, .network, .battery, .history:
             ranked = Leaderboard.ranked(groups, by: \.cpuPercent, id: \.id)
             metric = .cpu
         case .memory:

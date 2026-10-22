@@ -35,6 +35,22 @@ struct InertBatterySource: BatterySource {
     }
 }
 
+/// GPU:预览合成读数(固定 42% 利用率 + M4 静态信息,卡面有数好看);
+/// 与电池/磁盘的"恒 nil 占位"不同——GPU 卡是常驻轴,预览有真形状更可验。
+struct InertGpuSource: GpuSource {
+    func read() -> GpuRawReading? {
+        GpuRawReading(
+            deviceUtilizationPercent: 42,
+            rendererUtilizationPercent: 38,
+            tilerUtilizationPercent: 11,
+            allocatedBytes: 2_233_000_000,
+            inUseBytes: 1_180_000_000,
+            modelName: "Apple M4",
+            coreCount: 10
+        )
+    }
+}
+
 /// 磁盘容量:读不到(容量卡整卡占位)。
 struct InertDiskCapacitySource: DiskCapacitySource {
     func read() -> DiskCapacityRawReading? {
@@ -156,6 +172,7 @@ extension SystemMonitor {
                     throughputSource: InertDiskThroughputSource()
                 ),
                 battery: BatteryFeature(source: InertBatterySource()),
+                gpu: GpuFeature(source: InertGpuSource()),
                 launchdManifest: LaunchdManifestFeature(
                     provider: LaunchdManifestProvider(source: InertLaunchdPlistSource())
                 )

@@ -72,6 +72,11 @@ final class SystemMonitor {
         features.battery
     }
 
+    /// GPU 读数与走势(工单 p2-sensors/02)。
+    var gpu: GpuFeature {
+        features.gpu
+    }
+
     /// dev server 盘点(工单 p1-history/08)。
     var devServers: DevServerFeature {
         features.devServers
@@ -264,7 +269,8 @@ final class SystemMonitor {
         updateVisibility(MonitorVisibility(
             popover: visible,
             moduleRankings: visibility.moduleRankings,
-            mainWindow: visibility.mainWindow
+            mainWindow: visibility.mainWindow,
+            gpuPage: visibility.gpuPage
         ))
         let sampler = sampler
         Task { await sampler.setPopoverVisible(visible) }
@@ -276,7 +282,19 @@ final class SystemMonitor {
         updateVisibility(MonitorVisibility(
             popover: visibility.popover,
             moduleRankings: visible,
-            mainWindow: visibility.mainWindow
+            mainWindow: visibility.mainWindow,
+            gpuPage: visibility.gpuPage
+        ))
+    }
+
+    /// GPU 页可见性变化(p2-sensors/02):主窗口停在 GPU 页时由 UI 调用。
+    /// GPU 传感闸 = 弹窗 ∨ 本旗标(GpuFeature 折算),与排行闸分立不串门。
+    func setGpuPageVisible(_ visible: Bool) {
+        updateVisibility(MonitorVisibility(
+            popover: visibility.popover,
+            moduleRankings: visibility.moduleRankings,
+            mainWindow: visibility.mainWindow,
+            gpuPage: visible
         ))
     }
 
@@ -286,7 +304,8 @@ final class SystemMonitor {
         updateVisibility(MonitorVisibility(
             popover: visibility.popover,
             moduleRankings: visibility.moduleRankings,
-            mainWindow: visible
+            mainWindow: visible,
+            gpuPage: visibility.gpuPage
         ))
     }
 

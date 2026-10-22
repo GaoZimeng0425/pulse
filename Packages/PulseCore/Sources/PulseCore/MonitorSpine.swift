@@ -111,16 +111,26 @@ public struct MonitorVisibility: Equatable, Sendable {
     public var moduleRankings = false
     /// 主窗口整体在场(popover-leak/01 视图门控专用,不参与 anyWindow 传感闸门)。
     public var mainWindow = false
+    /// 主窗口停在 GPU 页(p2-sensors/02):GPU 传感器的采样闸门信号之一,
+    /// 与 `moduleRankings` 刻意分旗——GPU 页可见不该白开 nettop,排行页可见
+    /// 也不该白采 GPU(旗标语义不混,ADR-0006)。
+    public var gpuPage = false
 
     /// 任一(传感意义上的)窗口可见。
     public var anyWindow: Bool {
         popover || moduleRankings
     }
 
-    public init(popover: Bool = false, moduleRankings: Bool = false, mainWindow: Bool = false) {
+    public init(
+        popover: Bool = false,
+        moduleRankings: Bool = false,
+        mainWindow: Bool = false,
+        gpuPage: Bool = false
+    ) {
         self.popover = popover
         self.moduleRankings = moduleRankings
         self.mainWindow = mainWindow
+        self.gpuPage = gpuPage
     }
 }
 
