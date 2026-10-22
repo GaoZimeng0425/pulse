@@ -57,8 +57,9 @@ struct MetricTabStack<Ranking: View>: View {
             }
             SmcTempsDetailCardView(reading: monitor.smc.reading, isCompact: isCompact)
         case .peripherals:
-            // 外设页(p2-sensors/05):声音区(纯展示,事件驱动零轮询);
-            // 蓝牙区随 06 票进(三源电量合并)。
+            // 外设页(p2-sensors/05/06):蓝牙设备表(三源电量合并,可见 30s 扫描)
+            // + 声音区(纯展示,事件驱动零轮询)。
+            BluetoothDevicesCardView(reading: monitor.bluetooth.reading, isCompact: isCompact)
             SoundCardView(reading: monitor.sound.reading, isCompact: isCompact)
         case .gpu:
             // GPU 页(p2-sensors/02/03):利用率主卡 + ANE 卡与五路功率区

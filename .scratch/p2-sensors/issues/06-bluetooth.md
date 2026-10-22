@@ -4,10 +4,43 @@
 
 **Blocked by:** 01(GATT 验证)、05(外设页在场)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] 外设页蓝牙区列出本机真实设备(妙控板/QC35 等 6 台),Apple 外设电量直读成功
-- [ ] 三源合并单测:地址规整、三级匹配、歧义即弃、缓存电量 1→100
-- [ ] 组/页不可见时零扫描,睡眠中停扫(可由日志/采样栈佐证)
-- [ ] 弹窗蓝牙紧凑组出现
-- [ ] 关两窗指纹全零;check.sh 全绿
+- [x] 三源合并单测:地址规整、三级匹配、歧义即弃、缓存电量 1→100(13 例)
+- [x] 组/页不可见时零扫描(gate 关 = 一个源都不碰,provider 单测钉死);睡眠停扫
+  天然成立(进程随睡眠挂起,30s tick 不跑),唤醒后下一可见 tick 自动重启
+- [x] check.sh 全绿(719 例:核心 384 + app 335);关两窗指纹全零
+- [ ] 外设页蓝牙区列出本机真实设备(妙控板/QC35 等 6 台),Apple 外设电量直读成功 —— **待用户目验**
+- [ ] 弹窗蓝牙紧凑组出现 —— **待用户目验**
+
+## Comments
+
+**执行记录(2026-10-22 晚)**:
+- 核心包 `BluetoothModel`:三源原始条目(HID/缓存/GATT)+ 配对锚
+  (PairedDeviceStatus)+ `BluetoothMerge` 纯值合并器——锚按规整地址去重
+  (实探小米平板在 pairedDevices() 出现两次)、三级匹配(规整地址 → 唯一名 →
+  唯一厂商/产品 ID)歧义即弃、缓存电量 1 当 100 解、RSSI 哨兵(0/127)归
+  未知、hid > cache > gatt 优先级、挂不上锚的样本单独成行。13 例单测。
+- Live `BluetoothSensor`:LiveBluetoothSource(IOBluetooth 锚 + IORegistry HID
+  电量 [实探妙控板 41% 开箱即用] + 系统 plist DeviceCache [本机 macOS 26 无
+  该键 = 空态常态])+ GattBatteryProbe(有界扫描 12s/连接 8s,名字命中才建连,
+  读完即断;探针交付进缓冲**下一轮**收账)+ BluetoothSensorProvider(30s 档,
+  不可见一个源都不碰)。
+- IOBluetooth 的 vendorID/productID 选择子原语返回在 Swift 侧不可见——锚侧
+  ID 置 nil,级③匹配留给合成载荷单测(单测覆盖,Live 走级①②)。
+- BluetoothDevicesCardView(名称/连接点/电量 meter/RSSI,已连接置顶);
+  InertBluetoothSource 预览源(三台设备含电量未知形态)。
+- **真崩溃隐患修复**:IOBluetooth 首访触发 TCC 隐私检查,app Info.plist 缺
+  `NSBluetoothAlwaysUsageDescription` 即被系统杀(测试宿主崩溃 .ips 实证);
+  project.yml 补键。无此修复合并后正式 app 打开外设页当场崩。
+
+**睡眠停扫口径**:不做显式 NSWorkspace 睡眠监听——进程随睡眠挂起,tick 天然
+停;唤醒后下一个可见 tick 自动扫描。与 stats 的显式停扫(paused API 复杂度)
+效果等价,记档备查。
+
+**待用户目验**:
+- 外设页蓝牙区:6 台真实设备、妙控板电量直读(IORegistry 44%±,随电量走)、
+  已连接两台置顶(妙控板 + Hack59-2 键盘)。
+- GATT 路真机验证:QC35/MOONDROP 在场且可连时 30s 内出电量;不在场安静
+  显示"电量未知"。
+- 弹窗(外设 tab 紧凑档)同形状(前 6 台)。

@@ -62,6 +62,34 @@ struct InertSmcSource: SmcSource {
     }
 }
 
+/// 蓝牙:预览合成载荷(两台带电量 + 一台未知,三级匹配/去重/排序都有形状可验)。
+struct InertBluetoothSource: BluetoothSource {
+    var poweredOn: Bool? {
+        true
+    }
+
+    func readPaired() -> [PairedDeviceStatus]? {
+        [
+            PairedDeviceStatus(
+                name: "子蒙's Magic Trackpad",
+                address: "d4-57-63-5d-bf-6b",
+                isConnected: true,
+                rawRSSI: -58
+            ),
+            PairedDeviceStatus(name: "Bose QC35 II", address: "2c-41-a1-c8-c5-01", isConnected: false, rawRSSI: 0),
+            PairedDeviceStatus(name: "Hack59-2", address: "ca-d2-10-9d-83-1e", isConnected: true, rawRSSI: 127),
+        ]
+    }
+
+    func readHidBatteries() -> [HidBatteryEntry] {
+        [HidBatteryEntry(batteryPercent: 41, productName: "子蒙's Magic Trackpad", address: "d4-57-63-5d-bf-6b")]
+    }
+
+    func readCachedBatteries() -> [CachedBatteryEntry] {
+        [CachedBatteryEntry(batteryPercent: 80, name: "Bose QC35 II", address: "2c:41:a1:c8:c5:01")]
+    }
+}
+
 /// 声音:预览合成读数(默认设备 + 42% 音量 + 未静音,卡面有形状可验)。
 struct InertSoundSource: SoundSource {
     func read() -> SoundRawReading? {
@@ -228,6 +256,7 @@ extension SystemMonitor {
                 power: PowerFeature(source: InertPowerSource(), chipName: HostInfo.current.chipName ?? ""),
                 smc: SmcFeature(source: InertSmcSource()),
                 sound: SoundFeature(source: InertSoundSource()),
+                bluetooth: BluetoothFeature(source: InertBluetoothSource()),
                 launchdManifest: LaunchdManifestFeature(
                     provider: LaunchdManifestProvider(source: InertLaunchdPlistSource())
                 )

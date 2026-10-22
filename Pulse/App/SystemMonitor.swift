@@ -92,6 +92,11 @@ final class SystemMonitor {
         features.sound
     }
 
+    /// 蓝牙三源合并读数(工单 p2-sensors/06)。
+    var bluetooth: BluetoothFeature {
+        features.bluetooth
+    }
+
     /// dev server 盘点(工单 p1-history/08)。
     var devServers: DevServerFeature {
         features.devServers

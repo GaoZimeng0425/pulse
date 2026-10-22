@@ -40,6 +40,9 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSUIElement: YES
+        # 蓝牙家族(p2-sensors/06):IOBluetooth/CoreBluetooth 读设备表与电量,
+        # TCC 强制 usage description——缺键即崩(2026-10-22 测试宿主崩溃实证)。
+        INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: Pulse 读取已配对蓝牙设备的连接状态与电量,用于外设页展示。
         ENABLE_APP_SANDBOX: NO
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "-"
