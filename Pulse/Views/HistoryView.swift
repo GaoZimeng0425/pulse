@@ -7,13 +7,31 @@ import SwiftUI
 // HistorySeries——查询经 monitor.history.series 走引擎 actor(UI 线程零 SQL,
 // spec User Story 10);UI 不单测,预览 + 真机验收(spec 既定)。
 
+extension HistoryMetricKey {
+    /// 药丸 tab 图标(视图层映射):CPU/内存/网络/磁盘与主窗口 tab 同符号,
+    /// 系统负载取仪表盘——两者同为 CPU 蓝(accent 同源),靠符号区分身份
+    /// (与工具栏"总览/CPU 同蓝不同符"同一手法)。
+    var symbolName: String {
+        switch self {
+        case .systemLoad: "gauge.with.needle"
+        case .cpu: "cpu"
+        case .memory: "memorychip"
+        case .network: "network"
+        case .disk: "internaldrive"
+        }
+    }
+}
+
 /// 历史页:选指标(系统负载/CPU/内存/网络/磁盘)× 选范围(近 1 小时/24 小时/
-/// 7 天/30 天)看走势。app 未运行的时段曲线留缺不补零(User Story 8);网络/
-/// 磁盘的记录列要等工单 06 接入,此前如实显示"暂无数据"不伪造。
+/// 7 天/30 天)看走势,切换用与主窗口工具栏同一款药丸 tab(用户拍板
+/// 2026-10-22:tab 是通用组件样式,`PillTabBar`)。app 未运行的时段曲线留缺
+/// 不补零(User Story 8);网络/磁盘的记录列要等工单 06 接入,此前如实显示
+/// "暂无数据"不伪造。
 struct HistoryTabView: View {
     let monitor: SystemMonitor
-    /// 弹窗紧凑档(2026-10-20 起弹窗也有历史页):小号分段控件、曲线 160 高、
-    /// 卡 {rounded.card-compact} 12 + {spacing.card-padding-compact} 12。
+    /// 弹窗紧凑档(2026-10-20 起弹窗也有历史页):指标条未选中纯图标、
+    /// 选中才展开文字,360pt 里放得下;曲线 160 高、卡 {rounded.card-compact} 12
+    /// + {spacing.card-padding-compact} 12。
     var isCompact = false
 
     /// 选择态:页面本地会话态,默认系统负载 × 近 1 小时(最常用的排障起点)。
@@ -24,20 +42,18 @@ struct HistoryTabView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: isCompact ? 8 : 12) {
-            Picker("指标", selection: $metric) {
-                ForEach(HistoryMetricKey.allCases) { key in
-                    Text(key.title).tag(key)
-                }
+            // 指标条 = 工具栏同形态(未选中纯图标、选中展开文字):五项各有
+            // 指标色与符号,与主窗口 tab 一眼同族。
+            PillTabBar(
+                HistoryMetricKey.allCases, selection: $metric, textVisibility: .selectedOnly
+            ) { key in
+                PillTabItem(title: key.title, symbol: key.symbolName, tint: key.accent.accentColor)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            Picker("范围", selection: $range) {
-                ForEach(HistoryRange.allCases) { span in
-                    Text(span.title).tag(span)
-                }
+            // 范围条:文字恒显(四项短文案无宽度竞争),色调跟随所选指标——
+            // 与曲线、统计数字同族,整页一个颜色故事。
+            PillTabBar(HistoryRange.allCases, selection: $range) { span in
+                PillTabItem(title: span.title, tint: metric.accent.accentColor)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
 
             chartCard
 
@@ -46,7 +62,6 @@ struct HistoryTabView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }
-        .controlSize(isCompact ? .small : .regular)
         // 换指标/换范围即重查;驻留本页期间每分钟补一轮(分钟表一分钟长一行,
         // "近 1 小时"要能往前走)。查询在引擎 actor,取消即停,离页不空转。
         .task(id: QueryKey(metric: metric, range: range)) {
