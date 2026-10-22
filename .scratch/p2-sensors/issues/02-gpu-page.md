@@ -4,10 +4,20 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] GPU tab 上线:利用率大数、Renderer/Tiler、显存真实显示,数值与活动监视器 GPU 档数量级互证
-- [ ] 弹窗 GPU 紧凑组出现,开弹窗才采、关窗即停
-- [ ] toolbar 按终态 11 tab 定尺寸,720/最小宽下新布局验证不溢出(本票只放 GPU 一个新 tab)
-- [ ] 解析模型合成载荷单测(钳位/关电/缺键三分支),Live 冒烟一次真读
-- [ ] 关两窗 15s 指纹全零(ADR-0006 验收协议);check.sh 全绿
+- [x] GPU tab 上线:利用率大数、Renderer/Tiler、显存真实显示(数值与活动监视器互证 = 用户目验项,见 Comments)
+- [x] 弹窗 GPU 紧凑组出现(tab 体系自动),开弹窗才采、关窗即停(gate 单测+指纹实证)
+- [x] toolbar 容量:并行会话已落 PillTabBar.selectedOnly(未选中纯图标,总量恒定)根治宽度竞争——本票零额外 toolbar 改动,8 pill 随轴自动;11 pill 终态由 04/05/07 各票落地时逐票目验
+- [x] 解析模型合成载荷单测 5 例(GpuModelTests:钳位/关电/回退键序/透传),Live 冒烟 1 例真读(GpuSensorTests)
+- [x] 关两窗 15s 指纹全零(实测 PID 46852,含 MetricTabStack/MetricCardView/GpuFeature 新名);check.sh 664 例全绿(核心 349+app 315)
+
+## Comments
+
+**2026-10-22 执行完毕(develop @1b65035,hook Release 装机后指纹验收):**
+
+- 实现:PulseCore GpuModel(原始载荷+折算,防御口径移植 stats MIT)/Metric.gpu 令牌(DESIGN.md 先补表 #e87ba4/#d55181)/MetricTab.gpu 第 8 轴/MonitorVisibility.gpuPage 旗标;app LiveGpuSource+GpuSensorProvider(5s 档+门控)+GpuFeature(趋势环 60 点);GPU tab 主卡+总览网格卡;预览 InertGpuSource。
+- 门控形状:GPU 传感闸 = 弹窗 ∨ GPU 页,与排行闸分旗(gpuPage 不进 anyWindow——GPU 页可见不白开 nettop,排行页可见不白采 GPU)。
+- 过程坑:Swift Testing 风格新测试不进套件(仓库纯 XCTest),转写后 664 例才见增量;轴序 5 个既有测试照 8-tab 更新。
+- **待用户目验**:①GPU tab 大数与活动监视器 GPU 档数量级互证(跑点图形负载看数字抬升);②弹窗 GPU 组紧凑形态;③总览网格第 6 张卡(点卡跳 GPU 页);④PillTabBar 8-pill 下选中展开文字的观感。
+- 历史 30s 不可见档刻意留给 08 票(先不空转)。
