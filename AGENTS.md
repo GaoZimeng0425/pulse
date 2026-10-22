@@ -16,7 +16,7 @@
 ## 分支
 
 - 一律合回 `develop`;`p1-implementation` 已冻结别再合,`main` 只在用户明确要求时才动。
-- 合入前:合进 `develop` 新提交 → `xcodegen generate` → `sh scripts/check.sh` 全绿;推送先问用户。merge 真正落到 `develop` 后,post-merge hook 自动 `sh scripts/build.sh` Release 安装(应急 `PULSE_SKIP_BUILD=1` 跳过,`PULSE_HOOK_DEBUG=1` 干跑)。
+- 合入前:合进 `develop` 新提交 → `xcodegen generate` → `sh scripts/check.sh` 全绿;推送直接推 origin 不再询问(2026-10-22 用户撤销"推送先问";main 仍只在明确要求时动)。merge 真正落到 `develop` 后,post-merge hook 自动 `sh scripts/build.sh` Release 安装(应急 `PULSE_SKIP_BUILD=1` 跳过,`PULSE_HOOK_DEBUG=1` 干跑)。
 - 分支保护由 hook 机械化(pre-merge-commit):`main` / `master` 禁止 merge 提交,`p1-implementation` 已冻结禁合;develop 合并来源白名单待分支命名收敛后再补。
 
 ## 构建与测试
