@@ -2,7 +2,7 @@
 
 **What to build:** 让菜单栏弹窗(`MenuBarExtra` `.window` 样式,内容 `DashboardView`)**关闭后不再逐轮重算**。现状:弹窗被点开一次再关掉,视图树(含 `RankingCardView` / `RankingRowView` / `StripChartView` 等)仍活着,每轮采样落地都重评估 + 布局周期,直到进程重启——辅助功能报 0 个窗口,采样栈里却整页在渲染。结果是"窗口全关"的稳态在用户看过一眼弹窗之后**悄悄变成观看态**,常驻成本账全部失真。
 
-**Status:** ready-for-agent
+**Status:** done(2026-10-22 结项,见 Comments)
 **Category:** bug(性能)
 
 ## 为什么现在开(2026-10-21)
@@ -59,13 +59,22 @@
 - `MenuBarLoadLabel` / 徽标显示快照(badge-hysteresis/01)不在触碰范围。
 
 **Acceptance criteria:**
-- [ ] 干净拉起 → 15s 指纹全 0 → 开关弹窗一次 → 15s 指纹仍全 0(修复后);修复前同协议先行一遍作对照
-- [ ] 开关弹窗后 150s 稳态窗(cputime÷墙钟)与从未开过弹窗的状态一致(负载相近,如实记档)
-- [ ] 弹窗重开即时有数据、无空白帧;采样节奏切换不回归
-- [ ] 主窗口同协议结论记档(同病同修或明确"无此病")
-- [ ] 门控逻辑若可单测则有单测;既有 655 例零回归;`sh scripts/check.sh` 全绿
+- [x] 干净拉起 → 15s 指纹全 0 → 开关弹窗一次 → 15s 指纹仍全 0——修复前对照 77 点/15s,修复后(弹窗+主窗口都开关过)全 0:DashboardView/MainWindowView/RankingRowView/RankingListRow/RankingCardView/MetricTabStack/nettop 全零(2026-10-22)
+- [x] 150s 稳态窗:开关两窗后 1.67%(load 15.6→9.35 重载)——视图翻搅 0、归因干净(采集+历史落库随负载变慢、徽标合法换字);不同负载窗口不直接相减,以"开关过与没开过的指纹逐位等价"为等价主证据,如实记档
+- [x] 弹窗重开即时有数据、无空白帧;采样节奏切换不回归——用户目验(2026-10-21"都没问题")
+- [x] 主窗口同病:**Window 场景关闭后视图树同样不销毁**(AX 0 窗、排行行 25 点/15s),同修 @fe0b6b3(MainWindowGate);修复后开关主窗口指纹全 0
+- [x] 视图粘合层按仓库约定不单测(验收走指纹协议);655 例零回归,check.sh 全绿(LiveCoreTickSourceSmokeTests 在 load 8.5 下假阳性一次,负载落至 5 后单跑通过 + 全量绿——实机冒烟测试的已知负载敏感,非本票改动)
 
 **Out of scope:**
 - 弹窗 / 主窗口**可见时**的渲染成本(观看态,属产品功能)
 - 菜单栏徽标路径(badge-hysteresis/01 已收口)
 - 采样节奏本身的调整
+
+> 2026-10-22 结项(主会话;用户验收"好了"后收票)
+
+- **修复两刀**:① 弹窗侧 @60ebde5——新 `MenuBarPopoverGate` 作 MenuBarExtra 内容根,按 `monitor.popoverVisible` 条件渲染,隐藏时只放上次同尺寸透明占位;tab 与 DashboardModel 提升到门控层持有(重开不回总览、不丢展开);`DashboardView.init` 增 model / onTabChange 注入缝;`SystemMonitor` 暴露 popoverVisible。② 主窗口同病同修 @fe0b6b3——验收指纹实锤 Window 场景同样不销毁(25 点/15s),`MonitorVisibility` 增 `mainWindow`(仅视图门控,不进 anyWindow 传感闸门,主窗口停在非排行页不白跑 nettop),新 `MainWindowGate` 同款门控。
+- **验收(指纹协议)**:修复前 77 点/15s(开关弹窗后)→ 修复后弹窗+主窗口都开关过 **全 0**;nettop 0(传感闸门行为不变)。
+- **150s 稳态窗 1.67% @ load 15.6→9.35**:视图翻搅 0,归因 = 采集+历史落库(重载下系统调用变慢)+ 徽标合法换字(CPU 摆动每轮跨 2pp、四槽含网络口径);与 0.96%(load 2.9→12.5)/1.07%(安静)不同负载不直接相减——**等价主证据 = 开关过与没开过的指纹逐位等价**,数字如实记。
+- **行为变化(记录)**:主窗口页面等 @State 随关窗丢弃(标准 macOS 行为;泄漏时代"跨开关记住页面"的副作用取消);弹窗 tab 与会话状态已由门控层保持,无倒退。
+- **测试 655 例零回归**;两次全量 check.sh 全绿。**观感**:弹窗重开数据即时无空白帧、tab 记忆正常(用户 2026-10-21 目验);主窗口开关如常(用户 2026-10-22 验收)。
+- 分支 `fix/popover-leak-gate`、`fix/popover-leak-main-window-gate` 已合并可删。
