@@ -115,6 +115,9 @@ public struct MonitorVisibility: Equatable, Sendable {
     /// 与 `moduleRankings` 刻意分旗——GPU 页可见不该白开 nettop,排行页可见
     /// 也不该白采 GPU(旗标语义不混,ADR-0006)。
     public var gpuPage = false
+    /// 主窗口停在传感器页(p2-sensors/04):SMC 传感器的采样闸门信号之一
+    /// (弹窗 ∨ 本旗标);一族一旗,不并进 anyWindow。
+    public var sensorsPage = false
 
     /// 任一(传感意义上的)窗口可见。
     public var anyWindow: Bool {
@@ -125,12 +128,14 @@ public struct MonitorVisibility: Equatable, Sendable {
         popover: Bool = false,
         moduleRankings: Bool = false,
         mainWindow: Bool = false,
-        gpuPage: Bool = false
+        gpuPage: Bool = false,
+        sensorsPage: Bool = false
     ) {
         self.popover = popover
         self.moduleRankings = moduleRankings
         self.mainWindow = mainWindow
         self.gpuPage = gpuPage
+        self.sensorsPage = sensorsPage
     }
 }
 

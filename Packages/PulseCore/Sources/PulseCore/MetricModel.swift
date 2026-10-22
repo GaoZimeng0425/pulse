@@ -5,7 +5,9 @@ import Foundation
 /// 指标维度(P0.6-02):"每指标一色"的键,tab 化(工单 03)与 meter/图表从这里取色。
 /// 收录参考文档 §1.1 全表中 Pulse 现阶段用得到的项:CPU/内存有实时数据,
 /// 磁盘/网络为 tab 化"更多按需"预留,电池随 P1 工单 02 传感器卡入表;
-/// GPU 随 P2 工单 p2-sensors/02 入表;Neural 与 Memory 同色(参考文档已注明),
+/// GPU 随 P2 工单 p2-sensors/02 入表;sensors(温度/风扇,p2-sensors/04)是
+/// **Pulse 扩展行**——参考文档无温度面板独立色,自补珊瑚暖色(与 Disk 琥珀、
+/// state-negative 红均拉开);Neural 与 Memory 同色(参考文档已注明),
 /// 入表即破坏"指标间互异"前提——03 票再议;声音/蓝牙有意砍掉,需要时按表补行。
 public enum Metric: String, CaseIterable, Sendable {
     case cpu
@@ -14,6 +16,7 @@ public enum Metric: String, CaseIterable, Sendable {
     case network
     case battery
     case gpu
+    case sensors
 }
 
 /// 单指标强调色令牌:浅/深双套,0xRRGGBB。色值唯一出处是
@@ -40,6 +43,7 @@ public extension Metric {
         case .network: MetricAccentToken(light: 0x1BAF7A, dark: 0x199E70)
         case .battery: MetricAccentToken(light: 0x008300, dark: 0x2FA83A)
         case .gpu: MetricAccentToken(light: 0xE87BA4, dark: 0xD55181)
+        case .sensors: MetricAccentToken(light: 0xD96A4E, dark: 0xE07B5F)
         }
     }
 }

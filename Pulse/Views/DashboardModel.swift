@@ -46,10 +46,11 @@ final class DashboardModel {
         .memory(monitor.memory, trend: monitor.sampleHistory.memoryUsed.values, host: .current)
     }
 
-    /// 电池卡(工单 02):六项读数读 monitor.battery(lastGood 语义——读失败
-    /// 不回退为 nil);未首读/无电池机器的占位模型只在轴内不会出现,仍给全占位兜底。
+    /// 电池卡(工单 02;p2-sensors/04 顺手活):六项读数读 monitor.battery
+    /// (lastGood 语义);功率优先 SMC PPBR(更准,探针⑤实证可读),读不到回退
+    /// V×A——合流在取数层,两个功能模块互不持引用(ADR-0003)。
     var batteryModel: MetricCardModel {
-        .battery(monitor.battery.reading)
+        .battery(monitor.battery.reading, powerWattsOverride: monitor.smc.reading?.batteryPowerWatts)
     }
 
     /// 磁盘卡(工单 05):容量对账 + 可清除 + 各卷 + 快照读容量 provider,

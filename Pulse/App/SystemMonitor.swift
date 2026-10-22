@@ -82,6 +82,11 @@ final class SystemMonitor {
         features.power
     }
 
+    /// SMC 温度/风扇读数(工单 p2-sensors/04)。
+    var smc: SmcFeature {
+        features.smc
+    }
+
     /// dev server 盘点(工单 p1-history/08)。
     var devServers: DevServerFeature {
         features.devServers
@@ -275,7 +280,8 @@ final class SystemMonitor {
             popover: visible,
             moduleRankings: visibility.moduleRankings,
             mainWindow: visibility.mainWindow,
-            gpuPage: visibility.gpuPage
+            gpuPage: visibility.gpuPage,
+            sensorsPage: visibility.sensorsPage
         ))
         let sampler = sampler
         Task { await sampler.setPopoverVisible(visible) }
@@ -288,7 +294,8 @@ final class SystemMonitor {
             popover: visibility.popover,
             moduleRankings: visible,
             mainWindow: visibility.mainWindow,
-            gpuPage: visibility.gpuPage
+            gpuPage: visibility.gpuPage,
+            sensorsPage: visibility.sensorsPage
         ))
     }
 
@@ -299,7 +306,19 @@ final class SystemMonitor {
             popover: visibility.popover,
             moduleRankings: visibility.moduleRankings,
             mainWindow: visibility.mainWindow,
-            gpuPage: visible
+            gpuPage: visible,
+            sensorsPage: visibility.sensorsPage
+        ))
+    }
+
+    /// 传感器页可见性变化(p2-sensors/04):SMC 传感闸 = 弹窗 ∨ 本旗标。
+    func setSensorsPageVisible(_ visible: Bool) {
+        updateVisibility(MonitorVisibility(
+            popover: visibility.popover,
+            moduleRankings: visibility.moduleRankings,
+            mainWindow: visibility.mainWindow,
+            gpuPage: visibility.gpuPage,
+            sensorsPage: visible
         ))
     }
 
