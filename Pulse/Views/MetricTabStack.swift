@@ -48,6 +48,10 @@ struct MetricTabStack<Ranking: View>: View {
                 memoryByApp
             }
             ranking()
+        case .gpu:
+            // GPU 页(p2-sensors/02):利用率/Renderer/Tiler/显存主卡 + 走势;
+            // 每 App GPU 归因是 P3(root helper)的事,本页不设排行。
+            MetricMainCardView(model: model.gpuModel, isCompact: isCompact)
         case .battery:
             // 电池页(工单 p1-history/02):六项读数主卡 + 能耗影响排行
             // (工单 module-rankings/01,只读);组排行与电池无关,不放。
@@ -104,6 +108,7 @@ struct MetricTabStack<Ranking: View>: View {
         ) {
             MetricCardView(model: model.cpuModel, style: style) { onSelectTab(.cpu) }
             MetricCardView(model: model.memoryModel, style: style) { onSelectTab(.memory) }
+            MetricCardView(model: model.gpuModel, style: style) { onSelectTab(.gpu) }
             MetricCardView(model: model.diskModel, style: style) { onSelectTab(.disk) }
             MetricCardView(model: model.networkModel, style: style) { onSelectTab(.network) }
             if monitor.battery.hasBattery {

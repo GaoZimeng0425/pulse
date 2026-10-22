@@ -59,6 +59,12 @@ final class DashboardModel {
         .disk(capacity: monitor.disk.capacity, throughput: monitor.disk.throughput)
     }
 
+    /// GPU 卡(p2-sensors/02):读数与走势环都读 monitor.gpu(LastGood 语义);
+    /// 未首读时全占位(MetricCardModel.gpu 兜底)。
+    var gpuModel: MetricCardModel {
+        .gpu(monitor.gpu.reading, trend: monitor.gpu.trend)
+    }
+
     /// 网络卡(工单 06):实时速率读心跳差分(monitor.network.reading,LastGood),
     /// Today/7 天累计读历史库聚合(monitor.history.networkTotals),走势 = 速率环;
     /// 未首读时全占位(MetricCardModel.network 兜底)。

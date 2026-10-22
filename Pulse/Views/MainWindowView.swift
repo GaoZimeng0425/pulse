@@ -65,9 +65,12 @@ struct MainWindowView: View {
         // 内做,这里不碰弹窗语义;重复同值调用在 provider 侧是 no-op。
         .onChange(of: tabSelection.current) { _, newTab in
             monitor.setModuleRankingsVisible(newTab.hostsModuleRanking)
+            // GPU 传感闸(p2-sensors/02):与排行闸分立,各自只表达本页贡献。
+            monitor.setGpuPageVisible(newTab == .gpu)
         }
         .onDisappear {
             monitor.setModuleRankingsVisible(false)
+            monitor.setGpuPageVisible(false)
         }
         // 点开告警通知 → 直达对应 tab(工单 P1-07):窗口存活时响应广播;
         // 窗口刚被 openWindow 拉起时 onAppear 消费落下的 pendingTab。
@@ -86,6 +89,7 @@ struct MainWindowView: View {
             // 模块排行闸(工单 01):窗口可能直接深链落在排行页,进场即按当前
             // tab 开闸(onChange 只管后续切换,不覆盖进场初值)。
             monitor.setModuleRankingsVisible(tabSelection.current.hostsModuleRanking)
+            monitor.setGpuPageVisible(tabSelection.current == .gpu)
             MainWindowView.repositionIfOffscreen()
             // 系统窗口恢复套旧 frame 发生在 onAppear 之后——补一拍延迟守卫。
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {

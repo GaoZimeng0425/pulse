@@ -12,6 +12,7 @@ colors:
   accent-disk: "#eda100 / #c98500"
   accent-network: "#1baf7a / #199e70"
   accent-battery: "#008300 / #2fa83a"
+  accent-gpu: "#e87ba4 / #d55181"
   state-positive: = {accent-battery}
   state-negative: "#e0352b / #ff453a"
   state-warning: = {accent-disk}
@@ -84,7 +85,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{colors.surface-card}` | `Surface.card` | 卡片底 |
 | `{colors.surface-card-high}` | `Surface.cardHigh` | 卡内强调底、环形"其他/空闲"段 |
 | `{colors.ink-tertiary}` | `Surface.inkTertiary` | 三级墨色(缓存段、最弱文字) |
-| `{colors.accent-cpu}` … `{colors.accent-battery}` | `Metric.accentColor` | 每指标一色:tab、图表、徽章、大数字 |
+| `{colors.accent-cpu}` … `{colors.accent-battery}`、`{colors.accent-gpu}` | `Metric.accentColor` | 每指标一色:tab、图表、徽章、大数字(GPU 入表 p2-sensors/02;Neural 与 Memory 同色,03 票再议) |
 | `{colors.state-positive}` | `Surface.positive` | ✓正常、充电中 |
 | `{colors.state-warning}` | `Surface.warning`(= Disk 指标色别名) | 压力偏高、优化充电介入、触发中告警横幅(琥珀语义) |
 | `{colors.category-*}` | `GroupCategory.identityColor` | 非 App 组的图标瓦片底色;孤儿另作组行强调色(见下) |

@@ -50,11 +50,12 @@ struct MonitorFeatures {
     let history: HistoryFeature
     let disk: DiskFeature
     let battery: BatteryFeature
+    let gpu: GpuFeature
     let launchdManifest: LaunchdManifestFeature
 
     /// 派发顺序:onRound / 广播 / 可见性 / 传感器登记 / 启停都按它走。
     var registry: [any MonitorFeature] {
-        [network, alerts, devServers, rankings, history, disk, battery, launchdManifest]
+        [network, alerts, devServers, rankings, history, disk, battery, gpu, launchdManifest]
     }
 }
 
@@ -80,6 +81,7 @@ extension SystemMonitor {
                     throughputSource: LiveDiskThroughputSource.adoptingBestPath(fallbackHeartbeat: relay)
                 ),
                 battery: BatteryFeature(source: LiveBatterySource()),
+                gpu: GpuFeature(source: LiveGpuSource()),
                 launchdManifest: LaunchdManifestFeature(provider: LaunchdManifestProvider())
             )
         )
