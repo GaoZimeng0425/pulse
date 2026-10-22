@@ -1,0 +1,10 @@
+id: swiftui-no-indices-foreach
+message: >-
+  ForEach 以 .indices 为数据源是删行闪退形状(2026-10-21 设置页实锤:删槽那一帧
+  SwiftUI 仍按旧下标求值被删行,slots[index] 越界崩)。改用
+  Array(coll.enumerated()) + id: \.offset 让行值从元组取、不再二次下标;
+  Binding 侧另配越界守卫(先例 MenuBarBadgeSettingsView.displayedSlot)。
+severity: error
+language: swift
+rule:
+  pattern: 'ForEach($COLL.indices, id: \.self) { $$$BODY }'

@@ -1,0 +1,3 @@
+# ast-grep 仓库规则(Pulse):scan 默认读取;lint.sh 把 error 级发现作为门禁。
+ruleDirs:
+  - .ast-grep

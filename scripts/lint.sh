@@ -29,7 +29,7 @@ done
 
 # ── 工具缺失 = 拦截而非跳过:防止 agent 在未装工具的机器上「假绿」通过门禁 ──
 missing=""
-for tool in swiftlint swiftformat; do
+for tool in swiftlint swiftformat ast-grep; do
   command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
 done
 if [ -n "$missing" ]; then
@@ -106,6 +106,16 @@ else
   swiftlint lint --quiet || sl_status=1
 fi
 
+# ── ast-grep(结构形状门禁;规则在 .ast-grep/,error 级即非零)──
+# 只扫源码目录,避开 build/ 与 SwiftPM .build/ 的产物副本。staged 模式只扫暂存文件。
+ag_status=0
+if [ "$mode" = staged ]; then
+  # shellcheck disable=SC2086
+  ast-grep scan $files || ag_status=1
+else
+  ast-grep scan Pulse PulseTests Packages/PulseCore || ag_status=1
+fi
+
 fail=0
 if [ "$sf_status" != 0 ]; then
   fail=1
@@ -123,8 +133,14 @@ if [ "$sl_status" != 0 ]; then
   echo "❌ SwiftLint:error 级违规(见上,warning 放行)。" >&2
   echo "   修复对应行;确属误报或有理由保留时,加 // swiftlint:disable:next <rule> 并写明原因。" >&2
 fi
+if [ "$ag_status" != 0 ]; then
+  fail=1
+  echo "" >&2
+  echo "❌ ast-grep:结构形状违规(见上,规则在 .ast-grep/)。" >&2
+  echo "   按消息里的替代写法修;确属误报时在规则文件收紧 pattern 并写明原因。" >&2
+fi
 
 if [ "$fail" = 0 ]; then
-  echo "✅ swiftformat + swiftlint 通过"
+  echo "✅ swiftformat + swiftlint + ast-grep 通过"
 fi
 exit $fail

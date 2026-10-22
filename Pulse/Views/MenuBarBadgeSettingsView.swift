@@ -17,7 +17,10 @@ struct MenuBarBadgeSettingsView: View {
     var body: some View {
         Form {
             Section {
-                ForEach(configuration.slots.indices, id: \.self) { index in
+                // enumerated 取行值而非 .indices + 下标(ast-grep 门禁规则
+                // swiftui-no-indices-foreach:删行那一帧旧下标求值是越界闪退形状,
+                // 2026-10-21 实锤);行内只用 index 写回,读取走 displayedSlot 守卫。
+                ForEach(Array(configuration.slots.enumerated()), id: \.offset) { index, _ in
                     slotRow(index)
                 }
                 if configuration.slots.count < MenuBarBadgeConfiguration.slotRange.upperBound {
