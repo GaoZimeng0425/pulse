@@ -37,6 +37,22 @@ struct InertBatterySource: BatterySource {
 
 /// GPU:预览合成读数(固定 42% 利用率 + M4 静态信息,卡面有数好看);
 /// 与电池/磁盘的"恒 nil 占位"不同——GPU 卡是常驻轴,预览有真形状更可验。
+/// 五路功率:预览合成读数(CPU/GPU/ANE/RAM/SoC 各一瓦数,卡面有形状可验)。
+struct InertPowerSource: PowerSource {
+    func read() -> PowerRawReading? {
+        PowerRawReading(
+            channels: [
+                PowerChannelSample(name: "CPU Energy", unitLabel: "mJ", rawValue: 1000),
+                PowerChannelSample(name: "GPU", unitLabel: "mJ", rawValue: 400),
+                PowerChannelSample(name: "ANE", unitLabel: "mJ", rawValue: 60),
+                PowerChannelSample(name: "DRAM", unitLabel: "mJ", rawValue: 200),
+                PowerChannelSample(name: "SOC_REST", unitLabel: "mJ", rawValue: 90),
+            ],
+            takenAt: Date()
+        )
+    }
+}
+
 struct InertGpuSource: GpuSource {
     func read() -> GpuRawReading? {
         GpuRawReading(
@@ -173,6 +189,7 @@ extension SystemMonitor {
                 ),
                 battery: BatteryFeature(source: InertBatterySource()),
                 gpu: GpuFeature(source: InertGpuSource()),
+                power: PowerFeature(source: InertPowerSource(), chipName: HostInfo.current.chipName ?? ""),
                 launchdManifest: LaunchdManifestFeature(
                     provider: LaunchdManifestProvider(source: InertLaunchdPlistSource())
                 )

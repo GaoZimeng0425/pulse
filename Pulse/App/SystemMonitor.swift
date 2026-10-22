@@ -77,6 +77,11 @@ final class SystemMonitor {
         features.gpu
     }
 
+    /// 五路功率读数(工单 p2-sensors/03,GLOSSARY「五路功率」)。
+    var power: PowerFeature {
+        features.power
+    }
+
     /// dev server 盘点(工单 p1-history/08)。
     var devServers: DevServerFeature {
         features.devServers
