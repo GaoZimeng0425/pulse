@@ -19,6 +19,7 @@ public enum Metric: String, CaseIterable, Sendable {
     case sensors
     case sound
     case bluetooth
+    case containers
 }
 
 /// 单指标强调色令牌:浅/深双套,0xRRGGBB。色值唯一出处是
@@ -48,6 +49,7 @@ public extension Metric {
         case .sensors: MetricAccentToken(light: 0xD96A4E, dark: 0xE07B5F)
         case .sound: MetricAccentToken(light: 0xC2379B, dark: 0xD955B3)
         case .bluetooth: MetricAccentToken(light: 0x0891B2, dark: 0x22A8CC)
+        case .containers: MetricAccentToken(light: 0xEB6834, dark: 0xD95926)
         }
     }
 }

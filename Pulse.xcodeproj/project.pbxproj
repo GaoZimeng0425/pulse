@@ -40,6 +40,7 @@
 		3871E7D6449E0799D45D40DD /* MenuBarBadgeDisplayModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 073B425254E4BAF7B7E3744F /* MenuBarBadgeDisplayModel.swift */; };
 		3891285DCA8188E59A9EC34E /* GroupCategoryDisplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B7ADC75304AC8AC8EF1CED3 /* GroupCategoryDisplayTests.swift */; };
 		3912CC7AE8C5DF0325342786 /* RoundSpineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA32BC4006AFA168EE6CF9B5 /* RoundSpineTests.swift */; };
+		39462B81458878FA28174509 /* ContainerFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF2CA7CD9C3FB8777581E6E /* ContainerFeature.swift */; };
 		3A4696425FA64D6D47C5ED02 /* DiagnosticReportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 276EA0F7DAC2C0AC558E9614 /* DiagnosticReportTests.swift */; };
 		3C482A1F03A55F04BACE1E8F /* RankingList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45A0A70732B983FE5B5426B0 /* RankingList.swift */; };
 		3CF021A14DA00F8F1381EBF7 /* DiskSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCF3D2ECCF35087812BF92C5 /* DiskSensor.swift */; };
@@ -59,6 +60,7 @@
 		53ABDB008BB23CFB289F450E /* PillTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A07FFFA11CBCFAE4FED292 /* PillTabBar.swift */; };
 		549EC237B5E5F830B3C652A2 /* PulseCore in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 679FABC27E634B3FA90955FE /* PulseCore */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		5665FC76EC2418D1B81682B1 /* MenuBarBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABC98F0C4A2054944D3B34AC /* MenuBarBadge.swift */; };
+		5B9A85A61547AE07B7BA4924 /* ContainerSensorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8576B450296CE59084093EDC /* ContainerSensorTests.swift */; };
 		5C50195499CD0434F9BB20CB /* OverviewCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FA58858B993A1A243A26B63 /* OverviewCards.swift */; };
 		5E698B91C352218AEC7DF667 /* MetricAccentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD1902314E98C2C8F685D0D9 /* MetricAccentTests.swift */; };
 		5E918F632298B152858E0461 /* BluetoothSensorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A3A11CA7FAC45ECB8511C5B /* BluetoothSensorTests.swift */; };
@@ -78,6 +80,7 @@
 		7F9B2BCCDACD80F852FC20D3 /* HostInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = D363D25298EACE08DE4713DF /* HostInfo.swift */; };
 		8328544835522E8F1A0BDCF7 /* ProcessDrilldownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8434AD3F303A7E024D2887D /* ProcessDrilldownView.swift */; };
 		848B3618CDF4F547B6619433 /* StripChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB4FA4027487EAA178DE6EC /* StripChartView.swift */; };
+		89F5E5931E2250F60A9FCA0B /* ContainerCardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 578B06925AAA893C922D03BC /* ContainerCardViews.swift */; };
 		8BDCC1FD5A8A1D0FA8E1BAD4 /* AlertNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05102129BE186A01609E2D26 /* AlertNotification.swift */; };
 		8F2764770678C37BC8F19EB5 /* MetricTabStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC7E021DBD973F60A3D713EE /* MetricTabStack.swift */; };
 		8FF795C376F741469E469509 /* NetworkSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CEC39FCC8CC2FDE38BBAF7 /* NetworkSensor.swift */; };
@@ -104,6 +107,7 @@
 		B4FA6BDDC1AE8CEFE037CE8D /* SoundCardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 614CDDAE340894E028545198 /* SoundCardViews.swift */; };
 		B590F624901FBA4BF2DB438F /* ModuleRankingCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D83B99D1565E444748A7987 /* ModuleRankingCard.swift */; };
 		B6FEEBE806CD7DE27F672F4E /* StatusBadgeChipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA63CBA09D59DD528C7124CA /* StatusBadgeChipTests.swift */; };
+		BA1BE175D3E4B33CE9B90A80 /* ContainerSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200DFF5D21AE90C78A55C055 /* ContainerSensor.swift */; };
 		BA9E9907C976B309C88632A0 /* InertSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2395D7D9D7A918F62EDFADD8 /* InertSources.swift */; };
 		BC3F96643A2148359F32904E /* NetworkCardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39A94E49F6B1CA6A775BDD0E /* NetworkCardViews.swift */; };
 		C28472B069243FA1523B97C5 /* LiveBatterySourceSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F686C4FCD1571352152AE894 /* LiveBatterySourceSmokeTests.swift */; };
@@ -187,6 +191,8 @@
 		1C01F3A4AB4BC765537F64DA /* EnergyModelSensorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyModelSensorTests.swift; sourceTree = "<group>"; };
 		1C3691DE09224C04DEA8AB40 /* LaunchdManifestFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchdManifestFeature.swift; sourceTree = "<group>"; };
 		1C592AC26CEC4C7129D0463B /* BatterySensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySensor.swift; sourceTree = "<group>"; };
+		1FF2CA7CD9C3FB8777581E6E /* ContainerFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerFeature.swift; sourceTree = "<group>"; };
+		200DFF5D21AE90C78A55C055 /* ContainerSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerSensor.swift; sourceTree = "<group>"; };
 		215416C474EC313A5A138037 /* SystemStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemStatsTests.swift; sourceTree = "<group>"; };
 		2395D7D9D7A918F62EDFADD8 /* InertSources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InertSources.swift; sourceTree = "<group>"; };
 		23CC14BC245E753EAACD6E13 /* LiveCoreTickSourceSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCoreTickSourceSmokeTests.swift; sourceTree = "<group>"; };
@@ -212,6 +218,7 @@
 		4FBA30D234A433E58E16508B /* PulseTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PulseTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		53973290E8EB9138A67B958C /* MetricCardModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricCardModel.swift; sourceTree = "<group>"; };
 		556E90C2DDB739846AA22485 /* AlertCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertCenter.swift; sourceTree = "<group>"; };
+		578B06925AAA893C922D03BC /* ContainerCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerCardViews.swift; sourceTree = "<group>"; };
 		5A686C29DAEAD2AC1D94E833 /* HistoryFeatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryFeatureTests.swift; sourceTree = "<group>"; };
 		5D074B7F60170564351BEE7F /* MenuBarBadgeDisplayModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarBadgeDisplayModelTests.swift; sourceTree = "<group>"; };
 		5E7F860EECC5F68388BB8FC6 /* AlertSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSettingsView.swift; sourceTree = "<group>"; };
@@ -231,6 +238,7 @@
 		78EC09371E86E7408FA32ADC /* AppIconCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconCacheTests.swift; sourceTree = "<group>"; };
 		793E152BCFF6DC45BB501438 /* CardFamily.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardFamily.swift; sourceTree = "<group>"; };
 		84AFAFC8D33B01908457ADE1 /* BluetoothCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothCardViews.swift; sourceTree = "<group>"; };
+		8576B450296CE59084093EDC /* ContainerSensorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerSensorTests.swift; sourceTree = "<group>"; };
 		8B93B7757A455F9566934A21 /* MainWindowGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowGate.swift; sourceTree = "<group>"; };
 		8C71FCD146BC0C56EF25AEE9 /* AcceptanceAnchorEndToEndTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcceptanceAnchorEndToEndTests.swift; sourceTree = "<group>"; };
 		8D0336878D6164F8E0FA0FCD /* BatterySensorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySensorTests.swift; sourceTree = "<group>"; };
@@ -371,6 +379,7 @@
 				BA0853EEEEB0FB9F6834A00E /* AlertSettingsStore.swift */,
 				D60B90549169579BCCD01677 /* BatteryFeature.swift */,
 				AFE3997D6A5E04C1873A7645 /* BluetoothFeature.swift */,
+				1FF2CA7CD9C3FB8777581E6E /* ContainerFeature.swift */,
 				41196C89D2456B23F701DF21 /* DevServerFeature.swift */,
 				F5067DB98A38E61400019E48 /* DiskFeature.swift */,
 				4822D29598222B0F5B29959A /* GpuFeature.swift */,
@@ -431,6 +440,7 @@
 				C3ED9E7F6F40FF3D9167EACB /* BirthScanner.swift */,
 				931F7070B78C75E7EF03B08A /* BluetoothSensor.swift */,
 				3B385E37375A17C83745D0C7 /* BundleDisplayNameReader.swift */,
+				200DFF5D21AE90C78A55C055 /* ContainerSensor.swift */,
 				318F273F87B0FBA5A9534EAC /* DevServerFinder.swift */,
 				DCF3D2ECCF35087812BF92C5 /* DiskSensor.swift */,
 				D2C47A273B11DED944F68280 /* EnergyModelSensor.swift */,
@@ -457,6 +467,7 @@
 				9E21F1F65F4010BF7A6C0C88 /* AlertViews.swift */,
 				84AFAFC8D33B01908457ADE1 /* BluetoothCardViews.swift */,
 				793E152BCFF6DC45BB501438 /* CardFamily.swift */,
+				578B06925AAA893C922D03BC /* ContainerCardViews.swift */,
 				CA9B6FCA72A37F307AF87A30 /* DashboardModel.swift */,
 				07AEB236867D309A37AACDA8 /* DashboardView.swift */,
 				16D71F0A473C1329AEE02FF2 /* DevServerViews.swift */,
@@ -506,6 +517,7 @@
 				B861A747FF3BF8E186AD5FFB /* BirthScannerTests.swift */,
 				4A3A11CA7FAC45ECB8511C5B /* BluetoothSensorTests.swift */,
 				0B5633EC929F85A22B2BB45E /* BundleDisplayNameReaderTests.swift */,
+				8576B450296CE59084093EDC /* ContainerSensorTests.swift */,
 				DF3E209527FBD12B7B4014D9 /* DevServerFinderTests.swift */,
 				276EA0F7DAC2C0AC558E9614 /* DiagnosticReportTests.swift */,
 				E0C2BC1088F0581063C1D49A /* DiskSensorTests.swift */,
@@ -658,6 +670,7 @@
 				46DBB21B089E14C2B6E39036 /* BirthScannerTests.swift in Sources */,
 				5E918F632298B152858E0461 /* BluetoothSensorTests.swift in Sources */,
 				1A6FBBAA8FFC5AB748E47788 /* BundleDisplayNameReaderTests.swift in Sources */,
+				5B9A85A61547AE07B7BA4924 /* ContainerSensorTests.swift in Sources */,
 				3DEFB73B1AB0CBBE257F342F /* DevServerFinderTests.swift in Sources */,
 				3A4696425FA64D6D47C5ED02 /* DiagnosticReportTests.swift in Sources */,
 				114C6C63ADBC73CF7E07FFEB /* DiskFixture.swift in Sources */,
@@ -718,6 +731,9 @@
 				6517E8053877F96B96DB576D /* BluetoothSensor.swift in Sources */,
 				4A8D2CF642BAB02C25FEF6C9 /* BundleDisplayNameReader.swift in Sources */,
 				71EB9AFF0FA27487AB7EE515 /* CardFamily.swift in Sources */,
+				89F5E5931E2250F60A9FCA0B /* ContainerCardViews.swift in Sources */,
+				39462B81458878FA28174509 /* ContainerFeature.swift in Sources */,
+				BA1BE175D3E4B33CE9B90A80 /* ContainerSensor.swift in Sources */,
 				F561B3A52AAFFD59A852E1E8 /* DashboardModel.swift in Sources */,
 				B39FB0EABB42285010E7A4E3 /* DashboardView.swift in Sources */,
 				7700D89C75AA6D6D0EB794B6 /* DevServerFeature.swift in Sources */,

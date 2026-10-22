@@ -62,6 +62,31 @@ struct InertSmcSource: SmcSource {
     }
 }
 
+/// 容器:预览合成读数(两台运行 + 一台退出,状态点/CPU/内存列都有形状可验)。
+struct InertContainerSource: ContainerSource {
+    func read() async -> ContainersReading? {
+        ContainersReading(engineReachable: true, containers: [
+            ContainerRow(
+                id: "a1",
+                name: "postgres",
+                state: "running",
+                image: "postgres:16",
+                cpuPercent: 1.8,
+                memoryBytes: 312 * 1024 * 1024
+            ),
+            ContainerRow(
+                id: "b2",
+                name: "redis",
+                state: "running",
+                image: "redis:7",
+                cpuPercent: 0.4,
+                memoryBytes: 28 * 1024 * 1024
+            ),
+            ContainerRow(id: "c3", name: "old-api", state: "exited", image: "api:0.9"),
+        ])
+    }
+}
+
 /// 蓝牙:预览合成载荷(两台带电量 + 一台未知,三级匹配/去重/排序都有形状可验)。
 struct InertBluetoothSource: BluetoothSource {
     var poweredOn: Bool? {
@@ -257,6 +282,7 @@ extension SystemMonitor {
                 smc: SmcFeature(source: InertSmcSource()),
                 sound: SoundFeature(source: InertSoundSource()),
                 bluetooth: BluetoothFeature(source: InertBluetoothSource()),
+                containers: ContainerFeature(source: InertContainerSource()),
                 launchdManifest: LaunchdManifestFeature(
                     provider: LaunchdManifestProvider(source: InertLaunchdPlistSource())
                 )

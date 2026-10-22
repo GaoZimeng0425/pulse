@@ -97,6 +97,11 @@ final class SystemMonitor {
         features.bluetooth
     }
 
+    /// 容器读数(工单 p2-sensors/07)。
+    var containers: ContainerFeature {
+        features.containers
+    }
+
     /// dev server 盘点(工单 p1-history/08)。
     var devServers: DevServerFeature {
         features.devServers
@@ -322,6 +327,13 @@ final class SystemMonitor {
     func setPeripheralsPageVisible(_ visible: Bool) {
         var next = visibility
         next.peripheralsPage = visible
+        updateVisibility(next)
+    }
+
+    /// 容器页可见性变化(p2-sensors/07):docker.sock 采样闸 = 弹窗 ∨ 本旗标。
+    func setContainersPageVisible(_ visible: Bool) {
+        var next = visibility
+        next.containersPage = visible
         updateVisibility(next)
     }
 
