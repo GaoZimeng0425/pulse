@@ -62,6 +62,17 @@ struct InertSmcSource: SmcSource {
     }
 }
 
+/// 声音:预览合成读数(默认设备 + 42% 音量 + 未静音,卡面有形状可验)。
+struct InertSoundSource: SoundSource {
+    func read() -> SoundRawReading? {
+        SoundRawReading(
+            deviceName: "MacBook Pro Speakers",
+            volumeScalar: 0.42,
+            isMuted: false
+        )
+    }
+}
+
 /// 五路功率:预览合成读数(CPU/GPU/ANE/RAM/SoC 各一瓦数,卡面有形状可验)。
 struct InertPowerSource: PowerSource {
     func read() -> PowerRawReading? {
@@ -216,6 +227,7 @@ extension SystemMonitor {
                 gpu: GpuFeature(source: InertGpuSource()),
                 power: PowerFeature(source: InertPowerSource(), chipName: HostInfo.current.chipName ?? ""),
                 smc: SmcFeature(source: InertSmcSource()),
+                sound: SoundFeature(source: InertSoundSource()),
                 launchdManifest: LaunchdManifestFeature(
                     provider: LaunchdManifestProvider(source: InertLaunchdPlistSource())
                 )

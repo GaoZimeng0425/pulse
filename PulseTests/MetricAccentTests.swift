@@ -15,6 +15,9 @@ final class MetricAccentTests: XCTestCase {
         XCTAssertEqual(Metric.network.accent, MetricAccentToken(light: 0x1BAF7A, dark: 0x199E70))
         // 电池(工单 02):§1.1 Battery 行 = Surface.positive 同源的"正常态绿"。
         XCTAssertEqual(Metric.battery.accent, MetricAccentToken(light: 0x008300, dark: 0x2FA83A))
+        // 声音/蓝牙(p2-sensors/05):§1.1 Sound/Bluetooth 现成行,外设页取 Bluetooth 青。
+        XCTAssertEqual(Metric.sound.accent, MetricAccentToken(light: 0xC2379B, dark: 0xD955B3))
+        XCTAssertEqual(Metric.bluetooth.accent, MetricAccentToken(light: 0x0891B2, dark: 0x22A8CC))
     }
 
     /// "双套"的前提:同一指标的浅色与深色必须互异(相同即退化为单套)。
