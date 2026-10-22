@@ -37,6 +37,31 @@ struct InertBatterySource: BatterySource {
 
 /// GPU:预览合成读数(固定 42% 利用率 + M4 静态信息,卡面有数好看);
 /// 与电池/磁盘的"恒 nil 占位"不同——GPU 卡是常驻轴,预览有真形状更可验。
+/// SMC:预览合成读数(派生值/风扇/两条明细,卡面有形状可验;表外键
+/// 也带一条,未知组折叠形态可验)。
+struct InertSmcSource: SmcSource {
+    func read() -> SmcSnapshot? {
+        func sp78(_ value: Double) -> [UInt8] {
+            let scaled = Int(value * 256)
+            return [UInt8((scaled >> 8) & 0xFF), UInt8(scaled & 0xFF)]
+        }
+        return SmcSnapshot(
+            keys: [
+                SmcRawKey(key: "Tp01", dataType: "sp78", bytes: sp78(48)),
+                SmcRawKey(key: "Tp05", dataType: "sp78", bytes: sp78(52)),
+                SmcRawKey(key: "Tg05", dataType: "sp78", bytes: sp78(46)),
+                SmcRawKey(key: "Ts0S", dataType: "sp78", bytes: sp78(41)),
+                SmcRawKey(key: "TZ99", dataType: "sp78", bytes: sp78(43)),
+                SmcRawKey(key: "FNum", dataType: "ui8 ", bytes: [1]),
+                SmcRawKey(key: "F0Ac", dataType: "fpe2", bytes: [0x9C, 0x40]),
+                SmcRawKey(key: "F0Mn", dataType: "fpe2", bytes: [0x24, 0x40]),
+                SmcRawKey(key: "F0Mx", dataType: "fpe2", bytes: [0x66, 0x00]),
+            ],
+            takenAt: Date()
+        )
+    }
+}
+
 /// 五路功率:预览合成读数(CPU/GPU/ANE/RAM/SoC 各一瓦数,卡面有形状可验)。
 struct InertPowerSource: PowerSource {
     func read() -> PowerRawReading? {
@@ -190,6 +215,7 @@ extension SystemMonitor {
                 battery: BatteryFeature(source: InertBatterySource()),
                 gpu: GpuFeature(source: InertGpuSource()),
                 power: PowerFeature(source: InertPowerSource(), chipName: HostInfo.current.chipName ?? ""),
+                smc: SmcFeature(source: InertSmcSource()),
                 launchdManifest: LaunchdManifestFeature(
                     provider: LaunchdManifestProvider(source: InertLaunchdPlistSource())
                 )

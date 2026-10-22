@@ -134,7 +134,7 @@ extension MetricCardModel {
     /// 剩余时间(充电时"充满还需")/ 健康度 / 循环次数 / 功率。
     /// 读数缺失(未首读 / 部分字段读不到)显示占位,不伪造;电池卡无走势
     /// (事件驱动,数值罕变),图表区只剩网格线。
-    static func battery(_ reading: BatteryReading?) -> MetricCardModel {
+    static func battery(_ reading: BatteryReading?, powerWattsOverride: Double? = nil) -> MetricCardModel {
         guard let reading else {
             return MetricCardModel(
                 metric: .battery,
@@ -169,7 +169,11 @@ extension MetricCardModel {
                 ),
                 MetricCardStat(label: "健康度", value: reading.healthPercent.map { "\($0)%" } ?? "—"),
                 MetricCardStat(label: "循环次数", value: reading.cycleCount.map(String.init) ?? "—"),
-                MetricCardStat(label: "功率", value: reading.powerWatts.map(PulseFormat.watts) ?? "—"),
+                // p2-sensors/04:SMC PPBR 优先(V×A 回退),覆盖参数由取数层合流。
+                MetricCardStat(
+                    label: "功率",
+                    value: (powerWattsOverride ?? reading.powerWatts).map(PulseFormat.watts) ?? "—"
+                ),
             ],
             trend: [],
             domainMax: 100

@@ -13,6 +13,7 @@ colors:
   accent-network: "#1baf7a / #199e70"
   accent-battery: "#008300 / #2fa83a"
   accent-gpu: "#e87ba4 / #d55181"
+  accent-sensors: "#d96a4e / #e07b5f"
   state-positive: = {accent-battery}
   state-negative: "#e0352b / #ff453a"
   state-warning: = {accent-disk}

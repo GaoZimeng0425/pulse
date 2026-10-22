@@ -48,6 +48,14 @@ struct MetricTabStack<Ranking: View>: View {
                 memoryByApp
             }
             ranking()
+        case .sensors:
+            // 传感器页(p2-sensors/04):派生读数 + 风扇 pair,温度明细折叠其下;
+            // 弹窗紧凑档同构(派生与风扇即"温度紧凑组"的拍板形态)。
+            pair {
+                SmcDerivedCardView(reading: monitor.smc.reading, isCompact: isCompact)
+                SmcFansCardView(reading: monitor.smc.reading, isCompact: isCompact)
+            }
+            SmcTempsDetailCardView(reading: monitor.smc.reading, isCompact: isCompact)
         case .gpu:
             // GPU 页(p2-sensors/02/03):利用率主卡 + ANE 卡与五路功率区
             // (同一 Energy Model 订阅,一鱼五吃);每 App GPU 归因是 P3(root

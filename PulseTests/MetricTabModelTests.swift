@@ -10,20 +10,19 @@ import XCTest
 final class MetricTabModelTests: XCTestCase {
     // MARK: - MetricTab:顺序与文案
 
-    func testTabsAreOrderedOverviewCPUMemoryGpuDiskNetworkBatteryHistory() {
+    func testTabsAreOrderedOverviewCPUMemoryGpuSensorsDiskNetworkBatteryHistory() {
         // 展示序即键盘 ←/→ 的移动轴:总览在最左,历史(工单 04)在最右;
-        // 磁盘(工单 05)与网络(工单 06)按令牌表插在内存与电池之间;
-        // GPU(p2-sensors/02)插在内存之后——硬件性能族聚拢。
+        // GPU(p2-sensors/02)与传感器(p2-sensors/04)插在内存之后——硬件族聚拢。
         XCTAssertEqual(
             MetricTab.allCases.map(\.rawValue),
-            ["overview", "cpu", "memory", "gpu", "disk", "network", "battery", "history"]
+            ["overview", "cpu", "memory", "gpu", "sensors", "disk", "network", "battery", "history"]
         )
     }
 
     func testTabTitlesAreChinese() {
         // 药丸 tab 文字与无障碍标签共用中文文案。
         let titles = MetricTab.allCases.map(\.title)
-        XCTAssertEqual(titles, ["总览", "CPU", "内存", "GPU", "磁盘", "网络", "电池", "历史"])
+        XCTAssertEqual(titles, ["总览", "CPU", "内存", "GPU", "传感器", "磁盘", "网络", "电池", "历史"])
     }
 
     func testTabSymbolsAreDistinct() {
@@ -52,8 +51,8 @@ final class MetricTabModelTests: XCTestCase {
     }
 
     func testMoveRightAdvancesInDisplayOrder() {
-        // → 键沿展示序右移:总览 → CPU → 内存 → GPU → 磁盘 → 电池 → 历史
-        // (GPU 插在内存之后,p2-sensors/02)。
+        // → 键沿展示序右移:总览 → CPU → 内存 → GPU → 传感器 → 磁盘 → 电池 → 历史
+        // (GPU p2-sensors/02、传感器 p2-sensors/04 相继插在内存之后)。
         var selection = MetricTabSelection()
         selection.moveRight()
         XCTAssertEqual(selection.current, .cpu)
@@ -61,6 +60,8 @@ final class MetricTabModelTests: XCTestCase {
         XCTAssertEqual(selection.current, .memory)
         selection.moveRight()
         XCTAssertEqual(selection.current, .gpu)
+        selection.moveRight()
+        XCTAssertEqual(selection.current, .sensors)
         selection.moveRight()
         XCTAssertEqual(selection.current, .disk)
         selection.moveRight()
@@ -72,8 +73,7 @@ final class MetricTabModelTests: XCTestCase {
     }
 
     func testMoveLeftRetreatsInDisplayOrder() {
-        // ← 键左移:历史 → 电池 → 网络 → 磁盘 → GPU → 内存 → CPU → 总览
-        // (GPU 插在内存之后,p2-sensors/02)。
+        // ← 键左移:历史 → 电池 → 网络 → 磁盘 → 传感器 → GPU → 内存 → CPU → 总览。
         var selection = MetricTabSelection(current: .history)
         selection.moveLeft()
         XCTAssertEqual(selection.current, .battery)
@@ -81,6 +81,8 @@ final class MetricTabModelTests: XCTestCase {
         XCTAssertEqual(selection.current, .network)
         selection.moveLeft()
         XCTAssertEqual(selection.current, .disk)
+        selection.moveLeft()
+        XCTAssertEqual(selection.current, .sensors)
         selection.moveLeft()
         XCTAssertEqual(selection.current, .gpu)
         selection.moveLeft()
@@ -109,19 +111,19 @@ final class MetricTabModelTests: XCTestCase {
     }
 
     func testDisplayAxisHidesBatteryWithoutBattery() {
-        // 磁盘/网络/GPU 页(工单 05/06、p2-sensors/02)常驻轴(每台 Mac 都有),
-        // 无电池只隐藏电池页;历史页(工单 04)同为主窗口常驻轴。
+        // 磁盘/网络/GPU/传感器页(工单 05/06、p2-sensors/02、04)常驻轴
+        // (每台 Mac 都有),无电池只隐藏电池页;历史页(工单 04)同为主窗口常驻轴。
         XCTAssertEqual(
             MetricTab.displayAxis(hasBattery: false),
-            [.overview, .cpu, .memory, .gpu, .disk, .network, .history]
+            [.overview, .cpu, .memory, .gpu, .sensors, .disk, .network, .history]
         )
     }
 
     func testKeyboardMovesFollowAxisWithoutBattery() {
-        // 无电池机器:轴不含电池页(但含 GPU,p2-sensors/02,共 7 页),→ 走 6 步
-        // 到历史右端,再 → 夹紧停下(不跳空)。
+        // 无电池机器:轴不含电池页(含 GPU/传感器,共 8 页),→ 走 7 步到历史
+        // 右端,再 → 夹紧停下(不跳空)。
         var selection = MetricTabSelection(axis: MetricTab.displayAxis(hasBattery: false))
-        for _ in 0 ..< 6 {
+        for _ in 0 ..< 7 {
             selection.moveRight()
         }
         XCTAssertEqual(selection.current, .history)
