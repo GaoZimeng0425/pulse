@@ -56,6 +56,10 @@ struct MetricTabStack<Ranking: View>: View {
                 SmcFansCardView(reading: monitor.smc.reading, isCompact: isCompact)
             }
             SmcTempsDetailCardView(reading: monitor.smc.reading, isCompact: isCompact)
+        case .peripherals:
+            // 外设页(p2-sensors/05):声音区(纯展示,事件驱动零轮询);
+            // 蓝牙区随 06 票进(三源电量合并)。
+            SoundCardView(reading: monitor.sound.reading, isCompact: isCompact)
         case .gpu:
             // GPU 页(p2-sensors/02/03):利用率主卡 + ANE 卡与五路功率区
             // (同一 Energy Model 订阅,一鱼五吃);每 App GPU 归因是 P3(root

@@ -53,11 +53,12 @@ struct MonitorFeatures {
     let gpu: GpuFeature
     let power: PowerFeature
     let smc: SmcFeature
+    let sound: SoundFeature
     let launchdManifest: LaunchdManifestFeature
 
     /// 派发顺序:onRound / 广播 / 可见性 / 传感器登记 / 启停都按它走。
     var registry: [any MonitorFeature] {
-        [network, alerts, devServers, rankings, history, disk, battery, gpu, power, smc, launchdManifest]
+        [network, alerts, devServers, rankings, history, disk, battery, gpu, power, smc, sound, launchdManifest]
     }
 }
 
@@ -86,6 +87,7 @@ extension SystemMonitor {
                 gpu: GpuFeature(source: LiveGpuSource()),
                 power: PowerFeature(source: LiveEnergyModelSource(), chipName: HostInfo.current.chipName ?? ""),
                 smc: SmcFeature(source: LiveSmcSource()),
+                sound: SoundFeature(source: LiveSoundSource()),
                 launchdManifest: LaunchdManifestFeature(provider: LaunchdManifestProvider())
             )
         )
