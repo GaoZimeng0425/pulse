@@ -196,9 +196,16 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   排行卡不配节标题(主窗口也不配「当前最忙」节标题)。
 - **AreaTrendChartView**:56 点、线 2px 指标色、线下渐变 32%→0、4 条 8% 网格线、
   2% 左垫底;**StripChartView**:44 柱、36pt 高。二者都是自绘 Canvas,不引 Charts。
-- **MetricPillTabBar**:未选中纯图标 / 选中图标+文字(用户拍板,2026-10-16);
-  选中 = 指标色 15% 底 + 指标色前景;内距 9(水平)×5(垂直),首尾再留 4pt
-  与系统玻璃底的间距;切换动画 0.2s snappy。图标-only 必带 a11y label + help。
+- **PillTabBar(通用药丸 tab 条,用户拍板 2026-10-22:tab 是通用组件样式)**:
+  唯一视觉配方在 `Pulse/Views/PillTabBar.swift`——选中 = 该项强调色 15% 胶囊底
+  + 同色前景,未选中 = secondary 前景无底;内距 9(水平)×5(垂直)、药丸间距 4;
+  切换动画 0.2s snappy(选中文字自图标侧展开、胶囊生长、其余药丸滑移让位)。
+  两种文字形态:`.selectedOnly`(未选中纯图标 / 选中图标+文字;图标-only 必带
+  a11y label + help)与 `.always`(文字恒显)。三处用法同一组件:主窗口工具栏
+  tab(`MetricPillTabBar` 薄封装 = `.selectedOnly` + ←/→ 键盘 + 首尾再留 4pt
+  与系统玻璃底的间距;选中才展开文字是用户拍板 2026-10-16 的宽度根治法)、
+  历史页指标条(同工具栏形态:五项各指标色 + 与主窗口 tab 同符号,系统负载取
+  仪表盘符与 CPU 区分)、历史页范围条(`.always` 无图标,色调随所选指标)。
 - **工具栏**:药丸 tab 挂 `.principal`,搜索框定宽 **132pt** + 齿轮挂
   `.primaryAction`;标题不进工具栏(`.toolbar(removing: .title)`)。
   任何新增工具栏项必须重新验证 720 最小窗宽不触发 `>>` 溢出菜单。

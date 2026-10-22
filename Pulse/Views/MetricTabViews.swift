@@ -160,50 +160,24 @@ struct MetricIconTabBar: View {
     }
 }
 
-/// 主窗口药丸 tab(工单 03 图标+文字全圆药丸;P1 验收走查改为**选中带文字、
-/// 未选中纯图标**:7 个 tab 后工具栏把中间某枚药丸的文字压缩成省略号——压缩
-/// 只压一处、其余完好的怪象用"只让选中项带文字"根治,总量恒定不随窗口宽摆动;
-/// 视觉配方不变:选中 = 强调色 15% 底 + 强调色前景,渲染序同展示轴。
-/// 未选中项的可达性与悬停提示不缺席(a11yLabel + help)。
+/// 主窗口药丸 tab:通用 `PillTabBar` 的工具栏用法薄封装(用户拍板 2026-10-22
+/// tab 收敛为通用组件)——未选中纯图标、选中图标+文字(P1 验收走查拍板:7 个
+/// tab 后工具栏把中间某枚药丸的文字压缩成省略号,压缩只压一处、其余完好的怪象
+/// 用"只让选中项带文字"根治,总量恒定不随窗口宽摆动);视觉配方在 PillTabBar
+/// 一处(选中 = 强调色 15% 底 + 强调色前景,渲染序同展示轴),本封装只补上
+/// ←/→ 键盘切换与工具栏玻璃底的首尾内距。
 struct MetricPillTabBar: View {
     @Binding var selection: MetricTabSelection
 
     var body: some View {
-        HStack(spacing: 4) {
-            ForEach(selection.axis) { tab in
-                let isSelected = selection.current == tab
-                Button {
-                    selection.current = tab
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: tab.symbolName)
-                            .font(.system(size: 11, weight: .medium))
-                        if isSelected {
-                            Text(tab.title)
-                                // 选中文字从图标侧展开淡入;容器的 value 动画让胶囊
-                                // 随之生长、其余药丸滑移让位(键盘 ←/→ 切换同样生效)。
-                                .transition(.scale(scale: 0.6, anchor: .leading).combined(with: .opacity))
-                        }
-                    }
-                    .font(.callout.weight(.medium))
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .foregroundStyle(isSelected ? tab.accent.accentColor : Color.secondary)
-                    .background(
-                        isSelected ? tab.accent.accentColor.opacity(0.15) : Color.clear,
-                        in: .capsule
-                    )
-                    .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(tab.title)
-                .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-                .help(tab.title)
-            }
+        PillTabBar(
+            selection.axis,
+            selection: $selection.current,
+            textVisibility: .selectedOnly
+        ) { tab in
+            PillTabItem(title: tab.title, symbol: tab.symbolName, tint: tab.accent.accentColor)
         }
         .metricTabKeyboard($selection)
-        // 选中态变化(点按或键盘)统一走这条动画:文字展开/收起 + 胶囊宽度过渡。
-        .animation(.snappy(duration: 0.2), value: selection.current)
         // 首尾药丸与系统玻璃底(inner 的胶囊容器)留出内距,不再贴边。
         .padding(.horizontal, 4)
     }
