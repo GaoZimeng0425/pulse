@@ -42,16 +42,19 @@ struct HistoryTabView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: isCompact ? 8 : 12) {
-            // 指标条 = 工具栏同形态(未选中纯图标、选中展开文字):五项各有
-            // 指标色与符号,与主窗口 tab 一眼同族。
+            // 指标条 = 工具栏同形态(未选中纯图标、选中展开文字)+ 玻璃外裹:
+            // 五项各有指标色与符号,与主窗口 tab 一眼同族。
             PillTabBar(
-                HistoryMetricKey.allCases, selection: $metric, textVisibility: .selectedOnly
+                HistoryMetricKey.allCases,
+                selection: $metric,
+                textVisibility: .selectedOnly,
+                isGlassContainer: true
             ) { key in
                 PillTabItem(title: key.title, symbol: key.symbolName, tint: key.accent.accentColor)
             }
             // 范围条:文字恒显(四项短文案无宽度竞争),色调跟随所选指标——
-            // 与曲线、统计数字同族,整页一个颜色故事。
-            PillTabBar(HistoryRange.allCases, selection: $range) { span in
+            // 与曲线、统计数字同族,整页一个颜色故事;同样玻璃外裹。
+            PillTabBar(HistoryRange.allCases, selection: $range, isGlassContainer: true) { span in
                 PillTabItem(title: span.title, tint: metric.accent.accentColor)
             }
 
