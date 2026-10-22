@@ -90,7 +90,13 @@ final class GpuSensorProvider: SensorProvider {
     }
 
     func snapshot() async -> GpuReading? {
-        guard gate.isVisible, let raw = source.read() else { return nil }
+        guard gate.isVisible else { return nil }
+        return await historySnapshot()
+    }
+
+    /// 历史档读(p2-sensors/08):不看可见性闸(30s 恒采喂库),lastGood 同槽。
+    func historySnapshot() async -> GpuReading? {
+        guard let raw = source.read() else { return nil }
         let reading = GpuReading.make(from: raw)
         slot.store(reading)
         return reading

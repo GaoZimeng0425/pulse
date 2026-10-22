@@ -92,8 +92,20 @@ final class HistoryFeature: MonitorFeature {
     /// 磁盘吞吐交付(磁盘模块广播,含标 stale 的重投):恰好一次记账由内核负责
     /// ——只记 fresh。引擎缺席不记账。
     func onEvent(_ event: FeatureEvent) {
-        guard engine != nil, case let .diskThroughput(delivery) = event else { return }
-        feed.recordDiskThroughput(delivery)
+        guard engine != nil else { return }
+        switch event {
+        case let .diskThroughput(delivery):
+            feed.recordDiskThroughput(delivery)
+        case let .gpuSample(delivery):
+            // P2 传感器趋势量(08):三路 30s 历史档广播,fresh 才暂存(feed 内判)。
+            feed.recordGpu(delivery)
+        case let .smcSample(delivery):
+            feed.recordSmc(delivery)
+        case let .powerSample(delivery):
+            feed.recordPower(delivery)
+        case .diskCapacity, .devServers:
+            break
+        }
     }
 
     /// 历史页查询(工单 p1-history/04):SQL 全在引擎 actor 上执行(后台队列不掉帧,spec User

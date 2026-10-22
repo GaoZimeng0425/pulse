@@ -168,7 +168,11 @@ public actor HistoryEngine {
         netRxBytes: UInt64 = 0,
         netTxBytes: UInt64 = 0,
         diskReadBytes: UInt64 = 0,
-        diskWriteBytes: UInt64 = 0
+        diskWriteBytes: UInt64 = 0,
+        tempAverage: Double? = nil,
+        tempMax: Double? = nil,
+        gpuUtilization: Double? = nil,
+        powerWatts: [PowerDomain: Double]? = nil
     ) -> HistoryIngestOutcome {
         guard let database else { return .buffered }
         var wroteMinute = false
@@ -181,7 +185,11 @@ public actor HistoryEngine {
                     netRxBytes: netRxBytes,
                     netTxBytes: netTxBytes,
                     diskReadBytes: diskReadBytes,
-                    diskWriteBytes: diskWriteBytes
+                    diskWriteBytes: diskWriteBytes,
+                    tempAverage: tempAverage,
+                    tempMax: tempMax,
+                    gpuUtilization: gpuUtilization,
+                    powerWatts: powerWatts
                 ) {
                     try Self.insertMinute(aggregate, in: db)
                     wroteMinute = true
@@ -536,8 +544,9 @@ public actor HistoryEngine {
         try db.execute(
             sql: """
             INSERT OR REPLACE INTO system_min
-                (ts, load_avg, load_max, net_rx, net_tx, disk_read, disk_written)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                (ts, load_avg, load_max, net_rx, net_tx, disk_read, disk_written,
+                 temp_avg, temp_max, gpu_util, pow_cpu, pow_gpu, pow_ane, pow_ram, pow_soc)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             arguments: [
                 ts,
@@ -547,6 +556,14 @@ public actor HistoryEngine {
                 Int64(bitPattern: aggregate.netTxBytes),
                 Int64(bitPattern: aggregate.diskReadBytes),
                 Int64(bitPattern: aggregate.diskWriteBytes),
+                aggregate.tempAverage ?? nil,
+                aggregate.tempMax ?? nil,
+                aggregate.gpuUtilization ?? nil,
+                aggregate.powerWatts?.cpu ?? nil,
+                aggregate.powerWatts?.gpu ?? nil,
+                aggregate.powerWatts?.ane ?? nil,
+                aggregate.powerWatts?.ram ?? nil,
+                aggregate.powerWatts?.soc ?? nil,
             ]
         )
     }
@@ -573,10 +590,13 @@ public actor HistoryEngine {
         try db.execute(
             sql: """
             INSERT OR REPLACE INTO system_hour
-                (ts, load_avg, load_max, net_rx, net_tx, disk_read, disk_written)
+                (ts, load_avg, load_max, net_rx, net_tx, disk_read, disk_written,
+                 temp_avg, temp_max, gpu_util, pow_cpu, pow_gpu, pow_ane, pow_ram, pow_soc)
             SELECT ts / 3600 * 3600,
                    AVG(load_avg), MAX(load_max),
-                   SUM(net_rx), SUM(net_tx), SUM(disk_read), SUM(disk_written)
+                   SUM(net_rx), SUM(net_tx), SUM(disk_read), SUM(disk_written),
+                   AVG(temp_avg), MAX(temp_max), AVG(gpu_util),
+                   AVG(pow_cpu), AVG(pow_gpu), AVG(pow_ane), AVG(pow_ram), AVG(pow_soc)
             FROM system_min
             WHERE ts >= ? AND ts < ?
             GROUP BY ts / 3600 * 3600

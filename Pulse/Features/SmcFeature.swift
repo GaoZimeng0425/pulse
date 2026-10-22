@@ -12,13 +12,33 @@ final class SmcFeature: MonitorFeature {
     private(set) var reading: SmcReading?
 
     private let provider: SmcSensorProvider
+    /// 广播出口(历史记账,08);start 前为 nil。
+    @ObservationIgnored private var host: MonitorHost?
 
     init(source: any SmcSource) {
         provider = SmcSensorProvider(source: source)
     }
 
+    func start(_ host: MonitorHost) {
+        self.host = host
+    }
+
     func sensorDrivers() -> [SensorDriver] {
-        [
+        let provider = provider
+        let historyDriver = SensorDriver(
+            cadence: .every(seconds: 30),
+            tick: { [weak self] in
+                guard let self else { return }
+                if let reading = await provider.historySnapshot() {
+                    Task { @MainActor in
+                        self.host?.broadcast(.smcSample(.fresh(reading)))
+                    }
+                }
+            },
+            wakeups: nil,
+            label: "SMC历史档"
+        )
+        return [
             provider.driver { [weak self] reading in
                 guard let self else { return }
                 Task { @MainActor in
@@ -26,6 +46,7 @@ final class SmcFeature: MonitorFeature {
                     self.reading = reading
                 }
             },
+            historyDriver,
         ]
     }
 

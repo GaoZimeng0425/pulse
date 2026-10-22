@@ -133,6 +133,28 @@ public enum HistoryDatabase {
             )
             """)
         }
+        // P2 传感器趋势量(p2-sensors/08):温度派生/GPU 利用率/五路功率平均瓦数。
+        // 全部可空列——传感器缺席的分钟为 NULL,查询层如实空段不伪造 0;
+        // 历史档(不可见 30s)采样进分钟聚合,小时卷积取 AVG。
+        migrator.registerMigration("p2-sensors-v2") { db in
+            try db.execute(sql: "ALTER TABLE system_min ADD COLUMN temp_avg REAL")
+            try db.execute(sql: "ALTER TABLE system_min ADD COLUMN temp_max REAL")
+            try db.execute(sql: "ALTER TABLE system_min ADD COLUMN gpu_util REAL")
+            try db.execute(sql: "ALTER TABLE system_min ADD COLUMN pow_cpu REAL")
+            try db.execute(sql: "ALTER TABLE system_min ADD COLUMN pow_gpu REAL")
+            try db.execute(sql: "ALTER TABLE system_min ADD COLUMN pow_ane REAL")
+            try db.execute(sql: "ALTER TABLE system_min ADD COLUMN pow_ram REAL")
+            try db.execute(sql: "ALTER TABLE system_min ADD COLUMN pow_soc REAL")
+            try db.execute(sql: "ALTER TABLE system_hour ADD COLUMN temp_avg REAL")
+            try db.execute(sql: "ALTER TABLE system_hour ADD COLUMN temp_max REAL")
+            try db.execute(sql: "ALTER TABLE system_hour ADD COLUMN gpu_util REAL")
+            try db.execute(sql: "ALTER TABLE system_hour ADD COLUMN pow_cpu REAL")
+            try db.execute(sql: "ALTER TABLE system_hour ADD COLUMN pow_gpu REAL")
+            try db.execute(sql: "ALTER TABLE system_hour ADD COLUMN pow_ane REAL")
+            try db.execute(sql: "ALTER TABLE system_hour ADD COLUMN pow_ram REAL")
+            try db.execute(sql: "ALTER TABLE system_hour ADD COLUMN pow_soc REAL")
+        }
+
         return migrator
     }
 

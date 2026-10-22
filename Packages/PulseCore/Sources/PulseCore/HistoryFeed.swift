@@ -21,6 +21,12 @@ public struct HistoryIngest: Equatable, Sendable {
     /// 磁盘吞吐记账增量:自上一笔以来交付的新读数增量合计(字节)。
     public let diskReadBytes: UInt64
     public let diskWriteBytes: UInt64
+    /// P2 传感器趋势量(p2-sensors/08,仪表型):本轮携带的最新值(传感器
+    /// 广播进 feed 的暂存;从无样本 = nil,分钟聚合落 NULL 空段)。
+    public let tempAverage: Double?
+    public let tempMax: Double?
+    public let gpuUtilization: Double?
+    public let powerWatts: [PowerDomain: Double]?
 
     public init(
         at: Date,
@@ -31,7 +37,11 @@ public struct HistoryIngest: Equatable, Sendable {
         netRxBytes: UInt64,
         netTxBytes: UInt64,
         diskReadBytes: UInt64,
-        diskWriteBytes: UInt64
+        diskWriteBytes: UInt64,
+        tempAverage: Double? = nil,
+        tempMax: Double? = nil,
+        gpuUtilization: Double? = nil,
+        powerWatts: [PowerDomain: Double]? = nil
     ) {
         self.at = at
         self.systemLoad = systemLoad
@@ -42,6 +52,10 @@ public struct HistoryIngest: Equatable, Sendable {
         self.netTxBytes = netTxBytes
         self.diskReadBytes = diskReadBytes
         self.diskWriteBytes = diskWriteBytes
+        self.tempAverage = tempAverage
+        self.tempMax = tempMax
+        self.gpuUtilization = gpuUtilization
+        self.powerWatts = powerWatts
     }
 }
 
@@ -58,7 +72,11 @@ public extension HistoryEngine {
             netRxBytes: round.netRxBytes,
             netTxBytes: round.netTxBytes,
             diskReadBytes: round.diskReadBytes,
-            diskWriteBytes: round.diskWriteBytes
+            diskWriteBytes: round.diskWriteBytes,
+            tempAverage: round.tempAverage,
+            tempMax: round.tempMax,
+            gpuUtilization: round.gpuUtilization,
+            powerWatts: round.powerWatts
         )
     }
 }
@@ -75,7 +93,37 @@ public extension HistoryEngine {
 public struct HistoryFeed: Sendable {
     private var pendingDiskReadBytes: UInt64 = 0
     private var pendingDiskWriteBytes: UInt64 = 0
+    /// P2 传感器趋势量的最新仪表值(08):广播样本覆盖暂存,每轮 takeIngest
+    /// 整笔带走(轮间重复携带同一值 = 仪表携带前推,分钟均值口径不变)。
+    private var latestTempAverage: Double?
+    private var latestTempMax: Double?
+    private var latestGpuUtilization: Double?
+    private var latestPowerWatts: [PowerDomain: Double]?
     /// 磁盘吞吐交付进账本:新读数的增量逐笔 &+ 累计;重投的上次好值跳过。
+    /// GPU 传感器交付(可见 5s 档 ∨ 不可见 30s 历史档):fresh 才暂存(stale
+    /// 是读失败重投的旧值,历史不重复记)。
+    public mutating func recordGpu(_ delivery: SensorDelivery<GpuReading>) {
+        guard case let .fresh(reading) = delivery else { return }
+        latestGpuUtilization = reading.utilizationPercent
+    }
+
+    /// SMC 传感器交付:温度派生口径 = CPU 均值 + 全机最热(cpu/gpu/soc 三最热取最大)。
+    public mutating func recordSmc(_ delivery: SensorDelivery<SmcReading>) {
+        guard case let .fresh(reading) = delivery else { return }
+        latestTempAverage = reading.derived.cpuAverage
+        latestTempMax = [
+            reading.derived.cpuHottest,
+            reading.derived.gpuHottest,
+            reading.derived.socHottest,
+        ].compactMap(\.self).max()
+    }
+
+    /// 五路功率传感器交付:五域瓦数原样暂存(缺席域不伪造 0)。
+    public mutating func recordPower(_ delivery: SensorDelivery<PowerReading>) {
+        guard case let .fresh(reading) = delivery else { return }
+        latestPowerWatts = reading.watts.isEmpty ? nil : reading.watts
+    }
+
     public mutating func recordDiskThroughput(_ delivery: SensorDelivery<DiskThroughputReading>) {
         guard case let .fresh(reading) = delivery else { return }
         pendingDiskReadBytes &+= reading.readBytesDelta
@@ -97,7 +145,11 @@ public struct HistoryFeed: Sendable {
             netRxBytes: context.update.network?.downBytesDelta ?? 0,
             netTxBytes: context.update.network?.upBytesDelta ?? 0,
             diskReadBytes: pendingDiskReadBytes,
-            diskWriteBytes: pendingDiskWriteBytes
+            diskWriteBytes: pendingDiskWriteBytes,
+            tempAverage: latestTempAverage,
+            tempMax: latestTempMax,
+            gpuUtilization: latestGpuUtilization,
+            powerWatts: latestPowerWatts
         )
         pendingDiskReadBytes = 0
         pendingDiskWriteBytes = 0

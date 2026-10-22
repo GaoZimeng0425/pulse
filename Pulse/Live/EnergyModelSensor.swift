@@ -139,7 +139,14 @@ final class EnergyModelSensorProvider: SensorProvider, @unchecked Sendable {
     }
 
     func snapshot() async -> PowerReading? {
-        guard gate.isVisible, let raw = source.read() else { return nil }
+        guard gate.isVisible else { return nil }
+        return await historySnapshot()
+    }
+
+    /// 历史档读(p2-sensors/08):不看可见性闸;差分账本与 UI 档共用
+    /// (能量差分按实测时差,5s/30s 档位切换不断账)。
+    func historySnapshot() async -> PowerReading? {
+        guard let raw = source.read() else { return nil }
         let reading = accumulator.record(raw)
         slot.store(reading)
         return reading

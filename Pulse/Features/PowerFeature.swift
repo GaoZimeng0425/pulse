@@ -19,6 +19,8 @@ final class PowerFeature: MonitorFeature {
     /// 芯片名(ANE 归一化表的键源,装配时注入)。
     private let chipName: String
     private let provider: EnergyModelSensorProvider
+    /// 广播出口(历史记账,08);start 前为 nil。
+    @ObservationIgnored private var host: MonitorHost?
 
     init(source: any PowerSource, chipName: String, trendLimit: Int = 60) {
         provider = EnergyModelSensorProvider(source: source)
@@ -31,12 +33,31 @@ final class PowerFeature: MonitorFeature {
         reading.map { AnePowerCap.normalizedPercent(watts: $0.watts[.ane] ?? 0, chipName: chipName) }
     }
 
+    func start(_ host: MonitorHost) {
+        self.host = host
+    }
+
     func sensorDrivers() -> [SensorDriver] {
-        [
+        let provider = provider
+        let historyDriver = SensorDriver(
+            cadence: .every(seconds: 30),
+            tick: { [weak self] in
+                guard let self else { return }
+                if let reading = await provider.historySnapshot() {
+                    Task { @MainActor in
+                        self.host?.broadcast(.powerSample(.fresh(reading)))
+                    }
+                }
+            },
+            wakeups: nil,
+            label: "功率历史档"
+        )
+        return [
             provider.driver { [weak self] reading in
                 guard let self else { return }
                 Task { @MainActor in self.apply(reading) }
             },
+            historyDriver,
         ]
     }
 
