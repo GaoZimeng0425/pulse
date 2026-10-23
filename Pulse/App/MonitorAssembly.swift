@@ -39,8 +39,10 @@ struct MonitorSources {
 
 /// 功能模块注册列表(ADR-0003 扩展点):视图要直读的模块以具名字段持有,派发一律
 /// 按 `registry` 顺序。顺序有意义:网络先落地(徽标与历史同轮);告警先喂本轮采样、
-/// dev server 再盘点并广播(与迁移前的喂食次序一致);排行与历史随后。launchd 服务
-/// 清单模块没有 onRound,放末尾、顺序无意义。
+/// dev server 再盘点并广播(与迁移前的喂食次序一致);排行与历史随后。容器与
+/// launchd 服务清单模块没有 onRound(纯传感器门控 / 静态清单),放末尾、顺序不敏感。
+/// 两份清单(具名字段 × registry)由 MonitorAssemblyTests 钉住防漂移——漏登记
+/// = 模块静默失联(2026-10-23 审计低,containers 曾漏登即被该测试揭出)。
 @MainActor
 struct MonitorFeatures {
     let network: NetworkFeature
@@ -73,6 +75,7 @@ struct MonitorFeatures {
             smc,
             sound,
             bluetooth,
+            containers,
             launchdManifest,
         ]
     }

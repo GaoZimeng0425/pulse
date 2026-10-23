@@ -217,4 +217,39 @@ final class BluetoothModelTests: XCTestCase {
         )
         XCTAssertEqual(reading.devices.first?.name, "子蒙's Magic Trackpad")
     }
+
+    // MARK: 行 id 唯一性(ForEach 撞车收尾去重)
+
+    func testTwoUnnamedAddresslessAnchorsGetDistinctIds() {
+        // 2026-10-23 审计低:两条无名无址的已配对锚行都叫"未知设备",id 同源
+        // 撞车触发 SwiftUI ForEach 重复 id 告警——收尾去重追加序号消歧,两行
+        // 都保留且展示名不变。
+        let reading = BluetoothMerge.merge(
+            paired: [
+                PairedDeviceStatus(name: nil, address: nil),
+                PairedDeviceStatus(name: nil, address: nil),
+            ],
+            hid: [],
+            cache: [],
+            gatt: []
+        )
+        XCTAssertEqual(reading.devices.count, 2)
+        XCTAssertEqual(Set(reading.devices.map(\.id)).count, 2, "无名无址锚行 id 必须互异")
+        XCTAssertTrue(reading.devices.allSatisfy { $0.name == "未知设备" }, "消歧只改 id,展示名不变")
+    }
+
+    func testUnnamedAnchorAndBatteryRowNamedUnknownDeviceGetDistinctIds() {
+        // 无名锚 + 一条名字恰为"未知设备"的无锚电量行:行名同源、都无地址 →
+        // id 撞车同样被收尾消歧(电量读数不丢)。
+        let reading = BluetoothMerge.merge(
+            paired: [PairedDeviceStatus(name: nil, address: nil)],
+            hid: [],
+            cache: [],
+            gatt: [GattBatteryEntry(batteryPercent: 50, name: "未知设备")]
+        )
+        XCTAssertEqual(reading.devices.count, 2)
+        XCTAssertEqual(Set(reading.devices.map(\.id)).count, 2, "锚行与同名无锚电量行的 id 必须互异")
+        XCTAssertTrue(reading.devices.allSatisfy { $0.name == "未知设备" })
+        XCTAssertEqual(reading.devices.first { $0.batteryPercent == 50 }?.batterySource, .gatt)
+    }
 }

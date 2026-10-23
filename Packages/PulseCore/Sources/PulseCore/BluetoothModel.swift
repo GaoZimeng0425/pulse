@@ -112,10 +112,10 @@ public enum BluetoothBatterySource: String, Equatable, Sendable {
 /// 合并后的设备行:锚(已配对设备)+ 挂上的电量;或无锚的纯电量条目
 /// (GATT 扫到但不在配对表,如新设备)。
 public struct BluetoothDeviceRow: Equatable, Identifiable, Sendable {
-    /// 行身份:规整地址优先,无地址按名字。
-    public var id: String {
-        normalizedAddress ?? name
-    }
+    /// 行身份:规整地址优先,无地址按名字(构造时定值)。无名无址的行全落
+    /// "未知设备"会同源撞 id,由 merge 收尾对撞车行追加序号消歧(见 merge
+    /// 末尾;2026-10-23 审计低,SwiftUI ForEach 要求 id 唯一)。
+    public var id: String
 
     public let name: String
     public let address: String?
@@ -135,6 +135,8 @@ public struct BluetoothDeviceRow: Equatable, Identifiable, Sendable {
         batterySource: BluetoothBatterySource? = nil,
         rssi: Int? = nil
     ) {
+        // id 初值沿旧计算口径:规整地址优先,无地址按名字;撞车消歧在 merge 收尾。
+        id = normalizedAddress ?? name
         self.name = name
         self.address = address
         self.normalizedAddress = normalizedAddress
@@ -299,6 +301,18 @@ public enum BluetoothMerge {
                 return lhs.isConnected
             }
             return lhs.name < rhs.name
+        }
+
+        // 收尾去重:SwiftUI ForEach 要求 id 唯一;无名无址行撞 id 时追加
+        // "#2"/"#3" 序号消歧,只改 id 不改展示名(两行仍都显示"未知设备")。
+        var idOccurrences: [String: Int] = [:]
+        for index in rows.indices {
+            let base = rows[index].id
+            let nth = idOccurrences[base, default: 0] + 1
+            idOccurrences[base] = nth
+            if nth > 1 {
+                rows[index].id = "\(base)#\(nth)"
+            }
         }
         return BluetoothReading(poweredOn: nil, devices: rows)
     }
