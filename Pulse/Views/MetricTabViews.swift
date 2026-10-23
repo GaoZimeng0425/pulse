@@ -129,6 +129,9 @@ extension View {
 /// 弹窗顶部图标 tab(工单 03,参考文档 §2.1:无文字、title 提示):
 /// 选中态 = 该指标强调色 15% 胶囊 + 强调色图标(§1.1 选中 tab 配方)。
 /// 渲染序 = 选中态的展示轴(工单 02:无电池机器不含电池页)。
+/// 槽位单行满宽均分(P2 扩到 11 枚后的修复):弹窗内容区 332pt,原 32pt 定宽
+/// 槽 11 枚要 392pt,右端被裁切;改由 HStack 均分——枚数再多只收窄不溢出,
+/// 与主窗口工具栏「720 预算优先,不触发溢出菜单」同一哲学。
 struct MetricIconTabBar: View {
     @Binding var selection: MetricTabSelection
 
@@ -141,7 +144,7 @@ struct MetricIconTabBar: View {
                 } label: {
                     Image(systemName: tab.symbolName)
                         .font(.system(size: 13, weight: .medium))
-                        .frame(width: 32, height: 26)
+                        .frame(maxWidth: .infinity, minHeight: 26)
                         .foregroundStyle(isSelected ? tab.accent.accentColor : Color.secondary)
                         .background(
                             isSelected ? tab.accent.accentColor.opacity(0.15) : Color.clear,
