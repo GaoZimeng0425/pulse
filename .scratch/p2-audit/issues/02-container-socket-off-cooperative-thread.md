@@ -4,11 +4,27 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] recv/connect 阻塞段全部在全局队列执行域,协作线程零阻塞(采样栈佐证:容器页可见时主线程/协作池无 5s 停顿)
-- [ ] 并行单发与超时语义不变(5s 接收超时、8MiB 上限、socket 缺席安静空态)
-- [ ] check.sh 全绿;关两窗指纹全零
+- [x] recv/connect 阻塞段全部在全局队列执行域(withCheckedContinuation 桥回
+      async;行为证据 = 新增慢引擎测试:哑服务器握住连接时,等待窗口内协作池
+      心跳任务照常完成 + 接收超时照常触发)
+- [x] 并行单发与超时语义不变(5s 接收超时、8MiB 上限、socket 缺席
+      engineReachable false 安静空态——逐条保留;socketPaths/超时秒数改可注入,
+      默认值不变)
+- [x] check.sh 全绿(746 例:核心 402 + app 344);关两窗指纹全零
+
+## Comments
+
+**执行记录(2026-10-23)**:`httpGet` 拆两层——阻塞本体 `httpGetBlocking`
+(socket 三件,只许在全局队列上调用)经 `DispatchQueue.global().async` +
+`withCheckedContinuation` 桥回 async;stats 并行单发的 task group 子任务形状
+不变(它们 await continuation,不再亲自阻塞)。测试侧:`LiveContainerSource`
+的 socketPaths/recvTimeoutSeconds 改为可注入(默认行为不变),新增哑服务器
+测试(accept 后握 3s 不响应)钉三条:接收超时触发(返回 nil,读失败语义)、
+elapsed ≥ 0.9s 且 < 2.5s(超时即返回不被服务器 hold 满)、等待窗口内 50ms
+协作池心跳完成(阻塞段确已离开协作线程)。验收锚在满载机器上一次抖动
+(99.4%<100%),单跑即过,与改动无关。
 
 ## Agent Brief
 
