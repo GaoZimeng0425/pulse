@@ -11,11 +11,13 @@
 - 影响面 / 调用链 / 改名迁移类问题 → ripwire;合并前的 diff 安全检查用 `ripwire-change-check`。
 - 结构化查找与机械批量改写 → ast-grep(走技能写 AST 规则;机械重构的子代理必须用它,不准正则替换)。
 - 找已知字符串 → grep 即可。
+- 脚本/python 批量改文件:每处替换先 assert 锚点再替换——pattern 与格式化后的实际代码失配会**静默跳过**(2026-10 真案:registry 漏登让容器功能上线即死一天,测试/编译/lint 全绿);零散几处改用 Edit 工具,失配会大声失败。
 - 给实施子代理的 prompt 带上对应默认:改名 / 改签名 / 迁移类型 → 先 ripwire 查影响面;多点同构修改 → ast-grep。
 
 ## 分支
 
 - 一律合回 `develop`;`p1-implementation` 已冻结别再合,`main` 只在用户明确要求时才动。
+- 并行会话共享本 checkout:实施走独立 worktree(`git worktree add /tmp/<slug> -b feat/<slug> develop`),合并在 worktree 里做,绝不动共享 HEAD;只读看别的分支开 `--detach` worktree。
 - 合入前:合进 `develop` 新提交 → `xcodegen generate` → `sh scripts/check.sh` 全绿;推送直接推 origin 不再询问(2026-10-22 用户撤销"推送先问";main 仍只在明确要求时动)。merge 真正落到 `develop` 后,post-merge hook 自动 `sh scripts/build.sh` Release 安装(应急 `PULSE_SKIP_BUILD=1` 跳过,`PULSE_HOOK_DEBUG=1` 干跑)。
 - 分支保护由 hook 机械化(pre-merge-commit):`main` / `master` 禁止 merge 提交,`p1-implementation` 已冻结禁合;develop 合并来源白名单待分支命名收敛后再补。
 

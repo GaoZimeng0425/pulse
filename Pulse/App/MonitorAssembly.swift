@@ -43,6 +43,8 @@ struct MonitorSources {
 /// launchd 服务清单模块没有 onRound(纯传感器门控 / 静态清单),放末尾、顺序不敏感。
 /// 两份清单(具名字段 × registry)由 MonitorAssemblyTests 钉住防漂移——漏登记
 /// = 模块静默失联(2026-10-23 审计低,containers 曾漏登即被该测试揭出)。
+/// 新增模块三步:①具名字段 ②登记本数组 ③装配可达性另验——直调源的
+/// smoke 不经过这里(2026-10 真案:containers 直调 smoke 全绿但派发不达)。
 @MainActor
 struct MonitorFeatures {
     let network: NetworkFeature
