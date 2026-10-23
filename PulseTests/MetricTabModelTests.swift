@@ -1,3 +1,4 @@
+import AppKit
 @testable import Pulse
 @testable import PulseCore
 import XCTest
@@ -43,6 +44,21 @@ final class MetricTabModelTests: XCTestCase {
         // 图标 tab 靠符号区分,互异才可辨识。
         let symbols = MetricTab.allCases.map(\.symbolName)
         XCTAssertEqual(Set(symbols).count, symbols.count)
+    }
+
+    func testTabAndHistorySymbolsResolveToRealSFSymbols() {
+        // 符号名拼错 = Image(systemName:) 静默渲染空白(p2-sensors/07 实案:
+        // 容器 tab 写了本机不存在的 "shippingcontainer.fill",图标位空白直到
+        // 目验才抓到)。虽属外观,这是机械事实非观感判断,测试钉死:全 tab +
+        // 历史页指标条(同样图标承载)逐一 NSImage 解析非空。
+        let symbols = MetricTab.allCases.map(\.symbolName)
+            + HistoryMetricKey.allCases.map(\.symbolName)
+        for symbol in symbols {
+            XCTAssertNotNil(
+                NSImage(systemSymbolName: symbol, accessibilityDescription: nil),
+                "SF Symbol 不存在:\(symbol)"
+            )
+        }
     }
 
     func testTabAccentMapsToMetricTokens() {

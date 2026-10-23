@@ -46,3 +46,11 @@
 2026-10-23 审计尾票的防漂移测试(MonitorAssemblyTests:Mirror 字段数 == registry 条数)
 当场揭出并补登;该测试现为登记面的常驻门禁。教训三连:批量替换必须 assert 锚点;
 新 feature 必须过 registry 派发路径的真实验证(不只直调源);防漂移测试早一天就一天止血。
+
+## Comments(2026-10-23 补记二:tab 图标静默空白)
+
+票面时期 tab 与容器卡头图标选了 "shippingcontainer.fill"——本机实测该 SF Symbol
+不存在(连不带 .fill 的都没有),`Image(systemName:)` 对无效名静默渲染空白:
+容器 tab 在弹窗图标条、主窗口未选中药丸、容器页卡头三处全部无图标,用户目验抓到。
+两处一并改为实测存在的 "cube.box.fill";MetricTabModelTests 补回归测试
+(全 tab + 历史页指标符号逐一 NSImage 解析非空),符号名拼错从此测试期即红。

@@ -50,7 +50,7 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .peripherals: "headphones"
         case .disk: "internaldrive"
         case .network: "network"
-        case .containers: "shippingcontainer.fill"
+        case .containers: "cube.box.fill"
         case .battery: "battery.100percent"
         case .history: "clock.arrow.circlepath"
         }

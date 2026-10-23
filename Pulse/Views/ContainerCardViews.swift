@@ -16,7 +16,7 @@ struct ContainersCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             CardSubHeader(
-                symbolName: "shippingcontainer.fill",
+                symbolName: "cube.box.fill",
                 title: "容器",
                 tint: Metric.containers.accentColor,
                 note: note
