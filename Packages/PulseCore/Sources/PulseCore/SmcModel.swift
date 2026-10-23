@@ -161,7 +161,12 @@ public enum SmcReadingBuilder {
 
         var known: [SmcTempReading] = []
         var unknown: [SmcTempReading] = []
-        for raw in snapshot.keys where raw.key.hasPrefix("T") {
+        // 温度候选键 = T 前缀(stats 同款过滤)∨ 命名表标温的表外前缀键
+        // (SOC MTR / PMGR SOC Die 的 S/P 前缀——2026-10-23 审计④:此前 T 前缀
+        // 单一闸把 SoC 派生键整个挡在门外)。V*/I*/P* 已归正 voltage/current/
+        // power 类型,不进温度面。
+        for raw in snapshot.keys
+            where raw.key.hasPrefix("T") || SmcNamingTable.name(for: raw.key)?.type == .temperature {
             guard let decoded = values[raw.key] else { continue }
             let previousValue = previous?.allTemps.first(where: { $0.key == raw.key })?.value
             guard let value = sanitized(decoded, previous: previousValue) else { continue }
@@ -185,7 +190,9 @@ public enum SmcReadingBuilder {
         // 风扇:FNum 数量 + F?Ac/Mn/Mx/F?ID。
         var fans: [SmcFanReading] = []
         if let fanCount = values["FNum"] {
-            for index in 0 ..< Int(fanCount) {
+            // 坏 FNum(非 ui8 dataType 解出的大值)钳到 0…8,防超长循环。
+            let clampedFanCount = min(max(Int(fanCount), 0), 8)
+            for index in 0 ..< clampedFanCount {
                 let prefix = "F\(index)"
                 guard let rpm = values["\(prefix)Ac"] else { continue }
                 fans.append(
@@ -241,7 +248,9 @@ public enum SmcReadingBuilder {
 
         let cpu = stats(for: .cpu)
         let gpu = stats(for: .gpu)
-        let soc = stats(for: .system)
+        // SoC 派生只收 .soc 组(SOC MTR / PMGR SOC Die,2026-10-23 审计④:此前
+        // 误读 .system 组——算的是主板/电池/屏幕杂项,错值还进了 30 天历史)。
+        let soc = stats(for: .soc)
         return SmcDerivedTemps(
             cpuAverage: cpu.average, cpuHottest: cpu.hottest,
             gpuAverage: gpu.average, gpuHottest: gpu.hottest,

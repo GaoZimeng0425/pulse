@@ -52,6 +52,25 @@ final class GpuSensorTests: XCTestCase {
         XCTAssertEqual(provider.cadence, .every(seconds: 5))
     }
 
+    @MainActor
+    func testStaleRedeliveryDoesNotFillTrend() async {
+        // 审计④:门关期间调度器每 5s 重投 lastGood(stale)——走势环不被同一
+        // 旧值灌满(否则 60 点窗 5 分钟全是假平线);显示值保留。
+        let source = FakeGpuSource()
+        source.payload = GpuRawReading(deviceUtilizationPercent: 42, modelName: "Apple M4")
+        let feature = GpuFeature(source: source)
+        let drivers = feature.sensorDrivers()
+
+        feature.visibilityChanged(MonitorVisibility(popover: true))
+        await drivers[0].tick() // fresh
+        XCTAssertEqual(feature.trend, [42])
+
+        feature.visibilityChanged(MonitorVisibility()) // 关闸
+        await drivers[0].tick() // stale 重投
+        XCTAssertEqual(feature.trend, [42], "stale 重投不追加走势")
+        XCTAssertEqual(feature.reading?.utilizationPercent, 42, "显示保留上次好值")
+    }
+
     func testLiveSmokeOnThisMachine() {
         // Live 冒烟:本机真读一次(Apple Silicon 必有加速器);钳位在核心包,
         // 这里只验原始值量级与静态信息在场。

@@ -141,6 +141,12 @@ public struct PowerAccumulator: Sendable {
             let was = names.reduce(0.0) { $0 + (baselineJoules[$1] ?? 0) }
             let hasChannel = names.contains { joules[$0] != nil }
             guard hasChannel else { continue } // 通道缺席的域缺席,不伪造
+            // 域内任一在场通道在基线缺席(订阅中途新增通道):缺席项按 0 差分
+            // 会把开机累计量当一轮增量出巨刺——该域本轮跳过,store 后基线补齐,
+            // 下一轮恢复(2026-10-23 审计⑤)。
+            if names.contains(where: { joules[$0] != nil && baselineJoules[$0] == nil }) {
+                continue
+            }
             let delta = max(0, now - was) // 负差钳 0
             watts[domain] = delta / elapsed
         }

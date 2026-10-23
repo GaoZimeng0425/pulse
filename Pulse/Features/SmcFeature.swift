@@ -39,10 +39,11 @@ final class SmcFeature: MonitorFeature {
             label: "SMC历史档"
         )
         return [
-            provider.driver { [weak self] reading in
+            // UI 档带新鲜度:stale 重投整笔跳过,关窗期不逐 5s 打脏观察(审计④)。
+            provider.markedDriver { [weak self] delivery in
                 guard let self else { return }
                 Task { @MainActor in
-                    guard let reading else { return }
+                    guard case let .fresh(reading) = delivery else { return }
                     self.reading = reading
                 }
             },

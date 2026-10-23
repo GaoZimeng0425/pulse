@@ -95,33 +95,51 @@ public struct HistoryFeed: Sendable {
     private var pendingDiskWriteBytes: UInt64 = 0
     /// P2 传感器趋势量的最新仪表值(08):广播样本覆盖暂存,每轮 takeIngest
     /// 整笔带走(轮间重复携带同一值 = 仪表携带前推,分钟均值口径不变)。
-    private var latestTempAverage: Double?
-    private var latestTempMax: Double?
-    private var latestGpuUtilization: Double?
-    private var latestPowerWatts: [PowerDomain: Double]?
+    /// 样本带时刻:超过 `gaugeMaxAge` 无新样本(传感器持续失败)即置 nil 出
+    /// 空段,不把冻结值无限写进历史(2026-10-23 审计⑤)。
+    private struct GaugeSample<Value: Sendable>: Sendable {
+        var value: Value
+        var at: Date
+    }
+
+    /// 仪表过期窗 = 3 个历史档周期(30s×3):容忍两个周期的读失败。
+    private static let gaugeMaxAge: TimeInterval = 90
+
+    private var latestTempAverage: GaugeSample<Double>?
+    private var latestTempMax: GaugeSample<Double>?
+    private var latestGpuUtilization: GaugeSample<Double>?
+    private var latestPowerWatts: GaugeSample<[PowerDomain: Double]>?
     /// 磁盘吞吐交付进账本:新读数的增量逐笔 &+ 累计;重投的上次好值跳过。
-    /// GPU 传感器交付(可见 5s 档 ∨ 不可见 30s 历史档):fresh 才暂存(stale
-    /// 是读失败重投的旧值,历史不重复记)。
-    public mutating func recordGpu(_ delivery: SensorDelivery<GpuReading>) {
+    /// GPU 传感器交付(30s 历史档):fresh 才暂存(stale 是读失败重投的旧值,
+    /// 历史不重复记);`at` = 壳侧注入钟的采样时刻(过期判定用)。
+    public mutating func recordGpu(_ delivery: SensorDelivery<GpuReading>, at date: Date) {
         guard case let .fresh(reading) = delivery else { return }
-        latestGpuUtilization = reading.utilizationPercent
+        latestGpuUtilization = GaugeSample(value: reading.utilizationPercent, at: date)
     }
 
     /// SMC 传感器交付:温度派生口径 = CPU 均值 + 全机最热(cpu/gpu/soc 三最热取最大)。
-    public mutating func recordSmc(_ delivery: SensorDelivery<SmcReading>) {
+    public mutating func recordSmc(_ delivery: SensorDelivery<SmcReading>, at date: Date) {
         guard case let .fresh(reading) = delivery else { return }
-        latestTempAverage = reading.derived.cpuAverage
+        latestTempAverage = reading.derived.cpuAverage.map { GaugeSample(value: $0, at: date) }
         latestTempMax = [
             reading.derived.cpuHottest,
             reading.derived.gpuHottest,
             reading.derived.socHottest,
-        ].compactMap(\.self).max()
+        ].compactMap(\.self).max().map { GaugeSample(value: $0, at: date) }
     }
 
     /// 五路功率传感器交付:五域瓦数原样暂存(缺席域不伪造 0)。
-    public mutating func recordPower(_ delivery: SensorDelivery<PowerReading>) {
+    public mutating func recordPower(_ delivery: SensorDelivery<PowerReading>, at date: Date) {
         guard case let .fresh(reading) = delivery else { return }
-        latestPowerWatts = reading.watts.isEmpty ? nil : reading.watts
+        latestPowerWatts = reading.watts.isEmpty
+            ? nil
+            : GaugeSample(value: reading.watts, at: date)
+    }
+
+    /// 过期即 nil(样本时刻距今超窗);未过期取值。
+    private func gauge<Value>(_ sample: GaugeSample<Value>?, at now: Date) -> Value? {
+        guard let sample, now.timeIntervalSince(sample.at) <= Self.gaugeMaxAge else { return nil }
+        return sample.value
     }
 
     public mutating func recordDiskThroughput(_ delivery: SensorDelivery<DiskThroughputReading>) {
@@ -146,10 +164,10 @@ public struct HistoryFeed: Sendable {
             netTxBytes: context.update.network?.upBytesDelta ?? 0,
             diskReadBytes: pendingDiskReadBytes,
             diskWriteBytes: pendingDiskWriteBytes,
-            tempAverage: latestTempAverage,
-            tempMax: latestTempMax,
-            gpuUtilization: latestGpuUtilization,
-            powerWatts: latestPowerWatts
+            tempAverage: gauge(latestTempAverage, at: now),
+            tempMax: gauge(latestTempMax, at: now),
+            gpuUtilization: gauge(latestGpuUtilization, at: now),
+            powerWatts: gauge(latestPowerWatts, at: now)
         )
         pendingDiskReadBytes = 0
         pendingDiskWriteBytes = 0

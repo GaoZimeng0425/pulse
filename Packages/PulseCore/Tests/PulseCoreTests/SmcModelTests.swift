@@ -97,6 +97,20 @@ final class SmcModelTests: XCTestCase {
         XCTAssertNil(reading?.derived.socHottest)
     }
 
+    func testSocDerivedComesFromSocGroupOnly() {
+        // SoC 派生只收 .soc 组(SOC MTR / PMGR SOC Die,审计④:此前误读
+        // .system 组,算的是主板/电池杂项;系统组键不再混进 SoC 派生)。
+        let reading = SmcReadingBuilder.make(from: snapshot([
+            ("Tp01", "sp78", sp78(40)),
+            ("SOC MTR Temp Sensor%", "sp78", sp78(62)),
+            ("PMGR SOC Die Temp Sensor%", "sp78", sp78(58)),
+            ("Tm0P", "sp78", sp78(71)), // Mainboard,.system 组:不得进 SoC 派生
+        ], at: Date()), previous: nil)
+        XCTAssertEqual(reading?.derived.socHottest ?? -1, 62, accuracy: 1e-9)
+        // SOC MTR 无 average 标记 → SoC 均值为 nil(与 CPU 组口径一致)。
+        XCTAssertNil(reading?.derived.socAverage)
+    }
+
     func testMakeFansAndBatteryKeys() {
         // FNum=1(探针⑤本机实测)+ F0Ac/Mn/Mx + PPBR/PDTR 顺手键。
         let reading = SmcReadingBuilder.make(

@@ -129,7 +129,8 @@ struct SmcTempsDetailCardView: View {
                 note: reading.map { "\($0.knownTemps.count + $0.unknownTemps.count) 个键在场" }
             )
             if let reading {
-                ForEach([SmcSensorGroup.cpu, .gpu, .system, .sensor], id: \.self) { group in
+                // SoC 组(2026-10-23 审计④:SoC 派生键从 .sensor 归 .soc 独立成节)。
+                ForEach([SmcSensorGroup.cpu, .gpu, .soc, .system, .sensor], id: \.self) { group in
                     let rows = reading.knownTemps.filter { $0.group == group }
                     if !rows.isEmpty {
                         section(

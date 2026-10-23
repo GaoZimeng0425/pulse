@@ -140,7 +140,7 @@ public enum HistoryMetricKey: String, CaseIterable, Identifiable, Sendable {
         case .memory: "全部组内存峰值之和(App 归因视角;系统级未计入)"
         case .network: "收发合计平均速率;工单 06 起开始记录"
         case .disk: "读写合计平均速率;工单 06 起开始记录"
-        case .temperature: "CPU 均值派生温度(最热见峰值);P2 传感器 08 起记录"
+        case .temperature: "CPU 均值派生温度;P2 传感器 08 起记录"
         case .gpu: "GPU 总利用率(关电归 0 同记);P2 传感器 08 起记录"
         case .power: "五路功率合计(CPU+GPU+ANE+RAM+SoC 平均瓦数);P2 传感器 08 起记录"
         }
@@ -278,10 +278,15 @@ public enum HistoryQuery {
             GROUP BY bucket ORDER BY bucket
             """
         case .power:
-            // 五路合计取行级合计的桶均(NULL 传染:任一路缺席该行不计,诚实空段)。
+            // 五路合计:缺席域按 0 计(COALESCE,与存储层各域独立均值的合计口径
+            // 一致——缺 ANE 域的芯片不整行丢弃);全 NULL 的行经 FILTER 剔除,
+            // 该桶如实空段(2026-10-23 审计⑤)。
             sql = """
             SELECT ts / \(bucket) * \(bucket) AS bucket,
-                   AVG(pow_cpu + pow_gpu + pow_ane + pow_ram + pow_soc) AS value
+                   AVG(COALESCE(pow_cpu, 0) + COALESCE(pow_gpu, 0) + COALESCE(pow_ane, 0)
+                       + COALESCE(pow_ram, 0) + COALESCE(pow_soc, 0))
+                   FILTER (WHERE pow_cpu IS NOT NULL OR pow_gpu IS NOT NULL OR pow_ane IS NOT NULL
+                       OR pow_ram IS NOT NULL OR pow_soc IS NOT NULL) AS value
             FROM \(table) WHERE ts >= ? AND ts < ?
             GROUP BY bucket ORDER BY bucket
             """

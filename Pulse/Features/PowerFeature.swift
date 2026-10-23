@@ -53,9 +53,10 @@ final class PowerFeature: MonitorFeature {
             label: "功率历史档"
         )
         return [
-            provider.driver { [weak self] reading in
+            // UI 档带新鲜度:stale 重投不灌 ANE 走势环/不打脏观察(审计④)。
+            provider.markedDriver { [weak self] delivery in
                 guard let self else { return }
-                Task { @MainActor in self.apply(reading) }
+                Task { @MainActor in self.apply(delivery) }
             },
             historyDriver,
         ]
@@ -68,8 +69,10 @@ final class PowerFeature: MonitorFeature {
     }
 
     /// nil = 从未有过读数(订阅缺席 / 组不在)→ ANE 卡与功率区占位。
-    private func apply(_ reading: PowerReading?) {
-        guard let reading else { return }
+    /// stale(读失败重投的 lastGood)整笔跳过:显示保留既有值,走势环不被
+    /// 旧值灌满(审计④)。
+    private func apply(_ delivery: SensorDelivery<PowerReading>?) {
+        guard case let .fresh(reading) = delivery else { return }
         self.reading = reading
         aneTrend.append(reading.watts[.ane] ?? 0)
         if aneTrend.count > trendLimit {

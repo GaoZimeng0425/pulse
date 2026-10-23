@@ -97,12 +97,13 @@ final class HistoryFeature: MonitorFeature {
         case let .diskThroughput(delivery):
             feed.recordDiskThroughput(delivery)
         case let .gpuSample(delivery):
-            // P2 传感器趋势量(08):三路 30s 历史档广播,fresh 才暂存(feed 内判)。
-            feed.recordGpu(delivery)
+            // P2 传感器趋势量(08):三路 30s 历史档广播,fresh 才暂存(feed 内判);
+            // 时刻走注入钟(仪表过期判定用,审计⑤)。
+            feed.recordGpu(delivery, at: clock())
         case let .smcSample(delivery):
-            feed.recordSmc(delivery)
+            feed.recordSmc(delivery, at: clock())
         case let .powerSample(delivery):
-            feed.recordPower(delivery)
+            feed.recordPower(delivery, at: clock())
         case .diskCapacity, .devServers:
             break
         }

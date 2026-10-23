@@ -102,10 +102,22 @@ final class ContainerModelTests: XCTestCase {
         XCTAssertEqual(stats?.memoryBytes, 1024)
     }
 
+    func testNegativeCpuDeltaClampsToZero() {
+        // 计数器回绕(precpu > cpu):按 0% 不出负数(审计⑤)。
+        let body = statsBody(
+            total: 100, preTotal: 900,
+            system: 500, preSystem: 100,
+            onlineCPUs: 2, memory: 1024
+        )
+        let stats = ContainerStatsPayload.parse(body)
+        XCTAssertEqual(stats?.cpuPercent, 0)
+        XCTAssertEqual(stats?.memoryBytes, 1024)
+    }
+
     func testMissingStatsFieldsDegradeQuietly() {
         let stats = ContainerStatsPayload.parse(Array(#"{"cpu_stats": {}}"#.utf8))
         XCTAssertEqual(stats?.cpuPercent, 0)
-        XCTAssertEqual(stats?.memoryBytes, 0)
+        XCTAssertNil(stats?.memoryBytes, "内存读不到 = nil,不折叠成 0(审计⑤)")
         XCTAssertNil(ContainerStatsPayload.parse(Array("garbage".utf8)))
     }
 }

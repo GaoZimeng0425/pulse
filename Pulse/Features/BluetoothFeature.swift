@@ -19,10 +19,11 @@ final class BluetoothFeature: MonitorFeature {
 
     func sensorDrivers() -> [SensorDriver] {
         [
-            provider.driver { [weak self] reading in
+            // 带新鲜度:stale 重投跳过(读失败保显示 = 字段已持旧值,审计④)。
+            provider.markedDriver { [weak self] delivery in
                 guard let self else { return }
                 Task { @MainActor in
-                    guard let reading else { return }
+                    guard case let .fresh(reading) = delivery else { return }
                     self.reading = reading
                 }
             },
