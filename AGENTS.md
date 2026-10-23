@@ -8,6 +8,7 @@
 
 ## 代码工具选择
 
+- 判断类代码标准(防御纪律/并发/测试/注释)见根目录 `CODING_STANDARDS.md`——`/code-review` Standards 轴强制执行;机械项归 lint/测试,不两处重复。
 - 影响面 / 调用链 / 改名迁移类问题 → ripwire;合并前的 diff 安全检查用 `ripwire-change-check`。
 - 结构化查找与机械批量改写 → ast-grep(走技能写 AST 规则;机械重构的子代理必须用它,不准正则替换)。
 - 找已知字符串 → grep 即可。
