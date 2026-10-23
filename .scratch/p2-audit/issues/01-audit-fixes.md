@@ -16,6 +16,6 @@
 
 **执行记录(2026-10-23)**:审计五项全部修复,每项带回归测试(功率中途通道/SoC 组别/容器负差/仪表过期/功率 COALESCE/GPU stale 走势)。**SoC 修复比审计发现的更深**:命名表归组之外,builder 的 T 前缀单一闸把 SOC MTR/PMGR SOC Die 整个挡在温度面外——门放宽后 V*/I*/P* 误标条目变活雷,51 条归正一并拆掉。arm64-only 目标机上这些 Intel 键不在场,零回归面。
 
-**已知残留(不修,记档)**:ContainerSensor 阻塞 socket 在协作线程(≤5s 超时,挪全局队列属架构活);BluetoothModel.merge 的 poweredOn 硬编码 nil + 无名行 id 可撞(API 打磨);MonitorFeatures registry 双份手工维护无防漂移测试;GATT 探针生命周期无单测(需真蓝牙栈,以代码评审钉住)。
+**已知残留(不修,记档)**:ContainerSensor 阻塞 socket 在协作线程(≤5s 超时,挪全局队列属架构活);BluetoothModel.merge 的 poweredOn 硬编码 nil + 无名行 id 可撞(API 打磨);MonitorFeatures registry 防漂移测试已随尾票补上(并当场揭出 containers 漏登,见 07 票补记);GATT 探针生命周期无单测(需真蓝牙栈,以代码评审钉住)。
 
 **待用户目验**:传感器页 SoC 派生行有真值(SOC MTR 在场时);GPU 页走势环关窗重开后不再出现假平线段。

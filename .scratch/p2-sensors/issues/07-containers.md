@@ -36,3 +36,13 @@
 - OrbStack 运行时容器 tab 与 OrbStack 界面/`docker ps` 互证(数量/状态/CPU)。
 - OrbStack 退出后空态文案安静出现,无报错弹窗。
 - 弹窗(容器 tab 紧凑档)同形状(前 6 台)。
+
+## Comments(2026-10-23 补记:静默失联实锤)
+
+本票的 registry 登记**当时静默失败**(python 替换单行 pattern 对多行数组、无锚点断言):
+`containers` 具名字段在场但从未进 registry 派发表——正式 app 里容器模块的传感器登记/
+可见性门控/start 派发全部不达,容器页自 07 合入起一直空占位。测试未红的原因:smoke
+直调 LiveContainerSource,绕过注册表;指纹零也不背书(视图不在树既因门控也因功能死了)。
+2026-10-23 审计尾票的防漂移测试(MonitorAssemblyTests:Mirror 字段数 == registry 条数)
+当场揭出并补登;该测试现为登记面的常驻门禁。教训三连:批量替换必须 assert 锚点;
+新 feature 必须过 registry 派发路径的真实验证(不只直调源);防漂移测试早一天就一天止血。
