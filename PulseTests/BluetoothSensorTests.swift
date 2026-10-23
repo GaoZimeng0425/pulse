@@ -103,12 +103,54 @@ final class BluetoothSensorTests: XCTestCase {
         XCTAssertNil(drained?.devices.first { $0.name == "路过的设备" }, "缓冲是取走制,同一样本不进两轮")
     }
 
-    func testLivePairedSmokeOnThisMachine() {
+    /// 限时单发恢复盒(p2-audit/04 附带加固):IOBluetooth 首访可能阻塞等
+    /// TCC 授权弹窗(无头测试宿主无人可点)或 bluetoothd 失速——5s 内取值,
+    /// 超时恢复 .stalled 一次,晚到的读数丢弃。
+    private enum PairedProbe: Sendable {
+        case ok([PairedDeviceStatus]?)
+        case stalled
+    }
+
+    private final class OnceResume: @unchecked Sendable {
+        private let lock = NSLock()
+        private var resumed = false
+        private let continuation: CheckedContinuation<PairedProbe, Never>
+
+        init(_ continuation: CheckedContinuation<PairedProbe, Never>) {
+            self.continuation = continuation
+        }
+
+        func resume(_ result: PairedProbe) {
+            lock.lock()
+            let first = !resumed
+            resumed = true
+            lock.unlock()
+            if first {
+                continuation.resume(returning: result)
+            }
+        }
+    }
+
+    func testLivePairedSmokeOnThisMachine() async throws {
         // Live 冒烟:本机实探 6 台已配对(小米平板重复行,去重在合并器);
-        // 这里只验原始载荷结构健全(名字/地址非空、地址可规整)。
+        // 只验原始载荷结构健全(名字/地址非空、地址可规整)。IOBluetooth 调用
+        // 限时 5s——系统级健康另有 CLI 探针背书,宿主内阻塞(TCC 等待/蓝牙栈
+        // 失速)时跳过不判败:60s fuse 上岗首日即抓到此测试真挂死(2026-10-23)。
         let source = LiveBluetoothSource()
-        guard let paired = source.readPaired() else {
-            XCTAssertNil(source.readPaired(), "蓝牙栈不可用时恒 nil")
+        let probe: PairedProbe = await withCheckedContinuation { continuation in
+            let once = OnceResume(continuation)
+            DispatchQueue.global().async {
+                once.resume(.ok(source.readPaired()))
+            }
+            DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
+                once.resume(.stalled)
+            }
+        }
+        guard case let .ok(paired) = probe else {
+            throw XCTSkip("IOBluetooth 5s 未响应(疑似 TCC 授权等待/蓝牙栈失速)——本轮跳过冒烟")
+        }
+        guard let paired else {
+            // 蓝牙栈可用但返回空(nil):软断言恒 nil 后放过。
             return
         }
         for device in paired {

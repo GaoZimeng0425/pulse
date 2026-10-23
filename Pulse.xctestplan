@@ -1,0 +1,23 @@
+{
+  "configurations": [
+    {
+      "id": "5F3B9A2C-8D41-4E6B-B0A7-2C9D1E4F5A60",
+      "name": "Configuration 1",
+      "options": {}
+    }
+  ],
+  "defaultOptions": {
+    "testTimeoutsEnabled": true,
+    "defaultTestExecutionTimeAllowance": 60.0
+  },
+  "testTargets": [
+    {
+      "target": {
+        "containerPath": "container:Pulse.xcodeproj",
+        "identifier": "PulseTests",
+        "name": "PulseTests"
+      }
+    }
+  ],
+  "version": 1
+}

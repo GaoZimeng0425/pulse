@@ -83,3 +83,7 @@ schemes:
       config: Debug
       targets:
         - PulseTests
+      # 单测默认超时(p2-audit/04):挂死用例 60s 判失败,不再无限等待
+      # (2026-10-22 真案:假 AsyncStream 忘 finish() 挂死宿主 30 分钟)。
+      testPlans:
+        - path: Pulse.xctestplan

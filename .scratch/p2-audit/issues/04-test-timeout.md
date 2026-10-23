@@ -4,11 +4,29 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] 超时生效验证:人为写一个 sleep(120) 的用例在 60s 被判失败后删除
-- [ ] 既有 745 例无超时误伤(全绿)
-- [ ] check.sh 全绿
+- [x] 超时生效验证:临时 sleep(120) 用例被 "exceeded execution time allowance of
+      1 minute" 判败(~60s,验证后已删)
+- [x] 既有 745 例无超时误伤,check.sh 全绿(核心 402 + app 343)
+- [x] 顺手加固(见 Comments):蓝牙冒烟测试限时 5s + 超时 XCTSkip
+
+## Comments
+
+**执行记录(2026-10-23)**:根目录 `Pulse.xctestplan`(defaultOptions:
+testTimeoutsEnabled + defaultTestExecutionTimeAllowance 60s;configuration id
+必须是 UUID 形,非 UUID 读不出 plan——踩过)+ project.yml scheme.test.testPlans
+(`- path:` 形;裸字符串不生效,xcodegen 2.46 两者都不报错,以生成 scheme 里的
+TestPlanReference 为准)。
+
+**fuse 上岗首日战果**:全量跑里 `testLivePairedSmokeOnThisMachine` 真挂死 >60s
+被依规击毙——IOBluetooth 首访在无头测试宿主内会阻塞等 TCC 授权弹窗(加了
+usage description 后从"崩溃"变"等人点允许";新 worktree 二进制路径触发新弹窗;
+CLI 探针证实 bluetoothd 系统级健康)。顺带加固:该冒烟限时 5s,超时 XCTSkip
+——机会性冒烟不拖挂套件;正式 app 首开外设页弹一次授权属预期交互。
+
+**注意**:核心包 swift test 不经 xcodebuild,不受此 plan 管(核心套件自有
+纪律,零真等待);xctestplan 只覆盖 PulseTests 宿主侧。
 
 ## Agent Brief
 
