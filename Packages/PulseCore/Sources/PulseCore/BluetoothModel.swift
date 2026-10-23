@@ -147,13 +147,13 @@ public struct BluetoothDeviceRow: Equatable, Identifiable, Sendable {
     }
 }
 
-/// 一轮蓝牙读数:合并后的设备表 + 蓝牙开关态。
+/// 一轮蓝牙读数:合并后的设备表。蓝牙开关态字段已删(p2-audit/03,2026-10-23
+/// 用户拍板 A):查真值需常驻 CoreBluetooth 监听,性价比不足;蓝牙关时
+/// readPaired 返 nil 已走"蓝牙不可用或无设备"空态。往后排的点子记在票面。
 public struct BluetoothReading: Equatable, Sendable {
-    public let poweredOn: Bool?
     public let devices: [BluetoothDeviceRow]
 
-    public init(poweredOn: Bool?, devices: [BluetoothDeviceRow]) {
-        self.poweredOn = poweredOn
+    public init(devices: [BluetoothDeviceRow]) {
         self.devices = devices
     }
 }
@@ -314,7 +314,7 @@ public enum BluetoothMerge {
                 rows[index].id = "\(base)#\(nth)"
             }
         }
-        return BluetoothReading(poweredOn: nil, devices: rows)
+        return BluetoothReading(devices: rows)
     }
 
     /// 三级匹配:① 规整地址相等 → ② 名字两侧均唯一且相等 → ③ 厂商/产品 ID
@@ -367,13 +367,10 @@ public enum BluetoothMerge {
 /// (IOBluetooth/IORegistry/plist 读取 + CoreBluetooth 按需建连),测试注入
 /// 假源;缝上全部纯逻辑(本文件的合并器)。
 public protocol BluetoothSource: Sendable {
-    /// 已配对设备锚(IOBluetooth;poweredOn 时为空数组,蓝牙关 = nil?)——
-    /// 蓝牙关时返回 nil 交空态,不伪造。
+    /// 已配对设备锚(IOBluetooth):蓝牙关时返回 nil 交空态,不伪造。
     func readPaired() -> [PairedDeviceStatus]?
     /// 源①:IORegistry HID 电量条目。
     func readHidBatteries() -> [HidBatteryEntry]
     /// 源②:蓝牙偏好缓存电量条目(macOS 26 无 DeviceCache 键 = 空数组)。
     func readCachedBatteries() -> [CachedBatteryEntry]
-    /// 蓝牙开关态(CoreBluetooth 状态;nil = 未知)。
-    var poweredOn: Bool? { get }
 }
