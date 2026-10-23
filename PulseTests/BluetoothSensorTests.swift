@@ -12,10 +12,6 @@ private final class FakeBluetoothSource: BluetoothSource, @unchecked Sendable {
     var hid: [HidBatteryEntry] = []
     var cache: [CachedBatteryEntry] = []
 
-    var poweredOn: Bool? {
-        true
-    }
-
     func readPaired() -> [PairedDeviceStatus]? {
         paired
     }

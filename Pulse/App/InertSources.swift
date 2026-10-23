@@ -89,10 +89,6 @@ struct InertContainerSource: ContainerSource {
 
 /// 蓝牙:预览合成载荷(两台带电量 + 一台未知,三级匹配/去重/排序都有形状可验)。
 struct InertBluetoothSource: BluetoothSource {
-    var poweredOn: Bool? {
-        true
-    }
-
     func readPaired() -> [PairedDeviceStatus]? {
         [
             PairedDeviceStatus(

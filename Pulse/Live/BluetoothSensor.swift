@@ -14,12 +14,6 @@ import PulseCore
 /// `pairedDevices()`(实探:同设备可重复出现,去重在核心包合并器)。
 /// 源③ GATT 按 ON_DEMAND 建连,见 `GattBatteryProbe`(不在本源,不常开)。
 struct LiveBluetoothSource: BluetoothSource {
-    /// 蓝牙开关态:IOBluetooth 无廉价的同步查询,v1 不设探针——nil = 未知,
-    /// 空表交 UI 兜底文案。
-    var poweredOn: Bool? {
-        nil
-    }
-
     func readPaired() -> [PairedDeviceStatus]? {
         guard let raw = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] else {
             return nil // 蓝牙栈不可用
