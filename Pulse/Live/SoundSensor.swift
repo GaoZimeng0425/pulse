@@ -124,10 +124,16 @@ enum CoreAudioWakeupStream {
     /// 用锁护(Swift 6 Sendable 边界)。
     final class Box: @unchecked Sendable {
         private let continuation: AsyncStream<Void>.Continuation
+        /// 监听器增删专用串行队列:CoreAudio 惯例禁止在属性回调线程内同步
+        /// 增删监听(默认设备切换时可死锁,2026-10-23 审计③)——回调里只投递
+        /// 换挂请求到本队列,增删全部在此执行。
+        private let listenerQueue = DispatchQueue(label: "pulse.sound-listener")
         private let lock = NSLock()
         /// 当前挂着设备级监听的设备(默认设备切换时换挂;nil = 未挂)。
         private var listenedDevice: AudioDeviceID?
         private var systemListened = false
+        /// 已收尾标记:迟到的换挂请求见到即弃,不在 teardown 后重挂(泄漏)。
+        private var tornDown = false
 
         init(continuation: AsyncStream<Void>.Continuation) {
             self.continuation = continuation
@@ -139,10 +145,18 @@ enum CoreAudioWakeupStream {
             Unmanaged.passUnretained(self).toOpaque()
         }
 
-        /// 挂系统对象 + 当前默认设备两级监听(make 里调用一次)。
+        /// 挂系统对象 + 当前默认设备两级监听(make 里调用一次;增删走监听队列)。
         func start() {
+            listenerQueue.async { [self] in
+                installListeners()
+            }
+        }
+
+        /// 监听队列上执行:系统级 + 当前默认设备两级监听。
+        private func installListeners() {
             lock.lock()
             defer { lock.unlock() }
+            guard !tornDown else { return }
             var systemAddress = AudioObjectPropertyAddress(
                 mSelector: kAudioHardwarePropertyDefaultOutputDevice,
                 mScope: kAudioObjectPropertyScopeGlobal,
@@ -160,7 +174,8 @@ enum CoreAudioWakeupStream {
             relistenDeviceLocked()
         }
 
-        /// 属性回调:默认设备变化 → 换挂设备级监听;任何变化 → 唤醒读一轮。
+        /// 属性回调(HAL 自有线程):默认设备变化 → **异步**投递换挂请求到监听
+        /// 队列(回调内同步增删是死锁风险,审计③);任何变化 → 唤醒读一轮。
         func propertyChanged(
             objectID: AudioObjectID,
             addressCount: UInt32,
@@ -171,16 +186,29 @@ enum CoreAudioWakeupStream {
                 let address = addresses[index]
                 if objectID == AudioObjectID(kAudioObjectSystemObject),
                    address.mSelector == kAudioHardwarePropertyDefaultOutputDevice {
-                    lock.lock()
-                    relistenDeviceLocked()
-                    lock.unlock()
+                    listenerQueue.async { [self] in
+                        relistenDevice()
+                    }
                 }
                 continuation.yield()
             }
         }
 
-        /// 摘除全部监听并配平 retain(流终止时调用一次)。
+        /// 摘除全部监听并配平 retain(流终止时调用一次)。先置 tornDown 挡住
+        /// 在途换挂请求,再同步清空监听队列(teardown 不在 HAL 回调线程上,
+        /// sync 安全)。
         func teardown() {
+            lock.lock()
+            tornDown = true
+            lock.unlock()
+            listenerQueue.sync { [self] in
+                removeAllListeners()
+            }
+            Unmanaged.passUnretained(self).release()
+        }
+
+        /// 监听队列上执行:摘除两级监听。
+        private func removeAllListeners() {
             lock.lock()
             defer { lock.unlock() }
             if let device = listenedDevice {
@@ -201,11 +229,17 @@ enum CoreAudioWakeupStream {
                 )
                 systemListened = false
             }
-            Unmanaged.passUnretained(self).release()
         }
 
-        /// 对当前默认设备挂音量/静音监听(先摘旧设备;设备缺席安静跳过,
-        /// 下次默认设备变化再补挂)。
+        /// 监听队列上执行:对当前默认设备挂音量/静音监听(先摘旧设备;设备
+        /// 缺席安静跳过,下次默认设备变化再补挂)。
+        private func relistenDevice() {
+            lock.lock()
+            defer { lock.unlock() }
+            guard !tornDown else { return }
+            relistenDeviceLocked()
+        }
+
         private func relistenDeviceLocked() {
             if let old = listenedDevice {
                 removeDeviceListeners(from: old)

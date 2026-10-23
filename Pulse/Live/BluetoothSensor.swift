@@ -131,7 +131,12 @@ final class GattBatteryProbe: NSObject, @unchecked Sendable {
     /// provider 快照收账(探针异步完成,不阻塞当轮)。
     func start(wanting names: [String], deliver: @escaping @Sendable (GattBatteryEntry) -> Void) {
         queue.async { [self] in
-            guard central == nil, !names.isEmpty else { return }
+            guard !names.isEmpty, central == nil else { return }
+            // 上一轮已自然收尾(finish 置 central=nil):重置一次性状态再开新轮
+            // ——2026-10-23 审计①:此前漏重置,第二轮 attempted 全拦 + finished
+            // 拦死 finish,新 central 永不停扫也永不释放(电台常开泄漏)。
+            finished = false
+            attempted = []
             wantedNames = Set(names)
             self.deliver = deliver
             central = CBCentralManager(delegate: self, queue: queue)

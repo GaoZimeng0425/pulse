@@ -45,9 +45,11 @@ final class GpuFeature: MonitorFeature {
             label: "GPU历史档"
         )
         return [
-            provider.driver { [weak self] reading in
+            // UI 档带新鲜度(stale 重投不灌走势环/不打脏观察——门关期间调度器
+            // 每 5s 重投 lastGood,2026-10-23 审计④:此前走势环被同一旧值灌满)。
+            provider.markedDriver { [weak self] delivery in
                 guard let self else { return }
-                Task { @MainActor in self.apply(reading) }
+                Task { @MainActor in self.apply(delivery) }
             },
             historyDriver,
         ]
@@ -60,8 +62,10 @@ final class GpuFeature: MonitorFeature {
     }
 
     /// nil = 从未有过读数(无加速器)→ 卡片占位;首读前不追加走势。
-    private func apply(_ reading: GpuReading?) {
-        guard let reading else { return }
+    /// stale(读失败重投的 lastGood)整笔跳过:显示保留既有值(同一对象),
+    /// 走势环不被旧值灌满,关窗期不逐 5s 打脏观察(审计④)。
+    private func apply(_ delivery: SensorDelivery<GpuReading>?) {
+        guard case let .fresh(reading) = delivery else { return }
         self.reading = reading
         trend.append(reading.utilizationPercent)
         if trend.count > trendLimit {

@@ -185,8 +185,9 @@ final class LiveSmcSource: SmcSource, @unchecked Sendable {
 // MARK: - SMC 传感器 provider(p2-sensors/04,ADR-0004)
 
 /// SMC 传感器:短档 `.every(seconds: 5)`(弹窗 ∨ 传感器页可见才读);坏值防御
-/// 的"沿用旧值"档需要上一轮读数,provider 持有 previous(调度 actor 串行,
-/// nettop accumulator 同款纪律)。
+/// 的"沿用旧值"档需要上一轮读数,provider 持有 previous——由 stateLock 串行
+/// (5s UI 档与 30s 历史档两条 driver 的 tick 在调度 actor 外并发,2026-10-23
+/// 审计②;源的 io_connect 同经此锁串行)。
 final class SmcSensorProvider: SensorProvider, @unchecked Sendable {
     typealias Reading = SmcReading
 
@@ -196,6 +197,8 @@ final class SmcSensorProvider: SensorProvider, @unchecked Sendable {
     private let gate = SensorVisibilityGate()
     private let slot = SensorLastGoodBox<SmcReading>()
     private var previous: SmcReading?
+    /// 双档串行锁:护坏值沿用链 previous 与源的 SMC 连接。
+    private let stateLock = NSLock()
 
     var lastGood: SmcReading? {
         slot.current
@@ -218,9 +221,17 @@ final class SmcSensorProvider: SensorProvider, @unchecked Sendable {
     /// UI 档共用(同一条坏值沿用链,档位切换不断账)。
     func historySnapshot() async -> SmcReading? {
         guard let raw = source.read() else { return nil }
-        let reading = SmcReadingBuilder.make(from: raw, previous: previous)
+        return foldLocked(raw)
+    }
+
+    /// NSLock 禁用于 async 上下文(Swift 6)——锁段拆进同步方法。
+    private func foldLocked(_ raw: SmcSnapshot) -> SmcReading? {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard let reading = SmcReadingBuilder.make(from: raw, previous: previous) else {
+            return nil // 折算失败不动 previous:沿用链不被一次坏载荷清零(审计②顺带)
+        }
         previous = reading
-        guard let reading else { return nil }
         slot.store(reading)
         return reading
     }

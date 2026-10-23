@@ -148,7 +148,7 @@ struct HistoryTabView: View {
     private var emptyDetail: String {
         switch metric {
         case .network, .disk:
-            return "吞吐记录尚未接入(工单 06),接入后这里自动出现曲线"
+            return "该时段无吞吐记录(Pulse 未运行或网络/磁盘读数缺席)——历史留空,不补零"
         case .temperature, .gpu, .power:
             return "该时段传感器读数缺席,或 Pulse 未运行——历史留空,不补零"
         case .systemLoad, .cpu, .memory:

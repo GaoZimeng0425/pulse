@@ -195,12 +195,12 @@ public enum FeatureEvent {
     case diskCapacity(DiskCapacityReading)
     /// 本轮 dev server 盘点(DevServerFeature,每轮一次)。
     case devServers([DevServerStatus])
-    /// GPU 传感器交付(GpuFeature,可见 5s 档 ∨ 不可见 30s 历史档;带新鲜度,
-    /// 历史记账只认 fresh——p2-sensors/08)。
+    /// GPU 传感器交付(GpuFeature 的 30s 历史档驱动;带新鲜度,历史记账只认
+    /// fresh——p2-sensors/08。5s UI 档不广播,只走本地 apply)。
     case gpuSample(SensorDelivery<GpuReading>)
-    /// SMC 传感器交付(SmcFeature,温度派生口径在 HistoryFeed 折算)。
+    /// SMC 传感器交付(SmcFeature 的 30s 历史档;温度派生口径在 HistoryFeed 折算)。
     case smcSample(SensorDelivery<SmcReading>)
-    /// 五路功率传感器交付(PowerFeature)。
+    /// 五路功率传感器交付(PowerFeature 的 30s 历史档)。
     case powerSample(SensorDelivery<PowerReading>)
 }
 

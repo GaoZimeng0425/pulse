@@ -60,18 +60,38 @@ final class SensorHistoryWiringTests: XCTestCase {
 
     func testFeedRecordsSensorSamplesAndCarriesIntoIngest() {
         // fresh 广播暂存,stale 不覆盖;takeIngest 整笔带走(轮间携带前推)。
+        let sampledAt = Date(timeIntervalSince1970: 1_789_000_100)
         var feed = HistoryFeed()
-        feed.recordGpu(.fresh(GpuReading.make(from: GpuRawReading(deviceUtilizationPercent: 42))))
-        feed.recordSmc(.fresh(Self.smcReading(cpuAverage: 48, cpuHottest: 52, gpuHottest: 55, socHottest: 49)))
-        feed.recordPower(.fresh(PowerReading(watts: [.cpu: 3, .ane: 0.4], takenAt: Date())))
-        feed.recordGpu(.stale(GpuReading.make(from: GpuRawReading(deviceUtilizationPercent: 99))))
+        feed.recordGpu(.fresh(GpuReading.make(from: GpuRawReading(deviceUtilizationPercent: 42))), at: sampledAt)
+        feed.recordSmc(
+            .fresh(Self.smcReading(cpuAverage: 48, cpuHottest: 52, gpuHottest: 55, socHottest: 49)),
+            at: sampledAt
+        )
+        feed.recordPower(.fresh(PowerReading(watts: [.cpu: 3, .ane: 0.4], takenAt: sampledAt)), at: sampledAt)
+        feed.recordGpu(.stale(GpuReading.make(from: GpuRawReading(deviceUtilizationPercent: 99))), at: sampledAt)
 
-        let ingest = feed.takeIngest(from: Self.context(), at: Date())
+        let ingest = feed.takeIngest(from: Self.context(), at: sampledAt.addingTimeInterval(1))
         XCTAssertEqual(ingest.gpuUtilization, 42, "stale 重投不覆盖 fresh 值")
         XCTAssertEqual(ingest.tempAverage, 48)
         XCTAssertEqual(ingest.tempMax, 55, "全机最热 = cpu/gpu/soc 三最热取最大")
         XCTAssertEqual(ingest.powerWatts?[.cpu], 3)
         XCTAssertEqual(ingest.powerWatts?[.ane], 0.4)
+    }
+
+    func testStaleGaugeSamplesExpireInsteadOfFreezing() {
+        // 审计⑤:传感器持续失败 → 不再广播 fresh → 暂存样本超过 90s 即置 nil
+        // 出空段,不把冻结值无限写进历史。新鲜窗口内照常携带。
+        var feed = HistoryFeed()
+        let sampledAt = Date(timeIntervalSince1970: 1_789_000_100)
+        feed.recordGpu(.fresh(GpuReading.make(from: GpuRawReading(deviceUtilizationPercent: 42))), at: sampledAt)
+
+        // 60s 后(窗内):携带。
+        let fresh = feed.takeIngest(from: Self.context(), at: sampledAt.addingTimeInterval(60))
+        XCTAssertEqual(fresh.gpuUtilization, 42)
+
+        // 91s 后(超窗):置 nil。
+        let expired = feed.takeIngest(from: Self.context(), at: sampledAt.addingTimeInterval(91))
+        XCTAssertNil(expired.gpuUtilization, "冻结样本过期出空段,不无限携带")
     }
 
     /// 最小一轮主干上下文(单进程、无差分;与 HistoryFeedTests.context 同款最小形)。
@@ -110,6 +130,33 @@ final class SensorHistoryWiringTests: XCTestCase {
             adapterWatts: nil,
             takenAt: Date()
         )
+    }
+
+    // MARK: - 功率合计的缺域语义(审计⑤)
+
+    func testPowerSeriesSumsPresentDomainsAndSkipsAllNullRows() async throws {
+        // 直插分钟行:①只有 pow_cpu(缺 ANE/RAM 域的芯片形状)→ 合计 = cpu 单域,
+        // 不整行丢弃;②五路全 NULL → 该桶空段。
+        let queue = try HistoryDatabase.openInMemory()
+        let minute = base - 60
+        let currentBase = base // 局部量进 @Sendable 写闭包(XCTestCase 非 Sendable)
+        try await queue.write { db in
+            try db.execute(
+                sql: "INSERT INTO system_min (ts, load_avg, load_max, pow_cpu) VALUES (?, 1, 1, 12.5)",
+                arguments: [minute]
+            )
+            try db.execute(
+                sql: "INSERT INTO system_min (ts, load_avg, load_max) VALUES (?, 1, 1)",
+                arguments: [currentBase]
+            )
+        }
+        let engine = HistoryEngine(database: queue)
+        let series = await engine.series(
+            metric: .power, range: .hour1, now: Date(timeIntervalSince1970: Double(base + 60))
+        )
+        let values = try XCTUnwrap(series).values
+        XCTAssertEqual(try XCTUnwrap(values[58]), 12.5, accuracy: 0.001, "缺域行按在场域合计")
+        XCTAssertNil(values[59], "全 NULL 行空段不补零")
     }
 
     // MARK: - 引擎端到端:落库 → 序列查询

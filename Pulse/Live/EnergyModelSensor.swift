@@ -113,8 +113,9 @@ final class LiveEnergyModelSource: PowerSource, @unchecked Sendable {
 /// 五路功率传感器:短档 `.every(seconds: 5)`,与 GPU 同门控(弹窗 ∨ GPU 页,
 /// PowerFeature 折算下发);差分(首读 0/断档丢首轮/负差钳 0)在核心包
 /// PowerAccumulator。读失败交付 lastGood 不白屏。历史档随 08 票。
-/// @unchecked Sendable:accumulator 可变状态由 SensorScheduler 单 actor 串行
-/// 访问(nettop accumulator 同款)。
+/// @unchecked Sendable:accumulator 与源的订阅状态由 stateLock 串行——
+/// 5s UI 档与 30s 历史档两条 driver 的 tick 在调度 actor 外并发执行
+/// (2026-10-23 审计②:此前"单 actor 串行"前提被双档打破)。
 final class EnergyModelSensorProvider: SensorProvider, @unchecked Sendable {
     typealias Reading = PowerReading
 
@@ -124,6 +125,8 @@ final class EnergyModelSensorProvider: SensorProvider, @unchecked Sendable {
     private let gate = SensorVisibilityGate()
     private let slot = SensorLastGoodBox<PowerReading>()
     private var accumulator = PowerAccumulator()
+    /// 双档串行锁:护 accumulator 差分账本与源的懒建订阅。
+    private let stateLock = NSLock()
 
     var lastGood: PowerReading? {
         slot.current
@@ -147,6 +150,13 @@ final class EnergyModelSensorProvider: SensorProvider, @unchecked Sendable {
     /// (能量差分按实测时差,5s/30s 档位切换不断账)。
     func historySnapshot() async -> PowerReading? {
         guard let raw = source.read() else { return nil }
+        return foldLocked(raw)
+    }
+
+    /// NSLock 禁用于 async 上下文(Swift 6)——锁段拆进同步方法。
+    private func foldLocked(_ raw: PowerRawReading) -> PowerReading? {
+        stateLock.lock()
+        defer { stateLock.unlock() }
         let reading = accumulator.record(raw)
         slot.store(reading)
         return reading

@@ -43,6 +43,25 @@ final class PowerModelTests: XCTestCase {
         XCTAssertEqual(reading.watts[.cpu] ?? -1, 0.5, accuracy: 1e-9)
     }
 
+    func testMidStreamNewChannelDoesNotSpike() {
+        // 订阅中途新增通道(审计⑤):GPU 通道第二轮才出现——首差不得把开机
+        // 累计量当增量出巨刺,该域本轮缺席;基线补齐后下一轮恢复正常差分。
+        var accumulator = PowerAccumulator()
+        _ = accumulator.record(sample([("CPU Energy", "mJ", 1000)], at: Date(timeIntervalSince1970: 0)))
+        let spiked = accumulator.record(sample([
+            ("CPU Energy", "mJ", 1100),
+            ("GPU", "mJ", 5_000_000), // 中途出现:若按 0 基线差分会算出巨瓦
+        ], at: Date(timeIntervalSince1970: 1)))
+        XCTAssertEqual(spiked.watts[.cpu] ?? -1, 0.1, accuracy: 1e-9, "老通道差分照常")
+        XCTAssertNil(spiked.watts[.gpu], "中途新增通道的域本轮缺席,不出巨刺")
+
+        let recovered = accumulator.record(sample([
+            ("CPU Energy", "mJ", 1200),
+            ("GPU", "mJ", 5_001_000),
+        ], at: Date(timeIntervalSince1970: 2)))
+        XCTAssertEqual(recovered.watts[.gpu] ?? -1, 1.0, accuracy: 1e-9, "基线补齐后恢复差分")
+    }
+
     func testMixedUnitsPerChannel() {
         // 同读数里 GPU(mJ)与 GPU Energy(nJ)共存时按各通道标签换算:
         // GPU +1000 mJ = 1 J;间隔 1s → GPU 域 = 1 W + 0.001 W(nJ 通道 1e6 raw = 1 mJ)。

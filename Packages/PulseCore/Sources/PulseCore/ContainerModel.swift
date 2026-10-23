@@ -149,7 +149,7 @@ public enum ContainerListPayload {
 /// (cpu.total − precpu.total) ÷ (system − presystem) × onlineCPUs × 100;
 /// 分母 ≤0(首读/计数器回绕)= 0%(docker stats 同款安静口径)。
 public enum ContainerStatsPayload {
-    public static func parse(_ body: [UInt8]) -> (cpuPercent: Double, memoryBytes: UInt64)? {
+    public static func parse(_ body: [UInt8]) -> (cpuPercent: Double, memoryBytes: UInt64?)? {
         guard let json = try? JSONSerialization.jsonObject(with: Data(body)) as? [String: Any] else {
             return nil
         }
@@ -166,14 +166,17 @@ public enum ContainerStatsPayload {
 
         var cpuPercent = 0.0
         if let total, let preTotal, let system, let preSystem {
-            let usageDelta = Double(total) - Double(preTotal)
+            // 计数器回绕(precpu > cpu)按 0%(docker stats 同款安静口径),
+            // 不输出负百分比——2026-10-23 审计⑤。
+            let usageDelta = max(0, Double(total) - Double(preTotal))
             let systemDelta = Double(system) - Double(preSystem)
             if systemDelta > 0 {
                 cpuPercent = usageDelta / systemDelta * Double(max(onlineCPUs ?? 1, 1)) * 100
             }
         }
+        // 内存读不到 = nil(与 ContainerRow.memoryBytes 文档一致,不折叠成 0)。
         let memoryBytes = (memory["usage"] as? NSNumber)?.uint64Value
-        return (cpuPercent, memoryBytes ?? 0)
+        return (cpuPercent, memoryBytes)
     }
 
     private static func nested(_ dict: [String: Any], _ key: String, _ inner: String, asCount: Bool = false) -> Int? {
