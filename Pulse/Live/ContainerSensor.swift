@@ -13,17 +13,24 @@ import PulseCore
 /// Connection: close 必带、chunked 字节级去块、CRLF 字形簇——后两坑在核心包
 /// 单测,前两坑钉死在请求模板)。
 struct LiveContainerSource: ContainerSource {
-    /// socket 候选路径:系统标准位先行,OrbStack 用户域位兜底。
-    private static let socketPaths = [
-        "/var/run/docker.sock",
-        NSString(string: "~/.orbstack/run/docker.sock").expandingTildeInPath,
-    ]
+    /// socket 候选路径:系统标准位先行,OrbStack 用户域位兜底(测试可注入假路径)。
+    private let socketPaths: [String]
+    /// 接收超时秒数(测试可注入短超时;默认 5s,票面口径)。
+    private let recvTimeoutSeconds: Int
+
+    init(socketPaths: [String]? = nil, recvTimeoutSeconds: Int = 5) {
+        self.socketPaths = socketPaths ?? [
+            "/var/run/docker.sock",
+            NSString(string: "~/.orbstack/run/docker.sock").expandingTildeInPath,
+        ]
+        self.recvTimeoutSeconds = recvTimeoutSeconds
+    }
 
     func read() async -> ContainersReading? {
-        guard let path = Self.socketPaths.first(where: { FileManager.default.fileExists(atPath: $0) }) else {
+        guard let path = socketPaths.first(where: { FileManager.default.fileExists(atPath: $0) }) else {
             return ContainersReading(engineReachable: false, containers: []) // OrbStack 未跑:安静空态
         }
-        guard let listRaw = Self.httpGet("/containers/json?all=1", socketPath: path),
+        guard let listRaw = await httpGet("/containers/json?all=1", socketPath: path),
               let list = ContainerListPayload.parse(listRaw)
         else { return nil } // 引擎在但列表失败:读失败语义,不动 lastGood
 
@@ -33,7 +40,7 @@ struct LiveContainerSource: ContainerSource {
             for row in list {
                 group.addTask {
                     guard row.state == "running" else { return row } // 非运行容器无 stats 必要
-                    let statsBody = Self.httpGet(
+                    let statsBody = await httpGet(
                         "/containers/\(row.id)/stats?stream=false",
                         socketPath: path
                     )
@@ -60,8 +67,20 @@ struct LiveContainerSource: ContainerSource {
         return ContainersReading(engineReachable: true, containers: rows)
     }
 
-    /// 一发 HTTP GET(socket 短连;超时兜底防代理挂死——探针坑②的极端面)。
-    private static func httpGet(_ path: String, socketPath: String) -> [UInt8]? {
+    /// 一发 HTTP GET:**阻塞段在全局并发队列执行**(p2-audit/02:connect/recv
+    /// 至超时上限不得占用 Swift 协作线程池——引擎卡死时一个协作线程被堵满,
+    /// 与传感器 tick/历史落库争池子),continuation 桥回 async。
+    private func httpGet(_ path: String, socketPath: String) async -> [UInt8]? {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global().async { [self] in
+                continuation.resume(returning: httpGetBlocking(path, socketPath: socketPath))
+            }
+        }
+    }
+
+    /// 阻塞段本体(socket 短连;超时兜底防代理挂死——探针坑②的极端面)。
+    /// 只许在全局队列上调用(见 httpGet)。
+    private func httpGetBlocking(_ path: String, socketPath: String) -> [UInt8]? {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { return nil }
         defer { close(fd) }
@@ -86,8 +105,8 @@ struct LiveContainerSource: ContainerSource {
         }
         guard sent >= 0 else { return nil }
 
-        // 5s 接收超时:引擎卡死时本轮安静失败,不挂调度器。
-        var timeout = timeval(tv_sec: 5, tv_usec: 0)
+        // 接收超时(默认 5s):引擎卡死时本轮安静失败,不挂全局队列线程。
+        var timeout = timeval(tv_sec: recvTimeoutSeconds, tv_usec: 0)
         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
 
         var received: [UInt8] = []
