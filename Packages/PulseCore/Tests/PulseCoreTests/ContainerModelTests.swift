@@ -125,4 +125,31 @@ final class ContainerModelTests: XCTestCase {
         XCTAssertNil(stats?.memoryBytes, "内存读不到 = nil,不折叠成 0(审计⑤)")
         XCTAssertNil(ContainerStatsPayload.parse(Array("garbage".utf8)))
     }
+
+    // MARK: - 行序(p2-review/03:运行中置顶、组内按名称)
+
+    func testReadingOrdersRunningFirstThenByName() {
+        // Live 源按 TaskGroup 完成序收集,每轮乱序进来;读数本身必须给出稳定行序。
+        let shuffled = [
+            ContainerRow(id: "4", name: "web", state: "exited", image: "i"),
+            ContainerRow(id: "1", name: "redis", state: "running", image: "i"),
+            ContainerRow(id: "5", name: "api", state: "paused", image: "i"),
+            ContainerRow(id: "2", name: "postgres", state: "running", image: "i"),
+            ContainerRow(id: "3", name: "Caddy", state: "running", image: "i"),
+        ]
+        let reading = ContainersReading(engineReachable: true, containers: shuffled)
+        XCTAssertEqual(reading.containers.map(\.name), ["Caddy", "postgres", "redis", "api", "web"])
+        XCTAssertEqual(
+            ContainersReading(engineReachable: true, containers: shuffled.reversed()),
+            reading,
+            "入参顺序不同,读数行序相同"
+        )
+    }
+
+    func testOnlyRunningStateCountsAsRunning() {
+        // docker State 原样保留;"运行中"只认 running(paused 进程冻结、不出 stats)。
+        let states = ["running", "exited", "paused", "created", "dead", "?"]
+        let running = states.map { ContainerRow(id: $0, name: $0, state: $0, image: "i").isRunning }
+        XCTAssertEqual(running, [true, false, false, false, false, false])
+    }
 }
