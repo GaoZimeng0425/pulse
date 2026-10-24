@@ -3,6 +3,9 @@ import SwiftUI
 
 // MARK: - 每个 tab 的内容栈(主窗口与弹窗共用,2026-10-20 用户拍板:每个 tab 两处一致)
 
+// 唯一拍板例外:传感器 tab 弹窗只放派生卡(p2-review/04 A,2026-10-24;spec Story 17),
+// 见 `.sensors` 分支——不要按"两处一致"把风扇卡 / 明细卡加回弹窗。
+
 /// 一个 tab 的内容栈:主窗口与弹窗读同一份——卡片组成、顺序、数据出处全在这里,
 /// 两处只差排版档(`isCompact`:弹窗 360pt 定宽)。排版差异只有三种,全由宽度决定:
 /// 卡用紧凑档;主窗口并排的两卡(内存双环 / 各卷 + 快照)在弹窗里上下排;主窗口的
@@ -49,13 +52,19 @@ struct MetricTabStack<Ranking: View>: View {
             }
             ranking()
         case .sensors:
-            // 传感器页(p2-sensors/04):派生读数 + 风扇 pair,温度明细折叠其下;
-            // 弹窗紧凑档同构(派生与风扇即"温度紧凑组"的拍板形态)。
-            pair {
-                SmcDerivedCardView(reading: monitor.smc.reading, isCompact: isCompact)
-                SmcFansCardView(reading: monitor.smc.reading, isCompact: isCompact)
+            // 传感器页(p2-sensors/04):主窗口 = 派生读数 + 风扇 pair,温度明细折叠其下。
+            // 弹窗是"两处一致"的**拍板例外**(p2-review/04 A,2026-10-24;spec Story 17
+            // 「弹窗温度组只放派生值」):只画派生卡(Average/Hottest + 最快风扇),
+            // 逐核明细会把 360pt 弹窗撑得不可用的高;风扇信息由派生卡的最快风扇行承载。
+            if isCompact {
+                SmcDerivedCardView(reading: monitor.smc.reading, isCompact: true)
+            } else {
+                pair {
+                    SmcDerivedCardView(reading: monitor.smc.reading, isCompact: false)
+                    SmcFansCardView(reading: monitor.smc.reading, isCompact: false)
+                }
+                SmcTempsDetailCardView(reading: monitor.smc.reading, isCompact: false)
             }
-            SmcTempsDetailCardView(reading: monitor.smc.reading, isCompact: isCompact)
         case .peripherals:
             // 外设页(p2-sensors/05/06):蓝牙设备表(三源电量合并,可见 30s 扫描;
             // 默认关,卡片按钮 / 设置开关是唯一触发源——权限原则)+ 声音区(纯展示,

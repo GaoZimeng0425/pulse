@@ -133,6 +133,91 @@ final class SmcModelTests: XCTestCase {
         XCTAssertEqual(reading?.adapterWatts ?? -1, 47.96, accuracy: 0.01)
     }
 
+    // MARK: - 最快风扇(派生传感器,p2-review/08 ①)
+
+    /// fpe2 编码:(b0<<6)+(b1>>2) 的逆——测试载荷用。
+    private func fpe2(_ rpm: Int) -> [UInt8] {
+        [UInt8((rpm >> 6) & 0xFF), UInt8((rpm & 0x3F) << 2)]
+    }
+
+    private func fanKeys(_ fans: [(rpm: Int, name: String?)]) -> [(String, String, [UInt8])] {
+        var keys: [(String, String, [UInt8])] = [("FNum", "ui8 ", [UInt8(fans.count)])]
+        for (index, fan) in fans.enumerated() {
+            keys.append(("F\(index)Ac", "fpe2", fpe2(fan.rpm)))
+            keys.append(("F\(index)Mn", "fpe2", fpe2(2300)))
+            keys.append(("F\(index)Mx", "fpe2", fpe2(6500)))
+            if let name = fan.name {
+                // {fds:前 4 字节为头,第 4…16 字节为名字(stats getStringValue 同款)。
+                keys.append(("F\(index)ID", "{fds", [0, 0, 0, 0] + Array(name.utf8)))
+            }
+        }
+        return keys
+    }
+
+    func testFastestFanPicksHighestRpmAmongSeveral() {
+        let reading = SmcReadingBuilder.make(
+            from: snapshot(fanKeys([(rpm: 2400, name: "Left"), (rpm: 3200, name: "Right")])),
+            previous: nil
+        )
+        XCTAssertEqual(reading?.fastestFan?.id, 1)
+        XCTAssertEqual(reading?.fastestFan?.name, "Right")
+        XCTAssertEqual(reading?.fastestFan?.rpm, 3200)
+    }
+
+    func testFastestFanWithSingleFanIsThatFan() {
+        let reading = SmcReadingBuilder.make(from: snapshot(fanKeys([(rpm: 2500, name: nil)])), previous: nil)
+        XCTAssertEqual(reading?.fastestFan?.id, 0)
+        XCTAssertEqual(reading?.fastestFan?.rpm, 2500)
+    }
+
+    func testFastestFanIsNilWithoutFans() {
+        // 无风扇机(MacBook Air):没有 FNum,只有温度——派生值占位,不伪造 0 rpm。
+        let fanless = SmcReadingBuilder.make(from: snapshot([("Tp01", "sp78", sp78(45))]), previous: nil)
+        XCTAssertNotNil(fanless)
+        XCTAssertNil(fanless?.fastestFan)
+        // FNum 在但 F?Ac 全读不到 → 同样 nil。
+        let unreadable = SmcReadingBuilder.make(
+            from: snapshot([("FNum", "ui8 ", [2]), ("Tp01", "sp78", sp78(45))]),
+            previous: nil
+        )
+        XCTAssertNil(unreadable?.fastestFan)
+    }
+
+    func testFastestFanWhenAllStoppedReportsStoppedFan() {
+        // 全部停转是真读数(低负载常态):交出 rpm 0 的风扇,不归 nil。
+        let reading = SmcReadingBuilder.make(
+            from: snapshot(fanKeys([(rpm: 0, name: "Left"), (rpm: 0, name: "Right")])),
+            previous: nil
+        )
+        XCTAssertEqual(reading?.fastestFan?.rpm, 0)
+        XCTAssertEqual(reading?.fastestFan?.id, 0)
+    }
+
+    // MARK: - 风扇进度条归一(p2-review/04 C 拍板、/08 ③)
+
+    private func fan(rpm: Int, min: Int = 2300, max: Int = 6500) -> SmcFanReading {
+        SmcFanReading(id: 0, name: nil, rpm: rpm, minRpm: min, maxRpm: max)
+    }
+
+    func testSpeedFractionSpansMinToMax() {
+        XCTAssertEqual(fan(rpm: 2300).speedFraction, 0, accuracy: 1e-9) // 最低速 = 空条
+        XCTAssertEqual(fan(rpm: 4400).speedFraction, 0.5, accuracy: 1e-9) // (4400−2300)/(6500−2300)
+        XCTAssertEqual(fan(rpm: 6500).speedFraction, 1, accuracy: 1e-9) // 满速 = 满条
+    }
+
+    func testSpeedFractionClampsStoppedAndOverLimit() {
+        XCTAssertEqual(fan(rpm: 0).speedFraction, 0, accuracy: 1e-9) // 停转(0 < 下限)钳底
+        XCTAssertEqual(fan(rpm: 7200).speedFraction, 1, accuracy: 1e-9) // 越上限(强制满转)钳顶
+    }
+
+    func testSpeedFractionIsEmptyWhenLimitsAreUnusable() {
+        // 上下限缺失(builder 缺键记 0)或自相矛盾(max ≤ min):没有可信标尺,空条不伪造比例。
+        XCTAssertEqual(fan(rpm: 3000, min: 0, max: 0).speedFraction, 0)
+        XCTAssertEqual(fan(rpm: 3000, min: 2300, max: 0).speedFraction, 0)
+        XCTAssertEqual(fan(rpm: 3000, min: 4000, max: 4000).speedFraction, 0)
+        XCTAssertEqual(fan(rpm: 3000, min: 5000, max: 4000).speedFraction, 0)
+    }
+
     func testBatteryPowerOverrideExpiresAfterFreshnessWindow() {
         // PPBR 只在新鲜窗内覆盖电池功率(p2-review/01 ②):SMC 只在弹窗 ∨ 传感器页
         // 可见时刷新,只开电池页时读数会冻结——过窗返回 nil,由 V×A 回退接手。

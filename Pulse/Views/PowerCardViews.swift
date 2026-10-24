@@ -9,9 +9,7 @@ import SwiftUI
 
 /// 五路功率区:在场域各一行(名称 + 瓦数 + meter 按五路榜首归一),合计随
 /// 副标题走。读数缺失(订阅缺席/首轮前)给安静占位;通道缺席的域不出现,
-/// 不伪造。行色:CPU/GPU/RAM 各取自家指标色,ANE 与 SoC 无独立令牌
-/// (Neural 与 Memory 同色问题、SoC 无指标身份)——ANE 沿用 GPU 页强调色,
-/// SoC 用三级墨(中性),口径记 p2-sensors/03。
+/// 不伪造。行色取 `PowerDomain.tint`(本文件末,与历史页功率分项一个出处)。
 struct PowerDomainsCardView: View {
     let reading: PowerReading?
     var isCompact = false
@@ -66,12 +64,7 @@ struct PowerDomainsCardView: View {
         }
 
         var tint: Color {
-            switch domain {
-            case .cpu: Metric.cpu.accentColor
-            case .gpu, .ane: Metric.gpu.accentColor
-            case .ram: Metric.memory.accentColor
-            case .soc: Surface.inkTertiary
-            }
+            domain.tint
         }
     }
 
@@ -84,5 +77,21 @@ struct PowerDomainsCardView: View {
     /// 瓦数文案:<10 W 一位小数,≥10 W 取整。
     static func wattsText(_ watts: Double) -> String {
         watts < 10 ? String(format: "%.1f W", watts) : String(format: "%.0f W", watts)
+    }
+}
+
+// MARK: - 域配色(唯一出处:五路功率卡与历史页功率分项共用,p2-review/07)
+
+extension PowerDomain {
+    /// CPU/GPU/RAM 各取自家指标色;ANE 与 SoC 无独立令牌(Neural 与 Memory 同色
+    /// 问题、SoC 无指标身份)——ANE 沿用 GPU 页强调色,SoC 用三级墨(中性),
+    /// 口径记 p2-sensors/03。
+    var tint: Color {
+        switch self {
+        case .cpu: Metric.cpu.accentColor
+        case .gpu, .ane: Metric.gpu.accentColor
+        case .ram: Metric.memory.accentColor
+        case .soc: Surface.inkTertiary
+        }
     }
 }
