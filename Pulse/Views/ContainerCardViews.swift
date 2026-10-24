@@ -52,20 +52,21 @@ struct ContainersCardView: View {
         let running = container.state == "running"
         return HStack(spacing: 8) {
             Circle()
-                .fill(running ? Metric.containers.accentColor : Color.secondary.opacity(0.4))
+                .fill(running ? Metric.containers.accentColor : Surface.inactive)
                 .frame(width: 6, height: 6)
             Text(container.name)
                 .font(.system(size: 12, weight: .medium))
                 .lineLimit(1)
             Spacer(minLength: 8)
-            Text(container.cpuPercent.map { String(format: "%.1f%%", $0) } ?? "—")
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .frame(minWidth: 48, alignment: .trailing)
-            Text(container.memoryBytes.map { PulseFormat.memory($0) } ?? "—")
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(.tertiary)
-                .frame(minWidth: 56, alignment: .trailing)
+            CardRowValue(
+                text: container.cpuPercent.map { String(format: "%.1f%%", $0) } ?? "—",
+                minWidth: CardRowWidth.decimalPercentValue
+            )
+            CardRowValue(
+                text: container.memoryBytes.map { PulseFormat.memory($0) } ?? "—",
+                minWidth: CardRowWidth.quantityValue,
+                style: .tertiary
+            )
         }
     }
 }

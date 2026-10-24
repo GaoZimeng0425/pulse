@@ -30,12 +30,9 @@ struct PowerDomainsCardView: View {
                         HStack(spacing: 8) {
                             Text(row.title)
                                 .font(.system(size: 12, weight: .medium))
-                                .frame(width: 36, alignment: .leading)
+                                .frame(width: CardRowWidth.shortLabel, alignment: .leading)
                             MeterBar(fraction: MeterNormalization.fraction(row.watts, leader: leader), tint: row.tint)
-                            Text(Self.wattsText(row.watts))
-                                .font(.system(size: 12, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                                .frame(minWidth: 56, alignment: .trailing)
+                            CardRowValue(text: Self.wattsText(row.watts), minWidth: CardRowWidth.quantityValue)
                         }
                     }
                 }

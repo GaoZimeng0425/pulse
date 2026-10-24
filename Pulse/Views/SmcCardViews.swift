@@ -68,13 +68,10 @@ struct SmcDerivedCardView: View {
         HStack(spacing: 8) {
             Text(title)
                 .font(.system(size: 12, weight: .medium))
-                .frame(width: 64, alignment: .leading)
+                .frame(width: CardRowWidth.label, alignment: .leading)
             MeterBar(fraction: fraction, tint: Metric.sensors.accentColor)
-            Text(valueText)
-                .lineLimit(1)
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .frame(minWidth: 52, alignment: .trailing)
+            // 列宽按温度量("99.9°C");最快风扇行的转速 / 扇名文案更宽时撑开。
+            CardRowValue(text: valueText, minWidth: CardRowWidth.temperatureValue)
         }
     }
 }
@@ -115,10 +112,7 @@ struct SmcFansCardView: View {
                     .font(.system(size: 12, weight: .medium))
                     .lineLimit(1)
                 MeterBar(fraction: fan.speedFraction, tint: Metric.sensors.accentColor)
-                Text(SmcFanText.speed(fan))
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .frame(minWidth: 64, alignment: .trailing)
+                CardRowValue(text: SmcFanText.speed(fan), minWidth: CardRowWidth.rpmValue)
             }
             if showsLimits {
                 Text(SmcFanText.limits(fan))
@@ -216,9 +210,7 @@ struct SmcTempsDetailCardView: View {
                             .font(.system(size: 12))
                             .lineLimit(1)
                         Spacer(minLength: 8)
-                        Text(String(format: "%.1f°C", row.value))
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                        CardRowValue(text: String(format: "%.1f°C", row.value))
                     }
                 }
             }
