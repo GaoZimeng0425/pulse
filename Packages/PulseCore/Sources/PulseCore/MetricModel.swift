@@ -8,7 +8,9 @@ import Foundation
 /// GPU 随 P2 工单 p2-sensors/02 入表;sensors(温度/风扇,p2-sensors/04)是
 /// **Pulse 扩展行**——参考文档无温度面板独立色,自补珊瑚暖色(与 Disk 琥珀、
 /// state-negative 红均拉开);Neural 与 Memory 同色(参考文档已注明),
-/// 入表即破坏"指标间互异"前提——03 票再议;声音/蓝牙有意砍掉,需要时按表补行。
+/// 入表即破坏"指标间互异"前提——p2-sensors/03 拍板 ANE 沿用 GPU 色、Neural 不入表
+/// (留独立 tab 时再议);sound/bluetooth 随 p2-sensors/05(外设页)入表,containers
+/// 随 p2-sensors/07 入表(取 §1.1 Projects 行)。
 public enum Metric: String, CaseIterable, Sendable {
     case cpu
     case memory

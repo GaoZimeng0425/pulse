@@ -119,8 +119,8 @@ public struct MonitorVisibility: Equatable, Sendable {
     /// (弹窗 ∨ 本旗标);一族一旗,不并进 anyWindow。
     public var sensorsPage = false
     /// 主窗口停在外设页(p2-sensors/05 创建,含声音/蓝牙):声音家族事件驱动
-    /// 不消费本旗标;蓝牙家族(06 票)的"可见 30s / 不可见停"扫描闸消费它。
-    /// 旗标随 05 一并落地,页面接线不必二次拆动。
+    /// 不消费本旗标;蓝牙家族(p2-sensors/06)的"可见 30s / 不可见停"扫描闸消费它。
+    /// 旗标随 p2-sensors/05 一并落地,页面接线不必二次拆动。
     public var peripheralsPage = false
     /// 主窗口停在容器页(p2-sensors/07):docker.sock 采样闸消费(弹窗 ∨ 本旗标)。
     public var containersPage = false

@@ -6,7 +6,7 @@ import PulseCore
 /// 传感器(ADR-0004,`.onEvent` 事件档——设备/属性变更通知,零轮询)经
 /// sensorDrivers 登记;外设 tab 声音区与弹窗声音紧凑组直读 `reading`。
 /// 读失败交付上次好值(lastGood)。事件稀少且便宜,刻意不设可见性闸
-/// (MonitorVisibility 有 peripheralsPage 旗标,但消费方是 06 票的蓝牙)。
+/// (MonitorVisibility 有 peripheralsPage 旗标,但消费方是 p2-sensors/06 的蓝牙)。
 @Observable
 @MainActor
 final class SoundFeature: MonitorFeature {

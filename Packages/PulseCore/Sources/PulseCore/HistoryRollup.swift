@@ -182,7 +182,7 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
     /// 当前窗的磁盘吞吐增量合计(与网络增量同款记账)。
     private var diskReadBytes: UInt64 = 0
     private var diskWriteBytes: UInt64 = 0
-    /// P2 传感器仪表累计(08):温度均值样本/最热、GPU 利用率样本、五路功率
+    /// P2 传感器仪表累计(p2-sensors/08):温度均值样本/最热、GPU 利用率样本、五路功率
     /// 样本(各域独立求和计数;nil 样本不入账)。
     private var tempSamples: [Double] = []
     private var tempPeak: Double?
