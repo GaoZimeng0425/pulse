@@ -8,7 +8,7 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent(UI 形态 2026-10-24 用户拍板 (a))
+**Status:** done(UI 形态 2026-10-24 用户拍板 (a))
 
 **范围(第一刀,只用已落库的列)**:
 - 温度:CPU 均值(`temp_avg`)/ 全机最热(`temp_max`)可切换。
@@ -21,9 +21,9 @@
 **拍板(2026-10-24)**:UI 形态 (a)——指标下方再挂一条次级药丸选择器(复用 `PillTabBar`),一次看
 一条线。(b) 同图多线叠加未采纳。
 
-- [ ] 温度两项、功率六项可切换,查询与图表跟随
-- [ ] 次级选择器仅在有分项的指标出现
-- [ ] check.sh 全绿
+- [x] 温度两项、功率六项可切换,查询与图表跟随
+- [x] 次级选择器仅在有分项的指标出现
+- [x] check.sh 全绿
 
 ## Agent Brief
 
@@ -50,3 +50,28 @@
 不做多线叠加。
 
 ## Comments
+
+### 执行记录(2026-10-24)
+
+- **查询层**(`HistoryQueries.swift`):新增 `HistoryBreakdown`(GLOSSARY「分项」已补词条)——
+  温度 `CPU 均值`(AVG temp_avg)/ `全机最热`(**MAX** temp_max:与小时汇总 MAX(temp_max)
+  同口径,最热语义是峰,均摊会抹平尖峰;票面未定聚合,按存储口径取);功率 `合计`(原
+  COALESCE + FILTER 表达式原样保留)/ CPU·GPU·ANE·RAM·SoC(AVG pow_*,与小时汇总 AVG 同)。
+  `HistoryMetricKey.breakdowns / defaultBreakdown / resolvedBreakdown`:无分项指标恒 nil;
+  外指标分项回落默认(查询层与视图同一条规则)。`HistorySeries.breakdown` 随曲线带回。
+  引擎 / 功能模块透传(默认参数,既有调用零改动)。不加新列、不碰写入路径。
+- **测试**(`HistoryBreakdownQueryTests` 7 例,真 SQLite):各分项读对应列;合计口径回归
+  (字面期望 + 显式合计与默认逐位相等;去掉 FILTER 的变异会红);列 NULL 的分钟如实空段
+  (单域缺席不补 0);7 天档读小时表;引擎透传;目录 / 回落。check.sh 全绿(768 例)。
+- **视图**(`HistoryView.swift`):指标条正下方挂次级 `PillTabBar`(`.always`、玻璃外裹),
+  仅温度 / 功率出现;切主指标清空 → 回默认;会话态不持久(与指标 / 范围同惯例);查询键用
+  生效分项,清空前后不重复查。功率单域配色抽成 `PowerDomain.tint`(PowerCardViews.swift,
+  五路功率卡与历史页一个出处);曲线、范围条色调随分项。脚注随分项口径。预览夹具补温度 /
+  五路功率列(ANE 每三分钟一行,示意缺域空段)。
+- **DESIGN.md**:令牌表**无新增**(次级条沿用页面竖排间距 8 / 12 与 PillTabBar 既有配方);
+  §Components PillTabBar 叙述补「历史页分项条」用法(三处 → 四处)。
+- **未验证**:视图未真机目验——次级条在弹窗 360pt 紧凑档的宽度(功率六项文字恒显,估算
+  约 300pt 可容)、SoC 三级墨色调下范围条 / 曲线的可读性、深浅色两外观,待用户实机过目。
+- **小决定(可推翻)**:范围条色调由"随指标"改"随分项"(整页一个颜色故事延续到分项);
+  最热桶内取 MAX 而非 AVG(见上)。
+
