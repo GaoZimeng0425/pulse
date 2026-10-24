@@ -138,6 +138,17 @@ public struct SmcReading: Equatable, Sendable {
     public var allTemps: [SmcTempReading] {
         knownTemps + unknownTemps
     }
+
+    /// PPBR 覆盖电池功率的新鲜窗 = 3 个 SMC UI 档周期(5s×3):容忍两轮读失败,
+    /// 与历史仪表过期窗(HistoryFeed.gaugeMaxAge = 3 个历史档周期)同口径。
+    public static let batteryPowerMaxAge: TimeInterval = 15
+
+    /// 新鲜窗内的 PPBR,过窗为 nil(p2-review/01 ②):SMC 只在弹窗 ∨ 传感器页可见时
+    /// 刷新,只开电池页时读数冻结——过窗交给电池卡的 V×A 回退,不显示冻结值。
+    public func freshBatteryPowerWatts(asOf now: Date) -> Double? {
+        guard now.timeIntervalSince(takenAt) <= Self.batteryPowerMaxAge else { return nil }
+        return batteryPowerWatts
+    }
 }
 
 // MARK: - 折算入口

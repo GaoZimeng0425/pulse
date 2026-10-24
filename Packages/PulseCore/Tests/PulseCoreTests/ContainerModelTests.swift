@@ -115,8 +115,11 @@ final class ContainerModelTests: XCTestCase {
     }
 
     func testMissingStatsFieldsDegradeQuietly() {
+        // CPU 四字段缺失 = 读不到 → nil 占位,不伪造 0%(p2-review/01 ④;
+        // 区别于 Δsystem ≤ 0 / 回绕的"安静 0%"——那是有读数、口径钳 0)。
         let stats = ContainerStatsPayload.parse(Array(#"{"cpu_stats": {}}"#.utf8))
-        XCTAssertEqual(stats?.cpuPercent, 0)
+        XCTAssertNotNil(stats, "载荷可解析,行照出")
+        XCTAssertNil(stats?.cpuPercent, "CPU 读不到 = nil,不折叠成 0")
         XCTAssertNil(stats?.memoryBytes, "内存读不到 = nil,不折叠成 0(审计⑤)")
         XCTAssertNil(ContainerStatsPayload.parse(Array("garbage".utf8)))
     }

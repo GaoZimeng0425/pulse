@@ -83,7 +83,7 @@ public enum EnergyUnitScale {
 // MARK: - 折算后的读数
 
 /// 五路功率读数:在场域各一瓦数(通道缺席的域**缺席**,不伪造 0 之外的信息);
-/// 差分首读 / 间隔超限重置时各在场域记 0(首读 0 语义)。
+/// 差分首读 / 断档轮没有读数(PowerAccumulator 返回 nil),不以 0 冒充。
 public struct PowerReading: Equatable, Sendable {
     public let watts: [PowerDomain: Double]
     public let takenAt: Date
@@ -101,13 +101,15 @@ public struct PowerReading: Equatable, Sendable {
 
 // MARK: - 五路差分器(纯值)
 
-/// 能量差分器:ΔE(焦耳)÷ 实测时差(秒)→ 瓦数。三条防御(stats
-/// readANEPower 同款 + 票面口径):
-/// ① **首次记录记基线、各在场域返 0**(没有基线,首读 0);
-/// ② **间隔超 maxGap 视为断档**(典型:系统睡眠、门控长停后复采)——重置
-///    基线、本轮作废(唤醒丢首轮,防假尖峰;间隔在 5s 档下正常 ≤ 数秒,
-///    50s 上限 = 10 倍节奏);
+/// 能量差分器:ΔE(焦耳)÷ 实测时差(秒)→ 瓦数。三条防御:
+/// ① **首次记录只记基线、不交读数**(没有基线就没有功率);
+/// ② **间隔超 maxGap 或 ≤ 0 视为断档**(典型:系统睡眠、门控长停后复采;
+///    ≤ 0 = 样本乱序)——重置基线、本轮不交读数(唤醒丢首轮,防假尖峰;
+///    间隔在 5s 档下正常 ≤ 数秒,50s 上限 = 10 倍节奏);
 /// ③ **负差钳 0**(计数器回绕/重置)。
+/// ①② 原为"在场域返 0"(stats readANEPower 同款),但全 0 以 fresh 交付后
+/// 被历史与 ANE 走势当真 0 W 记账——p2-review/01 拍板改 nil,与 NettopSource
+/// 差分器首轮口径一致;nil 在 provider 层按读失败处理(lastGood 保底)。
 public struct PowerAccumulator: Sendable {
     public let maxGap: TimeInterval
     /// 基线的换算后焦耳(按通道名)+ 基线时刻。
@@ -118,20 +120,20 @@ public struct PowerAccumulator: Sendable {
         self.maxGap = maxGap
     }
 
-    /// 记一次采样:返回折算读数(读失败在 provider 层挡,这里不返 nil)。
-    public mutating func record(_ raw: PowerRawReading) -> PowerReading {
+    /// 记一次采样:返回折算读数;首读与断档轮只记基线、返回 nil。
+    public mutating func record(_ raw: PowerRawReading) -> PowerReading? {
         let joules = Self.joulesByChannel(raw)
 
         guard let baselineAt, let baselineJoules else {
             store(joules, at: raw.takenAt)
-            return PowerReading(watts: zeros(for: raw), takenAt: raw.takenAt)
+            return nil
         }
 
         let elapsed = raw.takenAt.timeIntervalSince(baselineAt)
         guard elapsed > 0, elapsed <= maxGap else {
-            // 断档(睡眠/长停):丢本轮、重置基线——唤醒丢首轮。
+            // 断档(睡眠/长停/乱序):丢本轮、重置基线——唤醒丢首轮。
             store(joules, at: raw.takenAt)
-            return PowerReading(watts: zeros(for: raw), takenAt: raw.takenAt)
+            return nil
         }
 
         var watts: [PowerDomain: Double] = [:]
@@ -152,16 +154,6 @@ public struct PowerAccumulator: Sendable {
         }
         store(joules, at: raw.takenAt)
         return PowerReading(watts: watts, takenAt: raw.takenAt)
-    }
-
-    /// 全部在场域记 0(首读/断档轮的交付形状)。
-    private func zeros(for raw: PowerRawReading) -> [PowerDomain: Double] {
-        var watts: [PowerDomain: Double] = [:]
-        let present = Set(raw.channels.map(\.name))
-        for domain in PowerDomain.allCases where domain.channelNames.contains(where: { present.contains($0) }) {
-            watts[domain] = 0
-        }
-        return watts
     }
 
     private mutating func store(_ joules: [String: Double], at date: Date) {

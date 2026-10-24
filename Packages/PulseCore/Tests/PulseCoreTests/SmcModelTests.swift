@@ -133,6 +133,26 @@ final class SmcModelTests: XCTestCase {
         XCTAssertEqual(reading?.adapterWatts ?? -1, 47.96, accuracy: 0.01)
     }
 
+    func testBatteryPowerOverrideExpiresAfterFreshnessWindow() {
+        // PPBR 只在新鲜窗内覆盖电池功率(p2-review/01 ②):SMC 只在弹窗 ∨ 传感器页
+        // 可见时刷新,只开电池页时读数会冻结——过窗返回 nil,由 V×A 回退接手。
+        let takenAt = Date(timeIntervalSince1970: 100)
+        let reading = SmcReadingBuilder.make(
+            from: snapshot([
+                ("PPBR", "sp78", sp78(1.309)),
+                ("Tp01", "sp78", sp78(45)),
+            ], at: takenAt),
+            previous: nil
+        )
+        XCTAssertEqual(
+            reading?.freshBatteryPowerWatts(asOf: takenAt.addingTimeInterval(15)) ?? -1,
+            1.309,
+            accuracy: 0.01,
+            "窗内(含边界 15s)取 PPBR"
+        )
+        XCTAssertNil(reading?.freshBatteryPowerWatts(asOf: takenAt.addingTimeInterval(15.5)), "过窗回退 V×A")
+    }
+
     func testPreviousValueSurvivesFrozenSensor() {
         // 冻死值(6.2)在第二轮被旧值顶替,同键读数不回跳。
         let first = SmcReadingBuilder.make(
