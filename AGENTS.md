@@ -8,7 +8,7 @@
 
 ## 代码工具选择
 
-- 判断类代码标准(防御纪律/并发/测试/注释)见根目录 `CODING_STANDARDS.md`——`/code-review` Standards 轴强制执行;机械项归 lint/测试,不两处重复。
+- 判断类代码标准(防御纪律/并发/权限 TCC/测试/注释)见根目录 `CODING_STANDARDS.md`——`/code-review` Standards 轴强制执行;机械项归 lint/测试,不两处重复。
 - 影响面 / 调用链 / 改名迁移类问题 → ripwire;合并前的 diff 安全检查用 `ripwire-change-check`。
 - 结构化查找与机械批量改写 → ast-grep(走技能写 AST 规则;机械重构的子代理必须用它,不准正则替换)。
 - 找已知字符串 → grep 即可。
@@ -28,3 +28,4 @@
 - 纯逻辑写进 `Packages/PulseCore`(只依赖 Foundation / GRDB,不碰 AppKit / SwiftUI / Darwin 采集调用);Live 适配器、`@Observable` 功能模块与 SwiftUI 留在 app target。测试跟着被测代码走:核心测试放包里(`swift test` 不起宿主),Live / SwiftUI 薄壳测试放 `PulseTests`。
 - 全量检查 `sh scripts/check.sh`(lint → 构建 → 测试);只跑测试 `sh scripts/test.sh [--only 套件]`;Release 安装 `sh scripts/build.sh`。
 - Swift lint 门禁:`sh scripts/lint.sh [--staged] [--fix]`(SwiftFormat `.swiftformat` 管美化,SwiftLint `.swiftlint.yml` 管 error 级检测);pre-commit 对 staged 自动修,工具缺失即拦截。改 `.githooks/` 下任何 hook 后重跑 `sh .githooks/install.sh`(副本自检会兜底)。
+- **本地部署自签(fail-closed)**:`build.sh` 用自签身份 `Pulse Local Code Signing`(`scripts/make-signing-cert.sh` 创建,登录钥匙串)——ad-hoc 每次重建换 cdhash,TCC/Keychain 授权全丢 = 每次重装被当陌生 app 重弹权限框(2026-10-24 蓝牙票实案;权限原则见 `CODING_STANDARDS.md`)。pre-flight 用 **codesign 签探针文件**验证身份,缺失响亮失败、**绝不静默回落 ad-hoc**;逃生 `PULSE_SIGNING_IDENTITY=-`。**存在性检查不要用 `security find-identity -p codesigning`**——该过滤器隐藏无信任设置的自签证书(实测致重复导入 + codesign 二义)。Debug / 测试构建保持 ad-hoc(本地部署才需要稳定身份)。身份名改动静要脚本、本手册、证书三处一起换。

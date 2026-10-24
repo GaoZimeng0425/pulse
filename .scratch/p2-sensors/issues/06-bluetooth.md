@@ -60,3 +60,12 @@ build.sh 装机换 cdhash、TCC 视为陌生 app 重新弹窗,双因叠加成"�
 8 例 BluetoothFeatureAccessTests 钉死四条路径;原则全文落 CODING_STANDARDS.md
 「权限 / TCC 纪律」。遗留:ad-hoc 签名问题待稳定自签身份(NemoNotch
 make-signing-cert.sh 方案)解决——落地前每次重装后需重新点一次授权。
+
+## Comments(2026-10-24 补记二:稳定自签身份已落地,"遗留"解除)
+
+NemoNotch `make-signing-cert.sh` + `build.sh` fail-closed 方案已移植:Pulse 本地
+部署改用登录钥匙串自签身份 `Pulse Local Code Signing`(10 年),构建时关掉
+xcodebuild 的 ad-hoc、产物统一重签。验证:连续两次 build.sh 装机,designated
+requirement 逐字节一致(锚定同一证书根哈希)——重装后 TCC 授权不再丢,蓝牙
+只需授予一次。纪律落 AGENTS.md「构建与测试 → 本地部署自签」(含探针判据与
+find-identity 坑);Debug/测试构建保持 ad-hoc。
