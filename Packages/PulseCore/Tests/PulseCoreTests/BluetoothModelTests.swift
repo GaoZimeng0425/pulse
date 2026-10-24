@@ -63,7 +63,8 @@ final class BluetoothModelTests: XCTestCase {
     }
 
     func testAmbiguousNameIsDroppedNotMisattributed() {
-        // 锚侧两台同名:名字匹配歧义即弃——不给任何一台挂错电量,条目走无锚行。
+        // 锚侧两台同名:名字匹配歧义即弃——不给任何一台挂错电量;歧义读数也不
+        // 单独成带电量的行(p2-review/02:此前进无锚池带 55% 展示 = 把歧义读数露出去)。
         let reading = BluetoothMerge.merge(
             paired: [
                 PairedDeviceStatus(name: "同款耳机", address: "aa-aa-aa-aa-aa-01"),
@@ -76,9 +77,73 @@ final class BluetoothModelTests: XCTestCase {
         XCTAssertEqual(reading.devices.filter(\.isConnected).count, 0)
         XCTAssertNil(reading.devices.first { $0.normalizedAddress?.hasSuffix("01") == true }?.batteryPercent)
         XCTAssertNil(reading.devices.first { $0.normalizedAddress?.hasSuffix("02") == true }?.batteryPercent)
-        // 无锚行保住读数(不丢数据,只是不知道是谁的)。
-        XCTAssertEqual(reading.devices.last?.name, "同款耳机")
-        XCTAssertEqual(reading.devices.last?.batteryPercent, 55)
+        XCTAssertEqual(reading.devices.count, 2, "只剩两条锚行,歧义候选不成独立行")
+        XCTAssertTrue(reading.devices.allSatisfy { $0.batteryPercent == nil })
+    }
+
+    func testSameNameCandidatesNeverOverrideAnchor() {
+        // spec Story 11「歧义即弃」候选侧(p2-review/02):一轮 GATT 里两条同名样本
+        // (两副同款耳机都在场)——名在锚侧唯一也不知道哪条是锚的,锚不带电量;
+        // 两条读数也不得以带电量的独立行出现。
+        let reading = BluetoothMerge.merge(
+            paired: [PairedDeviceStatus(name: "AirPods Pro", address: "aa-aa-aa-aa-aa-01")],
+            hid: [],
+            cache: [],
+            gatt: [
+                GattBatteryEntry(batteryPercent: 80, name: "AirPods Pro"),
+                GattBatteryEntry(batteryPercent: 20, name: "AirPods Pro"),
+            ]
+        )
+        XCTAssertEqual(reading.devices.count, 1, "歧义候选不成独立行")
+        XCTAssertNil(reading.devices[0].batteryPercent, "锚电量不被任一同名候选覆盖")
+        XCTAssertNil(reading.devices[0].batterySource)
+    }
+
+    func testSameSourceAmbiguityDoesNotBlockOtherSourceForSameAnchor() {
+        // 歧义按源判:GATT 两条同名弃掉,不连累 HID 经地址唯一挂锚(跨源同名 =
+        // 同一设备的多源读数,不算歧义)。
+        let reading = BluetoothMerge.merge(
+            paired: [PairedDeviceStatus(name: "AirPods Pro", address: "aa-aa-aa-aa-aa-01")],
+            hid: [HidBatteryEntry(batteryPercent: 41, productName: "AirPods Pro", address: "aa:aa:aa:aa:aa:01")],
+            cache: [],
+            gatt: [
+                GattBatteryEntry(batteryPercent: 80, name: "AirPods Pro"),
+                GattBatteryEntry(batteryPercent: 20, name: "AirPods Pro"),
+            ]
+        )
+        XCTAssertEqual(reading.devices.count, 1)
+        XCTAssertEqual(reading.devices[0].batteryPercent, 41)
+        XCTAssertEqual(reading.devices[0].batterySource, .hid)
+    }
+
+    func testAnchorHitByTwoSameSourceCandidatesDropsBoth() {
+        // 同一锚被同源两条候选经不同级命中(一条走地址、一条走唯一名):不再"同级
+        // 后到者胜",全部弃挂,也不单独成行。
+        let reading = BluetoothMerge.merge(
+            paired: [PairedDeviceStatus(name: "妙控键盘", address: "d4-57-63-5d-bf-6b")],
+            hid: [
+                HidBatteryEntry(batteryPercent: 90, productName: "Keyboard", address: "d4-57-63-5d-bf-6b"),
+                HidBatteryEntry(batteryPercent: 15, productName: "妙控键盘"),
+            ],
+            cache: [],
+            gatt: []
+        )
+        XCTAssertEqual(reading.devices.count, 1)
+        XCTAssertNil(reading.devices[0].batteryPercent)
+    }
+
+    func testAmbiguousUnanchoredCandidatesProduceNoBatteryRow() {
+        // 无锚池同源同名两条不同读数:不知道哪个读数是哪台 → 都不成行。
+        let reading = BluetoothMerge.merge(
+            paired: [],
+            hid: [],
+            cache: [],
+            gatt: [
+                GattBatteryEntry(batteryPercent: 30, name: "路过的耳机"),
+                GattBatteryEntry(batteryPercent: 70, name: "路过的耳机"),
+            ]
+        )
+        XCTAssertTrue(reading.devices.isEmpty)
     }
 
     // MARK: 级③厂商/产品 ID 匹配
@@ -99,6 +164,22 @@ final class BluetoothModelTests: XCTestCase {
         )
         XCTAssertEqual(reading.devices.first?.batteryPercent, 66)
         XCTAssertEqual(reading.devices.first?.batterySource, .hid)
+    }
+
+    func testSameVendorProductCandidatesNeverOverrideAnchor() {
+        // 候选侧 ID 歧义:两条无址、名对不上锚、同厂商/产品 ID 的 HID 条目(两只
+        // 同款手柄)→ 锚不带电量,两条读数也不成独立行。
+        let reading = BluetoothMerge.merge(
+            paired: [PairedDeviceStatus(name: "手柄", address: "b2-2f-35-a4-75-f3", vendorID: 0x1234, productID: 0x5678)],
+            hid: [
+                HidBatteryEntry(batteryPercent: 66, productName: "GameSir Nova", vendorID: 0x1234, productID: 0x5678),
+                HidBatteryEntry(batteryPercent: 33, productName: "GameSir Nova 2", vendorID: 0x1234, productID: 0x5678),
+            ],
+            cache: [],
+            gatt: []
+        )
+        XCTAssertEqual(reading.devices.count, 1, "歧义候选不成独立行")
+        XCTAssertNil(reading.devices[0].batteryPercent, "锚电量不被任一同 ID 候选覆盖")
     }
 
     // MARK: 源②坑口径

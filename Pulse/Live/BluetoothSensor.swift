@@ -103,12 +103,22 @@ struct LiveBluetoothSource: BluetoothSource {
 
 // MARK: - GATT 电量探针(源③,按需建连)
 
+/// GATT 探针接缝(p2-review/02):provider 只认"起 / 取消"两个动作——产品唯一实现
+/// = `GattBatteryProbe`,单测注入假探针钉"闸关 → 取消",不转真蓝牙栈。
+protocol GattBatteryProbing: Sendable {
+    /// 起一轮探针(已在跑 = no-op);交付走 deliver,异步完成。
+    func start(wanting names: [String], deliver: @escaping @Sendable (GattBatteryEntry) -> Void)
+    /// 取消在途一轮:停扫、断开在连外设、释放 central;没在跑 = no-op。
+    func cancel()
+}
+
 /// 有界 GATT 探针:为"缺电量的已配对设备名"扫描 → 名字命中才建连 → 读
 /// 0x180F/0x2A19 → 交付后断连(p2-sensors/01 探针⑥实证:设备须在场,连接可
 /// 超时——超时/失败安静放弃,下轮 30s 再试)。全部状态锁在自有串行队列
 /// (CBCentralManager delegate 队列),deliver 出队即 @Sendable;探针一次起一个,
-/// 自然有界:扫描窗 12s、每设备连接 8s,全链最多 ~20s 自动收尾。
-final class GattBatteryProbe: NSObject, @unchecked Sendable {
+/// 自然有界:扫描窗 12s、每设备连接 8s,全链最多 ~20s 自动收尾;闸关时 provider
+/// 调 `cancel()` 提前收尾(p2-review/02)。
+final class GattBatteryProbe: NSObject, GattBatteryProbing, @unchecked Sendable {
     private static let scanWindow: TimeInterval = 12
     private static let connectTimeout: TimeInterval = 8
 
@@ -120,6 +130,9 @@ final class GattBatteryProbe: NSObject, @unchecked Sendable {
     private var pendingConnects = Set<UUID>()
     private var peripherals: [UUID: CBPeripheral] = [:]
     private var finished = false
+    /// 轮次号:每次 start 自增。扫描窗 / 连接超时定时器捕获起时的轮次,轮次已变
+    /// (被 cancel 后又开新轮)即作废——旧轮定时器不得掐断新轮的扫描。
+    private var round = 0
 
     /// 起探针(重复调用安全:已在跑 = no-op)。交付走 deliver,结果由下一轮
     /// provider 快照收账(探针异步完成,不阻塞当轮)。
@@ -130,10 +143,22 @@ final class GattBatteryProbe: NSObject, @unchecked Sendable {
             // ——2026-10-23 审计①:此前漏重置,第二轮 attempted 全拦 + finished
             // 拦死 finish,新 central 永不停扫也永不释放(电台常开泄漏)。
             finished = false
+            round &+= 1
             attempted = []
             wantedNames = Set(names)
             self.deliver = deliver
             central = CBCentralManager(delegate: self, queue: queue)
+        }
+    }
+
+    /// 闸关取消(p2-review/02;BluetoothFeature 关开关 / 不可见 / 授权失效都折到
+    /// provider.setVisible(false) 再到这里):在探针自有队列上走同一条收尾路径——
+    /// 停扫、取消在连外设、释放 central。之后的 delegate 回调因 central 已释放 /
+    /// 身份不符而作废。
+    func cancel() {
+        queue.async { [self] in
+            guard central != nil else { return } // 没在跑:no-op
+            finish()
         }
     }
 
@@ -153,16 +178,20 @@ final class GattBatteryProbe: NSObject, @unchecked Sendable {
 
 extension GattBatteryProbe: CBCentralManagerDelegate, CBPeripheralDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        // 已被 cancel / 收尾的旧 central 迟到的状态回调:不是本轮的,不起扫。
+        guard central === self.central else { return }
         guard central.state == .poweredOn else {
             finish()
             return
         }
         central.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+        let startedRound = round
         queue.asyncAfter(deadline: .now() + Self.scanWindow) { [weak self] in
             // 扫描窗到:还在连的让它连完(每设备另有 8s 超时),只是不再发现新目标。
-            self?.central?.stopScan()
-            if self?.pendingConnects.isEmpty == true {
-                self?.finish()
+            guard let self, round == startedRound else { return }
+            self.central?.stopScan()
+            if pendingConnects.isEmpty {
+                finish()
             }
         }
     }
@@ -181,8 +210,10 @@ extension GattBatteryProbe: CBCentralManagerDelegate, CBPeripheralDelegate {
         peripheral.delegate = self
         central.connect(peripheral)
         let id = peripheral.identifier
+        let startedRound = round
         queue.asyncAfter(deadline: .now() + Self.connectTimeout) { [weak self] in
-            guard let self, let central = self.central, let target = peripherals[id] else { return }
+            guard let self, round == startedRound,
+                  let central = self.central, let target = peripherals[id] else { return }
             if pendingConnects.contains(id) {
                 central.cancelPeripheralConnection(target)
             }
@@ -253,7 +284,7 @@ final class BluetoothSensorProvider: SensorProvider {
     private let source: any BluetoothSource
     private let gate = SensorVisibilityGate()
     private let slot = SensorLastGoodBox<BluetoothReading>()
-    private let probe = GattBatteryProbe()
+    private let probe: any GattBatteryProbing
     private let gattBuffer = GattBatteryBuffer()
 
     var lastGood: BluetoothReading? {
@@ -265,15 +296,23 @@ final class BluetoothSensorProvider: SensorProvider {
         gate.isVisible
     }
 
-    init(source: any BluetoothSource = LiveBluetoothSource()) {
+    init(
+        source: any BluetoothSource = LiveBluetoothSource(),
+        probe: any GattBatteryProbing = GattBatteryProbe()
+    ) {
         self.source = source
+        self.probe = probe
     }
 
     /// 采集闸(BluetoothFeature 折算下发:可见 ∧ 用户已开启 ∧ 系统已授权——三者缺一
     /// 即关;关闸时 snapshot 一个源都不碰,IOBluetooth / CoreBluetooth 的 TCC 路径
-    /// 完全不被触及)。
+    /// 完全不被触及)。闸关同时取消在途 GATT 探针("关开关立即停采"含这一路,
+    /// p2-review/02);先落闸再取消,与 snapshot 尾部的复核配成对,见那里。
     func setVisible(_ visible: Bool) {
-        _ = gate.setVisible(visible)
+        gate.setVisible(visible)
+        if !visible {
+            probe.cancel()
+        }
     }
 
     func snapshot() async -> BluetoothReading? {
@@ -293,6 +332,13 @@ final class BluetoothSensorProvider: SensorProvider {
         if !lacking.isEmpty {
             probe.start(wanting: lacking) { [weak self] entry in
                 self?.appendGatt(entry)
+            }
+            // 竞态补口:本轮开闸检查之后、start 之前闸可能已关(setVisible(false)
+            // 的 cancel 先于这次 start 入探针队列 = 取消落空)。start 后复核闸,关了
+            // 就补一次 cancel——start / cancel 在探针串行队列上按入队序执行,
+            // 两种交错都以"取消"收场。
+            if !gate.isVisible {
+                probe.cancel()
             }
         }
         return reading
