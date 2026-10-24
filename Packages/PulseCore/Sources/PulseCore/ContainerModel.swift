@@ -147,8 +147,9 @@ public enum ContainerListPayload {
 /// docker `/containers/{id}/stats?stream=false` 响应 → (CPU%, 内存字节)。
 /// CPU% = 单发口径(响应里带 precpu_stats,docker 服务端已采好差分基线):
 /// (cpu.total − precpu.total) ÷ (system − presystem) × onlineCPUs × 100;
-/// 分母 ≤0(首读/计数器回绕)= 0%(docker stats 同款安静口径);CPU 四字段任一
-/// 缺失 = 读不到 → nil(p2-review/01 ④,不伪造 0%)。
+/// CPU 四字段任一缺失 = 读不到、Δsystem ≤ 0 = docker 侧首读无基线——两者都没有
+/// 差分,CPU% 为 nil 占位(CODING_STANDARDS 差分三防御,p2-review/01;原口径照搬
+/// docker stats 出 0%)。用量负差(计数器回绕)仍钳 0%:有差分、口径钳位。
 public enum ContainerStatsPayload {
     public static func parse(_ body: [UInt8]) -> (cpuPercent: Double?, memoryBytes: UInt64?)? {
         guard let json = try? JSONSerialization.jsonObject(with: Data(body)) as? [String: Any] else {
@@ -171,9 +172,9 @@ public enum ContainerStatsPayload {
             // 不输出负百分比——2026-10-23 审计⑤。
             let usageDelta = max(0, Double(total) - Double(preTotal))
             let systemDelta = Double(system) - Double(preSystem)
-            cpuPercent = systemDelta > 0
-                ? usageDelta / systemDelta * Double(max(onlineCPUs ?? 1, 1)) * 100
-                : 0
+            if systemDelta > 0 {
+                cpuPercent = usageDelta / systemDelta * Double(max(onlineCPUs ?? 1, 1)) * 100
+            }
         }
         // 内存读不到 = nil(与 ContainerRow.memoryBytes 文档一致,不折叠成 0)。
         let memoryBytes = (memory["usage"] as? NSNumber)?.uint64Value

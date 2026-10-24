@@ -129,6 +129,8 @@ final class EnergyModelSensorProvider: SensorProvider, @unchecked Sendable {
     private var accumulator = PowerAccumulator()
     /// 双档串行锁:护 accumulator 差分账本与源的懒建订阅——读源与折算同在一个
     /// 锁段(p2-review/01 ①:此前读源在锁外,两档并发进懒建订阅,乱序折算出假 0)。
+    /// 代价:两档撞车时后到的一档等前一档读完一轮(一次 IOReport 采样),等待期间
+    /// 占住一个协作线程——按 5s/30s 节奏撞车稀少,换取差分账本不乱序。
     private let stateLock = NSLock()
 
     var lastGood: PowerReading? {

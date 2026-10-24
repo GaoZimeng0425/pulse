@@ -16,35 +16,18 @@ private final class FakeSmcSource: SmcSource, @unchecked Sendable {
     }
 }
 
-/// 并发探针源(p2-review/01 ①):read() 内停 20ms 并记录同时在 read() 里的调用数
-/// 峰值——provider 若在锁外读源,两档并发时峰值 > 1(真源的发现缓存与 io_connect
-/// 会被并发进入)。计数自带锁(与被测锁无关)。
+/// 并发探针源(p2-review/01 ①):每次读经 ReentryProbe(真源的发现缓存与
+/// io_connect 若被并发进入,峰值 > 1)。
 private final class ConcurrencyProbeSmcSource: SmcSource, @unchecked Sendable {
-    private let counterLock = NSLock()
-    private var inFlight = 0
-    private(set) var peakInFlight = 0
+    let probe = ReentryProbe()
 
     func read() -> SmcSnapshot? {
-        enter()
-        Thread.sleep(forTimeInterval: 0.02)
-        exit()
-        return SmcSnapshot(
-            keys: [SmcRawKey(key: "Tp01", dataType: "sp78", bytes: [45, 0])],
-            takenAt: Date()
-        )
-    }
-
-    private func enter() {
-        counterLock.lock()
-        defer { counterLock.unlock() }
-        inFlight += 1
-        peakInFlight = max(peakInFlight, inFlight)
-    }
-
-    private func exit() {
-        counterLock.lock()
-        defer { counterLock.unlock() }
-        inFlight -= 1
+        probe.measure { ordinal in
+            SmcSnapshot(
+                keys: [SmcRawKey(key: "Tp01", dataType: "sp78", bytes: [45, 0])],
+                takenAt: Date(timeIntervalSince1970: Double(ordinal))
+            )
+        }
     }
 }
 
@@ -67,7 +50,7 @@ final class SmcSensorTests: XCTestCase {
                 }
             }
         }
-        XCTAssertEqual(source.peakInFlight, 1)
+        XCTAssertEqual(source.probe.peakInFlight, 1)
     }
 
     private func sp78(_ value: Double) -> [UInt8] {

@@ -46,7 +46,7 @@ final class DashboardModel {
         .memory(monitor.memory, trend: monitor.sampleHistory.memoryUsed.values, host: .current)
     }
 
-    /// 电池卡(工单 02;p2-sensors/04 顺手活):六项读数读 monitor.battery
+    /// 电池卡(p1-history/02;p2-sensors/04 顺手活):六项读数读 monitor.battery
     /// (lastGood 语义);功率优先 SMC PPBR(更准,探针⑤实证可读),读不到或
     /// 过了新鲜窗回退 V×A(p2-review/01 ②:只开电池页时 SMC 不刷新,不显示冻结值)
     /// ——合流在取数层,两个功能模块互不持引用(ADR-0003)。

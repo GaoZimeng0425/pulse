@@ -74,6 +74,7 @@
 		6F81F0419525B5BABE9C8885 /* MenuBarBadgeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D24F280DF9DF1C4BD1AE2729 /* MenuBarBadgeSettingsView.swift */; };
 		71EB9AFF0FA27487AB7EE515 /* CardFamily.swift in Sources */ = {isa = PBXBuildFile; fileRef = 793E152BCFF6DC45BB501438 /* CardFamily.swift */; };
 		71FDAE1452AD249D0F8D0867 /* LaunchdManifestFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C3691DE09224C04DEA8AB40 /* LaunchdManifestFeature.swift */; };
+		735A8430B7309693C237F7EB /* ReentryProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2059A699152A69DF6101ED2 /* ReentryProbe.swift */; };
 		73B3EC560B0C6A5339B55928 /* TestHostIsolationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE86A48D24949B3D225394BD /* TestHostIsolationTests.swift */; };
 		7700D89C75AA6D6D0EB794B6 /* DevServerFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41196C89D2456B23F701DF21 /* DevServerFeature.swift */; };
 		7A42BF5BE1ECD8D87989902C /* SoundSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A93981AEA461948386E597BB /* SoundSensor.swift */; };
@@ -273,6 +274,7 @@
 		BA0853EEEEB0FB9F6834A00E /* AlertSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSettingsStore.swift; sourceTree = "<group>"; };
 		BA63CBA09D59DD528C7124CA /* StatusBadgeChipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadgeChipTests.swift; sourceTree = "<group>"; };
 		BE86A48D24949B3D225394BD /* TestHostIsolationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHostIsolationTests.swift; sourceTree = "<group>"; };
+		C2059A699152A69DF6101ED2 /* ReentryProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReentryProbe.swift; sourceTree = "<group>"; };
 		C3ED9E7F6F40FF3D9167EACB /* BirthScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BirthScanner.swift; sourceTree = "<group>"; };
 		C53D2D1E33AFAC1704FD224A /* KillServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KillServiceTests.swift; sourceTree = "<group>"; };
 		CA3DD124F0650F10B15F255D /* SmcFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmcFeature.swift; sourceTree = "<group>"; };
@@ -555,6 +557,7 @@
 				992A92032D0B982D3C0006EB /* ProcessRankingSensorTests.swift */,
 				DF43629A17EF4D982135C6DC /* ProjectRootsStoreTests.swift */,
 				29E406A1D678E2CAF14F3E30 /* RankingListMetricsTests.swift */,
+				C2059A699152A69DF6101ED2 /* ReentryProbe.swift */,
 				EA32BC4006AFA168EE6CF9B5 /* RoundSpineTests.swift */,
 				D1C9148F4EC10E000CE96ABA /* SmcSensorTests.swift */,
 				126800DC1FC5FCB799DDA633 /* SoundSensorTests.swift */,
@@ -712,6 +715,7 @@
 				A1307D0D5CDA410E84C9AA0D /* ProcessRankingSensorTests.swift in Sources */,
 				0E7CC3EE21A1321E89D78BFC /* ProjectRootsStoreTests.swift in Sources */,
 				1F7A55CC3A6CF75D16DEF819 /* RankingListMetricsTests.swift in Sources */,
+				735A8430B7309693C237F7EB /* ReentryProbe.swift in Sources */,
 				3912CC7AE8C5DF0325342786 /* RoundSpineTests.swift in Sources */,
 				E9F71EE03BA7B4C44DD8DCC6 /* SmcSensorTests.swift in Sources */,
 				EF095DB50F12562588921E86 /* SoundSensorTests.swift in Sources */,

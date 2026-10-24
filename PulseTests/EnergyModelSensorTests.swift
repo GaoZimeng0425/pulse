@@ -21,37 +21,17 @@ private final class FakePowerSource: PowerSource, @unchecked Sendable {
     }
 }
 
-/// 并发探针源(p2-review/01 ①):read() 内停 20ms 并记录同时在 read() 里的调用数
-/// 峰值——provider 若在锁外读源,两档并发时峰值 > 1。计数自带锁(与被测锁无关)。
+/// 并发探针源(p2-review/01 ①):每次读经 ReentryProbe,载荷按调用序号单调递增。
 private final class ConcurrencyProbePowerSource: PowerSource, @unchecked Sendable {
-    private let counterLock = NSLock()
-    private var inFlight = 0
-    private var calls = 0
-    private(set) var peakInFlight = 0
+    let probe = ReentryProbe()
 
     func read() -> PowerRawReading? {
-        let call = enter()
-        Thread.sleep(forTimeInterval: 0.02)
-        exit()
-        return PowerRawReading(
-            channels: [PowerChannelSample(name: "ANE", unitLabel: "mJ", rawValue: Double(call) * 10)],
-            takenAt: Date(timeIntervalSince1970: Double(call))
-        )
-    }
-
-    private func enter() -> Int {
-        counterLock.lock()
-        defer { counterLock.unlock() }
-        inFlight += 1
-        calls += 1
-        peakInFlight = max(peakInFlight, inFlight)
-        return calls
-    }
-
-    private func exit() {
-        counterLock.lock()
-        defer { counterLock.unlock() }
-        inFlight -= 1
+        probe.measure { ordinal in
+            PowerRawReading(
+                channels: [PowerChannelSample(name: "ANE", unitLabel: "mJ", rawValue: Double(ordinal) * 10)],
+                takenAt: Date(timeIntervalSince1970: Double(ordinal))
+            )
+        }
     }
 }
 
@@ -118,7 +98,7 @@ final class EnergyModelSensorTests: XCTestCase {
                 }
             }
         }
-        XCTAssertEqual(source.peakInFlight, 1)
+        XCTAssertEqual(source.probe.peakInFlight, 1)
     }
 
     func testProviderDeliversDifferencedWatts() async {

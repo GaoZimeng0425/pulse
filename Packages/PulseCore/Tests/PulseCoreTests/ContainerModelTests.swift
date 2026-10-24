@@ -90,15 +90,17 @@ final class ContainerModelTests: XCTestCase {
         XCTAssertEqual(stats?.memoryBytes, 512 * 1024 * 1024)
     }
 
-    func testZeroOrNegativeSystemDeltaYieldsZeroPercent() {
-        // 首读/回绕:Δsystem ≤ 0 → 0%(docker stats 同款安静口径),内存照常。
+    func testZeroOrNegativeSystemDeltaYieldsNoCpuReading() {
+        // Δsystem ≤ 0(docker 侧首读,precpu 无基线):没有差分就没有 CPU% → nil 占位,
+        // 不出假 0%(CODING_STANDARDS 差分三防御,p2-review/01);内存照常。
         let body = statsBody(
             total: 100, preTotal: 50,
             system: 500, preSystem: 500, // Δsystem = 0
             onlineCPUs: 2, memory: 1024
         )
         let stats = ContainerStatsPayload.parse(body)
-        XCTAssertEqual(stats?.cpuPercent, 0)
+        XCTAssertNotNil(stats)
+        XCTAssertNil(stats?.cpuPercent)
         XCTAssertEqual(stats?.memoryBytes, 1024)
     }
 
