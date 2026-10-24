@@ -2,7 +2,7 @@ import AppKit
 import PulseCore
 import SwiftUI
 
-/// 弹窗主页(工单 P0.6-05 对齐 OG 左图):图标 tab → "页名 / 已运行时长" 头 →
+/// 弹窗主页(工单 P0.6-05 对齐 OG 左图):图标 tab → "页名 + 本机一行 / 已运行时长" 头 →
 /// 各 tab 内容(与主窗口同一份 MetricTabStack,紧凑档)→ 底部操作排(打开主窗口 +
 /// 设置 + 退出)。tab 内容模型与会话状态在
 /// DashboardModel(与主窗口共用,评审 F4);组下钻(工单 06)与处置编排
@@ -94,10 +94,21 @@ struct DashboardView: View {
         model.content(tab: tabSelection.current)
     }
 
-    /// 页头(OG:"Overview" + 右侧 "⏱ Up 6d 4h"):运行时长每分钟刷新。
+    /// 页头(OG:"Overview" + 右侧 "⏱ Up 6d 4h";页名下的本机一行补齐参考文档
+    /// 点名的缺口「Vitals 报 Apple M1 Max · 10 cores · 64 GB」——用户 2026-10-24
+    /// 反馈弹窗总览缺本机信息):「芯片 · 核数 · 内存」与主窗口内容头同一出处
+    /// (hostSummary);全部 tab 一致,切 tab 页头不跳高。运行时长每分钟刷新。
     private var pageHeader: some View {
-        HStack {
-            Text(tabSelection.current.title)
+        let host = HostInfo.current
+        return HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(tabSelection.current.title)
+                Text(PulseFormat.hostSummary(
+                    chipName: host.chipName,
+                    coreCount: host.coreCount,
+                    physicalMemoryBytes: host.physicalMemoryBytes
+                ))
+            }
             Spacer()
             TimelineView(.periodic(from: .now, by: 60)) { _ in
                 Label(
