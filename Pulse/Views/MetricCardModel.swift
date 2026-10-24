@@ -267,9 +267,9 @@ extension MetricCardModel {
                 MetricCardStat(label: "归一化", value: normalizedPercent.map { String(format: "%.0f%%", $0) } ?? "—"),
                 MetricCardStat(
                     label: "五路合计",
-                    value: power.map { PowerDomainsCardView.wattsText($0.totalWatts) } ?? "—"
+                    value: power.map { PulseFormat.watts($0.totalWatts) } ?? "—"
                 ),
-                MetricCardStat(label: "峰值", value: trend.max().map { PowerDomainsCardView.wattsText($0) } ?? "—"),
+                MetricCardStat(label: "峰值", value: trend.max().map(PulseFormat.watts) ?? "—"),
             ],
             trend: trend,
             domainMax: max(1, trend.max() ?? 1)

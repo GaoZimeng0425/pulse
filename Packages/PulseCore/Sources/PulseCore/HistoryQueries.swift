@@ -155,7 +155,7 @@ public enum HistoryMetricKey: String, CaseIterable, Identifiable, Sendable {
         case .network, .disk: PulseFormat.diskRate(value)
         case .temperature: String(format: "%.1f°C", value)
         case .gpu: PulseFormat.cpuPercent(value)
-        case .power: String(format: "%.1f W", value)
+        case .power: PulseFormat.watts(value)
         }
     }
 }

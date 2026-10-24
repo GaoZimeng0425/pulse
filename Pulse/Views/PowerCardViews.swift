@@ -20,7 +20,7 @@ struct PowerDomainsCardView: View {
                 symbolName: "bolt.horizontal.fill",
                 title: "五路功率",
                 tint: Metric.gpu.accentColor,
-                note: reading.map { "合计 \(Self.wattsText($0.totalWatts))" }
+                note: reading.map { "合计 \(PulseFormat.watts($0.totalWatts))" }
             )
             if let reading {
                 let rows = Self.rows(for: reading)
@@ -32,7 +32,7 @@ struct PowerDomainsCardView: View {
                                 .font(.system(size: 12, weight: .medium))
                                 .frame(width: CardRowWidth.shortLabel, alignment: .leading)
                             MeterBar(fraction: MeterNormalization.fraction(row.watts, leader: leader), tint: row.tint)
-                            CardRowValue(text: Self.wattsText(row.watts), minWidth: CardRowWidth.quantityValue)
+                            CardRowValue(text: PulseFormat.watts(row.watts), minWidth: CardRowWidth.quantityValue)
                         }
                     }
                 }
@@ -69,11 +69,6 @@ struct PowerDomainsCardView: View {
         PowerDomain.allCases.compactMap { domain in
             reading.watts[domain].map { DomainRow(domain: domain, watts: $0) }
         }
-    }
-
-    /// 瓦数文案:<10 W 一位小数,≥10 W 取整。
-    static func wattsText(_ watts: Double) -> String {
-        watts < 10 ? String(format: "%.1f W", watts) : String(format: "%.0f W", watts)
     }
 }
 
