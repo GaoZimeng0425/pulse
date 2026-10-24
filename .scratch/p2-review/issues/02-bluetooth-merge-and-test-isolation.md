@@ -6,12 +6,12 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] ① 合并器歧义即弃(两侧唯一)
-- [ ] ② GATT 探针随闸关取消
-- [ ] ③ 单测不碰真栈
-- [ ] check.sh 全绿
+- [x] ① 合并器歧义即弃(两侧唯一)
+- [x] ② GATT 探针随闸关取消
+- [x] ③ 单测不碰真栈
+- [x] check.sh 全绿
 
 ## Agent Brief
 
@@ -48,3 +48,32 @@
 
 **范围边界**:不改三源采集本身、不改授权四路径行为(acbfdbf 已钉);provider 逐 tick 静默复核授权
 (REPORT 架构轴 6)本票不做,记档待后续。
+
+## Comments
+
+**执行记录(2026-10-24)**:
+- ① `BluetoothMerge` 匹配改为 `resolve` + `matchAnchor`(返回 锚 / 未匹配 / 歧义)+ `unanchoredRows`。
+  口径:**候选侧唯一按同源判**(跨源同名 = 同一设备的多源读数,hid > cache > gatt 照旧);同源
+  完全相同的样本先折叠(同一读数重复交付不算歧义,旧用例「同名同值样本去重」因此仍成立);某级
+  锚侧有命中却不唯一(任一侧 ≥2)= 歧义直接弃、不降级;同一锚被同源 ≥2 条候选命中 → 该源全部弃挂
+  (取消"同级后到者胜")。**歧义候选不进无锚池,也不以无电量行出现**——无锚行的唯一意义是展示
+  电量,去掉电量只剩无连接态、无 RSSI 的名字,已配对设备另有锚行;无锚池同源同池键 ≥2 也弃。
+  新增 5 条合成载荷用例(同名两候选、同 ID 两候选、同锚同源双命中、无锚池歧义、跨源不连坐),
+  改写旧用例 `testAmbiguousNameIsDroppedNotMisattributed`(原钉住"歧义读数单独成行带电量");
+  变异检查:新行为用例在旧合并器上全红(跨源不连坐为回归护栏,新旧皆绿)。
+- ② 抽 `GattBatteryProbing`(start / cancel)薄接缝,provider 注入;`setVisible(false)` 先落闸再
+  `cancel()`,snapshot 起探针后复核闸补 cancel(start / cancel 在探针串行队列按入队序执行,两种
+  交错都以取消收场)。探针加轮次号:被取消后再开新轮时,旧轮扫描窗 / 连接超时定时器作废,不掐新轮;
+  旧 central 迟到的状态回调不起扫。`BluetoothSensorTests.testClosingGateCancelsInFlightGattProbe`
+  假探针钉"闸关 → 取消被调用"。
+- ③ 删 `testLivePairedSmokeOnThisMachine`(IOBluetooth,含限时恢复盒)与
+  `SoundSensorTests.testLiveSmokeOnThisMachine`(CoreAudio);`Pulse.xctestplan` / scheme 无残留。
+  InertSources 补 `BluetoothFeature.inert()`(合成源 + 固定已授权 + `InertGattBatteryProbe` +
+  不碰 UserDefaults),预览装配与 `MonitorAssemblyTests` 共用;`BluetoothFeature` 指定构造器可注入
+  探针(默认真探针)。provider / 功能模块单测一律注入假 / 惰性探针(此前靠"载荷全员带电量"避开真探针)。
+  保留 `testLiveHidSmokeOnThisMachine` / `testLiveCacheSmokeOnThisMachine`:只读 IORegistry / 系统
+  plist,不碰蓝牙栈与 TCC。
+- check.sh 全绿:766 用例(核心包 409 + app 357)。
+- **未验证**:真机目验——关开关后 GATT 扫描是否即停(无宿主接缝,靠代码评审);两副同款耳机同时
+  在场时卡面表现。**记档**:级①地址未命中任何锚的候选仍会降级按名匹配(带地址 A 的条目可能挂到
+  同名但地址为 B 的锚),属沿用 stats 规则的存量口径,本票未改;provider 逐 tick 复核授权仍待后续。
