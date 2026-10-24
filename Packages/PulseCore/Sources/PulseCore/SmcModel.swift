@@ -109,6 +109,18 @@ public struct SmcFanReading: Equatable, Identifiable, Sendable {
     public let rpm: Int
     public let minRpm: Int
     public let maxRpm: Int
+
+    /// 进度条归一(spec Story 7「转到了几成」;p2-review/04 C 拍板):
+    /// (rpm − min)/(max − min)——最低速 = 空条、满速 = 满条。钳 0…1:停转(rpm 0 低于
+    /// 下限)落空条;强制满转 / 读数抖动越过上限落满条——条只表达"几成",超额看数字。
+    /// max ≤ min(含上限缺键被 builder 记 0)→ 空条:上下限自相矛盾时没有可信标尺,
+    /// 不退回 rpm/max 猜比例(min 坏还是 max 坏无从判断),也免得除以 0 出 NaN/∞;
+    /// 转速数字照常显示,读数不丢。
+    public var speedFraction: Double {
+        guard maxRpm > minRpm else { return 0 }
+        let raw = Double(rpm - minRpm) / Double(maxRpm - minRpm)
+        return min(max(raw, 0), 1)
+    }
 }
 
 /// 派生传感器(GLOSSARY「派生传感器」):Average 只收命名表标 average 的
@@ -137,6 +149,14 @@ public struct SmcReading: Equatable, Sendable {
     /// 全部温度(明细折叠区用;组序见视图)。
     public var allTemps: [SmcTempReading] {
         knownTemps + unknownTemps
+    }
+
+    /// 派生传感器「最快风扇」(GLOSSARY「派生传感器」;p2-review/04 B 拍板、/08 ①):
+    /// 当前转速最高的那台,并列取序号小的。由 `fans` 现算而非存进 `SmcDerivedTemps`——
+    /// 派生值只有一个出处(基础读数),不会与 `fans` 不同步。无风扇 / 风扇全读不到
+    /// (`fans` 为空)→ nil,UI 占位不伪造 0;全部停转(rpm 0)是真读数,如实交出。
+    public var fastestFan: SmcFanReading? {
+        fans.max { $0.rpm < $1.rpm }
     }
 
     /// PPBR 覆盖电池功率的新鲜窗 = 3 个 SMC UI 档周期(5s×3):容忍两轮读失败,
