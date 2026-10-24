@@ -25,6 +25,21 @@ extension HistoryMetricKey {
     }
 }
 
+extension HistoryBreakdown {
+    /// 分项药丸与曲线强调色:功率单域取五路功率卡的域配色(`PowerDomain.tint`,
+    /// 一个出处,p2-review/07),其余随所属指标。
+    var tint: Color {
+        powerDomain?.tint ?? metric.accent.accentColor
+    }
+}
+
+extension HistorySeries {
+    /// 曲线强调色:有分项随分项,否则随指标。
+    var tint: Color {
+        breakdown?.tint ?? metric.accent.accentColor
+    }
+}
+
 /// 历史页:选指标(系统负载/CPU/内存/网络/磁盘)× 选范围(近 1 小时/24 小时/
 /// 7 天/30 天)看走势,切换用与主窗口工具栏同一款药丸 tab(用户拍板
 /// 2026-10-22:tab 是通用组件样式,`PillTabBar`)。app 未运行的时段曲线留缺
@@ -40,6 +55,9 @@ struct HistoryTabView: View {
     /// 选择态:页面本地会话态,默认系统负载 × 近 1 小时(最常用的排障起点)。
     @State private var metric: HistoryMetricKey = .systemLoad
     @State private var range: HistoryRange = .hour1
+    /// 所选分项(p2-review/07):会话态不持久(与指标/范围同惯例);切主指标即清空
+    /// → 回落该指标默认分项(温度 = CPU 均值、功率 = 合计)。
+    @State private var breakdown: HistoryBreakdown?
     /// 当前曲线(nil = 尚未查到 / 库不可用):按占位处理,不区分原因(旁路语义)。
     @State private var series: HistorySeries?
 
@@ -55,22 +73,37 @@ struct HistoryTabView: View {
             ) { key in
                 PillTabItem(title: key.title, symbol: key.symbolName, tint: key.accent.accentColor)
             }
-            // 范围条:文字恒显(四项短文案无宽度竞争),色调跟随所选指标——
-            // 与曲线、统计数字同族,整页一个颜色故事;同样玻璃外裹。
+            // 分项条(p2-review/07,用户拍板 2026-10-24 形态 (a)):只在有分项的
+            // 指标出现,一次看一条线;文字恒显(短文案),各项取分项色,同样玻璃外裹。
+            if let activeBreakdown {
+                PillTabBar(
+                    metric.breakdowns,
+                    selection: Binding(get: { activeBreakdown }, set: { breakdown = $0 }),
+                    isGlassContainer: true
+                ) { item in
+                    PillTabItem(title: item.title, tint: item.tint)
+                }
+            }
+            // 范围条:文字恒显(四项短文案无宽度竞争),色调跟随所选指标/分项——
+            // 与曲线同族,整页一个颜色故事;同样玻璃外裹。
             PillTabBar(HistoryRange.allCases, selection: $range, isGlassContainer: true) { span in
-                PillTabItem(title: span.title, tint: metric.accent.accentColor)
+                PillTabItem(title: span.title, tint: tint)
             }
 
             chartCard
 
-            // 口径脚注(GLOSSARY 双口径 / 占位语义的展示出口,工单 04 票面既定)。
-            Text(metric.caption)
+            // 口径脚注(GLOSSARY 双口径 / 占位语义的展示出口,工单 04 票面既定);
+            // 有分项随分项口径。
+            Text(activeBreakdown?.caption ?? metric.caption)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }
         // 换指标/换范围即重查;驻留本页期间每分钟补一轮(分钟表一分钟长一行,
         // "近 1 小时"要能往前走)。查询在引擎 actor,取消即停,离页不空转。
-        .task(id: QueryKey(metric: metric, range: range)) {
+        // 切主指标清空分项:查询键用生效分项(旧分项不属新指标即回落默认),
+        // 清空前后键不变,不重复查询。
+        .onChange(of: metric) { breakdown = nil }
+        .task(id: QueryKey(metric: metric, breakdown: activeBreakdown, range: range)) {
             await reload()
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(60))
@@ -80,9 +113,21 @@ struct HistoryTabView: View {
         }
     }
 
+    /// 生效分项(无分项的指标为 nil;回落规则与查询层同一条)。
+    private var activeBreakdown: HistoryBreakdown? {
+        metric.resolvedBreakdown(breakdown)
+    }
+
+    /// 页面强调色:有分项随分项,否则随指标。
+    private var tint: Color {
+        activeBreakdown?.tint ?? metric.accent.accentColor
+    }
+
     /// 重查当前选择(最新时刻取窗)。
     private func reload() async {
-        series = await monitor.history.series(metric: metric, range: range)
+        series = await monitor.history.series(
+            metric: metric, breakdown: activeBreakdown, range: range
+        )
     }
 
     /// 曲线卡:统计行(仅非空桶)+ Canvas 走势 / "暂无数据"占位。
@@ -157,9 +202,10 @@ struct HistoryTabView: View {
     }
 }
 
-/// 查询键:task(id:) 的重启条件(换指标或换范围)。
+/// 查询键:task(id:) 的重启条件(换指标、分项或范围)。
 private struct QueryKey: Equatable {
     let metric: HistoryMetricKey
+    let breakdown: HistoryBreakdown?
     let range: HistoryRange
 }
 
@@ -183,7 +229,7 @@ struct HistoryCurveView: View {
         }
         // 轨道:强调色 9%(与 StripChartView 的 §1.1 color-mix 口径一致)。
         .background(
-            series.metric.accent.accentColor.opacity(0.09),
+            series.tint.opacity(0.09),
             in: .rect(cornerRadius: 8)
         )
         .accessibilityHidden(true) // 数值信息由统计行的文字承载
@@ -208,7 +254,7 @@ struct HistoryCurveView: View {
             )
         }
 
-        let tint = series.metric.accent.accentColor
+        let tint = series.tint
         var run: [(index: Int, value: Double)] = []
 
         func flush() {
@@ -267,9 +313,19 @@ struct HistoryCurveView: View {
         for minute in 0 ..< 180 where minute % 17 != 0 {
             let ts = hourStart - (180 - minute) * 60
             let load = 18.0 + Double((minute * 37) % 64)
+            // 传感器趋势列(p2-review/07 分项预览):温度均值/最热、五路功率各路。
+            let wave = Double((minute * 23) % 40) / 10
             try db.execute(
-                sql: "INSERT INTO system_min (ts, load_avg, load_max) VALUES (?, ?, ?)",
-                arguments: [ts, load, load]
+                sql: """
+                INSERT INTO system_min
+                    (ts, load_avg, load_max, temp_avg, temp_max,
+                     pow_cpu, pow_gpu, pow_ane, pow_ram, pow_soc)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                arguments: [
+                    ts, load, load, 42 + wave * 2, 58 + wave * 5,
+                    2 + wave, 0.8 + wave / 2, minute % 3 == 0 ? 0.4 : nil, 0.3, 0.6,
+                ]
             )
             try db.execute(
                 sql: """

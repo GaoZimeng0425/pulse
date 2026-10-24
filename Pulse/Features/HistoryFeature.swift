@@ -113,11 +113,12 @@ final class HistoryFeature: MonitorFeature {
     /// Story 10);引擎缺席 → nil,页面按"暂无数据"占位,不打断页面。
     func series(
         metric: HistoryMetricKey,
+        breakdown: HistoryBreakdown? = nil,
         range: HistoryRange,
         now: Date = Date()
     ) async -> HistorySeries? {
         guard let engine else { return nil }
-        return await engine.series(metric: metric, range: range, now: now)
+        return await engine.series(metric: metric, breakdown: breakdown, range: range, now: now)
     }
 
     /// 收流(单测收尾 / SystemMonitor.stop):已入流的入参照常落完,写入者随后退出;

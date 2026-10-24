@@ -160,11 +160,99 @@ public enum HistoryMetricKey: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// 历史指标的分项(p2-review/07,GLOSSARY「分项」):同一指标下可单独查看的
+/// 一条曲线,一次只看一条(用户拍板 2026-10-24 形态 (a),不叠加)。只用已落库
+/// 的列(p2-sensors/08 迁移 `p2-sensors-v2`)——GPU/SoC 派生温度等新列等
+/// p2-review/06 历史量收敛后再加。
+public enum HistoryBreakdown: Hashable, Identifiable, Sendable {
+    /// 温度:CPU 均值派生温度(`temp_avg`,桶内取均)。
+    case temperatureAverage
+    /// 温度:全机最热(`temp_max`,桶内取峰值)。
+    case temperatureHottest
+    /// 功率:五路合计(COALESCE + FILTER 口径,审计⑤)。
+    case powerTotal
+    /// 功率:五路之一(`pow_*` 本域列,桶内取均)。
+    case powerDomain(PowerDomain)
+
+    public var id: String {
+        switch self {
+        case .temperatureAverage: "temperatureAverage"
+        case .temperatureHottest: "temperatureHottest"
+        case .powerTotal: "powerTotal"
+        case let .powerDomain(domain): "power.\(domain.rawValue)"
+        }
+    }
+
+    /// 所属指标。
+    public var metric: HistoryMetricKey {
+        switch self {
+        case .temperatureAverage, .temperatureHottest: .temperature
+        case .powerTotal, .powerDomain: .power
+        }
+    }
+
+    /// 功率单域分项的域(视图取域配色用,与 GPU 页五路功率卡一个出处);
+    /// 其余分项 nil。
+    public var powerDomain: PowerDomain? {
+        if case let .powerDomain(domain) = self {
+            domain
+        } else {
+            nil
+        }
+    }
+
+    /// 次级药丸条文案。
+    public var title: String {
+        switch self {
+        case .temperatureAverage: "CPU 均值"
+        case .temperatureHottest: "全机最热"
+        case .powerTotal: "合计"
+        case let .powerDomain(domain): domain.title
+        }
+    }
+
+    /// 页面脚注(分项口径说明);默认分项沿用指标脚注,一处出处。
+    public var caption: String {
+        switch self {
+        case .temperatureAverage, .powerTotal:
+            metric.caption
+        case .temperatureHottest:
+            "全机最热派生温度(CPU/GPU/SoC 最热取最高,桶内取峰值);P2 传感器 08 起记录"
+        case let .powerDomain(domain):
+            "\(domain.title) 域平均瓦数(五路功率之一);该域缺席的芯片留空不补零;P2 传感器 08 起记录"
+        }
+    }
+}
+
+public extension HistoryMetricKey {
+    /// 本指标的分项(有序,首项 = 默认);空 = 无分项(页面不出次级条)。
+    var breakdowns: [HistoryBreakdown] {
+        switch self {
+        case .temperature: [.temperatureAverage, .temperatureHottest]
+        case .power: [.powerTotal] + PowerDomain.allCases.map(HistoryBreakdown.powerDomain)
+        case .systemLoad, .cpu, .memory, .network, .disk, .gpu: []
+        }
+    }
+
+    /// 默认分项(切换主指标时回到它);无分项 = nil。
+    var defaultBreakdown: HistoryBreakdown? {
+        breakdowns.first
+    }
+
+    /// 实际生效的分项:所选分项属于本指标则用它,否则(nil / 切主指标瞬间带着
+    /// 旧指标的分项)回落默认;无分项的指标恒 nil。查询层与页面同用这一条。
+    func resolvedBreakdown(_ selected: HistoryBreakdown?) -> HistoryBreakdown? {
+        selected.flatMap { breakdowns.contains($0) ? $0 : nil } ?? defaultBreakdown
+    }
+}
+
 /// 一条历史曲线:固定桶网格上的值。`nil` = 该桶无行(app 未运行 / 该指标
 /// 未记录)——留缺不补零(spec User Story 8);曲线分段绘制,统计只数
 /// 有数据的桶。
 public struct HistorySeries: Equatable, Sendable {
     public let metric: HistoryMetricKey
+    /// 所看分项(无分项的指标为 nil)。
+    public let breakdown: HistoryBreakdown?
     public let range: HistoryRange
     /// 网格起点(epoch 秒,桶对齐;= range.bounds(now:).start)。
     public let startSeconds: Int
@@ -213,12 +301,14 @@ public struct HistorySeries: Equatable, Sendable {
 
     public init(
         metric: HistoryMetricKey,
+        breakdown: HistoryBreakdown? = nil,
         range: HistoryRange,
         startSeconds: Int,
         bucketSeconds: Int,
         values: [Double?]
     ) {
         self.metric = metric
+        self.breakdown = breakdown
         self.range = range
         self.startSeconds = startSeconds
         self.bucketSeconds = bucketSeconds
@@ -229,12 +319,15 @@ public struct HistorySeries: Equatable, Sendable {
 /// 查询执行(真 SQLite,测试不设缝):同步、直接给 `Database`——线程由
 /// 调用方决定,app 侧经 `HistoryEngine.series`(actor)在后台执行。
 public enum HistoryQuery {
+    /// `breakdown` 为 nil 或不属于本指标 → 取本指标默认分项(无分项的指标恒 nil)。
     public static func series(
         metric: HistoryMetricKey,
+        breakdown: HistoryBreakdown? = nil,
         range: HistoryRange,
         now: Date,
         in db: Database
     ) throws -> HistorySeries {
+        let breakdown = metric.resolvedBreakdown(breakdown)
         let (start, end) = range.bounds(now: now)
         let bucket = range.bucketSeconds
         let table = range.readsHourTable
@@ -266,8 +359,11 @@ public enum HistoryQuery {
             GROUP BY bucket ORDER BY bucket
             """
         case .temperature:
+            // 最热取桶内峰值:与小时汇总 MAX(temp_max) 同口径(最热的语义是峰,
+            // 均摊会把尖峰抹平);CPU 均值桶内取均,与小时汇总 AVG(temp_avg) 同。
+            let value = breakdown == .temperatureHottest ? "MAX(temp_max)" : "AVG(temp_avg)"
             sql = """
-            SELECT ts / \(bucket) * \(bucket) AS bucket, AVG(temp_avg) AS value
+            SELECT ts / \(bucket) * \(bucket) AS bucket, \(value) AS value
             FROM \(table) WHERE ts >= ? AND ts < ?
             GROUP BY bucket ORDER BY bucket
             """
@@ -278,18 +374,28 @@ public enum HistoryQuery {
             GROUP BY bucket ORDER BY bucket
             """
         case .power:
-            // 五路合计:缺席域按 0 计(COALESCE,与存储层各域独立均值的合计口径
-            // 一致——缺 ANE 域的芯片不整行丢弃);全 NULL 的行经 FILTER 剔除,
-            // 该桶如实空段(2026-10-23 审计⑤)。
-            sql = """
-            SELECT ts / \(bucket) * \(bucket) AS bucket,
-                   AVG(COALESCE(pow_cpu, 0) + COALESCE(pow_gpu, 0) + COALESCE(pow_ane, 0)
-                       + COALESCE(pow_ram, 0) + COALESCE(pow_soc, 0))
-                   FILTER (WHERE pow_cpu IS NOT NULL OR pow_gpu IS NOT NULL OR pow_ane IS NOT NULL
-                       OR pow_ram IS NOT NULL OR pow_soc IS NOT NULL) AS value
-            FROM \(table) WHERE ts >= ? AND ts < ?
-            GROUP BY bucket ORDER BY bucket
-            """
+            if let domain = breakdown?.powerDomain {
+                // 单域:本域列桶内取均(与小时汇总 AVG(pow_*) 同口径);该域 NULL
+                // 的分钟 AVG 跳过,全 NULL 的桶 = NULL → 空段,不伪造 0。
+                sql = """
+                SELECT ts / \(bucket) * \(bucket) AS bucket, AVG(\(domain.historyColumn)) AS value
+                FROM \(table) WHERE ts >= ? AND ts < ?
+                GROUP BY bucket ORDER BY bucket
+                """
+            } else {
+                // 五路合计:缺席域按 0 计(COALESCE,与存储层各域独立均值的合计口径
+                // 一致——缺 ANE 域的芯片不整行丢弃);全 NULL 的行经 FILTER 剔除,
+                // 该桶如实空段(2026-10-23 审计⑤)。
+                sql = """
+                SELECT ts / \(bucket) * \(bucket) AS bucket,
+                       AVG(COALESCE(pow_cpu, 0) + COALESCE(pow_gpu, 0) + COALESCE(pow_ane, 0)
+                           + COALESCE(pow_ram, 0) + COALESCE(pow_soc, 0))
+                       FILTER (WHERE pow_cpu IS NOT NULL OR pow_gpu IS NOT NULL OR pow_ane IS NOT NULL
+                           OR pow_ram IS NOT NULL OR pow_soc IS NOT NULL) AS value
+                FROM \(table) WHERE ts >= ? AND ts < ?
+                GROUP BY bucket ORDER BY bucket
+                """
+            }
         case .cpu, .memory:
             // 组级指标两级聚合:内层按 ts 对全组求和(每分钟/每小时一行),
             // 外层桶内取均——桶内各分钟组数不同也不会歪。组级磁盘两列本阶段
@@ -325,11 +431,26 @@ public enum HistoryQuery {
         }
         return HistorySeries(
             metric: metric,
+            breakdown: breakdown,
             range: range,
             startSeconds: start,
             bucketSeconds: bucket,
             values: values
         )
+    }
+}
+
+private extension PowerDomain {
+    /// 系统级表的本域功率列(p2-sensors/08 迁移 `p2-sensors-v2`;封闭枚举常量,
+    /// 非用户输入,可直插 SQL)。
+    var historyColumn: String {
+        switch self {
+        case .cpu: "pow_cpu"
+        case .gpu: "pow_gpu"
+        case .ane: "pow_ane"
+        case .ram: "pow_ram"
+        case .soc: "pow_soc"
+        }
     }
 }
 
@@ -342,6 +463,7 @@ public extension HistoryEngine {
     /// 库不可用同样返回 nil,页面按占位处理。
     func series(
         metric: HistoryMetricKey,
+        breakdown: HistoryBreakdown? = nil,
         range: HistoryRange,
         now: Date
     ) async -> HistorySeries? {
@@ -350,7 +472,9 @@ public extension HistoryEngine {
             // GRDB 的 read 在 async 上下文走 async 重载:闭包照旧同步跑在
             // 库队列上,await 只挂起本 actor 任务(查询在后台队列,工单 04 验收)。
             let series = try await database.read { db in
-                try HistoryQuery.series(metric: metric, range: range, now: now, in: db)
+                try HistoryQuery.series(
+                    metric: metric, breakdown: breakdown, range: range, now: now, in: db
+                )
             }
             noteReadSuccess()
             return series
