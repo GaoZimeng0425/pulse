@@ -25,6 +25,37 @@ private final class FakeBluetoothSource: BluetoothSource, @unchecked Sendable {
     }
 }
 
+/// 假 GATT 探针(p2-review/02 接缝):只记账,不碰 CoreBluetooth——单测不转蓝牙栈。
+private final class FakeGattProbe: GattBatteryProbing, @unchecked Sendable {
+    private let lock = NSLock()
+    private var starts: [[String]] = []
+    private var cancels = 0
+
+    var startedNames: [[String]] {
+        lock.lock()
+        defer { lock.unlock() }
+        return starts
+    }
+
+    var cancelCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return cancels
+    }
+
+    func start(wanting names: [String], deliver _: @escaping @Sendable (GattBatteryEntry) -> Void) {
+        lock.lock()
+        defer { lock.unlock() }
+        starts.append(names)
+    }
+
+    func cancel() {
+        lock.lock()
+        defer { lock.unlock() }
+        cancels += 1
+    }
+}
+
 final class BluetoothSensorTests: XCTestCase {
     /// 全员带电量的标准载荷(妙控板 HID + QC35 缓存)。
     private func fullBatterySource() -> FakeBluetoothSource {
@@ -76,6 +107,23 @@ final class BluetoothSensorTests: XCTestCase {
         let failed = await provider.snapshot()
         XCTAssertNil(failed)
         XCTAssertEqual(provider.lastGood?.devices.count, 2)
+    }
+
+    func testClosingGateCancelsInFlightGattProbe() async {
+        // p2-review/02:闸关(开关关 / 不可见 / 授权失效都折成 setVisible(false))
+        // = 立即停采,在途 GATT 探针随之取消,不再扫满 ~20s。
+        let source = fullBatterySource()
+        source.paired?.append(PairedDeviceStatus(name: "缺电量耳机", address: "aa-aa-aa-aa-aa-09"))
+        let probe = FakeGattProbe()
+        let provider = BluetoothSensorProvider(source: source, probe: probe)
+
+        provider.setVisible(true)
+        _ = await provider.snapshot()
+        XCTAssertEqual(probe.startedNames, [["缺电量耳机"]], "缺电量设备起探针")
+        XCTAssertEqual(probe.cancelCount, 0)
+
+        provider.setVisible(false)
+        XCTAssertEqual(probe.cancelCount, 1, "闸关即取消在途探针")
     }
 
     func testGattBufferIsCollectedNextCycle() async {

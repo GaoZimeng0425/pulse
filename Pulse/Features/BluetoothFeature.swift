@@ -133,7 +133,8 @@ final class BluetoothFeature: MonitorFeature {
         applyGate()
     }
 
-    /// 闸 = 可见 ∧ 已开启 ∧ 已授权;关闸时 provider 一个源都不碰。
+    /// 闸 = 可见 ∧ 已开启 ∧ 已授权;关闸时 provider 一个源都不碰,在途 GATT 探针
+    /// 随之取消(p2-review/02;关开关 / 不可见 / 授权失效三路都经此)。
     private func applyGate() {
         provider.setVisible(isVisible && accessState == .ready)
     }
