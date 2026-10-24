@@ -73,7 +73,8 @@
   探针(默认真探针)。provider / 功能模块单测一律注入假 / 惰性探针(此前靠"载荷全员带电量"避开真探针)。
   保留 `testLiveHidSmokeOnThisMachine` / `testLiveCacheSmokeOnThisMachine`:只读 IORegistry / 系统
   plist,不碰蓝牙栈与 TCC。
-- check.sh 全绿:766 用例(核心包 409 + app 357)。
+- check.sh 全绿:合入 integ/p2-review 最新 tip(含 04 / 08)后 780 用例(核心包 423 + app 357)。
+  首跑一次 `LiveCoreTickSourceSmokeTests` 静息态口径差 62 > 60 失败(并行子代理构建占满 CPU,与本票无关),重跑全绿。
 - **未验证**:真机目验——关开关后 GATT 扫描是否即停(无宿主接缝,靠代码评审);两副同款耳机同时
   在场时卡面表现。**记档**:级①地址未命中任何锚的候选仍会降级按名匹配(带地址 A 的条目可能挂到
   同名但地址为 B 的锚),属沿用 stats 规则的存量口径,本票未改;provider 逐 tick 复核授权仍待后续。
