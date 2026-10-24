@@ -260,11 +260,18 @@ final class BluetoothSensorProvider: SensorProvider {
         slot.current
     }
 
+    /// 当前是否在采(闸开)。诊断与单测读,不参与采样路径。
+    var isCollecting: Bool {
+        gate.isVisible
+    }
+
     init(source: any BluetoothSource = LiveBluetoothSource()) {
         self.source = source
     }
 
-    /// 可见性切换(弹窗在场 ∨ 主窗口外设页在场,BluetoothFeature 折算下发)。
+    /// 采集闸(BluetoothFeature 折算下发:可见 ∧ 用户已开启 ∧ 系统已授权——三者缺一
+    /// 即关;关闸时 snapshot 一个源都不碰,IOBluetooth / CoreBluetooth 的 TCC 路径
+    /// 完全不被触及)。
     func setVisible(_ visible: Bool) {
         _ = gate.setVisible(visible)
     }
@@ -320,5 +327,93 @@ final class GattBatteryBuffer: @unchecked Sendable {
         let drained = entries
         entries = []
         return drained
+    }
+}
+
+// MARK: - 蓝牙授权(权限原则:默认关 + 用户动作处才弹 + 静默预检 + 被拒不重试)
+
+/// 进程级蓝牙授权态(`CBManagerAuthorization` 的镜像)。IOBluetooth 与 CoreBluetooth
+/// 走同一个 TCC 服务,一个读数覆盖三源。不直接用 CoreBluetooth 类型,是让功能模块
+/// 与单测不依赖蓝牙栈。
+enum BluetoothAuthorization: Equatable, Sendable {
+    case notDetermined
+    case denied
+    case restricted
+    case allowed
+}
+
+/// 蓝牙授权的两个动作必须分清(CODING_STANDARDS「权限 / TCC 纪律」):
+/// - `authorization()` **静默**:只读类属性,不初始化协调器、不弹窗——启动路径、
+///   可见性切换、回前台都可以调;
+/// - `requestAccess` **显式**:全 app 唯一会触发系统蓝牙权限弹窗的调用,只许在用户
+///   动作(设置开关 / 卡片按钮)那一刻调用;系统有答复后回调一次,用户不答复不回调。
+protocol BluetoothAccessControl: Sendable {
+    func authorization() -> BluetoothAuthorization
+    func requestAccess(_ completion: @escaping @Sendable () -> Void)
+}
+
+/// Live 实现:静默读走 `CBCentralManager.authorization` 类属性(NemoNotch 实证:
+/// 不初始化协调器、不弹);显式请求靠建一个 `CBCentralManager`——首次建即弹系统
+/// 权限框,答复落地走 delegate 的状态更新。同时只挂一个请求器,连点不叠加。
+/// `@unchecked Sendable` 前提:唯一可变状态 `pending` 由 `lock` 串行化。
+final class LiveBluetoothAccessControl: BluetoothAccessControl, @unchecked Sendable {
+    private let lock = NSLock()
+    private var pending: BluetoothAccessRequester?
+
+    func authorization() -> BluetoothAuthorization {
+        switch CBCentralManager.authorization {
+        case .notDetermined: .notDetermined
+        case .denied: .denied
+        case .restricted: .restricted
+        case .allowedAlways: .allowed
+        @unknown default: .notDetermined
+        }
+    }
+
+    func requestAccess(_ completion: @escaping @Sendable () -> Void) {
+        lock.lock()
+        guard pending == nil else {
+            lock.unlock()
+            return
+        }
+        let requester = BluetoothAccessRequester { [weak self] in
+            self?.clearPending()
+            completion()
+        }
+        pending = requester
+        lock.unlock()
+        // 锁外启动:协调器的 delegate 回调若与锁段重入会死锁。
+        requester.start()
+    }
+
+    private func clearPending() {
+        lock.lock()
+        defer { lock.unlock() }
+        pending = nil
+    }
+}
+
+/// 一次性请求器:持有协调器直到首个状态更新(= 用户已答复 / 栈状态已知),随即
+/// 释放协调器——不留常驻扫描对象。`@unchecked Sendable` 前提:状态只在主队列
+/// (CBCentralManager queue nil = 主队列)上读写。
+private final class BluetoothAccessRequester: NSObject, CBCentralManagerDelegate, @unchecked Sendable {
+    private var central: CBCentralManager?
+    private var completion: (@Sendable () -> Void)?
+
+    init(completion: @escaping @Sendable () -> Void) {
+        self.completion = completion
+        super.init()
+    }
+
+    /// 这一行就是系统弹窗出现的那一刻(未决时);已授权 / 已拒则只收到状态更新。
+    func start() {
+        central = CBCentralManager(delegate: self, queue: nil)
+    }
+
+    func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        guard let completion else { return }
+        self.completion = nil
+        self.central = nil
+        completion()
     }
 }

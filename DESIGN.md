@@ -176,7 +176,9 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   变化、自己排内距的卡用——总览卡 16/12、指标主卡 20/12)、主卡头 `CardHeader`(22pt 徽章 +
   card-title 指标色)、副卡头 `CardSubHeader`(10pt 指标色符号 + 11 medium 次级标题 +
   10.5 注记)、统计值 `StatValue`、卡内空态 `CardEmptyState`(12.5 medium secondary 一句 +
-  10.5 tertiary 说明,居中)。**新卡一律组装这些零件,不再手写卡壳 / 卡头 / 空态。**
+  10.5 tertiary 说明,居中;可带一个 11pt `.link` 动作——授权型能力卡的开启 / 授权 /
+  去系统设置,与告警横幅降级出口同款,其余空态不配按钮)。**新卡一律组装这些零件,
+  不再手写卡壳 / 卡头 / 空态。**
 
 - **MetricCardView(full)**:徽章 22×22 + 标题 + chevron / 34pt 大数字 + 状态 chip /
   三列统计 / 36pt 高 44 柱 strip 走势——五张卡同形态(用户拍板 2026-10-20:撤 CPU

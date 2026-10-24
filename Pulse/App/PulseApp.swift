@@ -103,12 +103,14 @@ struct PulseApp: App {
                 )) { _ in
                     openWindow(id: MainWindowSceneID.value)
                 }
-                // 回前台同步通知授权现状:用户经「打开系统通知设置」改完切回来,
-                // 降级提示即时更新(常驻标签是全 app 唯一常在的挂点)。
+                // 回前台同步授权现状:用户经「打开系统设置」改完切回来,通知降级提示
+                // 与蓝牙卡态即时更新(常驻标签是全 app 唯一常在的挂点)。蓝牙是静默
+                // 类属性读,不弹窗。
                 .onReceive(NotificationCenter.default.publisher(
                     for: NSApplication.didBecomeActiveNotification
                 )) { _ in
                     Task { await monitor.alerts.syncAuthorizationStatus() }
+                    monitor.bluetooth.refreshAuthorization()
                 }
         }
         .menuBarExtraStyle(.window)

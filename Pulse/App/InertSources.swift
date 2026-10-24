@@ -111,6 +111,20 @@ struct InertBluetoothSource: BluetoothSource {
     }
 }
 
+/// 蓝牙授权:预览 / 测试宿主固定态(默认「已授权」),显式请求即刻回调——
+/// 不碰蓝牙栈,单测不受本机 TCC 状态影响(CODING_STANDARDS 测试纪律)。
+struct InertBluetoothAccessControl: BluetoothAccessControl {
+    var state: BluetoothAuthorization = .allowed
+
+    func authorization() -> BluetoothAuthorization {
+        state
+    }
+
+    func requestAccess(_ completion: @escaping @Sendable () -> Void) {
+        completion()
+    }
+}
+
 /// 声音:预览合成读数(默认设备 + 42% 音量 + 未静音,卡面有形状可验)。
 struct InertSoundSource: SoundSource {
     func read() -> SoundRawReading? {
@@ -277,7 +291,14 @@ extension SystemMonitor {
                 power: PowerFeature(source: InertPowerSource(), chipName: HostInfo.current.chipName ?? ""),
                 smc: SmcFeature(source: InertSmcSource()),
                 sound: SoundFeature(source: InertSoundSource()),
-                bluetooth: BluetoothFeature(source: InertBluetoothSource()),
+                // 预览 / 测试宿主:开关固定开 + 固定已授权,卡面直接呈现设备行;
+                // 不读不写用户 UserDefaults(TestHostIsolation)。
+                bluetooth: BluetoothFeature(
+                    source: InertBluetoothSource(),
+                    access: InertBluetoothAccessControl(),
+                    loadEnabled: { true },
+                    persistEnabled: { _ in }
+                ),
                 containers: ContainerFeature(source: InertContainerSource()),
                 launchdManifest: LaunchdManifestFeature(
                     provider: LaunchdManifestProvider(source: InertLaunchdPlistSource())

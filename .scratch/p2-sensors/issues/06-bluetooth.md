@@ -44,3 +44,19 @@
 - GATT 路真机验证:QC35/MOONDROP 在场且可连时 30s 内出电量;不在场安静
   显示"电量未知"。
 - 弹窗(外设 tab 紧凑档)同形状(前 6 台)。
+
+## Comments(2026-10-24 补记:权限原则纠偏——默认关 + 用户动作处才弹)
+
+用户目验反馈「一直提示蓝牙连接,不符合权限原则」(原则出处 NemoNotch AGENTS.md /
+experience-playbook:「只有用户真正需要并且触发了,才弹」)。本票上线时闸只看可见性
+(弹窗 ∨ 外设页)——点开菜单栏就碰 IOBluetooth/CoreBluetooth,且 ad-hoc 签名每次
+build.sh 装机换 cdhash、TCC 视为陌生 app 重新弹窗,双因叠加成"一直提示"。
+
+纠偏(NemoNotch 2026-10-17 同方案):蓝牙监控**默认关**(settings.bluetoothEnabled
+持久),设置页「外设」开关 + 蓝牙卡按钮是唯一触发源;采集闸 = 可见 ∧ 已开启 ∧ 系统已
+授权;静默预检走 CBCentralManager.authorization 类属性(不初始化协调器、不弹窗),
+启动 / 进场 / 回前台只静默读;被拒只给系统设置深链(Privacy_Bluetooth),绝不自动重试。
+重装后开关仍开而授权未决 → 卡片显示「授权蓝牙」按钮等用户点,启动路径零弹窗。
+8 例 BluetoothFeatureAccessTests 钉死四条路径;原则全文落 CODING_STANDARDS.md
+「权限 / TCC 纪律」。遗留:ad-hoc 签名问题待稳定自签身份(NemoNotch
+make-signing-cert.sh 方案)解决——落地前每次重装后需重新点一次授权。

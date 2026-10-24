@@ -109,10 +109,13 @@ struct StatValue: View {
 }
 
 /// 卡内空态:安静的一句(12.5 medium secondary)+ 可选说明(10.5 tertiary),居中。
-/// 没数据是常态,不报警不催促。
+/// 没数据是常态,不报警不催促。可选一个 `.link` 动作(授权型能力卡的
+/// 开启 / 授权 / 去系统设置,与告警横幅的降级出口同款);没动作就是安静空态。
 struct CardEmptyState: View {
     let title: String
     var detail: String?
+    var actionTitle: String?
+    var action: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 2) {
@@ -123,6 +126,12 @@ struct CardEmptyState: View {
                 Text(detail)
                     .font(.system(size: 10.5))
                     .foregroundStyle(.tertiary)
+            }
+            if let actionTitle, let action {
+                Button(actionTitle, action: action)
+                    .buttonStyle(.link)
+                    .font(.system(size: 11))
+                    .padding(.top, 4)
             }
         }
         .multilineTextAlignment(.center)

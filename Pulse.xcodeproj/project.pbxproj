@@ -133,6 +133,7 @@
 		E4D75C44AC23E2372C3ED09B /* BluetoothCardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84AFAFC8D33B01908457ADE1 /* BluetoothCardViews.swift */; };
 		E51ED75C0AB66949E0707600 /* NettopWatchdogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE62A3533CA867B81B4B903B /* NettopWatchdogTests.swift */; };
 		E559247BAA70D0A1868BD156 /* LiveProcessSourceSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A992F5F503CAD7CB90DD838 /* LiveProcessSourceSmokeTests.swift */; };
+		E5C1415D23B33D5D6F9ADB62 /* BluetoothFeatureAccessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0865C19D0EBD79356196C778 /* BluetoothFeatureAccessTests.swift */; };
 		E714615BB26F05C456D5D362 /* BatteryFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60B90549169579BCCD01677 /* BatteryFeature.swift */; };
 		E9F71EE03BA7B4C44DD8DCC6 /* SmcSensorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C9148F4EC10E000CE96ABA /* SmcSensorTests.swift */; };
 		EE16F89A8CB0C4C60A8E25AF /* ProjectRootsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC33A37E9CAE34AFFF9CA920 /* ProjectRootsStore.swift */; };
@@ -177,6 +178,7 @@
 		06A4CAD37F3D2BE0A494F9DA /* LiveProcessSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveProcessSource.swift; sourceTree = "<group>"; };
 		073B425254E4BAF7B7E3744F /* MenuBarBadgeDisplayModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarBadgeDisplayModel.swift; sourceTree = "<group>"; };
 		07AEB236867D309A37AACDA8 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		0865C19D0EBD79356196C778 /* BluetoothFeatureAccessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothFeatureAccessTests.swift; sourceTree = "<group>"; };
 		09C5195738D18D24F08D8281 /* LogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogService.swift; sourceTree = "<group>"; };
 		0AEE9CD05DD0A6FAA15E6014 /* PulseApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PulseApp.swift; sourceTree = "<group>"; };
 		0B5633EC929F85A22B2BB45E /* BundleDisplayNameReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundleDisplayNameReaderTests.swift; sourceTree = "<group>"; };
@@ -517,6 +519,7 @@
 				78EC09371E86E7408FA32ADC /* AppIconCacheTests.swift */,
 				8D0336878D6164F8E0FA0FCD /* BatterySensorTests.swift */,
 				B861A747FF3BF8E186AD5FFB /* BirthScannerTests.swift */,
+				0865C19D0EBD79356196C778 /* BluetoothFeatureAccessTests.swift */,
 				4A3A11CA7FAC45ECB8511C5B /* BluetoothSensorTests.swift */,
 				0B5633EC929F85A22B2BB45E /* BundleDisplayNameReaderTests.swift */,
 				8576B450296CE59084093EDC /* ContainerSensorTests.swift */,
@@ -671,6 +674,7 @@
 				AA6920C6B25E30AC0A50495C /* BatteryFixture.swift in Sources */,
 				9E646AB14BF339B36602F1B8 /* BatterySensorTests.swift in Sources */,
 				46DBB21B089E14C2B6E39036 /* BirthScannerTests.swift in Sources */,
+				E5C1415D23B33D5D6F9ADB62 /* BluetoothFeatureAccessTests.swift in Sources */,
 				5E918F632298B152858E0461 /* BluetoothSensorTests.swift in Sources */,
 				1A6FBBAA8FFC5AB748E47788 /* BundleDisplayNameReaderTests.swift in Sources */,
 				5B9A85A61547AE07B7BA4924 /* ContainerSensorTests.swift in Sources */,

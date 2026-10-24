@@ -45,6 +45,17 @@ struct GeneralSettingsView: View {
                     approvalHint
                 }
             }
+            // 授权型能力默认关、开关是唯一触发源(权限原则,CODING_STANDARDS
+            // 「权限 / TCC 纪律」):开的那一刻才可能弹系统蓝牙权限框。
+            Section("外设") {
+                Toggle("蓝牙外设监控", isOn: Binding(
+                    get: { monitor.bluetooth.isEnabled },
+                    set: { monitor.bluetooth.setEnabled($0) }
+                ))
+                Text("读取已配对设备的连接状态与电量。开启时请求一次蓝牙权限,只在你操作时弹出;关闭则完全不读取蓝牙。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Section("诊断") {
                 LabeledContent("文件日志") {
                     Button("打开日志文件夹") { openLogsFolder() }
