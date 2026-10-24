@@ -7,12 +7,13 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] ① 最快风扇派生值
-- [ ] ② 弹窗传感器 tab 只放派生值
-- [ ] ③ 风扇进度条 (rpm−min)/(max−min)
-- [ ] check.sh 全绿;关两窗指纹全零
+- [x] ① 最快风扇派生值
+- [x] ② 弹窗传感器 tab 只放派生值
+- [x] ③ 风扇进度条 (rpm−min)/(max−min)
+- [x] check.sh 全绿
+- [ ] 关两窗指纹全零(未跑,待真机——见执行记录)
 
 ## Agent Brief
 
@@ -46,3 +47,29 @@
 
 **范围边界**:不改 SMC 采集、坏值防御与命名表;不碰 `p2-review/03` ③ 的字体/令牌批量修正(本票只
 保证新写的代码合规);历史不加风扇量。
+
+## Comments
+
+### 执行记录(2026-10-24)
+
+- **① 最快风扇**:`SmcReading.fastestFan`(`SmcModel.swift`)由 `fans` 现算——派生值单一出处,
+  不存进 `SmcDerivedTemps`,故该类型仍名副其实(只装温度),未改名。转速最高者,并列取序号小;
+  `fans` 空(无风扇 / F?Ac 全读不到)→ nil;全停转交 rpm 0 的风扇。
+- **③ 归一**:`SmcFanReading.speedFraction` = (rpm−min)/(max−min) 钳 0…1;`hasSpeedRange`
+  (max > min)不成立 → 空条(不退回 rpm/max 猜比例:min/max 谁坏无从判断,且免 0/0)。
+  视图删掉 `SmcFansCardView.fraction`。
+- **测试**(`SmcModelTests`,合成载荷 +7):最快风扇多扇取最大 / 单扇 / 无扇 nil(含 FNum 在但
+  F?Ac 全缺)/ 全停转;归一最低速 0、中点 0.5、满速 1、停转 0、越上限钳 1、max≤min 与缺上限 → 0。
+- **② 视图**:`MetricTabStack` `.sensors` 弹窗只画派生卡,主窗口不变;文件头与分支注释写明
+  拍板例外出处。派生卡加「最快风扇」行(两档都显示;多扇时数值带扇名「名 · 3200 rpm」)。
+  风扇卡上下限:全部相同 → 卡头注记一次,否则逐扇行下 10.5 tertiary;rpm 0 显示「停转」。
+  `SmcCardViews.swift` 补三组 `#Preview`(builder 合成载荷)。
+- **DESIGN.md**:§Components「主窗口 / 弹窗同内容」补传感器 tab 拍板例外;新增「传感器卡文案与
+  风扇条」一条(停转 / — 文案、归一口径、上下限标注规则)。无新数值令牌(新文字用 micro 10.5)。
+- **未改**:派生卡温度行与风扇卡既有 `.monospaced` 字体(属 p2-review/03 ③ 批量收编)。
+- **check.sh**:全绿,用例 768(核心 411 + app 357)。
+- **未验证**:弹窗 / 主窗口外观需真机目验(派生卡多扇时数值列变宽、meter 变短是否可接受);
+  关两窗 15s `sample` 指纹未跑(本票只改卡片组成,不碰门控 / 采集)。
+- **顺记**:新 worktree 首次提交时 pre-commit 构建门禁报 SPM「Couldn't check out revision」,
+  手动 `xcodebuild -resolvePackageDependencies -derivedDataPath build` 后即过(疑 hook 内 GIT_* 环境
+  变量干扰 SPM 的 git 检出)。

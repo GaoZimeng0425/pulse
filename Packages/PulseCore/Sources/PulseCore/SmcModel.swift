@@ -117,9 +117,14 @@ public struct SmcFanReading: Equatable, Identifiable, Sendable {
     /// 不退回 rpm/max 猜比例(min 坏还是 max 坏无从判断),也免得除以 0 出 NaN/∞;
     /// 转速数字照常显示,读数不丢。
     public var speedFraction: Double {
-        guard maxRpm > minRpm else { return 0 }
+        guard hasSpeedRange else { return 0 }
         let raw = Double(rpm - minRpm) / Double(maxRpm - minRpm)
         return min(max(raw, 0), 1)
+    }
+
+    /// 上下限可用作标尺(max > min);UI 据此决定是否标出上下限,与归一同一口径。
+    public var hasSpeedRange: Bool {
+        maxRpm > minRpm
     }
 }
 
