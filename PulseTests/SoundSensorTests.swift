@@ -2,8 +2,9 @@
 @testable import PulseCore
 import XCTest
 
-// 声音传感器测试(p2-sensors/05):provider 行为用假源(零 CoreAudio 依赖),
-// Live 源只做"本机真读一次不崩 + 结构健全"冒烟(既有 Live 适配器测试同款纪律)。
+// 声音传感器测试(p2-sensors/05):provider 行为用假源(零 CoreAudio 依赖)。
+// Live 冒烟已移出单测目标(p2-review/02;测试纪律:音频栈不进单测)——系统级
+// 健康由 CLI 探针背书,手动核对走真 app 目验。
 
 /// 假声音源:固定载荷开关(测 lastGood 语义)。
 private final class FakeSoundSource: SoundSource, @unchecked Sendable {
@@ -55,17 +56,5 @@ final class SoundSensorTests: XCTestCase {
             wakes += 1
         }
         XCTAssertEqual(wakes, 2, "首唤醒 + 一次属性变化")
-    }
-
-    func testLiveSmokeOnThisMachine() {
-        // Live 冒烟:本机真读一次不崩;有默认输出设备时结构健全
-        // (折算与钳位在核心包,这里只验原始载荷量级)。
-        let reading = LiveSoundSource().read()
-        if let scalar = reading?.volumeScalar {
-            XCTAssertTrue(scalar >= -0.01 && scalar <= 1.01, "原始音量标量量级异常:\(scalar)")
-        }
-        if let name = reading?.deviceName {
-            XCTAssertFalse(name.isEmpty, "设备名读到但为空串")
-        }
     }
 }

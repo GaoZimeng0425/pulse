@@ -43,14 +43,16 @@ final class BluetoothFeature: MonitorFeature {
     /// 最近一次可见性折算(弹窗 ∨ 外设页)。
     private var isVisible = false
 
-    /// 注入构造(测试 / 预览):开关读写闭包 + 授权控制(AlertSettingsStore 同款注入口)。
+    /// 注入构造(测试 / 预览):开关读写闭包 + 授权控制(AlertSettingsStore 同款注入口);
+    /// 预览 / 测试宿主另注入惰性 GATT 探针(`BluetoothFeature.inert()`),不转蓝牙栈。
     init(
         source: any BluetoothSource,
         access: any BluetoothAccessControl,
+        probe: any GattBatteryProbing = GattBatteryProbe(),
         loadEnabled: () -> Bool,
         persistEnabled: @escaping (Bool) -> Void
     ) {
-        provider = BluetoothSensorProvider(source: source)
+        provider = BluetoothSensorProvider(source: source, probe: probe)
         self.access = access
         self.persistEnabled = persistEnabled
         isEnabled = loadEnabled()
