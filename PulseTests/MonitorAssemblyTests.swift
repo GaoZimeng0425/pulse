@@ -27,7 +27,9 @@ final class MonitorAssemblyTests: XCTestCase {
             power: PowerFeature(source: InertPowerSource(), chipName: ""),
             smc: SmcFeature(source: InertSmcSource()),
             sound: SoundFeature(source: InertSoundSource()),
-            bluetooth: BluetoothFeature(source: InertBluetoothSource()),
+            // 惰性构造:不走 Live 授权控制 + UserDefaults.standard 的生产便利构造器
+            // (p2-review/02;测试宿主不读不写用户偏好)。
+            bluetooth: .inert(),
             containers: ContainerFeature(source: InertContainerSource()),
             launchdManifest: LaunchdManifestFeature(
                 provider: LaunchdManifestProvider(source: InertLaunchdPlistSource())

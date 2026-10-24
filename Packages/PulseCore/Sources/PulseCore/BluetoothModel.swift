@@ -162,12 +162,13 @@ public struct BluetoothReading: Equatable, Sendable {
 
 /// 三源合并器:锚 = 已配对设备(按规整地址去重,同址重复行是 IOBluetooth 的
 /// 已知行为);电量条目经**三级匹配**挂锚——规整地址 → 唯一名 → 唯一
-/// 厂商/产品 ID;任一级出现多候选(歧义)即弃,不给错电量。同一设备多源
-/// 命中时按 hid > cache > gatt 取(探针实证 HID 是内核活值最可信;cache 可能
-/// 陈旧;gatt 需在场)。挂不上锚的电量条目单独成行(连接态未知)。
+/// 厂商/产品 ID;任一级锚侧或同源候选侧出现多候选(歧义)即弃,不给错电量,
+/// 歧义候选也不单独成行。同一设备多源命中时按 hid > cache > gatt 取(探针实证
+/// HID 是内核活值最可信;cache 可能陈旧;gatt 需在场)。挂不上锚、身份明确的
+/// 电量条目单独成行(连接态未知)。
 public enum BluetoothMerge {
     /// 统一折叠后的电量候选(三源条目去掉来源差异的中间形)。
-    private struct Candidate: Sendable {
+    private struct Candidate: Equatable, Sendable {
         var percent: Int
         var source: BluetoothBatterySource
         var name: String?
@@ -241,31 +242,19 @@ public enum BluetoothMerge {
                 )
             }
 
-        // 三级匹配:每条电量候选找至多一个锚;歧义即弃(该锚本轮不带此源的电量)。
-        var attached: [String: Candidate] = [:] // 键 = 锚 key
-        var unmatched: [Candidate] = []
-        for candidate in candidates {
-            if let key = matchAnchor(candidate, anchors: anchors) {
-                // 同锚多源:hid > cache > gatt(来源序即优先级)。
-                if let existing = attached[key] {
-                    let newcomerWins = rank(candidate.source) > rank(existing.source)
-                        // 同级再比新鲜度:后到的同级样本(如新读的 gatt)覆盖旧的。
-                        || rank(candidate.source) == rank(existing.source)
-                    if newcomerWins {
-                        attached[key] = candidate
-                    }
-                } else {
-                    attached[key] = candidate
-                }
-            } else {
-                unmatched.append(candidate)
+        // 同源完全相同的样本 = 同一读数重复上报(如同一设备两次 GATT 交付),先折叠;
+        // 余下同源同键的才是真歧义(读数不同,不知道哪条是谁的)。
+        let distinct = candidates.reduce(into: [Candidate]()) { kept, candidate in
+            if !kept.contains(candidate) {
+                kept.append(candidate)
             }
         }
+        let resolution = resolve(distinct, anchors: anchors)
 
         // 锚行:电量挂上即带;RSSI 哨兵(≥0,含 127 与 0)归 nil。
         var rows = order.map { key -> BluetoothDeviceRow in
             let anchor = anchors[key]!
-            let battery = attached[key]
+            let battery = resolution.attached[key]
             return BluetoothDeviceRow(
                 name: anchor.name ?? battery?.name ?? "未知设备",
                 address: anchor.address,
@@ -276,24 +265,7 @@ public enum BluetoothMerge {
                 rssi: anchor.rawRSSI < 0 ? anchor.rawRSSI : nil
             )
         }
-
-        // 无锚电量行:按规整地址/名字自去重后追加(连接态未知)。
-        var seenUnmatched = Set<String>()
-        for candidate in unmatched {
-            let key = candidate.normalizedAddress ?? (candidate.name ?? UUID().uuidString)
-            guard seenUnmatched.insert(key).inserted else { continue }
-            rows.append(
-                BluetoothDeviceRow(
-                    name: candidate.name ?? "未知设备",
-                    address: nil,
-                    normalizedAddress: candidate.normalizedAddress,
-                    isConnected: false,
-                    batteryPercent: candidate.percent,
-                    batterySource: candidate.source,
-                    rssi: nil
-                )
-            )
-        }
+        rows += unanchoredRows(resolution.unmatched)
 
         // 行序:已连接置顶,其余按名稳定排。
         rows.sort { lhs, rhs in
@@ -317,38 +289,107 @@ public enum BluetoothMerge {
         return BluetoothReading(devices: rows)
     }
 
-    /// 三级匹配:① 规整地址相等 → ② 名字两侧均唯一且相等 → ③ 厂商/产品 ID
-    /// 两侧均唯一且相等;任何一级多候选 = 歧义即弃(返回 nil,条目走无锚池)。
+    /// 一轮匹配结果:锚 key → 挂上的电量;无锚池 = 挂不上锚且身份不歧义的候选。
+    /// 歧义候选两边都不进——直接弃(spec Story 11「歧义即弃」)。
+    private struct Resolution {
+        var attached: [String: Candidate]
+        var unmatched: [Candidate]
+    }
+
+    private enum Match {
+        case anchor(String)
+        case unmatched
+        case ambiguous
+    }
+
+    /// 逐条匹配后收口:同一锚被**同源** ≥2 条候选命中 = 歧义,该源对此锚全部弃挂
+    /// (不再"同级后到者胜");跨源同锚是同一设备的多源读数,按 hid > cache > gatt 取。
+    private static func resolve(
+        _ candidates: [Candidate],
+        anchors: [String: PairedDeviceStatus]
+    ) -> Resolution {
+        var hits: [String: [Candidate]] = [:] // 锚 key → 命中它的候选
+        var unmatched: [Candidate] = []
+        for candidate in candidates {
+            let peers = candidates.filter { $0.source == candidate.source }
+            switch matchAnchor(candidate, peers: peers, anchors: anchors) {
+            case let .anchor(key): hits[key, default: []].append(candidate)
+            case .unmatched: unmatched.append(candidate)
+            case .ambiguous: continue
+            }
+        }
+        let attached = hits.compactMapValues { contenders -> Candidate? in
+            Dictionary(grouping: contenders, by: \.source).values
+                .filter { $0.count == 1 }
+                .compactMap(\.first)
+                .max { rank($0.source) < rank($1.source) }
+        }
+        return Resolution(attached: attached, unmatched: unmatched)
+    }
+
+    /// 三级匹配,两侧都判唯一:① 规整地址相等 → ② 名字锚侧唯一且同源候选里唯一
+    /// → ③ 厂商/产品 ID 同理。某级在锚侧有命中却不唯一(任一侧 ≥2)= 歧义,直接弃,
+    /// 不降级试下一级;锚侧零命中才降级。「候选侧」= 同一源的本轮候选(跨源同名是
+    /// 同一设备的多源读数,不算歧义)。地址级不判候选侧:地址即身份,同址多读数由
+    /// `resolve` 的同锚同源规则弃。
     private static func matchAnchor(
         _ candidate: Candidate,
+        peers: [Candidate],
         anchors: [String: PairedDeviceStatus]
-    ) -> String? {
-        // 级①:地址。
-        if let address = candidate.normalizedAddress, !address.isEmpty {
-            let hits = anchors.filter { normalizeAddress($0.value.address ?? "") == address }
-            if hits.count == 1 {
-                return hits.first?.key
+    ) -> Match {
+        // 级①:地址(normalizedAddress 非 nil 即非空,见 normalizeAddress)。
+        if let address = candidate.normalizedAddress {
+            let keys = anchors.filter { normalizeAddress($0.value.address ?? "") == address }.map(\.key)
+            if !keys.isEmpty {
+                return keys.count == 1 ? .anchor(keys[0]) : .ambiguous
             }
-            if hits.count > 1 {
-                return nil
-            } // 歧义即弃
         }
-        // 级②:名(两侧各自唯一)。
+        // 级②:名。
         if let name = candidate.name, !name.isEmpty {
-            let anchorNames = anchors.values.compactMap(\.name)
-            let nameUniqueOnAnchorSide = anchorNames.filter { $0 == name }.count == 1
-            if nameUniqueOnAnchorSide {
-                return anchors.first { $0.value.name == name }?.key
+            let keys = anchors.filter { $0.value.name == name }.map(\.key)
+            if !keys.isEmpty {
+                let unique = keys.count == 1 && peers.filter { $0.name == name }.count == 1
+                return unique ? .anchor(keys[0]) : .ambiguous
             }
         }
-        // 级③:厂商/产品 ID(候选侧与锚侧都唯一)。
+        // 级③:厂商/产品 ID。
         if let vendorID = candidate.vendorID, let productID = candidate.productID {
-            let hits = anchors.filter { $0.value.vendorID == vendorID && $0.value.productID == productID }
-            if hits.count == 1 {
-                return hits.first?.key
+            let sameIDs: (Int?, Int?) -> Bool = { $0 == vendorID && $1 == productID }
+            let keys = anchors.filter { sameIDs($0.value.vendorID, $0.value.productID) }.map(\.key)
+            if !keys.isEmpty {
+                let unique = keys.count == 1 && peers.filter { sameIDs($0.vendorID, $0.productID) }.count == 1
+                return unique ? .anchor(keys[0]) : .ambiguous
             }
         }
-        return nil
+        return .unmatched
+    }
+
+    /// 无锚池口径:挂不上锚、身份明确的电量条目才单独成行(连接态未知)。池键 =
+    /// 规整地址,无址按名;同源同池键 ≥2 条(读数不同)= 不知道哪个读数是哪台 →
+    /// 全部弃,**也不以无电量行出现**——无锚行存在的唯一意义是展示电量,去掉电量
+    /// 只剩无连接态、无 RSSI 的名字;已配对的设备另有锚行,不缺这一行。跨源同池键
+    /// 按候选序(hid > cache > gatt)取首。
+    private static func unanchoredRows(_ pool: [Candidate]) -> [BluetoothDeviceRow] {
+        let keyed = pool.map { (key: $0.normalizedAddress ?? ($0.name ?? UUID().uuidString), candidate: $0) }
+        let sameSourceCounts = Dictionary(
+            keyed.map { ("\($0.candidate.source.rawValue)|\($0.key)", 1) },
+            uniquingKeysWith: +
+        )
+        var seen = Set<String>()
+        return keyed.compactMap { key, candidate -> BluetoothDeviceRow? in
+            guard sameSourceCounts["\(candidate.source.rawValue)|\(key)"] == 1,
+                  seen.insert(key).inserted
+            else { return nil }
+            return BluetoothDeviceRow(
+                name: candidate.name ?? "未知设备",
+                address: nil,
+                normalizedAddress: candidate.normalizedAddress,
+                isConnected: false,
+                batteryPercent: candidate.percent,
+                batterySource: candidate.source,
+                rssi: nil
+            )
+        }
     }
 
     /// 来源优先级:hid(内核活值)> cache(免权限快照)> gatt(需在场建连)。

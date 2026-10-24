@@ -125,6 +125,29 @@ struct InertBluetoothAccessControl: BluetoothAccessControl {
     }
 }
 
+/// GATT 探针:预览 / 测试宿主不建连——预览载荷里有缺电量设备(Hack59-2),
+/// 用真探针一开闸就会起 CoreBluetooth 扫描(p2-review/02)。
+struct InertGattBatteryProbe: GattBatteryProbing {
+    func start(wanting _: [String], deliver _: @escaping @Sendable (GattBatteryEntry) -> Void) {}
+
+    func cancel() {}
+}
+
+extension BluetoothFeature {
+    /// 惰性构造(预览 / 测试宿主):合成源 + 固定已授权 + 惰性探针 + 开关固定开、
+    /// 不读不写用户 UserDefaults(TestHostIsolation)——卡面直接呈现设备行,全程
+    /// 不碰 IOBluetooth / CoreBluetooth / TCC。
+    static func inert() -> BluetoothFeature {
+        BluetoothFeature(
+            source: InertBluetoothSource(),
+            access: InertBluetoothAccessControl(),
+            probe: InertGattBatteryProbe(),
+            loadEnabled: { true },
+            persistEnabled: { _ in }
+        )
+    }
+}
+
 /// 声音:预览合成读数(默认设备 + 42% 音量 + 未静音,卡面有形状可验)。
 struct InertSoundSource: SoundSource {
     func read() -> SoundRawReading? {
@@ -291,14 +314,7 @@ extension SystemMonitor {
                 power: PowerFeature(source: InertPowerSource(), chipName: HostInfo.current.chipName ?? ""),
                 smc: SmcFeature(source: InertSmcSource()),
                 sound: SoundFeature(source: InertSoundSource()),
-                // 预览 / 测试宿主:开关固定开 + 固定已授权,卡面直接呈现设备行;
-                // 不读不写用户 UserDefaults(TestHostIsolation)。
-                bluetooth: BluetoothFeature(
-                    source: InertBluetoothSource(),
-                    access: InertBluetoothAccessControl(),
-                    loadEnabled: { true },
-                    persistEnabled: { _ in }
-                ),
+                bluetooth: .inert(),
                 containers: ContainerFeature(source: InertContainerSource()),
                 launchdManifest: LaunchdManifestFeature(
                     provider: LaunchdManifestProvider(source: InertLaunchdPlistSource())
