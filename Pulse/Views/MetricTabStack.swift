@@ -128,21 +128,36 @@ struct MetricTabStack<Ranking: View>: View {
 
     /// 总览模块卡网格(用户拍板 2026-10-17:全部模块一屏可点,点卡跳对应 tab);
     /// 电池卡随有无内建电池。卡间距 full 16 / compact 8(DESIGN.md §Components)。
+    /// 主窗口列数**自适应 1–4**(用户拍板 2026-10-24):列数 = 内容宽容纳的最多列,
+    /// 单卡最小宽 340(DESIGN.md `layout.overview-card-min-width`)——720 最小窗宽
+    /// 下 1 列、744 起两列、约 1104 三列、约 1456 四列,再宽也不超过 4 列;
+    /// 弹窗定宽 360 固定 2 列。
+    @ViewBuilder
     private var overviewGrid: some View {
-        let spacing: CGFloat = isCompact ? 8 : 16
         let style: MetricCardView.Style = isCompact ? .compact : .full
-        return LazyVGrid(
-            columns: [GridItem(.flexible(), spacing: spacing), GridItem(.flexible())],
-            spacing: spacing
-        ) {
-            MetricCardView(model: model.cpuModel, style: style) { onSelectTab(.cpu) }
-            MetricCardView(model: model.memoryModel, style: style) { onSelectTab(.memory) }
-            MetricCardView(model: model.gpuModel, style: style) { onSelectTab(.gpu) }
-            MetricCardView(model: model.diskModel, style: style) { onSelectTab(.disk) }
-            MetricCardView(model: model.networkModel, style: style) { onSelectTab(.network) }
-            if monitor.battery.hasBattery {
-                MetricCardView(model: model.batteryModel, style: style) { onSelectTab(.battery) }
+        if isCompact {
+            LazyVGrid(
+                columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)],
+                spacing: 8
+            ) {
+                overviewCards(style: style)
             }
+        } else {
+            AdaptiveCardGrid {
+                overviewCards(style: style)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func overviewCards(style: MetricCardView.Style) -> some View {
+        MetricCardView(model: model.cpuModel, style: style) { onSelectTab(.cpu) }
+        MetricCardView(model: model.memoryModel, style: style) { onSelectTab(.memory) }
+        MetricCardView(model: model.gpuModel, style: style) { onSelectTab(.gpu) }
+        MetricCardView(model: model.diskModel, style: style) { onSelectTab(.disk) }
+        MetricCardView(model: model.networkModel, style: style) { onSelectTab(.network) }
+        if monitor.battery.hasBattery {
+            MetricCardView(model: model.batteryModel, style: style) { onSelectTab(.battery) }
         }
     }
 
@@ -170,6 +185,45 @@ struct MetricTabStack<Ranking: View>: View {
         if !isCompact {
             SectionTitle(title: title)
                 .padding(.top, 6)
+        }
+    }
+}
+
+/// 自适应网格的常量(泛型 struct 不支持 static 存储属性,独立枚举承载)。
+private enum AdaptiveCardGridMetrics {
+    /// 单卡最小宽(DESIGN.md `layout.overview-card-min-width`)。
+    static let minimumCardWidth: CGFloat = 340
+    static let spacing: CGFloat = 16
+    static let maximumColumns = 4
+}
+
+/// 自适应列数的卡片网格(总览用,用户拍板 2026-10-24:列数 1–4 随窗宽):
+/// 列数 = 内容宽容纳的最多列(单卡最小宽 340 + 列距 16),夹在 1…4——
+/// 比系统的 `.adaptive` 多一个**上限**(ultrawide 不出第 5 列)。宽度经
+/// `onGeometryChange` 读取,只在跨档时改状态,拖拽缩放不逐帧重排。
+private struct AdaptiveCardGrid<Card: View>: View {
+    /// 初值取默认窗宽(880)的档位,首帧即正确;onGeometryChange 随后按实测纠正。
+    @State private var columnCount = 2
+    @ViewBuilder let cards: () -> Card
+
+    var body: some View {
+        LazyVGrid(
+            columns: Array(
+                repeating: GridItem(.flexible(), spacing: AdaptiveCardGridMetrics.spacing),
+                count: columnCount
+            ),
+            spacing: AdaptiveCardGridMetrics.spacing
+        ) {
+            cards()
+        }
+        .onGeometryChange(for: Int.self) { proxy in
+            let perColumn = AdaptiveCardGridMetrics.minimumCardWidth + AdaptiveCardGridMetrics.spacing
+            let fitted = Int((proxy.size.width + AdaptiveCardGridMetrics.spacing) / perColumn)
+            return min(AdaptiveCardGridMetrics.maximumColumns, max(1, fitted))
+        } action: { newValue in
+            if newValue != columnCount {
+                columnCount = newValue
+            }
         }
     }
 }

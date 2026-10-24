@@ -147,9 +147,12 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{spacing.card-padding-compact}` | 12pt | 弹窗紧凑卡内距 |
 | `{spacing.card-gap}` | 16pt | 卡片网格的卡间 |
 | `{spacing.window-padding}` | 24pt | 主窗口内容左右/底部边距 |
+| `{layout.overview-card-min-width}` | 340pt | 总览卡自适应网格的单卡最小宽(主窗口列数 1–4 由它派生:列数 = 内容宽容纳的最多列,340 + 列距 16,上限 4) |
 
 窗口:主窗口最小 **720×560**(spec 钉死),默认 880×620;弹窗定宽 **360pt**
 (`DashboardView.width`)。工具栏内容必须按 720 最小窗宽预算(见 §Do's and Don'ts)。
+主窗口总览网格是**响应式**的(用户拍板 2026-10-24):列数随窗宽自适应 1–4
+(720 最小宽下 1 列、744 起两列、约 1104 三列、约 1456 四列;`AdaptiveCardGrid`)。
 
 ## Elevation & Depth
 
@@ -183,8 +186,10 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 - **MetricCardView(full)**:徽章 22×22 + 标题 + chevron / 34pt 大数字 + 状态 chip /
   三列统计 / 36pt 高 44 柱 strip 走势——五张卡同形态(用户拍板 2026-10-20:撤 CPU
   面积线特例,不再特殊化)。
-- **总览模块卡网格**(用户拍板 2026-10-17):CPU/内存/磁盘/网络/电池五卡 2 列
-  (电池卡随有无内建电池),点卡跳对应 tab;主窗口 full 卡间距 16,弹窗 compact 卡间距 8。
+- **总览模块卡网格**(用户拍板 2026-10-17;列数 2026-10-24 改自适应):CPU/内存/
+  GPU/磁盘/网络/电池六卡(电池卡随有无内建电池),点卡跳对应 tab;主窗口列数
+  **自适应 1–4**(单卡最小宽 `{layout.overview-card-min-width}` 340,卡间距 16),
+  弹窗 compact 定宽 360 固定 2 列、间距 8。
 - **MetricMainCardView**:左列 200pt(标签 / 44pt 数字 / chip / 2×2 统计)+
   右列 56 点面积图,卡高 176pt。compact(弹窗)竖排:数字行 / 64pt 面积图 / 四列统计;
   底部走势组件 full / compact 同一(用户拍板:同一指标两处读数同观感)。
