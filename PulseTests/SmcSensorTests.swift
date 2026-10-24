@@ -16,7 +16,43 @@ private final class FakeSmcSource: SmcSource, @unchecked Sendable {
     }
 }
 
+/// 并发探针源(p2-review/01 ①):每次读经 ReentryProbe(真源的发现缓存与
+/// io_connect 若被并发进入,峰值 > 1)。
+private final class ConcurrencyProbeSmcSource: SmcSource, @unchecked Sendable {
+    let probe = ReentryProbe()
+
+    func read() -> SmcSnapshot? {
+        probe.measure { ordinal in
+            SmcSnapshot(
+                keys: [SmcRawKey(key: "Tp01", dataType: "sp78", bytes: [45, 0])],
+                takenAt: Date(timeIntervalSince1970: Double(ordinal))
+            )
+        }
+    }
+}
+
 final class SmcSensorTests: XCTestCase {
+    func testConcurrentTiersNeverReadSourceConcurrently() async {
+        // 审计②补全(p2-review/01 ①):5s UI 档与 30s 历史档并发 tick 时,源不得
+        // 被并发进入——读源与坏值沿用链折算同在一个锁段。
+        let source = ConcurrencyProbeSmcSource()
+        let provider = SmcSensorProvider(source: source)
+        provider.setVisible(true)
+
+        await withTaskGroup(of: Void.self) { group in
+            for index in 0 ..< 8 {
+                group.addTask {
+                    if index.isMultiple(of: 2) {
+                        _ = await provider.snapshot()
+                    } else {
+                        _ = await provider.historySnapshot()
+                    }
+                }
+            }
+        }
+        XCTAssertEqual(source.probe.peakInFlight, 1)
+    }
+
     private func sp78(_ value: Double) -> [UInt8] {
         let scaled = Int(value * 256)
         return [UInt8((scaled >> 8) & 0xFF), UInt8(scaled & 0xFF)]

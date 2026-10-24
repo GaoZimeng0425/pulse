@@ -6,13 +6,13 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] ① 双档竞态止血
-- [ ] ② 电池功率冻结
-- [ ] ③ 首读/断档轮不入历史、不进走势
-- [ ] ④ 伪造 0 归 nil
-- [ ] check.sh 全绿;关两窗指纹全零
+- [x] ① 双档竞态止血
+- [x] ② 电池功率冻结
+- [x] ③ 首读/断档轮不入历史、不进走势(方案改 B:基线轮不交读数,见 Comments)
+- [x] ④ 伪造 0 归 nil
+- [x] check.sh 全绿("关两窗指纹全零"需真机目验,未验)
 
 ## Agent Brief
 
@@ -58,3 +58,23 @@
 - 测试:合成缺 `system_cpu_usage` 的 stats 载荷 → cpuPercent nil;ANE 通道缺席的功率读数 → 百分比 nil。
 
 **范围边界**:不重构调度(归 06)、不改可见性闸(归 05)、不动历史 schema。
+
+## Comments
+
+**执行记录(2026-10-24)**:
+- ① Energy/SMC provider 读源与折算同进 stateLock 锁段(`readAndFoldLocked`);共享重入探针
+  `PulseTests/ReentryProbe.swift` 两档 8 并发 tick——修前峰值 8、修后 1;变异检查(把读源挪回
+  锁外)确认测试会红。源侧三处 `@unchecked Sendable` 注释(LiveEnergyModelSource / LiveSmcSource /
+  SmcClient)改为指向 provider 锁的真实前提;锁注释写明撞车等待的代价。
+- ③ **用户拍板 B**(替代 Brief 的"基线轮字段"方案):`PowerAccumulator.record` 首读 / 断档 /
+  乱序(时差 ≤0)轮只记基线、返回 nil;provider 按读失败处理(lastGood 不动),历史档不广播、
+  走势不追加,界面首读显示占位。与 `NettopSource` 差分器首轮口径一致。同步回写
+  `CODING_STANDARDS.md` 差分三防御(存量偏差登记 DiskModel / NetworkModel / NetworkFeature)、
+  `GLOSSARY.md`「五路功率」、spec Story 5 及实现/测试决策两行。
+- ② `SmcReading.freshBatteryPowerWatts(asOf:)`:PPBR 只在 15s 新鲜窗(3×5s UI 档,与
+  `gaugeMaxAge` 同口径)内覆盖,过窗回退 V×A。**未钉住**:`DashboardModel.batteryModel` 的接线
+  (DashboardModel 无测试接缝);它靠视图重绘重新判窗,电池页每 5s 的重绘来自同栈的能耗排行观察
+  (附带而非设计,改布局时留意)。
+- ④ ANE 缺席百分比 nil、走势不追加;容器 stats CPU 字段缺失或 Δsystem ≤0(docker 侧首读)→ nil,
+  用量负差(回绕)仍钳 0%。
+- check.sh 全绿(见合并提交)。

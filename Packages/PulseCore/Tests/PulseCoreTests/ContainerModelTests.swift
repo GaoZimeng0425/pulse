@@ -90,15 +90,17 @@ final class ContainerModelTests: XCTestCase {
         XCTAssertEqual(stats?.memoryBytes, 512 * 1024 * 1024)
     }
 
-    func testZeroOrNegativeSystemDeltaYieldsZeroPercent() {
-        // 首读/回绕:Δsystem ≤ 0 → 0%(docker stats 同款安静口径),内存照常。
+    func testZeroOrNegativeSystemDeltaYieldsNoCpuReading() {
+        // Δsystem ≤ 0(docker 侧首读,precpu 无基线):没有差分就没有 CPU% → nil 占位,
+        // 不出假 0%(CODING_STANDARDS 差分三防御,p2-review/01);内存照常。
         let body = statsBody(
             total: 100, preTotal: 50,
             system: 500, preSystem: 500, // Δsystem = 0
             onlineCPUs: 2, memory: 1024
         )
         let stats = ContainerStatsPayload.parse(body)
-        XCTAssertEqual(stats?.cpuPercent, 0)
+        XCTAssertNotNil(stats)
+        XCTAssertNil(stats?.cpuPercent)
         XCTAssertEqual(stats?.memoryBytes, 1024)
     }
 
@@ -115,8 +117,11 @@ final class ContainerModelTests: XCTestCase {
     }
 
     func testMissingStatsFieldsDegradeQuietly() {
+        // CPU 四字段缺失 = 读不到 → nil 占位,不伪造 0%(p2-review/01 ④;
+        // 区别于 Δsystem ≤ 0 / 回绕的"安静 0%"——那是有读数、口径钳 0)。
         let stats = ContainerStatsPayload.parse(Array(#"{"cpu_stats": {}}"#.utf8))
-        XCTAssertEqual(stats?.cpuPercent, 0)
+        XCTAssertNotNil(stats, "载荷可解析,行照出")
+        XCTAssertNil(stats?.cpuPercent, "CPU 读不到 = nil,不折叠成 0")
         XCTAssertNil(stats?.memoryBytes, "内存读不到 = nil,不折叠成 0(审计⑤)")
         XCTAssertNil(ContainerStatsPayload.parse(Array("garbage".utf8)))
     }

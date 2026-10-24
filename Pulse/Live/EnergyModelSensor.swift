@@ -59,8 +59,9 @@ private func cfDictionaryCreateMutableCopy(
 /// Darwin 薄适配器:持有 "Energy Model" 组的订阅(懒建一次,失败下轮重试),
 /// 每次读 = 一次采样,交回**全部通道**的 (名, 单位标签, 整数读数) 原始载荷——
 /// 通道名 → 域的映射与单位换算是纯逻辑,住核心包(PowerModel)。
-/// @unchecked Sendable:订阅与通道字典不是 Sendable;调度由 SensorScheduler
-/// 单 actor 串行驱动(净top provider 同款纪律),无并发访问。
+/// @unchecked Sendable:订阅与通道字典不是 Sendable,懒建与采样无自锁——前提是
+/// 唯一调用方 EnergyModelSensorProvider 在其 stateLock 内调用 read()(5s UI 档与
+/// 30s 历史档会并发 tick,p2-review/01 ①);换调用方须同样串行化。
 final class LiveEnergyModelSource: PowerSource, @unchecked Sendable {
     private var channelList: CFMutableDictionary?
     private var subscription: OpaquePointer?
@@ -111,8 +112,9 @@ final class LiveEnergyModelSource: PowerSource, @unchecked Sendable {
 // MARK: - 五路功率传感器 provider(p2-sensors/03,ADR-0004)
 
 /// 五路功率传感器:短档 `.every(seconds: 5)`,与 GPU 同门控(弹窗 ∨ GPU 页,
-/// PowerFeature 折算下发);差分(首读 0/断档丢首轮/负差钳 0)在核心包
-/// PowerAccumulator。读失败交付 lastGood 不白屏。历史档随 08 票。
+/// PowerFeature 折算下发);差分(首读/断档轮不交读数/负差钳 0)在核心包
+/// PowerAccumulator。读失败与基线轮都交 nil,调度器重投 lastGood 不白屏。历史档随
+/// p2-sensors/08。
 /// @unchecked Sendable:accumulator 与源的订阅状态由 stateLock 串行——
 /// 5s UI 档与 30s 历史档两条 driver 的 tick 在调度 actor 外并发执行
 /// (2026-10-23 审计②:此前"单 actor 串行"前提被双档打破)。
@@ -125,7 +127,10 @@ final class EnergyModelSensorProvider: SensorProvider, @unchecked Sendable {
     private let gate = SensorVisibilityGate()
     private let slot = SensorLastGoodBox<PowerReading>()
     private var accumulator = PowerAccumulator()
-    /// 双档串行锁:护 accumulator 差分账本与源的懒建订阅。
+    /// 双档串行锁:护 accumulator 差分账本与源的懒建订阅——读源与折算同在一个
+    /// 锁段(p2-review/01 ①:此前读源在锁外,两档并发进懒建订阅,乱序折算出假 0)。
+    /// 代价:两档撞车时后到的一档等前一档读完一轮(一次 IOReport 采样),等待期间
+    /// 占住一个协作线程——按 5s/30s 节奏撞车稀少,换取差分账本不乱序。
     private let stateLock = NSLock()
 
     var lastGood: PowerReading? {
@@ -149,15 +154,15 @@ final class EnergyModelSensorProvider: SensorProvider, @unchecked Sendable {
     /// 历史档读(p2-sensors/08):不看可见性闸;差分账本与 UI 档共用
     /// (能量差分按实测时差,5s/30s 档位切换不断账)。
     func historySnapshot() async -> PowerReading? {
-        guard let raw = source.read() else { return nil }
-        return foldLocked(raw)
+        readAndFoldLocked()
     }
 
-    /// NSLock 禁用于 async 上下文(Swift 6)——锁段拆进同步方法。
-    private func foldLocked(_ raw: PowerRawReading) -> PowerReading? {
+    /// NSLock 禁用于 async 上下文(Swift 6)——锁段拆进同步方法,锁内不 await。
+    private func readAndFoldLocked() -> PowerReading? {
         stateLock.lock()
         defer { stateLock.unlock() }
-        let reading = accumulator.record(raw)
+        // 读失败与基线轮(首读/断档)都交 nil:lastGood 不动,调度器按读失败重投。
+        guard let raw = source.read(), let reading = accumulator.record(raw) else { return nil }
         slot.store(reading)
         return reading
     }

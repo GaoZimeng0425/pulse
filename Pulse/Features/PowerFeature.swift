@@ -9,7 +9,7 @@ import PulseCore
 @Observable
 @MainActor
 final class PowerFeature: MonitorFeature {
-    /// 最近一次交付,LastGood 语义;首读/断档轮 = 在场域全 0(不是 nil)。
+    /// 最近一次交付,LastGood 语义;首读/断档轮不交读数(未首读前为 nil 占位)。
     private(set) var reading: PowerReading?
     /// ANE 瓦数走势环(~60 点 × 5s 档 ≈ 5 分钟窗)。
     private(set) var aneTrend: [Double] = []
@@ -28,9 +28,10 @@ final class PowerFeature: MonitorFeature {
         self.trendLimit = trendLimit
     }
 
-    /// ANE 归一化百分比(M4 = 6.0W 上限,stats 表);未首读为 nil(占位)。
+    /// ANE 归一化百分比(M4 = 6.0W 上限,stats 表);未首读或 ANE 通道缺席为 nil
+    /// (占位,不伪造 0——p2-review/01 ④)。
     var aneNormalizedPercent: Double? {
-        reading.map { AnePowerCap.normalizedPercent(watts: $0.watts[.ane] ?? 0, chipName: chipName) }
+        reading?.watts[.ane].map { AnePowerCap.normalizedPercent(watts: $0, chipName: chipName) }
     }
 
     func start(_ host: MonitorHost) {
@@ -74,7 +75,9 @@ final class PowerFeature: MonitorFeature {
     private func apply(_ delivery: SensorDelivery<PowerReading>?) {
         guard case let .fresh(reading) = delivery else { return }
         self.reading = reading
-        aneTrend.append(reading.watts[.ane] ?? 0)
+        // ANE 缺席不追加:走势只画真读数(p2-review/01 ④)。
+        guard let aneWatts = reading.watts[.ane] else { return }
+        aneTrend.append(aneWatts)
         if aneTrend.count > trendLimit {
             aneTrend.removeFirst(aneTrend.count - trendLimit)
         }

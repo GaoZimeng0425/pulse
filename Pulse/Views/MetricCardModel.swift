@@ -233,7 +233,7 @@ extension MetricCardModel {
     /// 四列小统计 = 归一化(芯片上限表,M4=6W)/ 五路合计 / 峰值;走势 = ANE 瓦数环。
     /// 强调色沿用 GPU 页(ANE 无独立令牌——Neural 与 Memory 同色,独立 tab 时再议,
     /// 口径记 p2-sensors/03)。读数缺失(订阅缺席/首轮前/通道不在)占位不伪造;
-    /// 首读/断档轮 = 0 W 是差分语义(PowerAccumulator),显示 0 不是坏数。
+    /// 首读/断档轮不出读数(PowerAccumulator,p2-review/01),显示的 0 W 都是真读数。
     static func ane(
         power: PowerReading?,
         normalizedPercent: Double?,

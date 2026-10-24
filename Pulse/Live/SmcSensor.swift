@@ -10,8 +10,9 @@ import PulseCore
 // MARK: - SMC 客户端(只读裁剪,探针⑤同款布局)
 
 /// AppleSMC 用户态连接:open 一次常驻(与 app 同寿命),每键两连
-/// (readKeyInfo + readBytes)。调度由 SensorScheduler 单 actor 串行,
-/// 无锁;@unchecked Sendable 由这一纪律担保(nettop provider 同款)。
+/// (readKeyInfo + readBytes)。无自锁;@unchecked Sendable 的前提是唯一调用链
+/// LiveSmcSource.read() 只在 SmcSensorProvider 的 stateLock 内被调(两档并发
+/// tick,p2-review/01 ①——原"调度 actor 单串行"前提已被双档打破)。
 final class SmcClient: @unchecked Sendable {
     private var conn: io_connect_t = 0
 
@@ -150,7 +151,8 @@ final class SmcClient: @unchecked Sendable {
 /// 窗口不可见时由 provider 门控挡住全部 IOConnect 调用。
 final class LiveSmcSource: SmcSource, @unchecked Sendable {
     private let client: SmcClient?
-    /// 发现缓存:同进程只枚举一次(调度 actor 串行,无锁)。
+    /// 发现缓存:同进程只枚举一次。无自锁——前提是唯一调用方 SmcSensorProvider
+    /// 在其 stateLock 内调用 read()(两档并发 tick,p2-review/01 ①)。
     private var discoveredKeys: [String]?
 
     init() {
@@ -197,7 +199,9 @@ final class SmcSensorProvider: SensorProvider, @unchecked Sendable {
     private let gate = SensorVisibilityGate()
     private let slot = SensorLastGoodBox<SmcReading>()
     private var previous: SmcReading?
-    /// 双档串行锁:护坏值沿用链 previous 与源的 SMC 连接。
+    /// 双档串行锁:护坏值沿用链 previous 与源的 SMC 连接(读源在锁内)。
+    /// 代价:两档撞车时后到的一档等前一档读完一轮全键(首轮还含键发现枚举),
+    /// 等待期间占住一个协作线程——按 5s/30s 节奏撞车稀少,换取连接不被并发进入。
     private let stateLock = NSLock()
 
     var lastGood: SmcReading? {
@@ -220,14 +224,16 @@ final class SmcSensorProvider: SensorProvider, @unchecked Sendable {
     /// 历史档读(p2-sensors/08):不看可见性闸;坏值防御的 previous 状态与
     /// UI 档共用(同一条坏值沿用链,档位切换不断账)。
     func historySnapshot() async -> SmcReading? {
-        guard let raw = source.read() else { return nil }
-        return foldLocked(raw)
+        readAndFoldLocked()
     }
 
-    /// NSLock 禁用于 async 上下文(Swift 6)——锁段拆进同步方法。
-    private func foldLocked(_ raw: SmcSnapshot) -> SmcReading? {
+    /// NSLock 禁用于 async 上下文(Swift 6)——锁段拆进同步方法,锁内不 await。
+    /// 读源与折算同在一个锁段(p2-review/01 ①:此前读源在锁外,两档并发进
+    /// 发现缓存与 io_connect)。
+    private func readAndFoldLocked() -> SmcReading? {
         stateLock.lock()
         defer { stateLock.unlock() }
+        guard let raw = source.read() else { return nil }
         guard let reading = SmcReadingBuilder.make(from: raw, previous: previous) else {
             return nil // 折算失败不动 previous:沿用链不被一次坏载荷清零(审计②顺带)
         }
