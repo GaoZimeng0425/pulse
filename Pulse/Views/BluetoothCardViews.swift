@@ -6,7 +6,8 @@ import SwiftUI
 
 // 三源合并(地址规整/三级匹配/歧义即弃/缓存 1→100)在核心层 BluetoothModel
 // (纯逻辑,单测覆盖);本文件只做 SwiftUI 外观——设备表行(名称/连接态/电量/
-// 信号),弹窗(紧凑)与主窗口共用,走预览 + 手动验收。
+// 信号),弹窗(紧凑)与主窗口共用,走预览 + 手动验收。设备行数值 / 定宽 / 状态点
+// 已收编令牌(2026-10-25 蓝牙令牌统一,清 DESIGN.md 已知偏差挂账)。
 
 /// 蓝牙设备卡:每台一行(名称 + 连接点 + 电量 meter + RSSI),已连接置顶;
 /// 无设备/蓝牙栈不可用安静占位。授权型能力(权限原则):未开启 / 未授权 / 被拒
@@ -84,7 +85,7 @@ struct BluetoothDevicesCardView: View {
     private func row(_ device: BluetoothDeviceRow) -> some View {
         HStack(spacing: 8) {
             Circle()
-                .fill(device.isConnected ? Metric.bluetooth.accentColor : Color.secondary.opacity(0.4))
+                .fill(device.isConnected ? Metric.bluetooth.accentColor : Surface.inactive)
                 .frame(width: 6, height: 6)
             Text(device.name)
                 .font(.system(size: 12, weight: .medium))
@@ -95,20 +96,14 @@ struct BluetoothDevicesCardView: View {
                     fraction: min(max(Double(percent) / 100, 0), 1),
                     tint: Metric.bluetooth.accentColor
                 )
-                .frame(width: isCompact ? 44 : 64)
-                Text("\(percent)%")
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .frame(minWidth: 36, alignment: .trailing)
+                .frame(width: isCompact ? CardRowWidth.meterCompact : CardRowWidth.meter)
+                CardRowValue(text: "\(percent)%", minWidth: CardRowWidth.percentValue)
             } else {
                 Text("电量未知")
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
             }
-            Text(rssiText(device.rssi))
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(.tertiary)
-                .frame(minWidth: 32, alignment: .trailing)
+            CardRowValue(text: rssiText(device.rssi), minWidth: CardRowWidth.rssiValue, style: .tertiary)
         }
     }
 
