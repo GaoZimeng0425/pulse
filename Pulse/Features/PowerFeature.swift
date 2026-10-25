@@ -63,10 +63,10 @@ final class PowerFeature: MonitorFeature {
         ]
     }
 
-    /// 功率采样闸:与 GPU 传感同门控(弹窗 ∨ GPU 页,GLOSSARY「五路功率」数据
-    /// 全部消费在 GPU 页)。
+    /// 功率采样闸:ANE 卡与五路功率只在 GPU 页展示(`displayedFamilies`,
+    /// p2-review/05;总览的 GPU 卡只吃利用率,不消费功率家族)。
     func visibilityChanged(_ visibility: MonitorVisibility) {
-        provider.setVisible(visibility.popover || visibility.gpuPage)
+        provider.setVisible(visibility.shows(.power))
     }
 
     /// nil = 从未有过读数(订阅缺席 / 组不在)→ ANE 卡与功率区占位。

@@ -117,7 +117,7 @@ struct PulseApp: App {
 
         // 主窗口(工单 P0.5-01):全部组 + 可排序进程表 + 详情下钻。
         // 入口在弹窗底部"打开主窗口"按钮(用户拍板:合并为单一菜单栏项);
-        // 窗口内容不触碰 setPopoverVisible:关窗只藏窗,采样节奏不受影响(spec)。
+        // 窗口内容不触碰 setPopoverTab:关窗只藏窗,采样节奏不受影响(spec)。
         // 内容经可见性门控(popover-leak/01 主窗口同病同修):关闭后视图树不再
         // 逐轮重算;.task(start)在门控根上。
         Window("Pulse", id: MainWindowSceneID.value) {

@@ -51,8 +51,8 @@ final class SmcFeature: MonitorFeature {
         ]
     }
 
-    /// SMC 采样闸:弹窗 ∨ 传感器页(与 GPU/排行闸分旗,ADR-0006 语义不混)。
+    /// SMC 采样闸:任一在场窗口停在传感器 tab(`displayedFamilies`,p2-review/05)。
     func visibilityChanged(_ visibility: MonitorVisibility) {
-        provider.setVisible(visibility.popover || visibility.sensorsPage)
+        provider.setVisible(visibility.shows(.smc))
     }
 }

@@ -31,8 +31,8 @@ final class ContainerFeature: MonitorFeature {
         ]
     }
 
-    /// 容器采样闸:弹窗 ∨ 容器页(一族一旗,ADR-0006 语义不混)。
+    /// 容器采样闸:任一在场窗口停在容器 tab(`displayedFamilies`,p2-review/05)。
     func visibilityChanged(_ visibility: MonitorVisibility) {
-        provider.setVisible(visibility.popover || visibility.containersPage)
+        provider.setVisible(visibility.shows(.containers))
     }
 }

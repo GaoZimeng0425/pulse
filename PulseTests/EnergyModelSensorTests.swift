@@ -164,7 +164,7 @@ final class EnergyModelSensorTests: XCTestCase {
         ]
         let feature = PowerFeature(source: source, chipName: "Apple M4")
         let drivers = feature.sensorDrivers()
-        feature.visibilityChanged(MonitorVisibility(popover: true))
+        feature.visibilityChanged(MonitorVisibility(popoverTab: .gpu))
 
         await drivers[0].tick() // 基线轮
         XCTAssertNil(feature.reading)
@@ -192,7 +192,7 @@ final class EnergyModelSensorTests: XCTestCase {
         ]
         let feature = PowerFeature(source: source, chipName: "Apple M4")
         let drivers = feature.sensorDrivers()
-        feature.visibilityChanged(MonitorVisibility(popover: true))
+        feature.visibilityChanged(MonitorVisibility(popoverTab: .gpu))
 
         await drivers[0].tick()
         await drivers[0].tick()

@@ -55,10 +55,11 @@ final class GpuFeature: MonitorFeature {
         ]
     }
 
-    /// GPU 采样闸:弹窗在场 ∨ 主窗口停在 GPU 页(旗标与排行闸刻意分立,
-    /// MonitorVisibility.gpuPage 的文档注释,ADR-0006 语义不混)。
+    /// GPU 采样闸:任一在场窗口停在展示 GPU 家族的 tab(总览的 GPU 卡 ∨ GPU 页,
+    /// `MetricTab.displayedFamilies`,p2-review/05)——弹窗停在 CPU 等无 GPU 内容的
+    /// tab 不再白采。
     func visibilityChanged(_ visibility: MonitorVisibility) {
-        provider.setVisible(visibility.popover || visibility.gpuPage)
+        provider.setVisible(visibility.shows(.gpu))
     }
 
     /// nil = 从未有过读数(无加速器)→ 卡片占位;首读前不追加走势。

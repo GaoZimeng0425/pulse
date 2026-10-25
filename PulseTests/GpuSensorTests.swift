@@ -61,7 +61,7 @@ final class GpuSensorTests: XCTestCase {
         let feature = GpuFeature(source: source)
         let drivers = feature.sensorDrivers()
 
-        feature.visibilityChanged(MonitorVisibility(popover: true))
+        feature.visibilityChanged(MonitorVisibility(popoverTab: .gpu))
         await drivers[0].tick() // fresh
         XCTAssertEqual(feature.trend, [42])
 
