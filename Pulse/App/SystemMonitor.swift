@@ -276,72 +276,34 @@ final class SystemMonitor {
     }
 
     /// 弹窗是否在场(popover-leak/01 视图门控的唯一读数):单一事实源 =
-    /// visibility(MonitorVisibility),写路径仍是 setPopoverVisible。
+    /// visibility(MonitorVisibility),写路径 setPopoverTab。
     var popoverVisible: Bool {
         visibility.popover
     }
 
     /// 主窗口是否在场(popover-leak/01 主窗口同病同修,视图门控的唯一读数):
-    /// 单一事实源 = visibility;不参与采样节奏与 anyWindow 传感闸门。
+    /// 单一事实源 = visibility;不参与采样节奏与 anyWindow 排行闸。
     var mainWindowVisible: Bool {
         visibility.mainWindow
     }
 
-    /// 弹窗可见性变化:采样节奏在 5s/1s 间切换(合盖省电,spec)。
-    /// 出生扫描不受弹窗影响:登记的完整性不依赖观看。弹窗也是模块排行
-    /// (工单 module-rankings/01)的可见性信号之一:弹窗在场即开闸(RankingsFeature.visibilityChanged)。
-    func setPopoverVisible(_ visible: Bool) {
+    /// 弹窗所在 tab 变化(p2-review/05):nil = 关闭。在场性、排行闸
+    /// (弹窗任何 tab 都承载组排行卡)与各传感家族闸(popoverTab 展示该家族才开)
+    /// 全由这一槽派生。采样节奏 5s/1s 切换照旧由在场性驱动;出生扫描不受弹窗影响。
+    func setPopoverTab(_ tab: MetricTab?) {
         var next = visibility
-        next.popover = visible
+        next.popoverTab = tab
         updateVisibility(next)
+        let visible = tab != nil
         let sampler = sampler
         Task { await sampler.setPopoverVisible(visible) }
     }
 
-    /// 模块排行可见性变化(工单 01):主窗口模块页在场时由 UI 调用。与弹窗
-    /// 信号合并门控——任一窗口可见即开闸,全关才停采(采样成本闸门)。
-    func setModuleRankingsVisible(_ visible: Bool) {
+    /// 主窗口所在 tab 变化(p2-review/05):nil = 关闭。视图门控读数、排行模块页
+    /// 判据与传感家族闸全由这一槽派生——旧的三旗标 + 四页旗五处写路径收成一个。
+    func setMainWindowTab(_ tab: MetricTab?) {
         var next = visibility
-        next.moduleRankings = visible
-        updateVisibility(next)
-    }
-
-    /// GPU 页可见性变化(p2-sensors/02):主窗口停在 GPU 页时由 UI 调用。
-    /// GPU 传感闸 = 弹窗 ∨ 本旗标(GpuFeature 折算),与排行闸分立不串门。
-    func setGpuPageVisible(_ visible: Bool) {
-        var next = visibility
-        next.gpuPage = visible
-        updateVisibility(next)
-    }
-
-    /// 传感器页可见性变化(p2-sensors/04):SMC 传感闸 = 弹窗 ∨ 本旗标。
-    func setSensorsPageVisible(_ visible: Bool) {
-        var next = visibility
-        next.sensorsPage = visible
-        updateVisibility(next)
-    }
-
-    /// 外设页可见性变化(p2-sensors/05 页面创建;声音事件驱动不消费本旗标,
-    /// p2-sensors/06 蓝牙扫描闸消费)。拷贝-改写式——旧的全参重建在 setMainWindowVisible
-    /// 曾漏传 sensorsPage 把旗标清零,顺带收编(改动对应文件时一并修)。
-    func setPeripheralsPageVisible(_ visible: Bool) {
-        var next = visibility
-        next.peripheralsPage = visible
-        updateVisibility(next)
-    }
-
-    /// 容器页可见性变化(p2-sensors/07):docker.sock 采样闸 = 弹窗 ∨ 本旗标。
-    func setContainersPageVisible(_ visible: Bool) {
-        var next = visibility
-        next.containersPage = visible
-        updateVisibility(next)
-    }
-
-    /// 主窗口可见性变化(popover-leak/01 主窗口内容门控信号):只驱动
-    /// `mainWindowVisible` 读数,不碰采样节奏与传感闸门(anyWindow 不含 mainWindow)。
-    func setMainWindowVisible(_ visible: Bool) {
-        var next = visibility
-        next.mainWindow = visible
+        next.mainWindowTab = tab
         updateVisibility(next)
     }
 

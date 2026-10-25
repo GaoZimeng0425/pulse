@@ -102,7 +102,7 @@ final class BluetoothFeature: MonitorFeature {
     /// GPU/传感器/排行闸分旗,ADR-0006 语义不混)。进场顺带静默刷新授权(用户可能
     /// 刚在系统设置里改过),不请求。
     func visibilityChanged(_ visibility: MonitorVisibility) {
-        isVisible = visibility.popover || visibility.peripheralsPage
+        isVisible = visibility.shows(.bluetooth)
         refreshAuthorization()
     }
 

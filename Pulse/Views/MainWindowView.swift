@@ -60,24 +60,11 @@ struct MainWindowView: View {
         .onChange(of: monitor.battery.hasBattery) { _, hasBattery in
             tabSelection.setAxis(MetricTab.displayAxis(hasBattery: hasBattery))
         }
-        // 模块排行采样闸(工单 01):主窗口停在电池/磁盘/网络页才开闸,切走或
-        // 关窗即关。只表达主窗口自己的贡献——与弹窗信号的 OR 合并在 monitor
-        // 内做,这里不碰弹窗语义;重复同值调用在 provider 侧是 no-op。
+        // 主窗口采样闸(p2-review/05 收编):切页 = 一次 setMainWindowTab——排行
+        // 模块页判据与 GPU/SMC/蓝牙/容器家族闸全由 tab 槽在 monitor 侧派生
+        // (`MonitorVisibility` 派生读数)。关窗归 MainWindowGate 写 nil。
         .onChange(of: tabSelection.current) { _, newTab in
-            monitor.setModuleRankingsVisible(newTab.hostsModuleRanking)
-            // GPU 传感闸(p2-sensors/02)与 SMC 传感闸(p2-sensors/04):
-            // 与排行闸分立,各自只表达本页贡献。
-            monitor.setGpuPageVisible(newTab == .gpu)
-            monitor.setSensorsPageVisible(newTab == .sensors)
-            monitor.setPeripheralsPageVisible(newTab == .peripherals)
-            monitor.setContainersPageVisible(newTab == .containers)
-        }
-        .onDisappear {
-            monitor.setModuleRankingsVisible(false)
-            monitor.setGpuPageVisible(false)
-            monitor.setSensorsPageVisible(false)
-            monitor.setPeripheralsPageVisible(false)
-            monitor.setContainersPageVisible(false)
+            monitor.setMainWindowTab(newTab)
         }
         // 点开告警通知 → 直达对应 tab(工单 P1-07):窗口存活时响应广播;
         // 窗口刚被 openWindow 拉起时 onAppear 消费落下的 pendingTab。
@@ -93,13 +80,9 @@ struct MainWindowView: View {
             if let tab = alertRouter?.consumePendingTab() {
                 tabSelection.current = tab
             }
-            // 模块排行闸(工单 01):窗口可能直接深链落在排行页,进场即按当前
-            // tab 开闸(onChange 只管后续切换,不覆盖进场初值)。
-            monitor.setModuleRankingsVisible(tabSelection.current.hostsModuleRanking)
-            monitor.setGpuPageVisible(tabSelection.current == .gpu)
-            monitor.setSensorsPageVisible(tabSelection.current == .sensors)
-            monitor.setPeripheralsPageVisible(tabSelection.current == .peripherals)
-            monitor.setContainersPageVisible(tabSelection.current == .containers)
+            // 进场即报当前 tab:覆盖深链落点(onChange 只管后续切换;引导值由
+            // MainWindowGate.onAppear 先写,此处同值 no-op)。
+            monitor.setMainWindowTab(tabSelection.current)
             MainWindowView.repositionIfOffscreen()
             // 系统窗口恢复套旧 frame 发生在 onAppear 之后——补一拍延迟守卫。
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {

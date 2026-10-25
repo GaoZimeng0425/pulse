@@ -42,7 +42,7 @@ final class BluetoothFeatureAccessTests: XCTestCase {
         var last: Bool?
     }
 
-    private let visible = MonitorVisibility(popover: true)
+    private let visible = MonitorVisibility(popoverTab: .peripherals)
     private let hidden = MonitorVisibility()
 
     private func makeFeature(

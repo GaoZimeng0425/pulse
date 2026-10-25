@@ -101,51 +101,55 @@ public struct RoundSpine {
 
 // MARK: - 功能模块扩展点(ADR-0003)
 
-/// 窗口可见性:功能模块的采样成本闸门信号——弹窗在场 / 主窗口模块排行页在场。
-/// 任一为真即「有窗口在看」(模块排行只在有人看时推进,工单 module-rankings/01)。
-/// `mainWindow` 例外:它只作主窗口**内容门控**的信号(popover-leak/01,Window 场景
-/// 关闭后视图树不销毁的对症读数),不进 `anyWindow`——传感闸门仍由弹窗 / 模块页
-/// 两个更精细的信号驱动,主窗口停在非排行页时不白跑 nettop。
+/// 窗口可见性:功能模块的采样成本闸门信号,两槽各答"哪个窗口开着 + 停在哪个 tab"
+/// (p2-review/05 收编;popover-leak/01 的三旗标 + p2-sensors 各页旗标在此合一)。
+/// `nil` = 该窗口不在场。派生读数(勿另立事实源):
+/// - `popover` / `mainWindow` —— 视图门控读数(MenuBarPopoverGate / MainWindowGate);
+///   `popover` 额外驱动采样节奏 1s/5s。
+/// - `moduleRankings` —— 主窗口停在排行模块页(battery/disk/network),与弹窗
+///   合成 `anyWindow`(排行闸,RankingsFeature)。
+/// - `shows(_:)` —— 传感器家族闸:任一在场的 tab **实际展示**该家族
+/// (tab → 家族由 `MetricTab.displayedFamilies` 定义)才开 5s UI 档——弹窗停在
+/// CPU 页不再白开 GPU/SMC/蓝牙/容器采集。历史 30s 档不看闸,口径不随可见性变。
 public struct MonitorVisibility: Equatable, Sendable {
-    public var popover = false
-    public var moduleRankings = false
-    /// 主窗口整体在场(popover-leak/01 视图门控专用,不参与 anyWindow 传感闸门)。
-    public var mainWindow = false
-    /// 主窗口停在 GPU 页(p2-sensors/02):GPU 传感器的采样闸门信号之一,
-    /// 与 `moduleRankings` 刻意分旗——GPU 页可见不该白开 nettop,排行页可见
-    /// 也不该白采 GPU(旗标语义不混,ADR-0006)。
-    public var gpuPage = false
-    /// 主窗口停在传感器页(p2-sensors/04):SMC 传感器的采样闸门信号之一
-    /// (弹窗 ∨ 本旗标);一族一旗,不并进 anyWindow。
-    public var sensorsPage = false
-    /// 主窗口停在外设页(p2-sensors/05 创建,含声音/蓝牙):声音家族事件驱动
-    /// 不消费本旗标;蓝牙家族(p2-sensors/06)的"可见 30s / 不可见停"扫描闸消费它。
-    /// 旗标随 p2-sensors/05 一并落地,页面接线不必二次拆动。
-    public var peripheralsPage = false
-    /// 主窗口停在容器页(p2-sensors/07):docker.sock 采样闸消费(弹窗 ∨ 本旗标)。
-    public var containersPage = false
+    /// 弹窗所在 tab;nil = 弹窗关闭。
+    public var popoverTab: MetricTab?
+    /// 主窗口所在 tab;nil = 主窗口关闭。在场与所在页一个槽说清,切页 = 一次赋值。
+    public var mainWindowTab: MetricTab?
+
+    /// 弹窗在场(派生)。
+    public var popover: Bool {
+        popoverTab != nil
+    }
+
+    /// 主窗口在场(派生,popover-leak/01 视图门控专用,不参与 anyWindow 排行闸)。
+    public var mainWindow: Bool {
+        mainWindowTab != nil
+    }
+
+    /// 主窗口停在排行模块页(派生;弹窗任何 tab 都承载组排行卡,故弹窗在场即开排行闸)。
+    public var moduleRankings: Bool {
+        mainWindowTab?.hostsModuleRanking ?? false
+    }
 
     /// 任一(传感意义上的)窗口可见。
     public var anyWindow: Bool {
         popover || moduleRankings
     }
 
+    /// 传感器家族闸(p2-review/05):任一在场窗口停在**展示该家族**的 tab 上才开闸。
+    /// 关闸瞬间读数不清(显示侧 lastGood 语义);30s 历史档不经此闸。
+    public func shows(_ family: MetricSensorFamily) -> Bool {
+        (popoverTab?.displayedFamilies.contains(family) ?? false)
+            || (mainWindowTab?.displayedFamilies.contains(family) ?? false)
+    }
+
     public init(
-        popover: Bool = false,
-        moduleRankings: Bool = false,
-        mainWindow: Bool = false,
-        gpuPage: Bool = false,
-        sensorsPage: Bool = false,
-        peripheralsPage: Bool = false,
-        containersPage: Bool = false
+        popoverTab: MetricTab? = nil,
+        mainWindowTab: MetricTab? = nil
     ) {
-        self.popover = popover
-        self.moduleRankings = moduleRankings
-        self.mainWindow = mainWindow
-        self.gpuPage = gpuPage
-        self.sensorsPage = sensorsPage
-        self.peripheralsPage = peripheralsPage
-        self.containersPage = containersPage
+        self.popoverTab = popoverTab
+        self.mainWindowTab = mainWindowTab
     }
 }
 

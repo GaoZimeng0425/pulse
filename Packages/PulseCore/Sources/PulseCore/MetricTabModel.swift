@@ -140,6 +140,35 @@ public extension MetricTab {
     }
 }
 
+// MARK: - 传感器家族可见性判据(p2-review/05)
+
+/// 5s UI 档随可见性门控的传感器家族(历史 30s 档不看闸,spec Story 24 成本纪律)。
+/// 家族与 feature 一一对应:GPU 利用率 / ANE+五路功率(同 Energy Model 订阅,
+/// 与 GPU 分立)/ SMC 温度风扇 / 蓝牙 / 容器。声音事件驱动不设家族。
+public enum MetricSensorFamily: String, CaseIterable, Sendable, Hashable {
+    case gpu
+    case power
+    case smc
+    case bluetooth
+    case containers
+}
+
+public extension MetricTab {
+    /// 本 tab 实际展示哪些传感器家族(`MetricTabStack` 的卡片组成,口径住数据层
+    /// 供 `MonitorVisibility.shows(_:)` 消费;成员资格由单测钉死,与视图层改动
+    /// 对齐时同步)。总览的 GPU 卡吃 GPU 家族;CPU/内存/排行类 tab 无家族内容。
+    var displayedFamilies: Set<MetricSensorFamily> {
+        switch self {
+        case .overview: [.gpu]
+        case .gpu: [.gpu, .power]
+        case .sensors: [.smc]
+        case .peripherals: [.bluetooth]
+        case .containers: [.containers]
+        case .cpu, .memory, .disk, .network, .battery, .history: []
+        }
+    }
+}
+
 // MARK: - 组卡读数口径(工单 03 纠偏:应用行回紧凑形态)
 
 /// 组卡的大数字口径:CPU tab(与总览)以 CPU% 为主读数、内存为副文;
