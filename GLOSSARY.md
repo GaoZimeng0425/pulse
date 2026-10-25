@@ -21,7 +21,7 @@ _Avoid_: 进程列表(那是原始呈现,不是这个)
 _Avoid_: 应用(仅在指 .app bundle 本体时用"App")、类别、聚合
 
 **App 归属 (Bundle attribution)**:
-进程(含 Helper/Renderer/XPC 子进程)归属到它所在的 .app bundle。
+进程(含 Helper/Renderer/XPC 子进程)归属到它所在的 .app bundle。**项目归因未命中时才轮到它**(project-visibility/02 对调:容器内的宿主 Helper、Xcode 工具链编译器随项目记账,不归 App)。
 _Avoid_: 应用归属
 
 **父链上溯 (Parent-chain walk)**:
@@ -33,7 +33,7 @@ _Avoid_: 递归找父
 _Avoid_: LineageCache(那是实现名)、缓存父链
 
 **项目归因 (Project attribution)**:
-到达归因层(未被 App 归属先行认领)的进程按其工作目录或 argv 中的路径归属到项目根——不限可执行文件名;命中 worktree 目录时显示为"项目名 @ worktree"。
+进程按其工作目录或 argv 中的路径归属到项目根——不限可执行文件名,也**先于 App 归属**(project-visibility/02:cwd/argv 命中即归项目,可执行在 .app 容器内也不例外);命中 worktree 目录时显示为"项目名 @ worktree"。
 _Avoid_: 项目归属、仓库匹配
 
 **项目根 (Project root)**:

@@ -115,9 +115,11 @@ public struct ProcessGroup: Identifiable, Equatable, Sendable {
 /// CFBundleName 由 UI 层注入读取器(工单 05),缺省退化为 bundle 目录名去掉 .app 后缀;
 /// launchd 服务清单由 app 侧低频传感器扫 plist 后整份注入(launchd-attribution/01)。
 ///
-/// 项目归因不设可执行名门槛(评审 S4):到达项目归因层(未先被 App 归属)
-/// 的进程,只要 cwd / argv 路径命中项目根即归项目——zig / bazel 等"名单外"
-/// 工具与 rustc / node 同权。历史上的 dev 可执行名单已随该评审移除。
+/// 项目归因不设可执行名门槛(评审 S4),且**先于 App 归属**(project-visibility/02,
+/// 2026-10-25 用户拍板 A 无条件翻):cwd / argv 路径命中项目根即归项目,可执行在
+/// `.app` 容器内也不例外(宿主 Helper、Xcode 工具链编译器随项目记账)——
+/// zig / bazel 等"名单外"工具与 rustc / node 同权。历史上的 dev 可执行名单
+/// 已随该评审移除。
 public struct GroupingConfiguration: Sendable {
     /// 项目根(GLOSSARY):用户配置的绝对路径(已展开 ~)。引擎只做路径前缀匹配。
     public var projectRoots: [String]
@@ -156,16 +158,19 @@ public struct GroupingConfiguration: Sendable {
 /// 输出 = 按组 CPU% 降序(次键 id 升序)的组列表。同输入同输出,不持 OS 状态。
 ///
 /// 每个进程的判定顺序:
-/// 1. App 归属——自身可执行在 `.app` 容器内(容器口径见 `appContainerPrefix`:
-///    含 `.app/Contents/MacOS/` 全盘生效;/Applications、/Users 下的容器助手
-///    ——Frameworks、XPCServices、.appex——也归最外层宿主 .app,断链的
-///    crashpad_handler、Sparkle Autoupdate 因此不再落孤儿);
-/// 2. 项目归因——按 cwd 优先、argv 中路径次之与项目根前缀匹配,
+/// 1. 项目归因——按 cwd 优先、argv 中路径次之与项目根前缀匹配,
 ///    命中 `.worktrees/<名>` 显示"项目名 @ 名"。不看可执行名(评审 S4:
 ///    名单闸已解除——cwd/argv 命中即归项目,zig 与 rustc 同权)。
-///    放在父链上溯之前:验收锚点要求 rustc ← cargo ← node ← Zcode
-///    归"项目 @ worktree",而不是归到拉起它的 Zcode;
-/// 3. 父链上溯——非 bundle、无项目归因的进程沿活 ppid 链向上找有归属的祖先;
+///    **先于 App 归属**(project-visibility/02,2026-10-25 用户拍板 A 无条件翻):
+///    容器内的宿主 Helper、Xcode 工具链编译器因此记到项目头上;也先于父链上溯
+///    ——验收锚点要求 rustc ← cargo ← node ← Zcode 归"项目 @ worktree",
+///    而不是归到拉起它的 Zcode;
+/// 2. App 归属——自身可执行在 `.app` 容器内(容器口径见 `appContainerPrefix`:
+///    含 `.app/Contents/MacOS/` 全盘生效;/Applications、/Users 下的容器助手
+///    ——Frameworks、XPCServices、.appex——也归最外层宿主 .app,断链的
+///    crashpad_handler、Sparkle Autoupdate 因此不再落孤儿)。
+///    项目未命中时才轮到它(project-visibility/02 对调后的兜底位);
+/// 3. 父链上溯——无自身归属的进程沿活 ppid 链向上找有归属的祖先;
 ///    断链(中间父进程已死 / 被重挂到 launchd)时回查出生登记的父链;
 /// 4. 兜底三分类——系统(知名系统进程,优先于第 1 步)/ 后台服务(launchd 域
 ///    推断:出生或现挂在 launchd 之下,且可执行位于 launchd 域——见
@@ -469,24 +474,26 @@ private final class Resolver {
         return resolution
     }
 
-    /// 进程自身可判定的两层归属:App 归属(bundle)→ 项目归因(项目根前缀)。
+    /// 进程自身可判定的两层归属:项目归因(项目根前缀)→ App 归属(bundle 兜底)。
     /// 这两层可被子进程与登记链继承;系统 / 兜底归属不可继承。
-    /// 项目归因不看可执行名(评审 S4):到达此层的非 bundle 进程,
-    /// cwd / argv 路径命中项目根即归项目。输入即归属三元组(ProcessIdentity,
+    /// 项目归因先于 App 归属(project-visibility/02,2026-10-25 用户拍板 A 无条件翻):
+    /// cwd / argv 路径命中项目根即归项目,可执行在 `.app` 容器内也不例外——宿主
+    /// Helper、Xcode 工具链编译器因此记到项目头上;项目未命中才退给容器判定。
+    /// 项目归因不看可执行名(评审 S4)。输入即归属三元组(ProcessIdentity,
     /// D1 收拢)——快照进程与出生登记的祖先同一份形状。
     private func layerSelf(_ identity: ProcessIdentity) -> Attribution? {
-        if let bundle = Self.outermostAppBundleDirectory(identity.executablePath) {
+        // 项目归因:cwd 优先,argv 中的路径次之。
+        if let match = projectMatch(identity.cwd) ?? argvProjectMatch(identity.argv) {
+            let projectName = Self.rootDisplayName(match.root)
             return Attribution(
-                id: .app(bundlePath: bundle),
-                name: bundleDisplayName(forBundleDirectory: bundle)
+                id: .project(root: match.root, worktreeName: match.worktreeName),
+                name: match.worktreeName.map { "\(projectName) @ \($0)" } ?? projectName
             )
         }
-        // 项目归因:cwd 优先,argv 中的路径次之。
-        guard let match = projectMatch(identity.cwd) ?? argvProjectMatch(identity.argv) else { return nil }
-        let projectName = Self.rootDisplayName(match.root)
+        guard let bundle = Self.outermostAppBundleDirectory(identity.executablePath) else { return nil }
         return Attribution(
-            id: .project(root: match.root, worktreeName: match.worktreeName),
-            name: match.worktreeName.map { "\(projectName) @ \($0)" } ?? projectName
+            id: .app(bundlePath: bundle),
+            name: bundleDisplayName(forBundleDirectory: bundle)
         )
     }
 

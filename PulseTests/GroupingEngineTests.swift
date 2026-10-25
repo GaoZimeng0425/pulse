@@ -298,6 +298,84 @@ final class GroupingEngineTests: XCTestCase {
         XCTAssertEqual(groups[0].processes.map(\.pid), [21])
     }
 
+    /// project-visibility/02(2026-10-25 拍板 A 无条件翻):可执行在 .app 容器内、
+    /// cwd 命中项目根的进程归项目组——宿主 Helper、Xcode 工具链编译器随项目记账。
+    func testBundledProcessWithCwdInsideRootAttributesToProject() {
+        let snapshot = ProcessSnapshot(processes: [
+            RawProcess(
+                pid: 21,
+                parentPID: 1,
+                executablePath: "/Applications/Zcode.app/Contents/MacOS/Zcode Helper",
+                argv: ["Zcode Helper"],
+                cwd: worktree("alpha"),
+                physicalFootprintBytes: 80_000_000
+            ),
+        ])
+
+        let groups = GroupingEngine.groups(
+            from: snapshot,
+            configuration: GroupingConfiguration(projectRoots: [octokRoot]),
+            cpuPercentByPID: [21: 12]
+        )
+
+        XCTAssertEqual(groups.count, 1)
+        XCTAssertEqual(groups[0].category, .project)
+        XCTAssertEqual(groups[0].name, "octok-client @ alpha")
+        XCTAssertEqual(groups[0].processes.map(\.pid), [21])
+    }
+
+    /// 防翻过头(对调后的兜底位):容器进程 cwd / argv 都不命中项目根时仍归宿主 App。
+    func testBundledProcessWithoutProjectMatchStillAttributesToHostApp() {
+        let snapshot = ProcessSnapshot(processes: [
+            RawProcess(
+                pid: 21,
+                parentPID: 1,
+                executablePath: "/Applications/Zcode.app/Contents/MacOS/Zcode Helper",
+                argv: ["Zcode Helper"],
+                cwd: "/Users/x",
+                physicalFootprintBytes: 80_000_000
+            ),
+        ])
+
+        let groups = GroupingEngine.groups(
+            from: snapshot,
+            configuration: GroupingConfiguration(projectRoots: [octokRoot]),
+            cpuPercentByPID: [21: 12]
+        )
+
+        XCTAssertEqual(groups.count, 1)
+        XCTAssertEqual(groups[0].category, .app)
+        XCTAssertEqual(groups[0].name, "Zcode")
+        XCTAssertEqual(groups[0].processes.map(\.pid), [21])
+    }
+
+    /// 容器进程(放宽口径的 Xcode 工具链路径)cwd 未命中、argv 路径命中项目根:
+    /// 同样归项目——项目层内 argv 次级通道压过容器判定。
+    func testBundledProcessWithArgvPathInsideRootAttributesToProject() {
+        let snapshot = ProcessSnapshot(processes: [
+            RawProcess(
+                pid: 21,
+                parentPID: 1,
+                executablePath:
+                "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend",
+                argv: ["swift-frontend", "-module-name", "octok", octokRoot + "/Sources/main.swift"],
+                cwd: "/tmp",
+                physicalFootprintBytes: 200_000_000
+            ),
+        ])
+
+        let groups = GroupingEngine.groups(
+            from: snapshot,
+            configuration: GroupingConfiguration(projectRoots: [octokRoot]),
+            cpuPercentByPID: [21: 90]
+        )
+
+        XCTAssertEqual(groups.count, 1)
+        XCTAssertEqual(groups[0].category, .project)
+        XCTAssertEqual(groups[0].name, "octok-client")
+        XCTAssertEqual(groups[0].processes.map(\.pid), [21])
+    }
+
     /// 并行 worktree 各自成组、互不混淆(用户故事 10)。
     func testParallelWorktreesFormDistinctGroups() {
         let snapshot = ProcessSnapshot(processes: [

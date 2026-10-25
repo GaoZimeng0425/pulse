@@ -163,6 +163,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.row-value-rssi}` | 32pt | 同上:信号强度 `-99 dBm` / `—`(蓝牙设备行) |
 | `{layout.row-meter-compact}` | 44pt | 行内电量条宽(紧凑档,蓝牙设备行) |
 | `{layout.row-meter}` | 64pt | 行内电量条宽(全尺寸档,蓝牙设备行) |
+| `{layout.row-host-icon}` | 14pt | 下钻进程行宿主 App 徽标图标边长(project-visibility/02;徽标文字随行 `{typography.caption}` secondary,图标-文字间距 `{spacing.inline}`) |
 | `{layout.overview-card-min-width}` | 340pt | 总览卡自适应网格的单卡最小宽(主窗口列数 1–4 由它派生:列数 = 内容宽容纳的最多列,340 + 列距 16,上限 4) |
 
 窗口:主窗口最小 **720×560**(spec 钉死),默认 880×620;弹窗定宽 **360pt**
