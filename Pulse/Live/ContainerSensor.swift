@@ -39,7 +39,7 @@ struct LiveContainerSource: ContainerSource {
         let rows: [ContainerRow] = await withTaskGroup(of: ContainerRow?.self) { group in
             for row in list {
                 group.addTask {
-                    guard row.state == "running" else { return row } // 非运行容器无 stats 必要
+                    guard row.isRunning else { return row } // 非运行容器无 stats 必要
                     let statsBody = await httpGet(
                         "/containers/\(row.id)/stats?stream=false",
                         socketPath: path

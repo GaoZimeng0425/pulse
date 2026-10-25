@@ -200,6 +200,8 @@ public enum PulseFormat {
 
     /// 功率(工单 02 电池卡):瓦 → "18.2 W"(一位小数;tenth 整数运算拼串,
     /// 不受系统区域小数点写法影响)。负值按 0 夹紧(方向语义由充电状态行表达)。
+    /// 全 app 功率文案的唯一出处(p2-review/03 收口:五路功率卡 / ANE 卡统计 / 历史统计
+    /// 曾各有一套,≥10 W 取整那套已删)。
     public static func watts(_ value: Double) -> String {
         let tenths = Int((max(0, value) * 10).rounded())
         return "\(tenths / 10).\(tenths % 10) W"

@@ -104,17 +104,37 @@ public struct ContainerRow: Equatable, Identifiable, Sendable {
         self.cpuPercent = cpuPercent
         self.memoryBytes = memoryBytes
     }
+
+    /// "运行中"的唯一判定(p2-review/03 收口:此前 Live 源 stats 门与卡片状态点 /
+    /// 计数三处各比一次字符串)。只认 docker `running`;paused 进程冻结、不出 stats。
+    public var isRunning: Bool {
+        state == "running"
+    }
 }
 
 /// 一轮容器读数:引擎可达性 + 容器表。socket 缺席(OrbStack 未跑)=
 /// `engineReachable = false` 的空表,不重试风暴由 cadence/门控保证(30s 一发)。
 public struct ContainersReading: Equatable, Sendable {
     public let engineReachable: Bool
+    /// 行序是读数的不变量(构造即排好):运行中置顶,组内按名称(自然序、不分大小写),
+    /// 同名再按 id 定序。凭什么在这里排:Live 源 stats 并行单发、按 TaskGroup 完成序
+    /// 收集,不排则每轮行序乱跳(p2-review/03)。
     public let containers: [ContainerRow]
 
     public init(engineReachable: Bool, containers: [ContainerRow]) {
         self.engineReachable = engineReachable
-        self.containers = containers
+        self.containers = containers.sorted(by: Self.displayOrder)
+    }
+
+    private static func displayOrder(_ lhs: ContainerRow, _ rhs: ContainerRow) -> Bool {
+        if lhs.isRunning != rhs.isRunning {
+            return lhs.isRunning
+        }
+        switch lhs.name.localizedStandardCompare(rhs.name) {
+        case .orderedAscending: return true
+        case .orderedDescending: return false
+        case .orderedSame: return lhs.id < rhs.id
+        }
     }
 }
 

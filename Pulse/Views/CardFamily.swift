@@ -83,6 +83,44 @@ struct CardSubHeader: View {
     }
 }
 
+/// 卡内明细行的定宽令牌(DESIGN.md `{layout.row-*}`,p2-review/03 入表):数值列按
+/// 该类读数的最宽现实文案量宽,作**最小宽**(真读数更宽时撑开,不截断);标签列定宽
+/// 让同卡各行的 meter 起点对齐。新读数类型先补 DESIGN.md 表再加常量。
+enum CardRowWidth {
+    /// 标签列(短):三字母域名,如五路功率 "SoC" / "ANE"。
+    static let shortLabel: CGFloat = 36
+    /// 标签列:四个汉字 / 一个英文词,如 "最快风扇" / "Hottest"。
+    static let label: CGFloat = 64
+    /// 数值列:整数百分比 "100%"(音量、设备电量)。
+    static let percentValue: CGFloat = 36
+    /// 数值列:一位小数百分比 "99.9%"(容器 CPU)。
+    static let decimalPercentValue: CGFloat = 48
+    /// 数值列:温度 "99.9°C"。
+    static let temperatureValue: CGFloat = 52
+    /// 数值列:带单位量 "999 MB" / "99.9 W"(内存、功率)。
+    static let quantityValue: CGFloat = 56
+    /// 数值列:风扇转速 "9999 rpm"。
+    static let rpmValue: CGFloat = 64
+}
+
+/// 卡内明细行数值:`{typography.body}` 12 常规 + `monospacedDigit`(DESIGN.md:一切数字
+/// 读数等宽数字,不用整体等宽字形 `.monospaced`),右对齐,`minWidth` 取 `CardRowWidth`
+/// 令牌(nil = 不定宽,如前置 Spacer 已把数值推到行尾)。层级色由调用方给(多为 secondary)。
+struct CardRowValue: View {
+    let text: String
+    var minWidth: CGFloat?
+    var style: HierarchicalShapeStyle = .secondary
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 12))
+            .monospacedDigit()
+            .lineLimit(1)
+            .foregroundStyle(style)
+            .frame(minWidth: minWidth, alignment: .trailing)
+    }
+}
+
 /// 统计值:小标签(10.5 secondary,可带 6pt 色点)在上,数值(12 semibold 等宽)在下。
 /// 总览卡、指标主卡(两档)共用一个字号——统计值不是大数字,不走圆体。
 struct StatValue: View {

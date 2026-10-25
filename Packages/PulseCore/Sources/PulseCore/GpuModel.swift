@@ -9,7 +9,7 @@ import Foundation
 /// "Device Utilization %",缺键回退 "GPU Activity(%)"(reader.swift:139);
 /// AGC 电源管理关电 = `AGCInfo["poweredOffByAGC"]`(条目顶层,reader.swift:205)。
 /// 本机实证(2026-10-22 探针):M4 三利用率键在场,字典**无**温度/频率键——
-/// GPU 温度归 SMC 家族(04 票),不进本读数。
+/// GPU 温度归 SMC 家族(p2-sensors/04),不进本读数。
 public struct GpuRawReading: Equatable, Sendable {
     /// 总利用率首选键 "Device Utilization %"。
     public var deviceUtilizationPercent: Double?
