@@ -65,7 +65,15 @@ fi
 # (.claude/worktrees 等) SwiftFormat would otherwise also read the primary
 # checkout's .swiftformat up the tree, whose --exclude skips every file
 # here — "0 files formatted, 1 file skipped", a silent pass.
-sf_config="$root/.swiftformat"
+# 必须传相对路径:绝对路径在 /tmp 下的 worktree 踩 macOS 符号链接双拼写
+# (/tmp vs /private/tmp),SwiftFormat 的 --exclude 相对锚定失配,build/ 里的
+# SPM 依赖检出被误扫(实测 ~68k 假违规,只在 build/ 已存在时发作——首个
+# check.sh 绿、第二个红)。相对路径锚定 cwd=$root,主仓与 worktree 都正确。
+sf_config=".swiftformat"
+if [ ! -f "$sf_config" ]; then
+  echo "✋ .swiftformat 缺失 — 显式相对 config 是防上游误读的前提,拒绝放行。" >&2
+  exit 1
+fi
 
 sf_status=0
 sl_status=0
