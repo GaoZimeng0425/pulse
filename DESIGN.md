@@ -20,6 +20,7 @@ colors:
   state-positive: = {accent-battery}
   state-negative: "#e0352b / #ff453a"
   state-warning: = {accent-disk}
+  state-inactive: "secondary @ 40%(系统语义色,随外观)"
   category-app: "#a2845e / #ac8e68"
   category-project: = {accent-cpu}
   category-system: "#8e8e93 / #98989d"
@@ -94,6 +95,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{colors.state-warning}` | `Surface.warning`(= Disk 指标色别名) | 压力偏高、优化充电介入、触发中告警横幅(琥珀语义) |
 | `{colors.category-*}` | `GroupCategory.identityColor` | 非 App 组的图标瓦片底色;孤儿另作组行强调色(见下) |
 | `{colors.state-negative}` | `Surface.negative` | 高负载、紧张、结束进程等负面偏差 |
+| `{colors.state-inactive}` | `Surface.inactive` | 行首状态点的"停 / 未连接"态(容器未运行、蓝牙设备未连接);亮起态取所在页指标色(p2-review/03 入表) |
 
 规则:
 - 文字层级用系统语义(`.primary/.secondary/.tertiary`),不自定义灰。
@@ -129,7 +131,11 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 - **一切数字**读数(百分比、字节、速率、PID)必须 `monospacedDigit()`;
   大数字另加 `.rounded` 设计族与负字距(`FigureText` 是唯一实现,不要复刻;字号只取
   `FigureSize` 令牌)。统计值(标签 + 数字)不是大数字:`{typography.body}` 12 semibold
-  等宽,不走圆体(`StatValue` 是唯一实现)。
+  等宽,不走圆体(`StatValue` 是唯一实现)。卡内明细行的数值(名称 + meter + 数值行)
+  是 `{typography.body}` 12 **常规** + `monospacedDigit`(`CardRowValue` 是唯一实现,
+  p2-review/03)。
+- 不用整体等宽字形 `design: .monospaced`(SF Mono)——数字对齐只靠 `monospacedDigit`;
+  确需等宽字形的非数字内容(如十六进制键名)须先在此登记例外。目前无例外。
 - 菜单栏徽标字号(11.5 / 7pt;网络上下行叠两行版式 9pt)是 NSStatusItem 尺寸约束下的特例,不外溢到窗口 UI。
 - 不引第三方字体;中英文混排依赖系统默认,不手动调字距。
 
@@ -147,6 +153,13 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{spacing.card-padding-compact}` | 12pt | 弹窗紧凑卡内距 |
 | `{spacing.card-gap}` | 16pt | 卡片网格的卡间 |
 | `{spacing.window-padding}` | 24pt | 主窗口内容左右/底部边距 |
+| `{layout.row-label-short}` | 36pt | 卡内明细行标签列(三字母域名 SoC / ANE,五路功率卡) |
+| `{layout.row-label}` | 64pt | 卡内明细行标签列(四汉字 / 一个英文词,传感器派生卡) |
+| `{layout.row-value-percent}` | 36pt | 卡内明细行数值列最小宽:整数百分比 `100%`(音量、设备电量) |
+| `{layout.row-value-decimal-percent}` | 48pt | 同上:一位小数百分比 `99.9%`(容器 CPU) |
+| `{layout.row-value-temperature}` | 52pt | 同上:温度 `99.9°C`(传感器派生卡) |
+| `{layout.row-value-quantity}` | 56pt | 同上:带单位量 `999 MB` / `99.9 W`(容器内存、五路功率) |
+| `{layout.row-value-rpm}` | 64pt | 同上:风扇转速 `9999 rpm` |
 | `{layout.overview-card-min-width}` | 340pt | 总览卡自适应网格的单卡最小宽(主窗口列数 1–4 由它派生:列数 = 内容宽容纳的最多列,340 + 列距 16,上限 4) |
 
 窗口:主窗口最小 **720×560**(spec 钉死),默认 880×620;弹窗定宽 **360pt**
@@ -180,7 +193,9 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   card-title 指标色)、副卡头 `CardSubHeader`(10pt 指标色符号 + 11 medium 次级标题 +
   10.5 注记)、统计值 `StatValue`、卡内空态 `CardEmptyState`(12.5 medium secondary 一句 +
   10.5 tertiary 说明,居中;可带一个 11pt `.link` 动作——授权型能力卡的开启 / 授权 /
-  去系统设置,与告警横幅降级出口同款,其余空态不配按钮)。**新卡一律组装这些零件,
+  去系统设置,与告警横幅降级出口同款,其余空态不配按钮)、卡内明细行数值 `CardRowValue`(12 常规 `monospacedDigit` 右对齐,
+  最小宽取 `{layout.row-value-*}` 令牌即 `CardRowWidth`;标签列定宽取 `{layout.row-label*}`)。
+  **新卡一律组装这些零件,
   不再手写卡壳 / 卡头 / 空态。**
 
 - **MetricCardView(full)**:徽章 22×22 + 标题 + chevron / 34pt 大数字 + 状态 chip /
@@ -213,11 +228,15 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   + 同色前景,未选中 = secondary 前景无底;内距 9(水平)×5(垂直)、药丸间距 4;
   切换动画 0.2s snappy(选中文字自图标侧展开、胶囊生长、其余药丸滑移让位)。
   两种文字形态:`.selectedOnly`(未选中纯图标 / 选中图标+文字;图标-only 必带
-  a11y label + help)与 `.always`(文字恒显)。三处用法同一组件:主窗口工具栏
+  a11y label + help)与 `.always`(文字恒显)。四处用法同一组件:主窗口工具栏
   tab(`MetricPillTabBar` 薄封装 = `.selectedOnly` + ←/→ 键盘 + 首尾再留 4pt
   与系统玻璃底的间距;选中才展开文字是用户拍板 2026-10-16 的宽度根治法)、
   历史页指标条(同工具栏形态:五项各指标色 + 与主窗口 tab 同符号,系统负载取
-  仪表盘符与 CPU 区分)、历史页范围条(`.always` 无图标,色调随所选指标)。
+  仪表盘符与 CPU 区分)、历史页分项条(p2-review/07,用户拍板 2026-10-24 形态 (a):
+  只在有分项的指标——温度、功率——出现,挂在指标条正下方,`.always` 无图标,一次
+  看一条线不叠加;各项取分项色——功率单域取五路功率卡域配色 `PowerDomain.tint`,
+  一个出处;间距沿用页面竖排间距 8 / 12,不另立数值)、历史页范围条(`.always` 无
+  图标,色调随所选指标 / 分项)。
   玻璃外裹(用户拍板 2026-10-22:历史页要同款包裹):工具栏胶囊是 macOS 26
   工具栏给 `.principal` 自动套的系统玻璃;内容页用法传 `isGlassContainer: true`
   自备同款——药丸外 4pt 内距 + 系统 Liquid Glass `glassEffect()` 胶囊(系统
@@ -234,6 +253,14 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   历史页弹窗不放」):每个 tab 的卡片组成与顺序只在 `MetricTabStack` 一处定义,两处
   只差排版档——弹窗卡用紧凑档、主窗口并排的两卡改上下排、节标题不画;组排行卡的
   交互深度(主窗口搜索 + 可排序进程表)由宿主给。新增卡片只改 `MetricTabStack`。
+  **唯一拍板例外**(p2-review/04 A,2026-10-24;spec Story 17):传感器 tab 弹窗只放
+  派生读数卡(Average/Hottest + 最快风扇),风扇卡与温度明细卡只在主窗口——逐核明细
+  会把 360pt 弹窗撑得不可用的高。
+- **传感器卡文案与风扇条**(p2-review/08):风扇转速 rpm 0 写「停转」(真读数,不写
+  「0 rpm」,也不是读失败的「—」);读不到 / 无风扇写「—」。风扇 meter 按该扇上下限归一
+  (rpm−min)/(max−min) 钳 0…1,上下限不可用(max ≤ min)给空条;上下限标注
+  「下限 N · 上限 M rpm」(`{typography.micro}` 10.5 tertiary):全部风扇相同时卡头注记写一次,
+  不同时逐扇行下各写,两处不同时出现。派生卡最快风扇行多扇时数值前带扇名(「名 · 3200 rpm」)。
 - **弹窗 DashboardView**:定宽 360pt;底部操作"开窗靠左、设置+退出靠右"
   (退出 = 纯图标,用户拍板)。顶部图标 tab 槽位**单行满宽均分**(P2 扩到
   11 枚后 32pt 定宽槽超出 332pt 内容区、右端裁切;均分只收窄不溢出,与主窗口
@@ -287,3 +314,7 @@ chip 图标 9.5pt → micro 10.5;排行行 chevron 9pt → 10。
 - 指标主卡全尺寸内距 `.padding(20)`(MetricTabViews)与 2×2 统计 `horizontalSpacing: 18`
   不在令牌表,18 也不在 4pt 网格上;弹窗外框 `.padding(14)`(DashboardView)同。
   三者改动都可见,需与用户确认后再动。
+- 蓝牙设备行(`BluetoothCardViews`,p2-review/03 盘点):电量 / RSSI 数值仍 `design: .monospaced`、
+  状态点裸 `Color.secondary.opacity(0.4)`、电量 meter 定宽 44 / 64 与 RSSI 列 32 不在令牌表——
+  改成 `CardRowValue` / `Surface.inactive`,meter 与 RSSI 宽先补表。p2-review/03 时该文件由
+  p2-review/02 并行改动,为免冲突未动,动该文件时顺带收编。

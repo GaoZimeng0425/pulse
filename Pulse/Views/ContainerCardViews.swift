@@ -7,7 +7,8 @@ import SwiftUI
 // 四坑);本文件只做 SwiftUI 外观——容器表行(名称/状态/CPU/内存),弹窗
 // (紧凑)与主窗口共用,走预览 + 手动验收。
 
-/// 容器卡:每台一行(名称 + 状态点 + CPU% + 内存),运行中置顶;引擎缺席
+/// 容器卡:每台一行(名称 + 状态点 + CPU% + 内存),运行中置顶(行序是
+/// `ContainersReading` 的不变量,本视图照序画,p2-review/03);引擎缺席
 /// (OrbStack 未跑)或无容器安静占位。
 struct ContainersCardView: View {
     let reading: ContainersReading?
@@ -37,7 +38,7 @@ struct ContainersCardView: View {
 
     private var note: String? {
         guard let reading, !reading.containers.isEmpty else { return nil }
-        let running = reading.containers.filter { $0.state == "running" }.count
+        let running = reading.containers.filter(\.isRunning).count
         return "\(reading.containers.count) 台 · \(running) 运行中"
     }
 
@@ -49,23 +50,24 @@ struct ContainersCardView: View {
     }
 
     private func row(_ container: ContainerRow) -> some View {
-        let running = container.state == "running"
+        let running = container.isRunning
         return HStack(spacing: 8) {
             Circle()
-                .fill(running ? Metric.containers.accentColor : Color.secondary.opacity(0.4))
+                .fill(running ? Metric.containers.accentColor : Surface.inactive)
                 .frame(width: 6, height: 6)
             Text(container.name)
                 .font(.system(size: 12, weight: .medium))
                 .lineLimit(1)
             Spacer(minLength: 8)
-            Text(container.cpuPercent.map { String(format: "%.1f%%", $0) } ?? "—")
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .frame(minWidth: 48, alignment: .trailing)
-            Text(container.memoryBytes.map { PulseFormat.memory($0) } ?? "—")
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(.tertiary)
-                .frame(minWidth: 56, alignment: .trailing)
+            CardRowValue(
+                text: container.cpuPercent.map { String(format: "%.1f%%", $0) } ?? "—",
+                minWidth: CardRowWidth.decimalPercentValue
+            )
+            CardRowValue(
+                text: container.memoryBytes.map { PulseFormat.memory($0) } ?? "—",
+                minWidth: CardRowWidth.quantityValue,
+                style: .tertiary
+            )
         }
     }
 }

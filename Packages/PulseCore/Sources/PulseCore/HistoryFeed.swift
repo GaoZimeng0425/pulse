@@ -93,7 +93,7 @@ public extension HistoryEngine {
 public struct HistoryFeed: Sendable {
     private var pendingDiskReadBytes: UInt64 = 0
     private var pendingDiskWriteBytes: UInt64 = 0
-    /// P2 传感器趋势量的最新仪表值(08):广播样本覆盖暂存,每轮 takeIngest
+    /// P2 传感器趋势量的最新仪表值(p2-sensors/08):广播样本覆盖暂存,每轮 takeIngest
     /// 整笔带走(轮间重复携带同一值 = 仪表携带前推,分钟均值口径不变)。
     /// 样本带时刻:超过 `gaugeMaxAge` 无新样本(传感器持续失败)即置 nil 出
     /// 空段,不把冻结值无限写进历史(2026-10-23 审计⑤)。

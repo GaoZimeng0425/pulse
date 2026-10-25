@@ -53,6 +53,7 @@ final class BluetoothFeatureAccessTests: XCTestCase {
         BluetoothFeature(
             source: InertBluetoothSource(),
             access: access,
+            probe: InertGattBatteryProbe(), // 闸关会调 cancel:惰性探针,不转蓝牙栈
             loadEnabled: { enabled },
             persistEnabled: { persist.last = $0 }
         )

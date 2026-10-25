@@ -6,7 +6,7 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent(拍板项 A–D 已全部定,2026-10-24;剩余为 spec 文本回写)
+**Status:** done(拍板项 A–D 2026-10-24 定;五项 spec 回写 2026-10-24 完成)
 
 ## 待拍板
 
@@ -25,15 +25,29 @@
 
 ## 直接回写(无需拍板,代码即现状)
 
-- [ ] Story 12 + spec 第 59、71 行:蓝牙改"默认关;设置开关/卡片按钮是唯一触发源;采集闸 = 可见 ∧
+- [x] Story 12 + spec 第 59、71 行:蓝牙改"默认关;设置开关/卡片按钮是唯一触发源;采集闸 = 可见 ∧
   已开启 ∧ 已授权"(acbfdbf;`BluetoothFeature.swift:150-152`),引用 `CODING_STANDARDS.md` 权限/TCC 节。
-- [ ] Story 21 + 第 55 行:原文「<10 或 >120 沿用旧值、0 或 >110 丢弃」自相矛盾(>120 ⊂ >110);
+- [x] Story 21 + 第 55 行:原文「<10 或 >120 沿用旧值、0 或 >110 丢弃」自相矛盾(>120 ⊂ >110);
   按代码与 p2-sensors/04 口径改为「≤0 或 >110 丢弃;(0,10) 沿用旧值」(`SmcModel.swift:222-229`)。
-- [ ] Story 16 + 第 67 行:弹窗组形态改按"每个 tab 两处一致"描述,**传感器 tab 例外**(弹窗只放派生值
+- [x] Story 16 + 第 67 行:弹窗组形态改按"每个 tab 两处一致"描述,**传感器 tab 例外**(弹窗只放派生值
   含最快风扇,Story 17 原文保留);GPU 组为三张卡;容器组取前 6 台(全部状态,运行中置顶——随
   `p2-review/03` ④)。
-- [ ] Story 23 + 第 65 行:窗口最小宽仍 720(`MainWindowView.swift:117`),11 tab 靠 `.selectedOnly`
+- [x] Story 23 + 第 65 行:窗口最小宽仍 720(`MainWindowView.swift:117`),11 tab 靠 `.selectedOnly`
   (未选中只显示图标)装下——改写为此方案。
-- [ ] 第 59 行"睡眠停扫/唤醒重启":按 p2-sensors/06 记档口径——靠进程随睡眠挂起自然停止,无专门实现。
+- [x] 第 59 行"睡眠停扫/唤醒重启":按 p2-sensors/06 记档口径——靠进程随睡眠挂起自然停止,无专门实现。
 
 ## Comments
+
+### 执行记录(2026-10-24)
+
+只改 `.scratch/p2-sensors/spec.md`,每处句末标「p2-review/04 回写,2026-10-24」,原句保留可追溯:
+
+- Story 12 + 第 59、71 行:补"默认关;设置开关/卡片按钮唯一触发源;采集闸 = 可见 ∧ 已开启 ∧ 已授权"
+  (acbfdbf,`BluetoothFeature.swift` `applyGate`),引 `CODING_STANDARDS.md`「权限 / TCC 纪律」。
+- Story 21 + 第 55 行:坏值口径改为「≤0 或 >110 丢弃;(0,10) 沿用旧值,首轮无旧值丢弃」,注明原文矛盾
+  (`SmcModel.swift` `sanitized`)。
+- Story 16 + 第 67 行:弹窗按"每个 tab 两处一致"描述(`MetricTabStack.swift`),传感器 tab 明文例外
+  (只放派生值含最快风扇 → p2-review/08);GPU 组三卡;容器组前 6 台、全部状态、运行中置顶(随 03 ④)。
+- Story 23 + 第 65 行:最小宽仍 720,11 tab 靠 `.selectedOnly` 装下。
+- 第 59 行睡眠停扫:按 p2-sensors/06 记档——进程随睡眠挂起自然停,无专门实现(Story 12 同步注明)。
+- Story 7 / 8 / 17 按拍板 B/C/D 保持原文;Story 5 与差分首读两行(p2-review/01 已改)未动。

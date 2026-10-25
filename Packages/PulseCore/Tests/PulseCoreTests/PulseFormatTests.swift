@@ -150,4 +150,17 @@ final class PulseFormatTests: XCTestCase {
         XCTAssertEqual(PulseFormat.cpuSeconds(-1), "0.0 秒")
         XCTAssertEqual(PulseFormat.wakeupsPerSecond(-0.5), "0.0 次/秒")
     }
+
+    func testWattsIsTheSingleFormatOneDecimalAtEveryMagnitude() {
+        // 功率文案唯一出处(p2-review/03 收口:五路功率卡 / ANE 卡 / 电池卡 / 历史统计
+        // 同一套)。口径 = 参考文档 §1.1 "Power Draw 12.6 W" 与历史统计既有断言:
+        // 量级 ≥10 W 也保留一位小数,不取整。
+        XCTAssertEqual(PulseFormat.watts(0), "0.0 W")
+        XCTAssertEqual(PulseFormat.watts(0.34), "0.3 W")
+        XCTAssertEqual(PulseFormat.watts(12.34), "12.3 W")
+        XCTAssertEqual(PulseFormat.watts(25), "25.0 W")
+        XCTAssertEqual(PulseFormat.watts(-2), "0.0 W", "负值夹 0")
+        XCTAssertEqual(HistoryMetricKey.power.statisticText(25), "25.0 W", "历史统计同一出处")
+        XCTAssertEqual(HistoryMetricKey.power.statisticText(-0.04), "0.0 W", "历史统计同样夹 0,不出 \"-0.0 W\"")
+    }
 }

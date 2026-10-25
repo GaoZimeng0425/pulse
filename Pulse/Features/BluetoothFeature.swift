@@ -43,14 +43,16 @@ final class BluetoothFeature: MonitorFeature {
     /// 最近一次可见性折算(弹窗 ∨ 外设页)。
     private var isVisible = false
 
-    /// 注入构造(测试 / 预览):开关读写闭包 + 授权控制(AlertSettingsStore 同款注入口)。
+    /// 注入构造(测试 / 预览):开关读写闭包 + 授权控制(AlertSettingsStore 同款注入口);
+    /// 预览 / 测试宿主另注入惰性 GATT 探针(`BluetoothFeature.inert()`),不转蓝牙栈。
     init(
         source: any BluetoothSource,
         access: any BluetoothAccessControl,
+        probe: any GattBatteryProbing = GattBatteryProbe(),
         loadEnabled: () -> Bool,
         persistEnabled: @escaping (Bool) -> Void
     ) {
-        provider = BluetoothSensorProvider(source: source)
+        provider = BluetoothSensorProvider(source: source, probe: probe)
         self.access = access
         self.persistEnabled = persistEnabled
         isEnabled = loadEnabled()
@@ -96,7 +98,7 @@ final class BluetoothFeature: MonitorFeature {
         ]
     }
 
-    /// 可见性输入:弹窗 ∨ 外设页(05 票立的 peripheralsPage 旗标在此消费;与
+    /// 可见性输入:弹窗 ∨ 外设页(p2-sensors/05 立的 peripheralsPage 旗标在此消费;与
     /// GPU/传感器/排行闸分旗,ADR-0006 语义不混)。进场顺带静默刷新授权(用户可能
     /// 刚在系统设置里改过),不请求。
     func visibilityChanged(_ visibility: MonitorVisibility) {
@@ -133,7 +135,8 @@ final class BluetoothFeature: MonitorFeature {
         applyGate()
     }
 
-    /// 闸 = 可见 ∧ 已开启 ∧ 已授权;关闸时 provider 一个源都不碰。
+    /// 闸 = 可见 ∧ 已开启 ∧ 已授权;关闸时 provider 一个源都不碰,在途 GATT 探针
+    /// 随之取消(p2-review/02;关开关 / 不可见 / 授权失效三路都经此)。
     private func applyGate() {
         provider.setVisible(isVisible && accessState == .ready)
     }

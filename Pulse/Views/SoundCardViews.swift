@@ -54,10 +54,7 @@ struct SoundCardView: View {
                     fraction: min(max(percent / 100, 0), 1),
                     tint: Metric.sound.accentColor
                 )
-                Text("\(Int(percent.rounded()))%")
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .frame(minWidth: 36, alignment: .trailing)
+                CardRowValue(text: "\(Int(percent.rounded()))%", minWidth: CardRowWidth.percentValue)
             } else {
                 Text("设备不控音量")
                     .font(.system(size: 12))

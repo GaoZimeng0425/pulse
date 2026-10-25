@@ -4,13 +4,13 @@ import PulseCore
 
 // 键名与防御口径移植自 stats(MIT)Modules/GPU/reader.swift(调研
 // docs/research/sensor-impl-comparison.md §2.4;本机 2026-10-22 探针实证
-// M4 三利用率键在场、字典无温度/频率键——GPU 温度归 SMC 家族,04 票)。
+// M4 三利用率键在场、字典无温度/频率键——GPU 温度归 SMC 家族,p2-sensors/04)。
 
 // MARK: - Live GPU 源
 
 /// Darwin 薄适配器:枚举 IORegistry `IOAccelerator` 条目,取第一个带
 /// `PerformanceStatistics` 字典的条目(Apple Silicon 单 GPU;双 GPU 机器取
-/// 排序首个,聚合口径 03 票随五路功率再议)。键提取在这里,值折算(钳位 /
+/// 排序首个,聚合口径 p2-sensors/03 随五路功率再议)。键提取在这里,值折算(钳位 /
 /// AGC / 回退键序)在 PulseCore `GpuReading.make`——测试缝在协议上(ADR-0004)。
 struct LiveGpuSource: GpuSource {
     func read() -> GpuRawReading? {

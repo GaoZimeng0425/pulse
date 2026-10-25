@@ -97,7 +97,7 @@ final class HistoryFeature: MonitorFeature {
         case let .diskThroughput(delivery):
             feed.recordDiskThroughput(delivery)
         case let .gpuSample(delivery):
-            // P2 传感器趋势量(08):三路 30s 历史档广播,fresh 才暂存(feed 内判);
+            // P2 传感器趋势量(p2-sensors/08):三路 30s 历史档广播,fresh 才暂存(feed 内判);
             // 时刻走注入钟(仪表过期判定用,审计⑤)。
             feed.recordGpu(delivery, at: clock())
         case let .smcSample(delivery):
@@ -113,11 +113,12 @@ final class HistoryFeature: MonitorFeature {
     /// Story 10);引擎缺席 → nil,页面按"暂无数据"占位,不打断页面。
     func series(
         metric: HistoryMetricKey,
+        breakdown: HistoryBreakdown? = nil,
         range: HistoryRange,
         now: Date = Date()
     ) async -> HistorySeries? {
         guard let engine else { return nil }
-        return await engine.series(metric: metric, range: range, now: now)
+        return await engine.series(metric: metric, breakdown: breakdown, range: range, now: now)
     }
 
     /// 收流(单测收尾 / SystemMonitor.stop):已入流的入参照常落完,写入者随后退出;

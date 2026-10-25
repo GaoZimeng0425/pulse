@@ -10,6 +10,17 @@ import XCTest
 // Live 源只做"本机真读一次不崩 + 结构健全"冒烟(OrbStack 在跑 = 真容器;
 // 未跑 = engineReachable false 空表,两条路径都合法)。
 
+/// 宽度 1 的任务执行器(SE-0417):偏好它的任务的作业全在一条串行队列上跑——
+/// 受限宽度下"阻塞段占不占执行线程"才可观测(协作池多线程,堵一条看不出)。
+private final class SingleLaneTaskExecutor: TaskExecutor {
+    private let lane = DispatchQueue(label: "pulse.tests.single-lane-executor")
+
+    func enqueue(_ job: consuming ExecutorJob) {
+        let job = UnownedJob(job)
+        lane.async { job.runSynchronously(on: self.asUnownedTaskExecutor()) }
+    }
+}
+
 /// 假容器源:载荷开关(测 lastGood 与空态语义)。
 private final class FakeContainerSource: ContainerSource, @unchecked Sendable {
     var payload: ContainersReading?
@@ -117,30 +128,26 @@ final class ContainerSensorTests: XCTestCase {
 
     func testBlockingWaitsOnGlobalQueueNotCooperativePool() async throws {
         // p2-audit/02:connect/recv 阻塞段移全局队列——慢引擎握住连接时,
-        // (a) 接收超时照常触发(语义不变,read 返 nil);(b) 等待期间协作
-        // 线程池不被占用:并发短任务照常完成。
+        // (a) 接收超时照常触发(语义不变,read 返 nil);(b) 等待期间不占调用方的
+        // 执行线程。(b) 的证据要能失败(p2-review/03 ⑥):默认协作池多线程,堵一条
+        // 不会饿死别的任务,旧"池心跳"断言恒真。这里把 read 与心跳都钉在**宽度 1**
+        // 的任务执行器上——阻塞段若在 read 的执行线程上跑,唯一那条线程被堵到超时,
+        // 心跳只能排在 read 返回(≥1s)之后。
         let socketPath = try makeSilentUnixSocketServer(holdSeconds: 3)
         let source = LiveContainerSource(socketPaths: [socketPath], recvTimeoutSeconds: 1)
+        let executor = SingleLaneTaskExecutor()
 
         let started = Date()
-        let readTask = Task { await source.read() }
-        // 协作池心跳:阻塞等待窗口内(≥1s)一个 50ms 异步任务必须已完成——
-        // 若阻塞仍在协作线程上,这里会被饿到 read 返回之后才轮到。
+        let readTask = Task(executorPreference: executor) { await source.read() }
         try await Task.sleep(nanoseconds: 100_000_000) // 等 read 进入阻塞段
-        let heartbeatDone: Bool = await withCheckedContinuation { continuation in
-            Task {
-                try await Task.sleep(nanoseconds: 50_000_000)
-                continuation.resume(returning: true)
-            }
-        }
-        XCTAssertTrue(heartbeatDone)
-        // read 仍在等超时由下方 elapsed ≥ 0.9s 兜底证明(心跳发生在 ~150ms,
-        // 远早于超时点——阻塞段若占协作线程,心跳任务会被压后到 read 返回之后)。
+        let heartbeat = Task(executorPreference: executor) { Date().timeIntervalSince(started) }
+        let heartbeatAt = await heartbeat.value
+        XCTAssertLessThan(heartbeatAt, 0.8, "单线执行器上的心跳在超时前跑到 = 阻塞段不在调用方执行线程上")
 
         let reading = await readTask.value
         XCTAssertNil(reading, "列表超时 = 读失败语义(不动 lastGood 口径不变)")
         let elapsed = Date().timeIntervalSince(started)
-        XCTAssertGreaterThanOrEqual(elapsed, 0.9, "接收超时被遵守")
+        XCTAssertGreaterThanOrEqual(elapsed, 0.9, "接收超时被遵守(心跳确实落在阻塞窗口内)")
         XCTAssertLessThan(elapsed, 2.5, "超时后即返回(不是被服务器 hold 满 3s)")
     }
 

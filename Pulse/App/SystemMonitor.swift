@@ -322,7 +322,7 @@ final class SystemMonitor {
     }
 
     /// 外设页可见性变化(p2-sensors/05 页面创建;声音事件驱动不消费本旗标,
-    /// 06 票蓝牙扫描闸消费)。拷贝-改写式——旧的全参重建在 setMainWindowVisible
+    /// p2-sensors/06 蓝牙扫描闸消费)。拷贝-改写式——旧的全参重建在 setMainWindowVisible
     /// 曾漏传 sensorsPage 把旗标清零,顺带收编(改动对应文件时一并修)。
     func setPeripheralsPageVisible(_ visible: Bool) {
         var next = visibility

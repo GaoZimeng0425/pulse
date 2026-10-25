@@ -15,7 +15,7 @@ INSTALL_PATH="/Applications/$APP_NAME.app"
 
 # ── 本地部署自签(2026-10-24,照搬 NemoNotch 2026-10-20 方案)──────────────
 # ad-hoc 每次重建换 cdhash,TCC/Keychain 授权全丢 = 每次重装都被当陌生 app
-# 重新弹权限框(蓝牙票 06 补记的"一直提示"根因之二)。改用登录钥匙串里的
+# 重新弹权限框(蓝牙票 p2-sensors/06 补记的"一直提示"根因之二)。改用登录钥匙串里的
 # 稳定自签身份:授权锚定在证书上,重装不丢。
 # 判据用 codesign 实签探针(find-identity -p codesigning 对无信任设置的自签
 # 证书不显示,不能当存在性检查,NemoNotch 实测)。
