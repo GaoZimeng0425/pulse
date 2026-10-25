@@ -26,7 +26,7 @@ final class SmcFeature: MonitorFeature {
     /// 分档单驱动(p2-review/06):一条循环两个节奏(可见 5s / 不可见 30s);
     /// 历史广播 HistoryThrottle 节流,每满 30s 放行一次。
     func sensorDrivers() -> [SensorDriver] {
-        let historyPass = HistoryThrottle(interval: 30)
+        let historyPass = HistoryThrottle(interval: SensorTier.history)
         return [
             // 带新鲜度:stale 重投整笔跳过,不打脏观察(审计④)。
             provider.markedDriver { [weak self] delivery in

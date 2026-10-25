@@ -44,7 +44,7 @@ final class PowerFeature: MonitorFeature {
     /// 历史广播 HistoryThrottle 节流,每满 30s 放行一次——差分窗 = 实测时差,
     /// 旧双档"可见期历史档只拿到最近 5s 窗"的口径问题就此根治。
     func sensorDrivers() -> [SensorDriver] {
-        let historyPass = HistoryThrottle(interval: 30)
+        let historyPass = HistoryThrottle(interval: SensorTier.history)
         return [
             // 带新鲜度:stale 重投不灌 ANE 走势环/不打脏观察(审计④)。
             provider.markedDriver { [weak self] delivery in

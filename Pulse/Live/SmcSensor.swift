@@ -215,7 +215,7 @@ final class SmcSensorProvider: SensorProvider, @unchecked Sendable {
     }
 
     var adaptiveInterval: (@Sendable () -> TimeInterval)? {
-        { [gate] in gate.isVisible ? 5 : 30 }
+        { [gate] in gate.isVisible ? SensorTier.ui : SensorTier.history }
     }
 
     func snapshot() async -> SmcReading? {

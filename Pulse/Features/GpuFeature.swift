@@ -35,7 +35,7 @@ final class GpuFeature: MonitorFeature {
     /// provider.adaptiveInterval);历史广播由 HistoryThrottle 节流——每满 30s
     /// 放行一次,替代旧 30s 历史档驱动。
     func sensorDrivers() -> [SensorDriver] {
-        let historyPass = HistoryThrottle(interval: 30)
+        let historyPass = HistoryThrottle(interval: SensorTier.history)
         return [
             // 带新鲜度(stale 重投不灌走势环/不打脏观察,2026-10-23 审计④)。
             provider.markedDriver { [weak self] delivery in

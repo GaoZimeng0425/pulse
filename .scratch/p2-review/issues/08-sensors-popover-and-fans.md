@@ -13,7 +13,10 @@
 - [x] ② 弹窗传感器 tab 只放派生值
 - [x] ③ 风扇进度条 (rpm−min)/(max−min)
 - [x] check.sh 全绿
-- [ ] 关两窗指纹全零(未跑,待真机——见执行记录)
+- [x] 关两窗指纹全零(2026-10-25 补测,装机版含 05/06/蓝牙令牌统一:基线
+      15s 全零;AX 点开弹窗再关后 15s 仍全零——DashboardView/RankingRowView 族/
+      MetricTabStack/OverviewCards/StripChartView/nettop 计数全 0。主窗口本轮
+      未程序化打开,其门控机制(MainWindowGate 条件渲染)本批未动、05 只改上报值)
 
 ## Agent Brief
 
