@@ -32,10 +32,18 @@ public protocol SensorProvider: Sendable {
     /// `.onEvent` 档的唤醒流:每次事件发一个 void,流结束 = 驱动循环结束。
     /// 非事件档无需实现(默认 nil)。
     func wakeups() -> AsyncStream<Void>?
+    /// 分档间隔(p2-review/06):每轮休眠前求值——可见走 UI 档、不可见走历史档,
+    /// 一条循环两个节奏,替代旧"双档两条驱动并发读同一 provider"的形状。
+    /// 默认 nil = 不分档,沿用 cadence 静态档。
+    var adaptiveInterval: (@Sendable () -> TimeInterval)? { get }
 }
 
 public extension SensorProvider {
     func wakeups() -> AsyncStream<Void>? {
+        nil
+    }
+
+    var adaptiveInterval: (@Sendable () -> TimeInterval)? {
         nil
     }
 }
@@ -93,6 +101,34 @@ public final class SensorVisibilityGate: @unchecked Sendable {
     public init() {}
 }
 
+// MARK: - 历史记账节流(p2-review/06)
+
+/// 历史记账节流:分档单循环下 UI 档与历史档同一条 tick——每满 interval 秒的
+/// 交付放行一次历史广播(可见期 5s 轮约每 6 轮放行,不可见期 30s 轮每轮放行)。
+/// 首轮即放行:启动 / 唤醒后的基线轮语义与旧历史档一致(能量差分首轮交 nil,
+/// 由 provider 折算层消化,不经这里)。锁保护的微小盒子:交付闭包 @Sendable,
+/// 求值发生在 MainActor 跳转之后,锁只护 lastPass 读写。
+public final class HistoryThrottle: @unchecked Sendable {
+    private let lock = NSLock()
+    private let interval: TimeInterval
+    private var lastPass: Date?
+
+    public init(interval: TimeInterval) {
+        self.interval = interval
+    }
+
+    /// 是否放行本轮广播;放行即记账(时间可注入,单测零真实等待)。
+    public func shouldPass(now: Date = Date()) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        if let lastPass, now.timeIntervalSince(lastPass) < interval {
+            return false
+        }
+        lastPass = now
+        return true
+    }
+}
+
 // MARK: - 调度登记(类型擦除核心)
 
 /// 调度器眼里的一项登记:节奏 + "读一次并交付"。provider 经 `driver(deliver:)`
@@ -104,6 +140,8 @@ public struct SensorDriver: Sendable {
     public let tick: @Sendable () async -> Void
     /// `.onEvent` 档的唤醒流构造;非事件档为 nil。
     public let wakeups: (@Sendable () -> AsyncStream<Void>?)?
+    /// 分档间隔(p2-review/06):每轮休眠前求值,nil = cadence 静态档。
+    public let adaptiveInterval: (@Sendable () -> TimeInterval)?
     /// 日志里点名用(provider 类型名);只在终态日志里出现。
     public var label = "传感器"
 
@@ -111,11 +149,13 @@ public struct SensorDriver: Sendable {
         cadence: SensorCadence,
         tick: @escaping @Sendable () async -> Void,
         wakeups: (@Sendable () -> AsyncStream<Void>?)?,
+        adaptiveInterval: (@Sendable () -> TimeInterval)? = nil,
         label: String = "传感器"
     ) {
         self.cadence = cadence
         self.tick = tick
         self.wakeups = wakeups
+        self.adaptiveInterval = adaptiveInterval
         self.label = label
     }
 }
@@ -164,7 +204,13 @@ public extension SensorProvider {
         if cadence == .onEvent {
             wakeups = { provider.wakeups() }
         }
-        return SensorDriver(cadence: cadence, tick: tick, wakeups: wakeups, label: String(describing: Self.self))
+        return SensorDriver(
+            cadence: cadence,
+            tick: tick,
+            wakeups: wakeups,
+            adaptiveInterval: provider.adaptiveInterval,
+            label: String(describing: Self.self)
+        )
     }
 }
 
@@ -209,8 +255,10 @@ public actor SensorScheduler {
         case let .every(interval):
             while !Task.isCancelled {
                 await driver.tick()
+                // 分档间隔(p2-review/06):每轮休眠前求值——可见性切换 ≤1 轮内生效。
+                let current = driver.adaptiveInterval?() ?? interval
                 do {
-                    try await sleep(interval)
+                    try await sleep(current)
                 } catch {
                     return // sleep 抛错(典型:取消)= 停机信号
                 }

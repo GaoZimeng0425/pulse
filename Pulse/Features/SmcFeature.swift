@@ -3,7 +3,7 @@ import Observation
 import PulseCore
 
 /// SMC 传感器功能模块(工单 p2-sensors/04;ADR-0003 MonitorFeature):AppleSMC
-/// 传感器(ADR-0004,5s 档,可见性门控)经 sensorDrivers 登记;传感器 tab 的
+/// 传感器(ADR-0004;p2-review/06 起分档单循环)经 sensorDrivers 登记;传感器 tab 的
 /// 派生值/明细/风扇与弹窗温度组直读 `reading`。读失败交付上次好值(lastGood)。
 @Observable
 @MainActor
@@ -23,31 +23,22 @@ final class SmcFeature: MonitorFeature {
         self.host = host
     }
 
+    /// 分档单驱动(p2-review/06):一条循环两个节奏(可见 5s / 不可见 30s);
+    /// 历史广播 HistoryThrottle 节流,每满 30s 放行一次。
     func sensorDrivers() -> [SensorDriver] {
-        let provider = provider
-        let historyDriver = SensorDriver(
-            cadence: .every(seconds: 30),
-            tick: { [weak self] in
-                guard let self else { return }
-                if let reading = await provider.historySnapshot() {
-                    Task { @MainActor in
-                        self.host?.broadcast(.smcSample(.fresh(reading)))
-                    }
-                }
-            },
-            wakeups: nil,
-            label: "SMC历史档"
-        )
+        let historyPass = HistoryThrottle(interval: 30)
         return [
-            // UI 档带新鲜度:stale 重投整笔跳过,关窗期不逐 5s 打脏观察(审计④)。
+            // 带新鲜度:stale 重投整笔跳过,不打脏观察(审计④)。
             provider.markedDriver { [weak self] delivery in
                 guard let self else { return }
                 Task { @MainActor in
                     guard case let .fresh(reading) = delivery else { return }
                     self.reading = reading
+                    if historyPass.shouldPass() {
+                        self.host?.broadcast(.smcSample(.fresh(reading)))
+                    }
                 }
             },
-            historyDriver,
         ]
     }
 

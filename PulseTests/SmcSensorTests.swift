@@ -16,41 +16,18 @@ private final class FakeSmcSource: SmcSource, @unchecked Sendable {
     }
 }
 
-/// 并发探针源(p2-review/01 ①):每次读经 ReentryProbe(真源的发现缓存与
-/// io_connect 若被并发进入,峰值 > 1)。
-private final class ConcurrencyProbeSmcSource: SmcSource, @unchecked Sendable {
-    let probe = ReentryProbe()
-
-    func read() -> SmcSnapshot? {
-        probe.measure { ordinal in
-            SmcSnapshot(
-                keys: [SmcRawKey(key: "Tp01", dataType: "sp78", bytes: [45, 0])],
-                takenAt: Date(timeIntervalSince1970: Double(ordinal))
-            )
-        }
-    }
-}
-
 final class SmcSensorTests: XCTestCase {
-    func testConcurrentTiersNeverReadSourceConcurrently() async {
-        // 审计②补全(p2-review/01 ①):5s UI 档与 30s 历史档并发 tick 时,源不得
-        // 被并发进入——读源与坏值沿用链折算同在一个锁段。
-        let source = ConcurrencyProbeSmcSource()
-        let provider = SmcSensorProvider(source: source)
-        provider.setVisible(true)
-
-        await withTaskGroup(of: Void.self) { group in
-            for index in 0 ..< 8 {
-                group.addTask {
-                    if index.isMultiple(of: 2) {
-                        _ = await provider.snapshot()
-                    } else {
-                        _ = await provider.historySnapshot()
-                    }
-                }
-            }
-        }
-        XCTAssertEqual(source.probe.peakInFlight, 1)
+    @MainActor
+    func testFeatureRegistersExactlyOneDriver() {
+        // p2-review/06 根治:并发入口(双档两条驱动)收编成一条——previous 沿用链
+        // 与 io_connect 的串行不再靠 p2-review/01 ① 的锁,靠"每 provider 一条驱动"
+        // 的结构保证。锁已删,此断言钉住结构不被退回双驱动。
+        let feature = SmcFeature(source: FakeSmcSource())
+        XCTAssertEqual(feature.sensorDrivers().count, 1)
+        feature.visibilityChanged(MonitorVisibility(popoverTab: .sensors))
+        XCTAssertEqual(feature.sensorDrivers()[0].adaptiveInterval?(), 5)
+        feature.visibilityChanged(MonitorVisibility())
+        XCTAssertEqual(feature.sensorDrivers()[0].adaptiveInterval?(), 30)
     }
 
     private func sp78(_ value: Double) -> [UInt8] {
@@ -58,7 +35,8 @@ final class SmcSensorTests: XCTestCase {
         return [UInt8((scaled >> 8) & 0xFF), UInt8(scaled & 0xFF)]
     }
 
-    func testGateBlocksReadsWhenInvisible() async {
+    func testGateDrivesIntervalNotReads() async {
+        // p2-review/06 分档单循环:闸只驱动节奏(可见 5s / 不可见 30s),不再挡读。
         let source = FakeSmcSource()
         source.snapshots = [
             SmcSnapshot(keys: [
@@ -68,12 +46,12 @@ final class SmcSensorTests: XCTestCase {
         let provider = SmcSensorProvider(source: source)
 
         provider.setVisible(false)
-        let blocked = await provider.snapshot()
-        XCTAssertNil(blocked)
+        XCTAssertEqual(provider.adaptiveInterval?(), 30)
+        let hiddenRead = await provider.snapshot()
+        XCTAssertEqual(hiddenRead?.knownTemps.first?.value ?? -1, 45, accuracy: 1e-9, "闸关照样读(历史档同一条循环)")
 
         provider.setVisible(true)
-        let read = await provider.snapshot()
-        XCTAssertEqual(read?.knownTemps.first?.value ?? -1, 45, accuracy: 1e-9)
+        XCTAssertEqual(provider.adaptiveInterval?(), 5)
     }
 
     func testFrozenSensorKeepsPreviousAcrossRounds() async {

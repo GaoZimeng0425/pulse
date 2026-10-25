@@ -3,55 +3,50 @@ import Observation
 import PulseCore
 
 /// GPU 功能模块(工单 p2-sensors/02;ADR-0003 MonitorFeature):IORegistry
-/// 传感器(ADR-0004,5s 档 + 可见性门控)经 sensorDrivers 登记;GPU tab 与弹窗
-/// GPU 组直读 `reading` / `trend`。读失败交付上次好值(lastGood),不白屏。
+/// 传感器(ADR-0004;p2-review/06 起分档单循环)经 sensorDrivers 登记;GPU tab
+/// 与弹窗 GPU 组直读 `reading` / `trend`。读失败交付上次好值(lastGood),不白屏。
 @Observable
 @MainActor
 final class GpuFeature: MonitorFeature {
     /// 最近一次交付,LastGood 语义。
     private(set) var reading: GpuReading?
-    /// 利用率走势环(~60 点 × 5s 档 ≈ 5 分钟窗),主卡走势图读这里;
+    /// 利用率走势环(最近 60 个样本,主卡走势图读这里);分档单循环
+    /// (p2-review/06)后为混排节拍——可见 5s / 不可见 30s,窗长按样本数计。
     /// 关电归 0 与真 0 同记——走势如实反映"没在用"。
-    private(set) var trend: [Double] = []
+    private var ring = TrendRing<Double>(limit: 60)
+    var trend: [Double] {
+        ring.values
+    }
 
-    /// 走势环上限(SampleHistory 同款窗口量级)。
-    private let trendLimit: Int
     private let provider: GpuSensorProvider
     /// 广播出口(历史记账,08);start 前为 nil。
     @ObservationIgnored private var host: MonitorHost?
 
     init(source: any GpuSource, trendLimit: Int = 60) {
         provider = GpuSensorProvider(source: source)
-        self.trendLimit = trendLimit
+        ring = TrendRing(limit: trendLimit)
     }
 
     func start(_ host: MonitorHost) {
         self.host = host
     }
 
+    /// 分档单驱动(p2-review/06):一条循环两个节奏(可见 5s / 不可见 30s,
+    /// provider.adaptiveInterval);历史广播由 HistoryThrottle 节流——每满 30s
+    /// 放行一次,替代旧 30s 历史档驱动。
     func sensorDrivers() -> [SensorDriver] {
-        let provider = provider
-        let historyDriver = SensorDriver(
-            cadence: .every(seconds: 30),
-            tick: { [weak self] in
+        let historyPass = HistoryThrottle(interval: 30)
+        return [
+            // 带新鲜度(stale 重投不灌走势环/不打脏观察,2026-10-23 审计④)。
+            provider.markedDriver { [weak self] delivery in
                 guard let self else { return }
-                if let reading = await provider.historySnapshot() {
-                    Task { @MainActor in
+                Task { @MainActor in
+                    self.apply(delivery)
+                    if case let .fresh(reading) = delivery, historyPass.shouldPass() {
                         self.host?.broadcast(.gpuSample(.fresh(reading)))
                     }
                 }
             },
-            wakeups: nil,
-            label: "GPU历史档"
-        )
-        return [
-            // UI 档带新鲜度(stale 重投不灌走势环/不打脏观察——门关期间调度器
-            // 每 5s 重投 lastGood,2026-10-23 审计④:此前走势环被同一旧值灌满)。
-            provider.markedDriver { [weak self] delivery in
-                guard let self else { return }
-                Task { @MainActor in self.apply(delivery) }
-            },
-            historyDriver,
         ]
     }
 
@@ -68,9 +63,6 @@ final class GpuFeature: MonitorFeature {
     private func apply(_ delivery: SensorDelivery<GpuReading>?) {
         guard case let .fresh(reading) = delivery else { return }
         self.reading = reading
-        trend.append(reading.utilizationPercent)
-        if trend.count > trendLimit {
-            trend.removeFirst(trend.count - trendLimit)
-        }
+        ring.append(reading.utilizationPercent)
     }
 }

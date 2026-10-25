@@ -3,19 +3,21 @@ import Observation
 import PulseCore
 
 /// 五路功率功能模块(工单 p2-sensors/03;ADR-0003 MonitorFeature):Energy Model
-/// 传感器(ADR-0004,5s 档,与 GPU 同门控)经 sensorDrivers 登记;GPU 页的 ANE 卡
-/// 与五路功率区直读 `reading` / `aneTrend` / `aneNormalizedPercent`。
+/// 传感器(ADR-0004;p2-review/06 起分档单循环,与 GPU 同门控)经 sensorDrivers
+/// 登记;GPU 页的 ANE 卡与五路功率区直读 `reading` / `aneTrend` / `aneNormalizedPercent`。
 /// 读失败交付上次好值(lastGood),不白屏。
 @Observable
 @MainActor
 final class PowerFeature: MonitorFeature {
     /// 最近一次交付,LastGood 语义;首读/断档轮不交读数(未首读前为 nil 占位)。
     private(set) var reading: PowerReading?
-    /// ANE 瓦数走势环(~60 点 × 5s 档 ≈ 5 分钟窗)。
-    private(set) var aneTrend: [Double] = []
+    /// ANE 瓦数走势环(最近 60 个样本;分档单循环 p2-review/06 后为混排节拍,
+    /// 可见 5s / 不可见 30s,窗长按样本数计)。
+    private var aneRing = TrendRing<Double>(limit: 60)
+    var aneTrend: [Double] {
+        aneRing.values
+    }
 
-    /// 走势环上限(SampleHistory/GpuFeature 同款窗口量级)。
-    private let trendLimit: Int
     /// 芯片名(ANE 归一化表的键源,装配时注入)。
     private let chipName: String
     private let provider: EnergyModelSensorProvider
@@ -25,7 +27,7 @@ final class PowerFeature: MonitorFeature {
     init(source: any PowerSource, chipName: String, trendLimit: Int = 60) {
         provider = EnergyModelSensorProvider(source: source)
         self.chipName = chipName
-        self.trendLimit = trendLimit
+        aneRing = TrendRing(limit: trendLimit)
     }
 
     /// ANE 归一化百分比(M4 = 6.0W 上限,stats 表);未首读或 ANE 通道缺席为 nil
@@ -38,28 +40,22 @@ final class PowerFeature: MonitorFeature {
         self.host = host
     }
 
+    /// 分档单驱动(p2-review/06):一条循环两个节奏(可见 5s / 不可见 30s);
+    /// 历史广播 HistoryThrottle 节流,每满 30s 放行一次——差分窗 = 实测时差,
+    /// 旧双档"可见期历史档只拿到最近 5s 窗"的口径问题就此根治。
     func sensorDrivers() -> [SensorDriver] {
-        let provider = provider
-        let historyDriver = SensorDriver(
-            cadence: .every(seconds: 30),
-            tick: { [weak self] in
+        let historyPass = HistoryThrottle(interval: 30)
+        return [
+            // 带新鲜度:stale 重投不灌 ANE 走势环/不打脏观察(审计④)。
+            provider.markedDriver { [weak self] delivery in
                 guard let self else { return }
-                if let reading = await provider.historySnapshot() {
-                    Task { @MainActor in
+                Task { @MainActor in
+                    self.apply(delivery)
+                    if case let .fresh(reading) = delivery, historyPass.shouldPass() {
                         self.host?.broadcast(.powerSample(.fresh(reading)))
                     }
                 }
             },
-            wakeups: nil,
-            label: "功率历史档"
-        )
-        return [
-            // UI 档带新鲜度:stale 重投不灌 ANE 走势环/不打脏观察(审计④)。
-            provider.markedDriver { [weak self] delivery in
-                guard let self else { return }
-                Task { @MainActor in self.apply(delivery) }
-            },
-            historyDriver,
         ]
     }
 
@@ -77,9 +73,6 @@ final class PowerFeature: MonitorFeature {
         self.reading = reading
         // ANE 缺席不追加:走势只画真读数(p2-review/01 ④)。
         guard let aneWatts = reading.watts[.ane] else { return }
-        aneTrend.append(aneWatts)
-        if aneTrend.count > trendLimit {
-            aneTrend.removeFirst(aneTrend.count - trendLimit)
-        }
+        aneRing.append(aneWatts)
     }
 }

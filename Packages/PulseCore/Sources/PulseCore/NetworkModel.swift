@@ -113,19 +113,18 @@ public struct NetworkTrendBuffer: Equatable, Sendable {
     /// 环容量:与走势图宽(56 点)同级,略留余量。
     public static let capacity = 60
 
-    private var values: [NetworkRates] = []
+    /// 走势环收编(p2-review/06):窗口语义住在核心 TrendRing,本类型只承载
+    /// 网络速率值与图表口径。
+    private var ring = TrendRing<NetworkRates>(limit: NetworkTrendBuffer.capacity)
 
     /// 追加一轮速率(丢弃轮的 0 也入环——图表如实画谷底,不跳点)。
     public mutating func append(_ rates: NetworkRates) {
-        values.append(rates)
-        if values.count > Self.capacity {
-            values.removeFirst(values.count - Self.capacity)
-        }
+        ring.append(rates)
     }
 
     /// 图表口径:上 + 下合计流量(与磁盘卡"读写合计"同款惯例)。
     public var totalBytesPerSecond: [Double] {
-        values.map { $0.upBytesPerSecond + $0.downBytesPerSecond }
+        ring.values.map { $0.upBytesPerSecond + $0.downBytesPerSecond }
     }
 
     public init() {}

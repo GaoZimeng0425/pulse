@@ -64,15 +64,17 @@ struct LiveGpuSource: GpuSource {
 
 // MARK: - GPU 传感器 provider(p2-sensors/02,ADR-0004)
 
-/// GPU 传感器:短档 `.every(seconds: 5)`(弹窗/主窗口 GPU 页可见时才读,
-/// 门控挡住 IORegistry 调用;不可见交付 lastGood 不白屏——nettop 同款形状)。
-/// 历史档(不可见 30s)随 p2-sensors/08 历史接线再上,本票先不空转。
+/// GPU 传感器:分档单循环(p2-review/06)——一条驱动两个节奏,可见 5s /
+/// 不可见 30s(`adaptiveInterval`),历史广播由 feature 侧 HistoryThrottle 节流。
+/// 旧形状(5s UI 档 + 30s 历史档两条驱动并发读同一 provider)就此收编:
+/// 单循环天然串行,读失败交付 lastGood 不白屏(nettop 同款形状)。
 final class GpuSensorProvider: SensorProvider {
     typealias Reading = GpuReading
 
     let cadence: SensorCadence = .every(seconds: 5)
 
     private let source: any GpuSource
+    /// 可见性闸(p2-review/06 起只驱动节奏分档,不再挡读——历史档本就 30s 恒采)。
     private let gate = SensorVisibilityGate()
     private let slot = SensorLastGoodBox<GpuReading>()
 
@@ -84,18 +86,16 @@ final class GpuSensorProvider: SensorProvider {
         self.source = source
     }
 
-    /// 可见性切换(弹窗在场 ∨ 主窗口 GPU 页在场,GpuFeature 折算下发)。
+    /// 可见性切换(任一窗口停在展示 GPU 家族的 tab,GpuFeature 折算下发)。
     func setVisible(_ visible: Bool) {
         _ = gate.setVisible(visible)
     }
 
-    func snapshot() async -> GpuReading? {
-        guard gate.isVisible else { return nil }
-        return await historySnapshot()
+    var adaptiveInterval: (@Sendable () -> TimeInterval)? {
+        { [gate] in gate.isVisible ? 5 : 30 }
     }
 
-    /// 历史档读(p2-sensors/08):不看可见性闸(30s 恒采喂库),lastGood 同槽。
-    func historySnapshot() async -> GpuReading? {
+    func snapshot() async -> GpuReading? {
         guard let raw = source.read() else { return nil }
         let reading = GpuReading.make(from: raw)
         slot.store(reading)
