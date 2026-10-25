@@ -78,10 +78,12 @@ final class HistoryDatabaseTests: XCTestCase {
         _ = try HistoryDatabase.open(at: temporaryURL)
         let reopened = try HistoryDatabase.open(at: temporaryURL)
 
+        let placeholders = HistoryDatabase.tableNames.map { _ in "?" }
+            .joined(separator: ",")
         let tables = try reopened.read { db in
             try Int.fetchOne(
                 db,
-                sql: "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name IN (?,?,?,?,?,?,?)",
+                sql: "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name IN (\(placeholders))",
                 arguments: StatementArguments(HistoryDatabase.tableNames)
             )
         }

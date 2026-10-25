@@ -169,10 +169,7 @@ public actor HistoryEngine {
         netTxBytes: UInt64 = 0,
         diskReadBytes: UInt64 = 0,
         diskWriteBytes: UInt64 = 0,
-        tempAverage: Double? = nil,
-        tempMax: Double? = nil,
-        gpuUtilization: Double? = nil,
-        powerWatts: [PowerDomain: Double]? = nil
+        gauges: [GaugeKey: Double] = [:]
     ) -> HistoryIngestOutcome {
         guard let database else { return .buffered }
         var wroteMinute = false
@@ -186,10 +183,7 @@ public actor HistoryEngine {
                     netTxBytes: netTxBytes,
                     diskReadBytes: diskReadBytes,
                     diskWriteBytes: diskWriteBytes,
-                    tempAverage: tempAverage,
-                    tempMax: tempMax,
-                    gpuUtilization: gpuUtilization,
-                    powerWatts: powerWatts
+                    gauges: gauges
                 ) {
                     try Self.insertMinute(aggregate, in: db)
                     wroteMinute = true
@@ -544,9 +538,8 @@ public actor HistoryEngine {
         try db.execute(
             sql: """
             INSERT OR REPLACE INTO system_min
-                (ts, load_avg, load_max, net_rx, net_tx, disk_read, disk_written,
-                 temp_avg, temp_max, gpu_util, pow_cpu, pow_gpu, pow_ane, pow_ram, pow_soc)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (ts, load_avg, load_max, net_rx, net_tx, disk_read, disk_written)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             arguments: [
                 ts,
@@ -556,16 +549,25 @@ public actor HistoryEngine {
                 Int64(bitPattern: aggregate.netTxBytes),
                 Int64(bitPattern: aggregate.diskReadBytes),
                 Int64(bitPattern: aggregate.diskWriteBytes),
-                aggregate.tempAverage ?? nil,
-                aggregate.tempMax ?? nil,
-                aggregate.gpuUtilization ?? nil,
-                aggregate.powerWatts?.cpu ?? nil,
-                aggregate.powerWatts?.gpu ?? nil,
-                aggregate.powerWatts?.ane ?? nil,
-                aggregate.powerWatts?.ram ?? nil,
-                aggregate.powerWatts?.soc ?? nil,
             ]
         )
+        // 传感器仪表行(p2-review/09 窄表):每键一行,只写口径列
+        // (GaugeKey.aggregation:最热写 max,其余写 avg),另一列 NULL——
+        // 与迁移变换出的存量行同形。
+        for (key, gauge) in aggregate.gauges {
+            try db.execute(
+                sql: """
+                INSERT OR REPLACE INTO gauge_min (ts, key, avg, max)
+                VALUES (?, ?, ?, ?)
+                """,
+                arguments: [
+                    ts,
+                    key.rawValue,
+                    key.aggregation == .average ? gauge.average ?? nil : nil,
+                    key.aggregation == .max ? gauge.max ?? nil : nil,
+                ]
+            )
+        }
     }
 
     /// 小时卷积(两级口径的下半):sample_min/system_min 中 `[lower, upper)`
@@ -590,16 +592,26 @@ public actor HistoryEngine {
         try db.execute(
             sql: """
             INSERT OR REPLACE INTO system_hour
-                (ts, load_avg, load_max, net_rx, net_tx, disk_read, disk_written,
-                 temp_avg, temp_max, gpu_util, pow_cpu, pow_gpu, pow_ane, pow_ram, pow_soc)
+                (ts, load_avg, load_max, net_rx, net_tx, disk_read, disk_written)
             SELECT ts / 3600 * 3600,
                    AVG(load_avg), MAX(load_max),
-                   SUM(net_rx), SUM(net_tx), SUM(disk_read), SUM(disk_written),
-                   AVG(temp_avg), MAX(temp_max), AVG(gpu_util),
-                   AVG(pow_cpu), AVG(pow_gpu), AVG(pow_ane), AVG(pow_ram), AVG(pow_soc)
+                   SUM(net_rx), SUM(net_tx), SUM(disk_read), SUM(disk_written)
             FROM system_min
             WHERE ts >= ? AND ts < ?
             GROUP BY ts / 3600 * 3600
+            """,
+            arguments: [lower, upper]
+        )
+        // 仪表小时卷积(p2-review/09):均取 AVG(avg)、峰取 MAX(max),按键分组
+        // ——与旧宽列口径逐位一致(温度均值 AVG(temp_avg)、最热 MAX(temp_max)、
+        // GPU/功率 AVG)。非口径列的 NULL 不进聚合。
+        try db.execute(
+            sql: """
+            INSERT OR REPLACE INTO gauge_hour (ts, key, avg, max)
+            SELECT ts / 3600 * 3600, key, AVG(avg), MAX(max)
+            FROM gauge_min
+            WHERE ts >= ? AND ts < ?
+            GROUP BY ts / 3600 * 3600, key
             """,
             arguments: [lower, upper]
         )
@@ -613,5 +625,7 @@ public actor HistoryEngine {
         try db.execute(sql: "DELETE FROM system_min WHERE ts < ?", arguments: [minuteCutoff])
         try db.execute(sql: "DELETE FROM sample_hour WHERE ts < ?", arguments: [hourCutoff])
         try db.execute(sql: "DELETE FROM system_hour WHERE ts < ?", arguments: [hourCutoff])
+        try db.execute(sql: "DELETE FROM gauge_min WHERE ts < ?", arguments: [minuteCutoff])
+        try db.execute(sql: "DELETE FROM gauge_hour WHERE ts < ?", arguments: [hourCutoff])
     }
 }

@@ -31,21 +31,32 @@ final class HistoryBreakdownQueryTests: XCTestCase {
         var soc: Double?
     }
 
+    /// 窄表播种(p2-review/09):系统表只写基础行,仪表行进 gauge_*——平均键
+    /// 写 avg 列、最热写 max 列,与存储层同形;缺席键不产行。
     private func insert(_ rows: [SensorRow], table: String = "system_min") throws {
+        let gaugeTable = table == "system_min" ? "gauge_min" : "gauge_hour"
         try queue.write { db in
             for row in rows {
                 try db.execute(
-                    sql: """
-                    INSERT INTO \(table)
-                        (ts, load_avg, load_max, temp_avg, temp_max,
-                         pow_cpu, pow_gpu, pow_ane, pow_ram, pow_soc)
-                    VALUES (?, 1, 1, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    arguments: [
-                        row.ts, row.tempAverage, row.tempMax,
-                        row.cpu, row.gpu, row.ane, row.ram, row.soc,
-                    ]
+                    sql: "INSERT INTO \(table) (ts, load_avg, load_max) VALUES (?, 1, 1)",
+                    arguments: [row.ts]
                 )
+                let keys: [(String, Double?, Bool)] = [
+                    ("temp_avg", row.tempAverage, false),
+                    ("temp_max", row.tempMax, true),
+                    ("pow_cpu", row.cpu, false),
+                    ("pow_gpu", row.gpu, false),
+                    ("pow_ane", row.ane, false),
+                    ("pow_ram", row.ram, false),
+                    ("pow_soc", row.soc, false),
+                ]
+                for (key, value, isMax) in keys {
+                    guard let value else { continue }
+                    try db.execute(
+                        sql: "INSERT INTO \(gaugeTable) (ts, key, avg, max) VALUES (?, ?, ?, ?)",
+                        arguments: [row.ts, key, isMax ? nil : value, isMax ? value : nil]
+                    )
+                }
             }
         }
     }

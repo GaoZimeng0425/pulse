@@ -43,7 +43,7 @@ final class GpuFeature: MonitorFeature {
                 Task { @MainActor in
                     self.apply(delivery)
                     if case let .fresh(reading) = delivery, historyPass.shouldPass() {
-                        self.host?.broadcast(.gpuSample(.fresh(reading)))
+                        self.host?.broadcast(.gauges(reading.historyGauges))
                     }
                 }
             },

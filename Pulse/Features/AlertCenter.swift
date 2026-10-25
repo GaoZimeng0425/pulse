@@ -235,7 +235,7 @@ extension AlertCenter: MonitorFeature {
                     AlertDevServerSnapshot(pid: server.pid, name: server.displayName, idleSeconds: $0)
                 }
             })
-        case .diskThroughput, .gpuSample, .smcSample, .powerSample:
+        case .diskThroughput, .gauges:
             break // 传感器样本面不进告警(08:只喂历史)
         }
     }

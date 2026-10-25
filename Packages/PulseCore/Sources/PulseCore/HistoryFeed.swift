@@ -21,12 +21,9 @@ public struct HistoryIngest: Equatable, Sendable {
     /// 磁盘吞吐记账增量:自上一笔以来交付的新读数增量合计(字节)。
     public let diskReadBytes: UInt64
     public let diskWriteBytes: UInt64
-    /// P2 传感器趋势量(p2-sensors/08,仪表型):本轮携带的最新值(传感器
-    /// 广播进 feed 的暂存;从无样本 = nil,分钟聚合落 NULL 空段)。
-    public let tempAverage: Double?
-    public let tempMax: Double?
-    public let gpuUtilization: Double?
-    public let powerWatts: [PowerDomain: Double]?
+    /// 传感器仪表值(p2-sensors/08 起,p2-review/09 收成按键字典):本轮携带的
+    /// 最新值(传感器广播进 feed 的暂存;某键从无样本 = 无键,分钟聚合不产行)。
+    public let gauges: [GaugeKey: Double]
 
     public init(
         at: Date,
@@ -38,10 +35,7 @@ public struct HistoryIngest: Equatable, Sendable {
         netTxBytes: UInt64,
         diskReadBytes: UInt64,
         diskWriteBytes: UInt64,
-        tempAverage: Double? = nil,
-        tempMax: Double? = nil,
-        gpuUtilization: Double? = nil,
-        powerWatts: [PowerDomain: Double]? = nil
+        gauges: [GaugeKey: Double] = [:]
     ) {
         self.at = at
         self.systemLoad = systemLoad
@@ -52,10 +46,7 @@ public struct HistoryIngest: Equatable, Sendable {
         self.netTxBytes = netTxBytes
         self.diskReadBytes = diskReadBytes
         self.diskWriteBytes = diskWriteBytes
-        self.tempAverage = tempAverage
-        self.tempMax = tempMax
-        self.gpuUtilization = gpuUtilization
-        self.powerWatts = powerWatts
+        self.gauges = gauges
     }
 }
 
@@ -73,10 +64,7 @@ public extension HistoryEngine {
             netTxBytes: round.netTxBytes,
             diskReadBytes: round.diskReadBytes,
             diskWriteBytes: round.diskWriteBytes,
-            tempAverage: round.tempAverage,
-            tempMax: round.tempMax,
-            gpuUtilization: round.gpuUtilization,
-            powerWatts: round.powerWatts
+            gauges: round.gauges
         )
     }
 }
@@ -105,35 +93,18 @@ public struct HistoryFeed: Sendable {
     /// 仪表过期窗 = 3 个历史档周期(30s×3):容忍两个周期的读失败。
     private static let gaugeMaxAge: TimeInterval = 90
 
-    private var latestTempAverage: GaugeSample<Double>?
-    private var latestTempMax: GaugeSample<Double>?
-    private var latestGpuUtilization: GaugeSample<Double>?
-    private var latestPowerWatts: GaugeSample<[PowerDomain: Double]>?
+    /// 仪表暂存(p2-review/09 收成按键):每键独立样本时刻——不同传感器各自
+    /// 失败时,一个键过期不拖累其它键(各广播时间可错开)。
+    private var latestGauges: [GaugeKey: GaugeSample<Double>] = [:]
+
     /// 磁盘吞吐交付进账本:新读数的增量逐笔 &+ 累计;重投的上次好值跳过。
-    /// GPU 传感器交付(30s 历史档):fresh 才暂存(stale 是读失败重投的旧值,
-    /// 历史不重复记);`at` = 壳侧注入钟的采样时刻(过期判定用)。
-    public mutating func recordGpu(_ delivery: SensorDelivery<GpuReading>, at date: Date) {
-        guard case let .fresh(reading) = delivery else { return }
-        latestGpuUtilization = GaugeSample(value: reading.utilizationPercent, at: date)
-    }
-
-    /// SMC 传感器交付:温度派生口径 = CPU 均值 + 全机最热(cpu/gpu/soc 三最热取最大)。
-    public mutating func recordSmc(_ delivery: SensorDelivery<SmcReading>, at date: Date) {
-        guard case let .fresh(reading) = delivery else { return }
-        latestTempAverage = reading.derived.cpuAverage.map { GaugeSample(value: $0, at: date) }
-        latestTempMax = [
-            reading.derived.cpuHottest,
-            reading.derived.gpuHottest,
-            reading.derived.socHottest,
-        ].compactMap(\.self).max().map { GaugeSample(value: $0, at: date) }
-    }
-
-    /// 五路功率传感器交付:五域瓦数原样暂存(缺席域不伪造 0)。
-    public mutating func recordPower(_ delivery: SensorDelivery<PowerReading>, at date: Date) {
-        guard case let .fresh(reading) = delivery else { return }
-        latestPowerWatts = reading.watts.isEmpty
-            ? nil
-            : GaugeSample(value: reading.watts, at: date)
+    /// 传感器仪表交付(p2-review/09):feature 在 fresh 交付的节流轮广播
+    /// `historyGauges`(口径住在读数模型),此处按键覆盖暂存;`at` = 壳侧注入钟
+    /// 的采样时刻(过期判定用)。空字典 = 一次全族读失败,不动既有暂存。
+    public mutating func recordGauges(_ values: [GaugeKey: Double], at date: Date) {
+        for (key, value) in values {
+            latestGauges[key] = GaugeSample(value: value, at: date)
+        }
     }
 
     /// 过期即 nil(样本时刻距今超窗);未过期取值。
@@ -164,10 +135,9 @@ public struct HistoryFeed: Sendable {
             netTxBytes: context.update.network?.upBytesDelta ?? 0,
             diskReadBytes: pendingDiskReadBytes,
             diskWriteBytes: pendingDiskWriteBytes,
-            tempAverage: gauge(latestTempAverage, at: now),
-            tempMax: gauge(latestTempMax, at: now),
-            gpuUtilization: gauge(latestGpuUtilization, at: now),
-            powerWatts: gauge(latestPowerWatts, at: now)
+            gauges: latestGauges.compactMapValues { sample in
+                gauge(sample, at: now)
+            }
         )
         pendingDiskReadBytes = 0
         pendingDiskWriteBytes = 0

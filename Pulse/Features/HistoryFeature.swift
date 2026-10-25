@@ -96,14 +96,10 @@ final class HistoryFeature: MonitorFeature {
         switch event {
         case let .diskThroughput(delivery):
             feed.recordDiskThroughput(delivery)
-        case let .gpuSample(delivery):
-            // P2 传感器趋势量(p2-sensors/08):三路 30s 历史档广播,fresh 才暂存(feed 内判);
-            // 时刻走注入钟(仪表过期判定用,审计⑤)。
-            feed.recordGpu(delivery, at: clock())
-        case let .smcSample(delivery):
-            feed.recordSmc(delivery, at: clock())
-        case let .powerSample(delivery):
-            feed.recordPower(delivery, at: clock())
+        case let .gauges(values):
+            // 传感器仪表(p2-sensors/08 起,p2-review/09 收成按键):feature 在
+            // fresh 节流轮广播,时刻走注入钟(仪表过期判定用,审计⑤)。
+            feed.recordGauges(values, at: clock())
         case .diskCapacity, .devServers:
             break
         }
