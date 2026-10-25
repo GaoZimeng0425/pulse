@@ -71,7 +71,9 @@ struct RankingCardView<Expanded: View>: View {
 }
 
 /// 组排行行:通用行配方 + 交互——点行展开、悬停底色与「结束整组」、右键同入口。
-/// 组 CPU% > 100%(徽章语义)在名称后挂红色 高负载 chip;点击结束只是请求确认。
+/// 组 CPU% > 100%(StatusBadgeRules 同一阈值)不再挂行内"高负载"文字 chip——
+/// 挤占行宽遮挡信息(2026-10-26 用户目验反馈);改由行尾 CPU 数值圈红表达,
+/// 仅 CPU 口径(内存值不背 CPU 警示)。点击结束只是请求确认。
 struct RankingRowView: View {
     let group: ProcessGroup
     let metric: GroupCardMetric
@@ -94,13 +96,10 @@ struct RankingRowView: View {
                 meterFraction: meterFraction,
                 tint: accent,
                 valueText: valueText,
+                alertsHighLoad: metric == .cpu
+                    && StatusBadgeRules.groupBadge(cpuPercent: group.cpuPercent) != nil,
                 isCompact: isCompact
-            ) {
-                if let badge = StatusBadgeRules.groupBadge(cpuPercent: group.cpuPercent) {
-                    MetricChipView(chip: badge.chip, compact: true)
-                        .fixedSize()
-                }
-            } trailing: {
+            ) {} trailing: {
                 trailingControls
             }
             .background(
@@ -114,7 +113,10 @@ struct RankingRowView: View {
         .contextMenu {
             Button("结束整组…", role: .destructive, action: onEndGroup)
         }
-        .accessibilityLabel("\(group.name),\(group.processes.count) 进程,\(valueText)")
+        .accessibilityLabel(
+            "\(group.name),\(group.processes.count) 进程,\(valueText)"
+                + (StatusBadgeRules.groupBadge(cpuPercent: group.cpuPercent) != nil ? ",高负载" : "")
+        )
         .accessibilityHint(isExpanded ? "收起组内进程列表" : "展开组内进程列表")
     }
 
