@@ -52,3 +52,18 @@ argv 次级匹配对 zap/zcode CLI 无效。/tmp worktree(并行会话惯例)是
 - 同时开两个项目的 agent 会话,排行/下钻能分清两个项目各自的占用;
 - 无 agent 在跑时,ZCode / Zap 组回归只含宿主自身进程;
 - 命中根的进程行为不回退(repl-mcp 样本仍归项目组)。
+
+## Comments
+
+### 勘误(2026-10-25,主会话;02 号票据此拆出)
+
+诊断一节"引擎判定顺序**已经是项目优先**"系误读,当日代码与今逐位一致
+(2026-10-22 后 GroupingEngine.swift 零提交)。项目归因层只先于**父链上溯**,
+不先于**自身 App 归属**——`layerSelf` 实序:① bundle 谓词命中即返回,② 才轮到
+cwd/argv 项目匹配。本票实测样本恰好没踩中受害区(采的都是非 bundle 进程或
+cwd miss 进程):**可执行在 `.app` 容器内 ∧ cwd 命中项目根**的进程(如 ZCode
+Helper、Xcode 工具链 swift-frontend/clang)现行一律归 App,项目组看不到。
+2026-10-25 用户以同一痛点再次立题,该半边已拆为 **02 号票**(判定顺序对调),
+本票剩余范围 = cwd 没命中根的三类 miss(draft 目录 / 项目父目录 / `/` 与 home,
+及 /tmp worktree)与其 A–E 候选。triage 请两票同看:02 若落地,本票候选 B
+(宿主下钻标注)的动机面会缩小,候选 C/D 的对象也只剩 miss 类进程。
