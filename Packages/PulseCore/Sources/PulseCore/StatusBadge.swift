@@ -4,7 +4,9 @@ import Foundation
 
 /// 状态徽章:两态语言——✓正常(空载)与 高负载(警示)。外观不复刻 04 的
 /// 独立组件,统一映射到 05 的 `MetricCardChip`(经 `MetricChipView` 渲染)——
-/// 徽章 = 值得注意的偏差,出现在指标卡大数字旁与排行行名内。
+/// 徽章 = 值得注意的偏差,现役于指标卡大数字旁(系统负载)。排行行的组高负载
+/// 改由行尾 CPU 数值圈红表达(2026-10-26 用户拍板,chip 遮挡行内信息),
+/// 阈值仍从本规则取——判定只有这一份。
 public enum StatusBadge: Equatable, Sendable {
     /// ✓ 正常:系统空载(参考文档 §2.2 "✓ Normal" 绿 chip 同款)。
     case normal

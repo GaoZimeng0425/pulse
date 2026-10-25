@@ -104,9 +104,11 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   图标)/ 项目 = CPU 蓝 / 系统 中性灰 / 后台服务 = Network 绿 / **孤儿 橙**,唯一出处
   `GroupCategory.identityColor`(与 `Metric` 同级,在 MetricAccent.swift)。孤儿橙是
   **身份**不是强调级,有意不与 `{colors.state-warning}` 琥珀合并(GLOSSARY:橙色高亮)。
-- 强调级(正常/偏高/紧张)→ 色的映射只允许集中在三处:`StatusBadge.chip`(系统 /
-  组负载)、`MetricCardModel` 的 chip 构造(内存压力、电池充电状态;两者都在 MetricCardModel.swift)
+- 强调级(正常/偏高/紧张)→ 色的映射只允许集中在三处:`StatusBadge.chip`(系统
+  负载)、`MetricCardModel` 的 chip 构造(内存压力、电池充电状态;两者都在 MetricCardModel.swift)
   与 `MenuBarBadgeRenderer.color(for:ink:)`;色值一律取语义令牌(菜单栏例外见 §已知偏差)。
+  组排行行的高负载警示不走 chip——行尾 CPU 数值圈红表达(见 §Components 排行列表,
+  2026-10-26 用户拍板:行内文字 chip 遮挡信息),色取 `{colors.state-negative}`。
 - 菜单栏位图颜色只能经 ImageRenderer 预绘(`.renderingMode(.original)`);
   NSStatusItem 会剥掉 SwiftUI 前景色,这是实测结论不是风格偏好。
 
@@ -221,7 +223,12 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   行 = 图标 22 / 名称 13 medium(可挂徽章)/ 副文 10.5 secondary / meter 110 榜首归一 /
   数值 13 semibold `monospacedDigit` **定宽列**(按最宽现实读数 `999.9 MB/s` 量宽 + 2,
   全部排行共用;不许按内容撑宽——速率文案会逐行撑出不同宽度)/ **行尾恒留 30pt 列**(组排行放结束按钮 +
-  展开箭头,模块排行留空)——所有排行的 meter 与数值在同一竖线上。紧凑档(弹窗):
+  展开箭头,模块排行留空)——所有排行的 meter 与数值在同一竖线上。组排行行高负载警示
+  (组 CPU > 100%,阈值 `StatusBadgeRules` 同源)= **该行 CPU 数值圈红**:
+  `{colors.state-negative}` 数字 + 同色 1pt 胶囊描边、负内距外扩 4pt(随文不占版,
+  数值竖线与行高不动);仅 CPU 口径行,内存口径行不标;不再挂行内"高负载"文字 chip
+  (2026-10-26 用户拍板:chip 挤占行宽遮挡信息)。此描边是警示标记,不属 §Elevation
+  的"不描边"层级规则。紧凑档(弹窗):
   图标 18、名称 / 数值 12.5、meter 52、数值列同法按 12.5pt 量宽、行内距 5;卡 `{rounded.card-compact}` 12
   + `{spacing.card-padding-compact}` 12;全尺寸卡 `{rounded.card}` 18 + `{spacing.card-padding}` 16。
   排行卡不配节标题(主窗口也不配「当前最忙」节标题)。
@@ -271,7 +278,9 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   工具栏 720 预算同一哲学)。页头 = 页名 + 本机一行「芯片 · 核数 · 内存」
   (`hostSummary`,与主窗口内容头同源;Vitals 页头同款)+ 右侧运行时长,全 tab 一致。
 - **状态 chip**:胶囊、tint 14~16% 底 + 同色文字,两态语言(✓正常 / 高负载),
-  阈值在 `StatusBadgeRules`(组 >100%、系统 <30% / >70%)。
+  阈值在 `StatusBadgeRules`(组 >100%、系统 <30% / >70%)。现役用法 = 指标卡大数字旁
+  (系统负载);**排行行不再挂文字 chip**,组高负载改由行尾数值圈红表达(见排行列表条,
+  2026-10-26 用户拍板)。
 
 ## Do's and Don'ts
 

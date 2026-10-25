@@ -124,6 +124,10 @@ struct RankingListRow<Badge: View, Trailing: View>: View {
     let meterFraction: Double
     let tint: Color
     let valueText: String
+    /// 数值高负载警示(project-visibility/02 目验反馈,2026-10-26 用户拍板):
+    /// 数值圈红(state-negative 1pt 胶囊描边 + 同色数字)取代行内"高负载"文字
+    /// chip——chip 挤占行宽遮挡信息。仅 CPU 口径的组行会传 true(内存值不背 CPU 警示)。
+    var alertsHighLoad = false
     var isCompact = false
     @ViewBuilder let badge: () -> Badge
     @ViewBuilder let trailing: () -> Trailing
@@ -153,6 +157,16 @@ struct RankingListRow<Badge: View, Trailing: View>: View {
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
+                .foregroundStyle(alertsHighLoad ? Surface.negative : .primary)
+                // 警示圈随文不占版:负内距外扩 4pt,数值列竖线与行高不动(描边是
+                // 警示标记不是层级描边,DESIGN.md 状态 chip 节登记的拍板例外)。
+                .overlay {
+                    if alertsHighLoad {
+                        Capsule()
+                            .strokeBorder(Surface.negative, lineWidth: 1)
+                            .padding(-4)
+                    }
+                }
                 .frame(width: RankingListMetrics.valueWidth(compact: isCompact), alignment: .trailing)
             trailing()
                 .frame(width: RankingListMetrics.trailingWidth, alignment: .trailing)
