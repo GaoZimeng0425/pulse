@@ -35,7 +35,7 @@ final class SmcFeature: MonitorFeature {
                     guard case let .fresh(reading) = delivery else { return }
                     self.reading = reading
                     if historyPass.shouldPass() {
-                        self.host?.broadcast(.smcSample(.fresh(reading)))
+                        self.host?.broadcast(.gauges(reading.historyGauges))
                     }
                 }
             },

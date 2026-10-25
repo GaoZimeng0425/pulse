@@ -52,7 +52,7 @@ final class PowerFeature: MonitorFeature {
                 Task { @MainActor in
                     self.apply(delivery)
                     if case let .fresh(reading) = delivery, historyPass.shouldPass() {
-                        self.host?.broadcast(.powerSample(.fresh(reading)))
+                        self.host?.broadcast(.gauges(reading.historyGauges))
                     }
                 }
             },

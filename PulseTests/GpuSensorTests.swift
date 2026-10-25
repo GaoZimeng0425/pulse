@@ -78,14 +78,14 @@ final class GpuSensorTests: XCTestCase {
         let source = FakeGpuSource()
         source.payload = GpuRawReading(deviceUtilizationPercent: 42, modelName: "Apple M4")
         let feature = GpuFeature(source: source)
-        var broadcast: [GpuReading] = []
+        var broadcast: [Double] = []
         feature.start(MonitorHost(
             restoreBirths: { _ in },
             setLaunchdServiceExecutablePaths: { _ in },
             setRankingsActive: { _ in },
             broadcast: {
-                if case let .gpuSample(.fresh(reading)) = $0 {
-                    broadcast.append(reading)
+                if case let .gauges(values) = $0, let utilization = values[.gpuUtilization] {
+                    broadcast.append(utilization)
                 }
             }
         ))

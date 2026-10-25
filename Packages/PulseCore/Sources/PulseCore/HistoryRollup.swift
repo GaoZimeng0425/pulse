@@ -73,13 +73,9 @@ public struct MinuteAggregate: Equatable, Sendable {
     /// 差分丢弃轮为 0,与网络增量同口径)。
     public let diskReadBytes: UInt64
     public let diskWriteBytes: UInt64
-    /// P2 传感器趋势量(p2-sensors/08,仪表型取窗内均值/峰值;传感器缺席
-    /// 的分钟为 nil → 落库 NULL,查询层如实空段):温度派生(CPU 均值/全机
-    /// 最热,°C)、GPU 利用率(%)、五路功率平均瓦数。
-    public let tempAverage: Double?
-    public let tempMax: Double?
-    public let gpuUtilization: Double?
-    public let powerWatts: PowerDomainWatts?
+    /// 传感器仪表聚合(p2-sensors/08 起,p2-review/09 收成按键):本分钟有样本
+    /// 的键各一条;空字典 → 窄表不产行,查询层如实空段。
+    public let gauges: [GaugeKey: GaugeAggregate]
 
     public init(
         minuteStart: Date,
@@ -90,10 +86,7 @@ public struct MinuteAggregate: Equatable, Sendable {
         netTxBytes: UInt64,
         diskReadBytes: UInt64,
         diskWriteBytes: UInt64,
-        tempAverage: Double? = nil,
-        tempMax: Double? = nil,
-        gpuUtilization: Double? = nil,
-        powerWatts: PowerDomainWatts? = nil
+        gauges: [GaugeKey: GaugeAggregate] = [:]
     ) {
         self.minuteStart = minuteStart
         self.groups = groups
@@ -103,33 +96,20 @@ public struct MinuteAggregate: Equatable, Sendable {
         self.netTxBytes = netTxBytes
         self.diskReadBytes = diskReadBytes
         self.diskWriteBytes = diskWriteBytes
-        self.tempAverage = tempAverage
-        self.tempMax = tempMax
-        self.gpuUtilization = gpuUtilization
-        self.powerWatts = powerWatts
+        self.gauges = gauges
     }
 }
 
-/// 五路功率的一分钟均值(p2-sensors/08;各域独立计数,缺席域为 nil——
-/// 某域无样本时不参与均值也不伪造 0)。
-public struct PowerDomainWatts: Equatable, Sendable {
-    public var cpu: Double?
-    public var gpu: Double?
-    public var ane: Double?
-    public var ram: Double?
-    public var soc: Double?
+/// 单个仪表键一分钟窗的聚合(窄表一行的内存形态):均值 = 窗内样本均值、
+/// 峰 = 窗内样本最大。写库时按 `GaugeKey.aggregation` 只写口径列,另一列
+/// 落 NULL(如「全机最热」只写 max)。
+public struct GaugeAggregate: Equatable, Sendable {
+    public let average: Double?
+    public let max: Double?
 
-    public init(cpu: Double? = nil, gpu: Double? = nil, ane: Double? = nil, ram: Double? = nil, soc: Double? = nil) {
-        self.cpu = cpu
-        self.gpu = gpu
-        self.ane = ane
-        self.ram = ram
-        self.soc = soc
-    }
-
-    public var total: Double? {
-        let values = [cpu, gpu, ane, ram, soc].compactMap(\.self)
-        return values.isEmpty ? nil : values.reduce(0, +)
+    public init(average: Double?, max: Double?) {
+        self.average = average
+        self.max = max
     }
 }
 
@@ -182,13 +162,16 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
     /// 当前窗的磁盘吞吐增量合计(与网络增量同款记账)。
     private var diskReadBytes: UInt64 = 0
     private var diskWriteBytes: UInt64 = 0
-    /// P2 传感器仪表累计(p2-sensors/08):温度均值样本/最热、GPU 利用率样本、五路功率
-    /// 样本(各域独立求和计数;nil 样本不入账)。
-    private var tempSamples: [Double] = []
-    private var tempPeak: Double?
-    private var gpuUtilSamples: [Double] = []
-    private var powerSums: [PowerDomain: Double] = [:]
-    private var powerCounts: [PowerDomain: Int] = [:]
+    /// 传感器仪表累计(p2-review/09 按键):sum/count → 均值,另跟最大值;
+    /// 键无样本 = 无条目(不产行)。
+    private var gaugeAccumulators: [GaugeKey: GaugeAccumulator] = [:]
+
+    /// 单键窗内累计。
+    private struct GaugeAccumulator: Sendable, Equatable {
+        var sum = 0.0
+        var count = 0
+        var max = -Double.infinity
+    }
 
     /// 采样进窗。跨入新分钟时返回上一分钟的聚合(该分钟有样本才非 nil);
     /// 时间戳早于当前窗(时钟回拨/乱序迟到)时丢弃该样本,不污染已聚合窗口。
@@ -201,10 +184,7 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
         netTxBytes: UInt64 = 0,
         diskReadBytes: UInt64 = 0,
         diskWriteBytes: UInt64 = 0,
-        tempAverage: Double? = nil,
-        tempMax: Double? = nil,
-        gpuUtilization: Double? = nil,
-        powerWatts: [PowerDomain: Double]? = nil
+        gauges: [GaugeKey: Double] = [:]
     ) -> MinuteAggregate? {
         let minute = HistoryWindows.minuteStart(of: now)
         if let current = currentMinuteStart {
@@ -218,11 +198,7 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
                 self.netTxBytes = 0
                 self.diskReadBytes = 0
                 self.diskWriteBytes = 0
-                tempSamples = []
-                tempPeak = nil
-                gpuUtilSamples = []
-                powerSums = [:]
-                powerCounts = [:]
+                gaugeAccumulators = [:]
                 accumulate(
                     systemLoad: systemLoad,
                     groups: groups,
@@ -230,10 +206,7 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
                     netTxBytes: netTxBytes,
                     diskReadBytes: diskReadBytes,
                     diskWriteBytes: diskWriteBytes,
-                    tempAverage: tempAverage,
-                    tempMax: tempMax,
-                    gpuUtilization: gpuUtilization,
-                    powerWatts: powerWatts
+                    gauges: gauges
                 )
                 return flushed
             }
@@ -247,10 +220,7 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
             netTxBytes: netTxBytes,
             diskReadBytes: diskReadBytes,
             diskWriteBytes: diskWriteBytes,
-            tempAverage: tempAverage,
-            tempMax: tempMax,
-            gpuUtilization: gpuUtilization,
-            powerWatts: powerWatts
+            gauges: gauges
         )
         return nil
     }
@@ -262,26 +232,15 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
         netTxBytes: UInt64 = 0,
         diskReadBytes: UInt64 = 0,
         diskWriteBytes: UInt64 = 0,
-        tempAverage: Double? = nil,
-        tempMax: Double? = nil,
-        gpuUtilization: Double? = nil,
-        powerWatts: [PowerDomain: Double]? = nil
+        gauges: [GaugeKey: Double] = [:]
     ) {
         systemLoads.append(systemLoad)
-        if let tempAverage {
-            tempSamples.append(tempAverage)
-        }
-        if let tempMax {
-            tempPeak = max(tempPeak ?? -Double.infinity, tempMax)
-        }
-        if let gpuUtilization {
-            gpuUtilSamples.append(gpuUtilization)
-        }
-        if let powerWatts {
-            for (domain, watts) in powerWatts {
-                powerSums[domain, default: 0] += watts
-                powerCounts[domain, default: 0] += 1
-            }
+        for (key, value) in gauges {
+            var accumulator = gaugeAccumulators[key] ?? GaugeAccumulator()
+            accumulator.sum += value
+            accumulator.count += 1
+            accumulator.max = Swift.max(accumulator.max, value)
+            gaugeAccumulators[key] = accumulator
         }
         // 增量逐轮求和(加法可能进位,用 &+ 防溢出崩溃:历史记账宁绕回不算)。
         self.netRxBytes = self.netRxBytes &+ netRxBytes
@@ -318,15 +277,14 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
                 )
             }
             .sorted { $0.identity < $1.identity } // stableKey 字典序(Comparable 即此序)
-        let powerWatts: PowerDomainWatts? = powerCounts.isEmpty
-            ? nil
-            : PowerDomainWatts(
-                cpu: powerSums[.cpu].map { $0 / Double(powerCounts[.cpu] ?? 1) },
-                gpu: powerSums[.gpu].map { $0 / Double(powerCounts[.gpu] ?? 1) },
-                ane: powerSums[.ane].map { $0 / Double(powerCounts[.ane] ?? 1) },
-                ram: powerSums[.ram].map { $0 / Double(powerCounts[.ram] ?? 1) },
-                soc: powerSums[.soc].map { $0 / Double(powerCounts[.soc] ?? 1) }
+        let gauges = gaugeAccumulators.mapValues { accumulator in
+            GaugeAggregate(
+                average: accumulator.count == 0
+                    ? nil
+                    : accumulator.sum / Double(accumulator.count),
+                max: accumulator.max == -Double.infinity ? nil : accumulator.max
             )
+        }
         return MinuteAggregate(
             minuteStart: currentMinuteStart ?? .distantPast,
             groups: groups,
@@ -336,10 +294,7 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
             netTxBytes: netTxBytes,
             diskReadBytes: diskReadBytes,
             diskWriteBytes: diskWriteBytes,
-            tempAverage: tempSamples.isEmpty ? nil : tempSamples.reduce(0.0, +) / Double(tempSamples.count),
-            tempMax: tempPeak,
-            gpuUtilization: gpuUtilSamples.isEmpty ? nil : gpuUtilSamples.reduce(0.0, +) / Double(gpuUtilSamples.count),
-            powerWatts: powerWatts
+            gauges: gauges
         )
     }
 

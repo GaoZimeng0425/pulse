@@ -199,15 +199,11 @@ public enum FeatureEvent {
     case diskCapacity(DiskCapacityReading)
     /// 本轮 dev server 盘点(DevServerFeature,每轮一次)。
     case devServers([DevServerStatus])
-    /// GPU 传感器历史交付(GpuFeature 分档单驱动里 HistoryThrottle 放行的轮次,
-    /// 每满 30s 一次;带新鲜度,历史记账只认 fresh——p2-sensors/08、p2-review/06。
-    /// 非节流轮只走本地 apply,不广播)。
-    case gpuSample(SensorDelivery<GpuReading>)
-    /// SMC 传感器历史交付(SmcFeature 分档单驱动的 HistoryThrottle 节流轮;
-    /// 温度派生口径在 HistoryFeed 折算)。
-    case smcSample(SensorDelivery<SmcReading>)
-    /// 五路功率传感器历史交付(PowerFeature 分档单驱动的 HistoryThrottle 节流轮)。
-    case powerSample(SensorDelivery<PowerReading>)
+    /// 传感器仪表历史交付(p2-sensors/08 起,p2-review/09 收编):分档单驱动里
+    /// HistoryThrottle 放行的轮次(每满 30s 一次)由 feature 广播——载荷是读数
+    /// 模型 `historyGauges` 自报的键值(口径住在模型)。feature 只在 fresh 交付
+    /// 时广播,新鲜度不经事件携带;非节流轮只走本地 apply,不广播。
+    case gauges([GaugeKey: Double])
 }
 
 /// 功能模块扩展点(ADR-0003 预约「每个服务以独立模块 + 小协议扩展点组织,经注册表

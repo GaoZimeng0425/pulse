@@ -124,6 +124,14 @@ public enum HistoryMetricKey: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// 仪表三指标读窄表 gauge_*(p2-review/09)。
+    public var readsGaugeTables: Bool {
+        switch self {
+        case .temperature, .gpu, .power: true
+        case .systemLoad, .network, .disk, .cpu, .memory: false
+        }
+    }
+
     /// 读系统级表(system_*)还是组级表(sample_*)。
     public var readsSystemTables: Bool {
         switch self {
@@ -330,14 +338,22 @@ public enum HistoryQuery {
         let breakdown = metric.resolvedBreakdown(breakdown)
         let (start, end) = range.bounds(now: now)
         let bucket = range.bucketSeconds
-        let table = range.readsHourTable
-            ? (metric.readsSystemTables ? "system_hour" : "sample_hour")
-            : (metric.readsSystemTables ? "system_min" : "sample_min")
+        // 仪表三指标(温度/GPU/功率)读窄表(p2-review/09);其余系统级读
+        // system_*,组级读 sample_*。
+        let table: String = if metric.readsGaugeTables {
+            range.readsHourTable ? "gauge_hour" : "gauge_min"
+        } else {
+            range.readsHourTable
+                ? (metric.readsSystemTables ? "system_hour" : "sample_hour")
+                : (metric.readsSystemTables ? "system_min" : "sample_min")
+        }
 
         // 表名 / 列名 / 桶宽全部来自封闭枚举常量(非用户输入),纯 Swift 插值
         // 拼进语句;时间界走绑定参数。net/disk 增量列任一侧 NULL 的行不计
         // (NULL 传染)——全 NULL 的桶 SUM 为 NULL,落网格即空段,不伪造 0。
         let sql: String
+        // 仪表查询的键绑定(前导参数;功率合计无键条件 = nil)。
+        var keyArgument: String?
         switch metric {
         case .systemLoad:
             sql = """
@@ -359,40 +375,46 @@ public enum HistoryQuery {
             GROUP BY bucket ORDER BY bucket
             """
         case .temperature:
-            // 最热取桶内峰值:与小时汇总 MAX(temp_max) 同口径(最热的语义是峰,
-            // 均摊会把尖峰抹平);CPU 均值桶内取均,与小时汇总 AVG(temp_avg) 同。
-            let value = breakdown == .temperatureHottest ? "MAX(temp_max)" : "AVG(temp_avg)"
+            // 最热取桶内峰值:与小时卷积 MAX(max) 同口径(最热的语义是峰,均摊
+            // 会把尖峰抹平);CPU 均值桶内取均,与 AVG(avg) 同(p2-review/09 窄表
+            // 按键查,键与聚合口径出自 GaugeKey)。
+            let key = breakdown == .temperatureHottest ? GaugeKey.tempMax : GaugeKey.tempAverage
+            let value = key.aggregation == .max ? "MAX(max)" : "AVG(avg)"
+            keyArgument = key.rawValue
             sql = """
             SELECT ts / \(bucket) * \(bucket) AS bucket, \(value) AS value
-            FROM \(table) WHERE ts >= ? AND ts < ?
+            FROM \(table) WHERE key = ? AND ts >= ? AND ts < ?
             GROUP BY bucket ORDER BY bucket
             """
         case .gpu:
+            keyArgument = GaugeKey.gpuUtilization.rawValue
             sql = """
-            SELECT ts / \(bucket) * \(bucket) AS bucket, AVG(gpu_util) AS value
-            FROM \(table) WHERE ts >= ? AND ts < ?
+            SELECT ts / \(bucket) * \(bucket) AS bucket, AVG(avg) AS value
+            FROM \(table) WHERE key = ? AND ts >= ? AND ts < ?
             GROUP BY bucket ORDER BY bucket
             """
         case .power:
             if let domain = breakdown?.powerDomain {
-                // 单域:本域列桶内取均(与小时汇总 AVG(pow_*) 同口径);该域 NULL
-                // 的分钟 AVG 跳过,全 NULL 的桶 = NULL → 空段,不伪造 0。
+                // 单域:本域键桶内取均(与小时卷积 AVG(avg) 同口径);该域无行
+                // 的桶 = NULL → 空段,不伪造 0。
                 sql = """
-                SELECT ts / \(bucket) * \(bucket) AS bucket, AVG(\(domain.historyColumn)) AS value
-                FROM \(table) WHERE ts >= ? AND ts < ?
+                SELECT ts / \(bucket) * \(bucket) AS bucket, AVG(avg) AS value
+                FROM \(table) WHERE key = ? AND ts >= ? AND ts < ?
                 GROUP BY bucket ORDER BY bucket
                 """
+                keyArgument = GaugeKey.power(domain).rawValue
             } else {
-                // 五路合计:缺席域按 0 计(COALESCE,与存储层各域独立均值的合计口径
-                // 一致——缺 ANE 域的芯片不整行丢弃);全 NULL 的行经 FILTER 剔除,
-                // 该桶如实空段(2026-10-23 审计⑤)。
+                // 五路合计:先按 ts 求在域键的 avg 和(缺席键不计 = 宽表 COALESCE 0
+                // 的窄表等价),再桶内取均;一分钟全无功率行则该分钟不进 AVG
+                // (与旧 FILTER 剔除全 NULL 行同口径,2026-10-23 审计⑤)。
+                let keys = GaugeKey.powerKeys.map(\.rawValue).sorted().joined(separator: "', '")
                 sql = """
-                SELECT ts / \(bucket) * \(bucket) AS bucket,
-                       AVG(COALESCE(pow_cpu, 0) + COALESCE(pow_gpu, 0) + COALESCE(pow_ane, 0)
-                           + COALESCE(pow_ram, 0) + COALESCE(pow_soc, 0))
-                       FILTER (WHERE pow_cpu IS NOT NULL OR pow_gpu IS NOT NULL OR pow_ane IS NOT NULL
-                           OR pow_ram IS NOT NULL OR pow_soc IS NOT NULL) AS value
-                FROM \(table) WHERE ts >= ? AND ts < ?
+                SELECT ts / \(bucket) * \(bucket) AS bucket, AVG(per_minute.total) AS value
+                FROM (
+                    SELECT ts, SUM(avg) AS total
+                    FROM \(table) WHERE key IN ('\(keys)') AND ts >= ? AND ts < ?
+                    GROUP BY ts
+                ) AS per_minute
                 GROUP BY bucket ORDER BY bucket
                 """
             }
@@ -414,7 +436,12 @@ public enum HistoryQuery {
         }
 
         var values = [Double?](repeating: nil, count: range.bucketCount)
-        let rows = try Row.fetchAll(db, sql: sql, arguments: [start, end])
+        // 仪表查询带键条件(前导绑定参数);功率合计子查询只有时间界。
+        let rows: [Row] = if let keyArgument {
+            try Row.fetchAll(db, sql: sql, arguments: [keyArgument, start, end])
+        } else {
+            try Row.fetchAll(db, sql: sql, arguments: [start, end])
+        }
         for row in rows {
             let bucketStart: Int = row["bucket"]
             guard let raw: Double = row["value"] else { continue } // NULL 列 → 空段
@@ -437,20 +464,6 @@ public enum HistoryQuery {
             bucketSeconds: bucket,
             values: values
         )
-    }
-}
-
-private extension PowerDomain {
-    /// 系统级表的本域功率列(p2-sensors/08 迁移 `p2-sensors-v2`;封闭枚举常量,
-    /// 非用户输入,可直插 SQL)。
-    var historyColumn: String {
-        switch self {
-        case .cpu: "pow_cpu"
-        case .gpu: "pow_gpu"
-        case .ane: "pow_ane"
-        case .ram: "pow_ram"
-        case .soc: "pow_soc"
-        }
     }
 }
 
