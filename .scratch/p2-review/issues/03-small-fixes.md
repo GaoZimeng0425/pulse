@@ -5,15 +5,15 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] ① 注释失真两处
-- [ ] ② 新写注释工单全名
-- [ ] ③ DESIGN.md:数字字体 + 定宽/颜色入令牌表
-- [ ] ④ 容器表稳定排序(运行中置顶)+ 状态字符串收成类型
-- [ ] ⑤ 功率格式化单一出处
-- [ ] ⑥ 容器心跳测试断言能失败
-- [ ] check.sh 全绿
+- [x] ① 注释失真两处
+- [x] ② 新写注释工单全名
+- [x] ③ DESIGN.md:数字字体 + 定宽/颜色入令牌表
+- [x] ④ 容器表稳定排序(运行中置顶)+ 状态字符串收成类型
+- [x] ⑤ 功率格式化单一出处
+- [x] ⑥ 容器心跳测试断言能失败
+- [x] check.sh 全绿
 
 ## Agent Brief
 
@@ -60,3 +60,36 @@
   该断言并在注释里写明以代码评审钉住。
 
 **范围边界**:不改采集行为、不动调度与可见性;容器 stats 并发上限不在本票(归 `p2-review/06` 讨论)。
+
+## Comments
+
+### 执行记录(2026-10-24)
+
+分支 `feat/p2-review-03`(基于 integ/p2-review 87fd830,收尾合入 1bd1f4e 含 p2-review/02)。
+
+- **①** `MetricModel` 枚举注释改为现状(sound/bluetooth 随 p2-sensors/05、containers 随
+  p2-sensors/07 入表;同句"03 票再议"改为 p2-sensors/03 实际拍板:ANE 沿用 GPU 色、Neural 不入表)。
+  追加条:`MainWindowView` 工具栏注释改为 11 枚 tab 靠 `.selectedOnly` 装进 720,内距 12→9 只是 P1 辅助。
+- **②** 逐条考证后补全名:MonitorSpine(06/05)、GpuModel(04)、GpuSensor(04、03)、HistoryFeed /
+  HistoryRollup / HistoryFeature(08)、SystemMonitor(06)、BluetoothFeature(05)、SoundFeature(06)、
+  build.sh(06),均 = `p2-sensors/NN`。**跳过**:`EnergyModelSensor.swift:115` 已被 p2-review/01 改成全名;
+  `MetricModel` 第 5 行"工单 03"是 P0.6 存量,不在新写范围。
+- **③** DESIGN.md 补 `{layout.row-*}` 七个定宽令牌(标签 36/64,数值 36/48/52/56/64)与
+  `{colors.state-inactive}`(`Surface.inactive`);Typography 规则补"不用 `design: .monospaced`,
+  目前无例外"。新零件 `CardRowValue` + `CardRowWidth`(CardFamily.swift)收编容器 / 传感器(含 08 新写的
+  派生卡、风扇卡、温度明细行)/ 五路功率 / 声音四个卡文件。字形由 SF Mono 换 SF Pro 等宽数字 = 有意的
+  可见变化(规则本来如此)。**跳过**:`BluetoothCardViews`(编排者指令:p2-review/02 并行改蓝牙文件,
+  本票不碰)——电量 / RSSI `.monospaced`、裸 opacity 状态点、meter 44/64 与 RSSI 32 定宽登记在
+  DESIGN.md §已知偏差 仍挂账。共享"名称 + 数值"整行组件未抽(各卡行结构差异大——色点 / meter /
+  标签定宽各不同,整行抽象会改视觉),只抽了数值零件。
+- **④** 行序成为 `ContainersReading` 构造不变量(运行中置顶,组内 `localizedStandardCompare`,同名按 id);
+  `ContainerRow.isRunning` 一处判定替换三处 `"running"` 比较。核心包单测两条。
+- **⑤** 选 `PulseFormat.watts`(一位小数、负值夹 0;依据参考文档 §1.1 "12.6 W" 与 HistoryQueryTests
+  既有 "12.3 W" 断言),删 `PowerDomainsCardView.wattsText`(≥10 W 取整);历史统计 power 的
+  `String(format:)` 也改走它(修 "-0.0 W")。可见变化:五路功率卡 / ANE 卡统计 ≥10 W 由 "25 W" 变 "25.0 W"。
+  ANE 主卡大数字(数值与单位分开渲染)仍用自己的 <10 一位 / ≥10 取整,不在本项范围。
+- **⑥** 改用宽度 1 的 TaskExecutor(SE-0417)钉 read 与心跳:变异验证(httpGet 改回内联阻塞)
+  断言以 1.002s ≥ 0.8s 失败,还原后通过;旧协作池心跳断言删除。
+- `sh scripts/check.sh` 全绿:合入 integ 1bd1f4e 后 783 用例(核心包 426 + app 357)。
+
+未验证:③ 的字形变化与 ⑤ 的 "25.0 W" 未实机截图验收(DESIGN.md:实机目验交用户)。
