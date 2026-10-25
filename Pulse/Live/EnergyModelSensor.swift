@@ -111,27 +111,22 @@ final class LiveEnergyModelSource: PowerSource, @unchecked Sendable {
 
 // MARK: - 五路功率传感器 provider(p2-sensors/03,ADR-0004)
 
-/// 五路功率传感器:短档 `.every(seconds: 5)`,与 GPU 同门控(弹窗 ∨ GPU 页,
-/// PowerFeature 折算下发);差分(首读/断档轮不交读数/负差钳 0)在核心包
-/// PowerAccumulator。读失败与基线轮都交 nil,调度器重投 lastGood 不白屏。历史档随
-/// p2-sensors/08。
-/// @unchecked Sendable:accumulator 与源的订阅状态由 stateLock 串行——
-/// 5s UI 档与 30s 历史档两条 driver 的 tick 在调度 actor 外并发执行
-/// (2026-10-23 审计②:此前"单 actor 串行"前提被双档打破)。
+/// 五路功率传感器:分档单循环(p2-review/06)——一条驱动两个节奏,可见 5s /
+/// 不可见 30s(`adaptiveInterval`);差分(首读/断档轮不交读数/负差钳 0)在核心包
+/// PowerAccumulator。读失败与基线轮都交 nil,调度器重投 lastGood 不白屏。
+/// @unchecked Sendable:accumulator 与源的订阅状态靠**单驱动串行**保证——
+/// 每 provider 只登记一条 SensorDriver(调度器一登记一子任务),p2-review/06
+/// 收编双档后 p2-audit/01 ② / p2-review/01 ① 的串行锁随之删除(根治替补丁)。
 final class EnergyModelSensorProvider: SensorProvider, @unchecked Sendable {
     typealias Reading = PowerReading
 
     let cadence: SensorCadence = .every(seconds: 5)
 
     private let source: any PowerSource
+    /// 可见性闸(p2-review/06 起只驱动节奏分档,不再挡读——历史档本就 30s 恒采)。
     private let gate = SensorVisibilityGate()
     private let slot = SensorLastGoodBox<PowerReading>()
     private var accumulator = PowerAccumulator()
-    /// 双档串行锁:护 accumulator 差分账本与源的懒建订阅——读源与折算同在一个
-    /// 锁段(p2-review/01 ①:此前读源在锁外,两档并发进懒建订阅,乱序折算出假 0)。
-    /// 代价:两档撞车时后到的一档等前一档读完一轮(一次 IOReport 采样),等待期间
-    /// 占住一个协作线程——按 5s/30s 节奏撞车稀少,换取差分账本不乱序。
-    private let stateLock = NSLock()
 
     var lastGood: PowerReading? {
         slot.current
@@ -141,27 +136,19 @@ final class EnergyModelSensorProvider: SensorProvider, @unchecked Sendable {
         self.source = source
     }
 
-    /// 可见性切换(与 GPU 传感同闸:弹窗 ∨ GPU 页)。
+    /// 可见性切换(与 GPU 传感同闸:任一窗口停在展示功率家族的 tab)。
     func setVisible(_ visible: Bool) {
         _ = gate.setVisible(visible)
     }
 
+    var adaptiveInterval: (@Sendable () -> TimeInterval)? {
+        { [gate] in gate.isVisible ? 5 : 30 }
+    }
+
     func snapshot() async -> PowerReading? {
-        guard gate.isVisible else { return nil }
-        return await historySnapshot()
-    }
-
-    /// 历史档读(p2-sensors/08):不看可见性闸;差分账本与 UI 档共用
-    /// (能量差分按实测时差,5s/30s 档位切换不断账)。
-    func historySnapshot() async -> PowerReading? {
-        readAndFoldLocked()
-    }
-
-    /// NSLock 禁用于 async 上下文(Swift 6)——锁段拆进同步方法,锁内不 await。
-    private func readAndFoldLocked() -> PowerReading? {
-        stateLock.lock()
-        defer { stateLock.unlock() }
         // 读失败与基线轮(首读/断档)都交 nil:lastGood 不动,调度器按读失败重投。
+        // 单循环下差分窗 = 实测时差(可见 5s / 不可见 30s)——旧双档形状里
+        // 可见期历史档只拿到"最近 5s 的窗"的口径问题就此根治。
         guard let raw = source.read(), let reading = accumulator.record(raw) else { return nil }
         slot.store(reading)
         return reading

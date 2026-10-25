@@ -186,23 +186,21 @@ final class LiveSmcSource: SmcSource, @unchecked Sendable {
 
 // MARK: - SMC 传感器 provider(p2-sensors/04,ADR-0004)
 
-/// SMC 传感器:短档 `.every(seconds: 5)`(弹窗 ∨ 传感器页可见才读);坏值防御
-/// 的"沿用旧值"档需要上一轮读数,provider 持有 previous——由 stateLock 串行
-/// (5s UI 档与 30s 历史档两条 driver 的 tick 在调度 actor 外并发,2026-10-23
-/// 审计②;源的 io_connect 同经此锁串行)。
+/// SMC 传感器:分档单循环(p2-review/06)——一条驱动两个节奏,可见 5s /
+/// 不可见 30s(`adaptiveInterval`)。坏值防御的"沿用旧值"档需要上一轮读数,
+/// provider 持有 previous;previous 与源的 io_connect 靠**单驱动串行**保证——
+/// 每 provider 只登记一条 SensorDriver,p2-audit/01 ② / p2-review/01 ① 的
+/// 串行锁随之删除(根治替补丁)。
 final class SmcSensorProvider: SensorProvider, @unchecked Sendable {
     typealias Reading = SmcReading
 
     let cadence: SensorCadence = .every(seconds: 5)
 
     private let source: any SmcSource
+    /// 可见性闸(p2-review/06 起只驱动节奏分档,不再挡读——历史档本就 30s 恒采)。
     private let gate = SensorVisibilityGate()
     private let slot = SensorLastGoodBox<SmcReading>()
     private var previous: SmcReading?
-    /// 双档串行锁:护坏值沿用链 previous 与源的 SMC 连接(读源在锁内)。
-    /// 代价:两档撞车时后到的一档等前一档读完一轮全键(首轮还含键发现枚举),
-    /// 等待期间占住一个协作线程——按 5s/30s 节奏撞车稀少,换取连接不被并发进入。
-    private let stateLock = NSLock()
 
     var lastGood: SmcReading? {
         slot.current
@@ -216,23 +214,11 @@ final class SmcSensorProvider: SensorProvider, @unchecked Sendable {
         _ = gate.setVisible(visible)
     }
 
+    var adaptiveInterval: (@Sendable () -> TimeInterval)? {
+        { [gate] in gate.isVisible ? 5 : 30 }
+    }
+
     func snapshot() async -> SmcReading? {
-        guard gate.isVisible else { return nil }
-        return await historySnapshot()
-    }
-
-    /// 历史档读(p2-sensors/08):不看可见性闸;坏值防御的 previous 状态与
-    /// UI 档共用(同一条坏值沿用链,档位切换不断账)。
-    func historySnapshot() async -> SmcReading? {
-        readAndFoldLocked()
-    }
-
-    /// NSLock 禁用于 async 上下文(Swift 6)——锁段拆进同步方法,锁内不 await。
-    /// 读源与折算同在一个锁段(p2-review/01 ①:此前读源在锁外,两档并发进
-    /// 发现缓存与 io_connect)。
-    private func readAndFoldLocked() -> SmcReading? {
-        stateLock.lock()
-        defer { stateLock.unlock() }
         guard let raw = source.read() else { return nil }
         guard let reading = SmcReadingBuilder.make(from: raw, previous: previous) else {
             return nil // 折算失败不动 previous:沿用链不被一次坏载荷清零(审计②顺带)

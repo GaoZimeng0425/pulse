@@ -21,23 +21,10 @@ private final class FakePowerSource: PowerSource, @unchecked Sendable {
     }
 }
 
-/// 并发探针源(p2-review/01 ①):每次读经 ReentryProbe,载荷按调用序号单调递增。
-private final class ConcurrencyProbePowerSource: PowerSource, @unchecked Sendable {
-    let probe = ReentryProbe()
-
-    func read() -> PowerRawReading? {
-        probe.measure { ordinal in
-            PowerRawReading(
-                channels: [PowerChannelSample(name: "ANE", unitLabel: "mJ", rawValue: Double(ordinal) * 10)],
-                takenAt: Date(timeIntervalSince1970: Double(ordinal))
-            )
-        }
-    }
-}
-
 final class EnergyModelSensorTests: XCTestCase {
-    func testGateBlocksReadsWhenInvisible() async {
-        // 门控关:不读源;开:采一次——首读只记基线、不交读数(p2-review/01 拍板 B)。
+    func testGateDrivesIntervalNotReads() async {
+        // p2-review/06 分档单循环:可见性闸只驱动节奏(可见 5s / 不可见 30s),
+        // 不再挡读——历史档本就 30s 恒采。首读只记基线、不交读数(拍板 B)不变。
         let source = FakePowerSource()
         source.readings = [
             PowerRawReading(channels: [
@@ -48,15 +35,16 @@ final class EnergyModelSensorTests: XCTestCase {
         let provider = EnergyModelSensorProvider(source: source)
 
         provider.setVisible(false)
-        let blocked = await provider.snapshot()
-        XCTAssertNil(blocked)
-        XCTAssertEqual(source.readCount, 0, "闸关不碰源")
+        XCTAssertEqual(provider.adaptiveInterval?(), 30, "不可见走历史档节奏")
+        let hiddenRead = await provider.snapshot()
+        XCTAssertEqual(source.readCount, 1, "闸关照样读(30s 历史档同一条循环)")
+        XCTAssertNil(hiddenRead, "首读只记基线")
+        XCTAssertNil(provider.lastGood, "基线轮不成为 lastGood")
 
         provider.setVisible(true)
-        let first = await provider.snapshot()
-        XCTAssertEqual(source.readCount, 1, "闸开读源")
-        XCTAssertNil(first, "首读只记基线")
-        XCTAssertNil(provider.lastGood, "基线轮不成为 lastGood")
+        XCTAssertEqual(provider.adaptiveInterval?(), 5, "可见走 UI 档节奏")
+        _ = await provider.snapshot()
+        XCTAssertEqual(source.readCount, 2, "差分账本按实测时差继续")
     }
 
     func testHistoryTierSkipsBaselineRound() async {
@@ -74,31 +62,22 @@ final class EnergyModelSensorTests: XCTestCase {
         ]
         let provider = EnergyModelSensorProvider(source: source)
 
-        let baseline = await provider.historySnapshot()
+        let baseline = await provider.snapshot()
         XCTAssertNil(baseline)
-        let measured = await provider.historySnapshot()
+        let measured = await provider.snapshot()
         XCTAssertEqual(measured?.watts[.ane] ?? -1, 0.01, accuracy: 1e-9)
     }
 
-    func testConcurrentTiersNeverReadSourceConcurrently() async {
-        // 审计②补全(p2-review/01 ①):5s UI 档与 30s 历史档并发 tick 时,源的
-        // 懒建订阅不得被并发进入——读源与折算同在一个锁段。
-        let source = ConcurrencyProbePowerSource()
-        let provider = EnergyModelSensorProvider(source: source)
-        provider.setVisible(true)
-
-        await withTaskGroup(of: Void.self) { group in
-            for index in 0 ..< 8 {
-                group.addTask {
-                    if index.isMultiple(of: 2) {
-                        _ = await provider.snapshot()
-                    } else {
-                        _ = await provider.historySnapshot()
-                    }
-                }
-            }
-        }
-        XCTAssertEqual(source.probe.peakInFlight, 1)
+    @MainActor
+    func testFeatureRegistersExactlyOneDriver() {
+        // p2-review/06 根治:并发入口(双档两条驱动)收编成一条——串行不再靠
+        // p2-audit/01 ② / p2-review/01 ① 的锁,靠"每 provider 一条驱动"的结构
+        // 保证。锁已删,此断言钉住结构不被退回双驱动。
+        let feature = PowerFeature(source: FakePowerSource(), chipName: "Apple M4")
+        XCTAssertEqual(feature.sensorDrivers().count, 1)
+        XCTAssertEqual(feature.sensorDrivers()[0].adaptiveInterval?(), 30, "不可见默认历史档节奏")
+        feature.visibilityChanged(MonitorVisibility(popoverTab: .gpu))
+        XCTAssertEqual(feature.sensorDrivers()[0].adaptiveInterval?(), 5, "可见切 UI 档节奏")
     }
 
     func testProviderDeliversDifferencedWatts() async {
