@@ -92,6 +92,49 @@ final class DrilldownStateTests: XCTestCase {
         XCTAssertEqual(state.rows(for: group).map(\.name), ["vitest", "pid 31"])
     }
 
+    /// 宿主徽标(project-visibility/02):可执行命中容器判定的行携带宿主 bundle 路径
+    /// (判定走引擎公开口径);非容器行 nil;组本身就是该宿主(App 组下钻)时省略
+    /// ——同组重复无信息量。
+    func testRowsCarryHostBundlePathForBundledProcessesExceptOwnHost() {
+        let processes = [
+            RawProcess(
+                pid: 21,
+                parentPID: 1,
+                executablePath: "/Applications/Zcode.app/Contents/MacOS/Zcode Helper",
+                argv: ["Zcode Helper"]
+            ),
+            RawProcess(
+                pid: 11,
+                parentPID: 1,
+                executablePath: "/usr/local/bin/node",
+                argv: ["node"]
+            ),
+        ]
+        let state = DrilldownState(
+            snapshot: ProcessSnapshot(takenAt: now, processes: processes),
+            lineage: LineageRegistry(),
+            processCPU: []
+        )
+
+        // 项目组下钻:容器行带宿主,非容器行 nil。
+        let projectGroup = ProcessGroup(
+            id: .project(root: "/Users/x/work/octok-client", worktreeName: nil),
+            name: "octok-client",
+            processes: processes, cpuPercent: 0, memoryBytes: 0
+        )
+        let projectRows = state.rows(for: projectGroup)
+        XCTAssertEqual(projectRows[0].hostBundlePath, "/Applications/Zcode.app")
+        XCTAssertNil(projectRows[1].hostBundlePath)
+
+        // App 组下钻:宿主即组自身,徽标省略。
+        let appGroup = ProcessGroup(
+            id: .app(bundlePath: "/Applications/Zcode.app"),
+            name: "Zcode",
+            processes: [processes[0]], cpuPercent: 0, memoryBytes: 0
+        )
+        XCTAssertNil(state.rows(for: appGroup)[0].hostBundlePath)
+    }
+
     // MARK: 进程详情
 
     private func gateTree() -> [RawProcess] {

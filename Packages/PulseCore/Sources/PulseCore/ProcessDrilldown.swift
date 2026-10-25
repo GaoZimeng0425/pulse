@@ -21,9 +21,13 @@ public struct DrilldownState: Equatable, Sendable {
     }
 
     /// 组内进程行(展开列表):保持组的既定顺序(引擎契约:进程 CPU% 降序、次键 pid 升序)。
+    /// 宿主徽标(project-visibility/02):可执行命中 `.app` 容器判定(引擎公开口径,
+    /// 判定只有这一份)的行携带宿主 bundle 路径——项目组里能看出"是哪个应用在干活";
+    /// 组本身就是该宿主时省略(同组重复无信息量)。
     public func rows(for group: ProcessGroup) -> [ProcessRowModel] {
         group.processes.map { process in
-            ProcessRowModel(
+            let host = GroupingEngine.appContainerPrefix(process.executablePath)?.prefix
+            return ProcessRowModel(
                 pid: process.pid,
                 name: PulseFormat.processName(
                     executablePath: process.executablePath,
@@ -31,7 +35,8 @@ public struct DrilldownState: Equatable, Sendable {
                     pid: process.pid
                 ),
                 cpuPercent: cpuPercentByPID[process.pid] ?? 0,
-                memoryBytes: process.physicalFootprintBytes
+                memoryBytes: process.physicalFootprintBytes,
+                hostBundlePath: host != group.bundlePath ? host : nil
             )
         }
     }
@@ -55,7 +60,7 @@ public struct DrilldownState: Equatable, Sendable {
 
 // MARK: - 视图模型
 
-/// 进程行视图模型:名字 / pid / CPU% / 内存——展开列表的行内四要素。
+/// 进程行视图模型:名字 / pid / CPU% / 内存 + 可选宿主徽标——展开列表的行内要素。
 public struct ProcessRowModel: Equatable, Sendable, Identifiable {
     public let pid: pid_t
     public let name: String
@@ -63,16 +68,26 @@ public struct ProcessRowModel: Equatable, Sendable, Identifiable {
     public let cpuPercent: Double
     /// 物理足迹字节(活动监视器"内存"列口径)。
     public let memoryBytes: UInt64
+    /// 宿主 App 的 bundle 目录(project-visibility/02):可执行命中容器判定时非 nil,
+    /// UI 画宿主小图标 + 名;组即该宿主时已由 rows(for:) 置 nil(同组重复无信息量)。
+    public let hostBundlePath: String?
 
     public var id: pid_t {
         pid
     }
 
-    public init(pid: pid_t, name: String, cpuPercent: Double, memoryBytes: UInt64) {
+    public init(
+        pid: pid_t,
+        name: String,
+        cpuPercent: Double,
+        memoryBytes: UInt64,
+        hostBundlePath: String? = nil
+    ) {
         self.pid = pid
         self.name = name
         self.cpuPercent = cpuPercent
         self.memoryBytes = memoryBytes
+        self.hostBundlePath = hostBundlePath
     }
 }
 

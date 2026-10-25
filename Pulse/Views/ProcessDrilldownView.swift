@@ -37,6 +37,8 @@ struct ProcessDrilldownView: View {
 /// 进程行四要素(工单 06):进程名 / pid / CPU% / 内存;选中态高亮。
 /// P0.6-02:主窗口进程表传入 meterFraction 时在行内附 6pt 占比 meter 条
 /// (CPU 指标强调色,榜首归一);弹窗下钻行保持紧凑(缺省 nil 不画条)。
+/// project-visibility/02:可执行来自 .app 容器的行带宿主 App 徽标
+/// (图标 `{layout.row-host-icon}` 14 + 名),项目组里能看出"是哪个应用在干活"。
 struct ProcessRowView: View {
     let row: ProcessRowModel
     let isSelected: Bool
@@ -54,6 +56,9 @@ struct ProcessRowView: View {
                     Text("\(row.pid)")
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
+                    if let hostBundlePath = row.hostBundlePath {
+                        hostBadge(hostBundlePath)
+                    }
                     Spacer(minLength: 12)
                     Text(PulseFormat.cpuPercent(row.cpuPercent))
                         .monospacedDigit()
@@ -78,6 +83,29 @@ struct ProcessRowView: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
+    }
+
+    /// 宿主 App 徽标:14pt 预栅格化图标(AppIconCache)+ 宿主名。名走 CFBundleName
+    /// 读取器(与 App 组显示名同通道,已缓存),缺省退 bundle 目录名去 .app 后缀
+    /// ——口径与引擎 App 组命名一致,不写第二份。
+    private func hostBadge(_ bundlePath: String) -> some View {
+        HStack(spacing: 6) {
+            Image(nsImage: AppIconCache.icon(forBundle: bundlePath, pointSize: 14))
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 14, height: 14)
+            Text(hostName(forBundle: bundlePath))
+                .lineLimit(1)
+        }
+        .foregroundStyle(.secondary)
+    }
+
+    private func hostName(forBundle bundlePath: String) -> String {
+        if let injected = BundleDisplayNameReader.shared.displayName(forBundleDirectory: bundlePath) {
+            return injected
+        }
+        let directoryName = String(bundlePath.split(separator: "/").last ?? Substring(bundlePath))
+        return directoryName.hasSuffix(".app") ? String(directoryName.dropLast(4)) : directoryName
     }
 }
 
