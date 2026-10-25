@@ -101,6 +101,17 @@ public final class SensorVisibilityGate: @unchecked Sendable {
     public init() {}
 }
 
+// MARK: - 分档节奏(p2-review/06)
+
+/// 分档节奏的单一出处:可见 UI 档 / 不可见历史档。provider 的
+/// `adaptiveInterval` 与 feature 的 `HistoryThrottle` 都取这里,不再散落裸数。
+public enum SensorTier {
+    /// 可见(UI 在场)节奏。
+    public static let ui: TimeInterval = 5
+    /// 不可见(仅历史记账)节奏。
+    public static let history: TimeInterval = 30
+}
+
 // MARK: - 历史记账节流(p2-review/06)
 
 /// 历史记账节流:分档单循环下 UI 档与历史档同一条 tick——每满 interval 秒的

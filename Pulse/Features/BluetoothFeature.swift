@@ -98,8 +98,8 @@ final class BluetoothFeature: MonitorFeature {
         ]
     }
 
-    /// 可见性输入:弹窗 ∨ 外设页(p2-sensors/05 立的 peripheralsPage 旗标在此消费;与
-    /// GPU/传感器/排行闸分旗,ADR-0006 语义不混)。进场顺带静默刷新授权(用户可能
+    /// 可见性输入:任一在场窗口停在外设 tab(`shows(.bluetooth)` 家族闸,
+    /// `MetricTab.displayedFamilies`,p2-review/05)。进场顺带静默刷新授权(用户可能
     /// 刚在系统设置里改过),不请求。
     func visibilityChanged(_ visibility: MonitorVisibility) {
         isVisible = visibility.shows(.bluetooth)
