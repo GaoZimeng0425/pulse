@@ -160,6 +160,9 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.row-value-temperature}` | 52pt | 同上:温度 `99.9°C`(传感器派生卡) |
 | `{layout.row-value-quantity}` | 56pt | 同上:带单位量 `999 MB` / `99.9 W`(容器内存、五路功率) |
 | `{layout.row-value-rpm}` | 64pt | 同上:风扇转速 `9999 rpm` |
+| `{layout.row-value-rssi}` | 32pt | 同上:信号强度 `-99 dBm` / `—`(蓝牙设备行) |
+| `{layout.row-meter-compact}` | 44pt | 行内电量条宽(紧凑档,蓝牙设备行) |
+| `{layout.row-meter}` | 64pt | 行内电量条宽(全尺寸档,蓝牙设备行) |
 | `{layout.overview-card-min-width}` | 340pt | 总览卡自适应网格的单卡最小宽(主窗口列数 1–4 由它派生:列数 = 内容宽容纳的最多列,340 + 列距 16,上限 4) |
 
 窗口:主窗口最小 **720×560**(spec 钉死),默认 880×620;弹窗定宽 **360pt**
@@ -314,7 +317,4 @@ chip 图标 9.5pt → micro 10.5;排行行 chevron 9pt → 10。
 - 指标主卡全尺寸内距 `.padding(20)`(MetricTabViews)与 2×2 统计 `horizontalSpacing: 18`
   不在令牌表,18 也不在 4pt 网格上;弹窗外框 `.padding(14)`(DashboardView)同。
   三者改动都可见,需与用户确认后再动。
-- 蓝牙设备行(`BluetoothCardViews`,p2-review/03 盘点):电量 / RSSI 数值仍 `design: .monospaced`、
-  状态点裸 `Color.secondary.opacity(0.4)`、电量 meter 定宽 44 / 64 与 RSSI 列 32 不在令牌表——
-  改成 `CardRowValue` / `Surface.inactive`,meter 与 RSSI 宽先补表。p2-review/03 时该文件由
-  p2-review/02 并行改动,为免冲突未动,动该文件时顺带收编。
+

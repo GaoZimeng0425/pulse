@@ -101,6 +101,12 @@ enum CardRowWidth {
     static let quantityValue: CGFloat = 56
     /// 数值列:风扇转速 "9999 rpm"。
     static let rpmValue: CGFloat = 64
+    /// 数值列:信号强度 "-99 dBm" / "—"(蓝牙设备行,2026-10-25 蓝牙令牌收编入表)。
+    static let rssiValue: CGFloat = 32
+    /// 行内电量条宽(紧凑档,蓝牙设备行)。
+    static let meterCompact: CGFloat = 44
+    /// 行内电量条宽(全尺寸档,蓝牙设备行)。
+    static let meter: CGFloat = 64
 }
 
 /// 卡内明细行数值:`{typography.body}` 12 常规 + `monospacedDigit`(DESIGN.md:一切数字
