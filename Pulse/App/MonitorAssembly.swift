@@ -61,6 +61,7 @@ struct MonitorFeatures {
     let bluetooth: BluetoothFeature
     let containers: ContainerFeature
     let launchdManifest: LaunchdManifestFeature
+    let energyImpact: EnergyImpactFeature
 
     /// 派发顺序:onRound / 广播 / 可见性 / 传感器登记 / 启停都按它走。
     var registry: [any MonitorFeature] {
@@ -79,6 +80,7 @@ struct MonitorFeatures {
             bluetooth,
             containers,
             launchdManifest,
+            energyImpact,
         ]
     }
 }
@@ -111,7 +113,8 @@ extension SystemMonitor {
                 sound: SoundFeature(source: LiveSoundSource()),
                 bluetooth: BluetoothFeature(source: LiveBluetoothSource()),
                 containers: ContainerFeature(source: LiveContainerSource()),
-                launchdManifest: LaunchdManifestFeature(provider: LaunchdManifestProvider())
+                launchdManifest: LaunchdManifestFeature(provider: LaunchdManifestProvider()),
+                energyImpact: EnergyImpactFeature()
             )
         )
     }

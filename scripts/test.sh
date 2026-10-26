@@ -40,6 +40,11 @@ run_core() {
   # shellcheck disable=SC2086
   (cd "$core_dir" && swift test $filter_flag) > "$core_log" 2>&1
   core_status=$?
+  # 特权助手包(p3-root-mcp/03):解析器等纯逻辑,与核心包同 swift test 路径。
+  if [ "$core_status" = 0 ]; then
+    (cd "$root/Packages/PulseHelper" && swift test) >> "$core_log" 2>&1
+    core_status=$?
+  fi
   core_passed=$(grep "' passed" "$core_log" | grep -vc "Test Suite '" || true)
   core_failed=$(grep "' failed" "$core_log" | grep -vc "Test Suite '" || true)
   echo "   核心包:通过 ${core_passed:-0} · 失败 ${core_failed:-0}"

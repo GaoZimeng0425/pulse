@@ -24,6 +24,8 @@ xcodebuild build \
   CODE_SIGNING_ALLOWED=NO
 # MCP 可执行独立 SPM 包(p3-root-mcp/02),不进 app 构建图,单独构建把关。
 swift build --package-path Packages/PulseMCP -q
+# 特权助手独立 SPM 包(p3-root-mcp/03)同上。
+swift build --package-path Packages/PulseHelper -q
 
 echo "🧪  3/3 测试"
 sh scripts/test.sh

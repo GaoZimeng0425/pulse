@@ -22,6 +22,10 @@ struct GeneralSettingsView: View {
     @State private var suppressNextChange = false
     /// 复制反馈(工单 11):标签翻转"已复制",~2s 后复位;新点击先取消旧定时,
     /// 连点不会提前收走反馈。
+    /// 特权助手(p3-root-mcp/03)三态镜像:与登录项同款"系统是唯一事实源"
+    /// 模式——开关动作即时 register/unregister,显示从 SMAppService 读回。
+    @State private var helperStatus: PrivilegedHelperStatus = .notRegistered
+    @State private var helperSuppressNextChange = false
     @State private var reportCopied = false
     @State private var copyFeedbackTask: Task<Void, Never>?
 
@@ -56,6 +60,37 @@ struct GeneralSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section("特权助手") {
+                Toggle("能耗归因(Root 助手)", isOn: Binding(
+                    get: { helperStatus == .enabled },
+                    set: { enabled in
+                        if helperSuppressNextChange {
+                            helperSuppressNextChange = false
+                            return
+                        }
+                        PrivilegedHelperStatus.setInstalled(enabled)
+                        refreshHelperStatus()
+                    }
+                ))
+                switch helperStatus {
+                case .enabled:
+                    Text("助手以 root 运行中:每分钟采集一次各 App 能耗影响,历史页可看全机合计。关闭即注销,一步干净。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                case .requiresApproval:
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("已提交注册,等你批准:在 系统设置 → 通用 → 登录项与扩展 中允许 Pulse 的后台项(需 Touch ID/密码)。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("打开系统设置") { openLoginItemsPane() }
+                            .buttonStyle(.link)
+                    }
+                case .notRegistered:
+                    Text("开启将安装一个仅采集能耗影响的 root 后台助手(首次需系统授权一次);不开启则完全不存在。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
             Section("诊断") {
                 LabeledContent("文件日志") {
                     Button("打开日志文件夹") { openLogsFolder() }
@@ -77,7 +112,10 @@ struct GeneralSettingsView: View {
         .formStyle(.grouped)
         .frame(maxWidth: .infinity)
         .padding()
-        .onAppear { refreshLaunchAtLogin() }
+        .onAppear {
+            refreshLaunchAtLogin()
+            refreshHelperStatus()
+        }
     }
 
     /// 系统要求用户手动批准(SMAppService 注册后可能落到 requiresApproval)。
@@ -129,6 +167,13 @@ struct GeneralSettingsView: View {
         guard launchAtLogin != value else { return }
         suppressNextChange = true
         launchAtLogin = value
+    }
+
+    /// 特权助手状态读回(镜像统一走 suppress,与登录项同款防重入)。
+    private func refreshHelperStatus() {
+        let status = PrivilegedHelperStatus.current()
+        helperSuppressNextChange = true
+        helperStatus = status
     }
 
     private func openLoginItemsPane() {

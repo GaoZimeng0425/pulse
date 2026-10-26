@@ -306,7 +306,7 @@ final class HistoryQueryTests: XCTestCase {
         // P2 传感器趋势量(p2-sensors/08):温度/GPU/功率三键排在网络磁盘之后。
         XCTAssertEqual(
             HistoryMetricKey.allCases.map(\.title),
-            ["系统负载", "CPU", "内存", "网络", "磁盘", "温度", "GPU", "功率"]
+            ["系统负载", "CPU", "内存", "网络", "磁盘", "温度", "GPU", "功率", "能耗"]
         )
         XCTAssertEqual(HistoryMetricKey.systemLoad.accent, .cpu)
         XCTAssertEqual(HistoryMetricKey.cpu.accent, .cpu)
@@ -316,8 +316,10 @@ final class HistoryQueryTests: XCTestCase {
         XCTAssertEqual(HistoryMetricKey.temperature.accent, .sensors)
         XCTAssertEqual(HistoryMetricKey.gpu.accent, .gpu)
         XCTAssertEqual(HistoryMetricKey.power.accent, .gpu)
+        XCTAssertEqual(HistoryMetricKey.energy.accent, .sensors)
         XCTAssertEqual(HistoryMetricKey.temperature.statisticText(48.26), "48.3°C")
         XCTAssertEqual(HistoryMetricKey.power.statisticText(12.34), "12.3 W")
+        XCTAssertEqual(HistoryMetricKey.energy.statisticText(1222.12), "1222")
         XCTAssertEqual(HistoryMetricKey.systemLoad.statisticText(42.4), "42%")
         XCTAssertEqual(HistoryMetricKey.cpu.statisticText(445.2), "445%")
         XCTAssertEqual(HistoryMetricKey.memory.statisticText(2_400_000_000), "2.4 GB")

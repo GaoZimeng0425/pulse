@@ -59,6 +59,16 @@ echo "==> 构建 pulse-mcp(MCP stdio server)..."
 swift build -c release --package-path Packages/PulseMCP -q
 cp "Packages/PulseMCP/.build/release/pulse-mcp" "$APP_BUNDLE/Contents/MacOS/pulse-mcp"
 
+# 特权助手 daemon(p3-root-mcp/03,探针 09 安装组合):可执行 + plist 嵌
+# Contents/Library/LaunchDaemons/(SMAppService.daemon 的既定位置);同样在
+# 重签前进 bundle。
+echo "==> 构建 pulse-helper(特权助手 daemon)..."
+swift build -c release --package-path Packages/PulseHelper -q
+mkdir -p "$APP_BUNDLE/Contents/Library/LaunchDaemons"
+cp "Packages/PulseHelper/.build/release/pulse-helper" "$APP_BUNDLE/Contents/Library/LaunchDaemons/pulse-helper"
+cp "Packages/PulseHelper/com.gaozimeng.pulse.helper.plist" "$APP_BUNDLE/Contents/Library/LaunchDaemons/"
+chmod 755 "$APP_BUNDLE/Contents/Library/LaunchDaemons/pulse-helper"
+
 if [ "$SIGNING_IDENTITY" != "-" ]; then
   echo "==> 重签($SIGNING_IDENTITY)..."
   codesign --force --deep --sign "$SIGNING_IDENTITY" "$APP_BUNDLE"

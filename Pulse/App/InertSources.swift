@@ -318,7 +318,9 @@ extension SystemMonitor {
                 containers: ContainerFeature(source: InertContainerSource()),
                 launchdManifest: LaunchdManifestFeature(
                     provider: LaunchdManifestProvider(source: InertLaunchdPlistSource())
-                )
+                ),
+                // 预览:助手缺席 = 空样本(与未安装态同观感)。
+                energyImpact: EnergyImpactFeature(fetch: { ([], Date()) })
             )
         )
     }

@@ -27,5 +27,4 @@ excluded:
   - .scratch
   - .claude
   - .worktrees                             # 仓库内 agent worktree 副本(AGENTS.md 分支节)
-  - Packages/PulseCore/.build              # SwiftPM 拉的依赖源码(GRDB),不是自有代码
-  - Packages/PulseMCP/.build             # 同上(pulse-mcp 的 swift-sdk 依赖源码;漏排会扫到 swiftlint SIGILL 崩溃,2026-10-26 实测)
+  - Packages/*/.build                    # SwiftPM 构建产物与依赖源码(GRDB/swift-sdk 等),不是自有代码;漏排轻则违规噪音、重则 swiftlint SIGILL 崩溃(2026-10-26 两票连续实踩:02 PulseMCP/03 PulseHelper,故通配根治)

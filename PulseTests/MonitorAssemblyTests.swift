@@ -33,7 +33,8 @@ final class MonitorAssemblyTests: XCTestCase {
             containers: ContainerFeature(source: InertContainerSource()),
             launchdManifest: LaunchdManifestFeature(
                 provider: LaunchdManifestProvider(source: InertLaunchdPlistSource())
-            )
+            ),
+            energyImpact: EnergyImpactFeature(fetch: { ([], Date()) })
         )
     }
 

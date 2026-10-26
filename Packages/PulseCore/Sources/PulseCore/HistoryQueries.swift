@@ -92,6 +92,7 @@ public enum HistoryMetricKey: String, CaseIterable, Identifiable, Sendable {
     case temperature
     case gpu
     case power
+    case energy
 
     public var id: String {
         rawValue
@@ -107,6 +108,7 @@ public enum HistoryMetricKey: String, CaseIterable, Identifiable, Sendable {
         case .temperature: "温度"
         case .gpu: "GPU"
         case .power: "功率"
+        case .energy: "能耗"
         }
     }
 
@@ -121,13 +123,14 @@ public enum HistoryMetricKey: String, CaseIterable, Identifiable, Sendable {
         case .temperature: .sensors
         case .gpu: .gpu
         case .power: .gpu // 五路功率页住在 GPU tab,同源粉色(GPU/功率一族)
+        case .energy: .sensors // 能耗影响:传感器一族,sensors 令牌色
         }
     }
 
     /// 仪表三指标读窄表 gauge_*(p2-review/09)。
     public var readsGaugeTables: Bool {
         switch self {
-        case .temperature, .gpu, .power: true
+        case .temperature, .gpu, .power, .energy: true
         case .systemLoad, .network, .disk, .cpu, .memory: false
         }
     }
@@ -135,7 +138,7 @@ public enum HistoryMetricKey: String, CaseIterable, Identifiable, Sendable {
     /// 读系统级表(system_*)还是组级表(sample_*)。
     public var readsSystemTables: Bool {
         switch self {
-        case .systemLoad, .network, .disk, .temperature, .gpu, .power: true
+        case .systemLoad, .network, .disk, .temperature, .gpu, .power, .energy: true
         case .cpu, .memory: false
         }
     }
@@ -151,6 +154,7 @@ public enum HistoryMetricKey: String, CaseIterable, Identifiable, Sendable {
         case .temperature: "CPU 均值派生温度;P2 传感器 08 起记录"
         case .gpu: "GPU 总利用率(关电归 0 同记);P2 传感器 08 起记录"
         case .power: "五路功率合计(CPU+GPU+ANE+RAM+SoC 平均瓦数);P2 传感器 08 起记录"
+        case .energy: "全机 Energy Impact 合计(苹果合成能耗影响分,无量纲);P3 特权助手起记录,助手未装则空段"
         }
     }
 
@@ -164,6 +168,7 @@ public enum HistoryMetricKey: String, CaseIterable, Identifiable, Sendable {
         case .temperature: String(format: "%.1f°C", value)
         case .gpu: PulseFormat.cpuPercent(value)
         case .power: PulseFormat.watts(value)
+        case .energy: String(format: "%.0f", value)
         }
     }
 }
@@ -238,7 +243,7 @@ public extension HistoryMetricKey {
         switch self {
         case .temperature: [.temperatureAverage, .temperatureHottest]
         case .power: [.powerTotal] + PowerDomain.allCases.map(HistoryBreakdown.powerDomain)
-        case .systemLoad, .cpu, .memory, .network, .disk, .gpu: []
+        case .systemLoad, .cpu, .memory, .network, .disk, .gpu, .energy: []
         }
     }
 
@@ -383,6 +388,13 @@ public enum HistoryQuery {
             keyArgument = key.rawValue
             sql = """
             SELECT ts / \(bucket) * \(bucket) AS bucket, \(value) AS value
+            FROM \(table) WHERE key = ? AND ts >= ? AND ts < ?
+            GROUP BY bucket ORDER BY bucket
+            """
+        case .energy:
+            keyArgument = GaugeKey.energyImpact.rawValue
+            sql = """
+            SELECT ts / \(bucket) * \(bucket) AS bucket, AVG(avg) AS value
             FROM \(table) WHERE key = ? AND ts >= ? AND ts < ?
             GROUP BY bucket ORDER BY bucket
             """

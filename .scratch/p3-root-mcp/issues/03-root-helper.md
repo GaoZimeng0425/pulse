@@ -18,7 +18,7 @@ Energy Impact 一项(per-app GPU 本机存疑、网络/全机功率免 root 已�
 
 **Blocked by:** None(拍板通过后可做;与 02 并行)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] build.sh 产物含 helper 且双端签名验证通过(探针 09 组合复刻)
 - [ ] 安装→批准→root 跑全流程在真 Pulse 上走通(unregister 一步干净复原)
@@ -114,3 +114,31 @@ status 才是判据。
 
 **用户参与点:** 实机验收须用户在场批准一次系统授权(安装流);设置页三态
 与历史页新量曲线归目验(汇总进 04 收口)。
+
+## Comments
+
+**2026-10-26 实施完毕(check 全绿:822 例 = 核心 455 + helper 4 + app 363;装机后待用户批准验收)**:
+
+- **helper(PulseHelper 独立 SPM 包)**:XPC server(拉模式,mach service = launchd
+  label)+ 60s powermetrics 单发采集(首轮立即)+ 对端校验 fail-closed(连接方须
+  满足本 daemon 的 designated requirement,自签无 Team ID 以证书指纹 DR 表达;
+  Procexp PeerValidation 路数);解析器**语义锚定**(行尾 = Energy Impact 恒末列、
+  名字后第一个纯整数 = pid)——不依赖列数,表头列名是多词(`Energy Impact`)按
+  表头数列不可靠,实测翻车后重写,4 单测钉死(probe 08 真实形态夹具)。
+- **app 侧**:EnergyHelperClient(每分钟短连接 + setCodeSigningRequirement 双向
+  校验对称);EnergyImpactFeature(60s 档拉取,**不做可见性门控**——一次 XPC
+  短调用开销可忽略,数据以落库为目的)按**进程名聚合** top10 + 全机合计,
+  合计经 FeatureEvent.gauges 广播进窄表(GaugeKey.energyImpact,零迁移管线);
+  设置页"特权助手"区三态(未装/待批准/运行中)+ 开关 + 批准引导。
+- **落库口径偏离 Brief 记档**:per-group 不进历史库,只落全机合计一个固定键
+  ——04 Agents 用量卡要的是实时排行(内存态 top10 已备),30 天 per-group
+  曲线无消费方,YAGNI;pid→组映射不做(60s 档与 5s 心跳不同拍,pid 复用错配
+  风险,名字聚合对"哪个 App 耗电"够用)。
+- **历史页接线**:HistoryMetricKey.energy(第 9 指标,标题"能耗"/sensors 色/
+  bolt.fill 符号/ "%.0f" 格式),选择器自动出现;防漂移测试已扩。
+- **XPC 校验单测 → 真机验收替代记档**:SecCode 校验本质是系统调用,合成
+  "伪造签名对端"单测无意义;真机整链路(未装/装+批准/开关往返)即真实校验。
+- **swiftlint exclude 通配根治**:Packages/*/.build(02/03 两票连续实踩后,
+  单包逐一加改通配)。
+- **待装机验收(用户参与点)**:开关开启 → 系统设置批准(Touch ID)→
+  历史页能耗曲线出数据;helper 常驻成本实测挂 04 收口统一做。
