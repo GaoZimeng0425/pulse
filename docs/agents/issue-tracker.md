@@ -10,6 +10,7 @@ Issues and specs for this repo live as markdown files in `.scratch/`.
 - Triage state is recorded as a `Status:` line near the top of each issue file (see `triage-labels.md` for the role strings)
 - Comments and conversation history append to the bottom of the file under a `## Comments` heading
 - 代码注释引用工单一律写全名 `<feature-slug>/<NN>`(如 `p1-history/06`)——编号只在目录内唯一,裸写"工单 06"会撞号(2026-10-19 拍板)。规则只管**新写**的注释(含挪动重写的段落);存量裸号不强制补——裸号本身有歧义,补全要逐条考证所指工单,不属于顺手活
+- **立票即分诊**(2026-10-26 用户拍板,作废"收尾提醒跑 /triage"旧约定):agent 立票(含手写票收尾)时同步完成 triage 的实质检查——冗余搜查、`.out-of-scope/` 比对、分类、Agent Brief——票直接落终态(通常 ready-for-agent);真产品/单向门拍板点单独停下问用户,一次一个。**流程不依赖用户敲 `/triage`**;该技能保留,仅用户主动想用才用。Status 标签体系不变(见 `triage-labels.md`)
 
 ## When a skill says "publish to the issue tracker"
 
