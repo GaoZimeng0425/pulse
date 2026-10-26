@@ -1,0 +1,52 @@
+探针 09 输出 —— SMAppService daemon 注册路径实机验证(P3 探针①实机轮)
+机器:Mac16,1 / macOS 26A434 / 2026-10-26
+身份:Pulse Local Code Signing(登录钥匙串自签,CN+O 无 OU,TeamIdentifier=not set 双端实锤)
+====================================================================
+
+[1] 构建与签名(build-and-sign.sh)
+    codesign --options runtime --timestamp=none 双端(helper 先、app 后)
+    codesign --verify --deep --strict: satisfies its Designated Requirement
+    TeamIdentifier=not set(app 与 helper 均如此——文献轮识别的 gap 实机状态)
+
+[2] 首次 register()(app open 启动,无参模式)
+    status before: notFound
+    register: FAILED — Error Domain=SMAppServiceErrorDomain Code=1
+              "Operation not permitted"
+    status after: requiresApproval
+    ▶ 解读:Code=1 不是失败终态——注册已提交进 BTM(后台任务管理)数据库,
+      卡在用户批准环节。用户在 系统设置→通用→登录项与扩展 批准(需 Touch ID/
+      密码)后 daemon 即启动。register() 的返回错不作为成败判据,status 才是。
+
+[3] 用户批准后三证(全部通过)
+    ① root 标记:/tmp/pulse-probe-root.marker
+       "pulse probe daemon ran at 2026-10-26 03:31:40 +0000 uid=0 pid=96581"
+    ② 进程:pgrep 命中 96581
+    ③ launchd:launchctl print system/com.pulse.probe.daemon
+       state = running / job state = running
+       program identifier = Contents/Library/LaunchDaemons/com.pulse.probe.daemon
+       pid = 96581 (state = active)
+
+[4] 升级路径(app 重编译+重签+重装 = cdhash 变化,--args status 模式)
+    mode: status / status before: enabled / status after: enabled
+    ▶ 自签身份名不变的前提下,app 二进制更新不丢 daemon 授权。
+      (推论:证书重建/换名才是丢授权的边界,日常发版安全。)
+
+[5] 复原(--args unregister 模式)+ 残留检查
+    mode: unregister / status before: enabled / unregister: OK
+    status after: notRegistered
+    launchctl print system/com.pulse.probe.daemon → Could not find service
+    进程已清、/Applications/PulseProbe.app 已删
+    ▶ 卸载路径干净:app 内 unregister 即可,无系统设置手动操作、无孤儿。
+
+====================================================================
+结论(P3 消费票的直接输入):
+  1. 主路成立:SMAppService daemon + 现有持久自签身份,无需重建证书、
+     无 TCC 重授权成本、无付费开发者账号、app 侧无需任何 entitlement。
+  2. 集成形状:helper 二进制+plist 放 Contents/Library/LaunchDaemons/,
+     plist 用 BundleProgram(bundle 相对路径)+ AssociatedBundleIdentifiers,
+     app 装在 /Applications。
+  3. 注册交互真实成本:首次 register → 用户去系统设置批准一次(或弹窗),
+     register() 本身会报 Code=1 "Operation not permitted",以 status 为准。
+  4. 后续 root helper 消费票剩余的不确定性:只剩 XPC 对端校验(Procexp
+     PeerValidation 路数:helper 读自身签名要求 app 匹配——无 Team ID 时
+     以证书指纹/自定义 requirement 表达)与 Energy Impact 采集节奏。
