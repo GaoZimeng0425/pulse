@@ -17,7 +17,7 @@ README 给 AI 客户端配置指引(claude desktop / ZCode 等)。
 
 **Blocked by:** None(零依赖,可与 03 并行)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] stdio JSON-RPC 握手通过(真 MCP client 或 inspector 连上并列出工具)
 - [ ] why_cpu_high 真机答出 top 进程组,与 Pulse UI 排行互证一致
@@ -75,3 +75,34 @@ sample_min 每分钟每进程组样本、gauge_min 窄表趋势量、system_min 
 
 **实施默认值**(遇阻可调,记档理由):分发=嵌 app bundle;工具参数=最小化
 (top-N / 时间窗);命名=pulse-mcp。
+
+## Comments
+
+**2026-10-26 实施完毕(check 全绿:815 例 = 核心 454 + app 361;探针真库三工具全通)**:
+
+- **查询层(PulseCore)**:新增 `InsightQueries`(`topCpuGroups` 窗口均值
+  排行 + `latestSnapshot` 各指标最新行,LEFT JOIN groups 元数据,空库诚实
+  返回空/nil);`HistoryDatabase.openReader` 外部只读入口(query_only 硬保证,
+  库不存在返回 nil,绝不创建/迁移);history_query 直接复用既有
+  `HistoryQuery.series` 零第二出处。7 个新单测(窗口过滤/排序/join 兜底/
+  NULL 传染/空库/openReader 行为面)。
+- **pulse-mcp(新独立 SPM 包)**:swift-sdk 0.12.1(官方,Server actor +
+  withMethodHandler + StdioTransport + waitUntilCompleted);三工具全实现,
+  格式化走 PulseFormat 与 UI 同源;PulseCore 加 `PulseCoreStatic` 静态产品,
+  可执行全静态单一产物,由 build.sh 拷进 app bundle(Contents/MacOS/)。
+- **真库探针实证**:stdio JSON-RPC 握手 → 列出三工具 → why_cpu_high 真答案
+  (ZCode 平均 45%/30 进程、Arc 36%、NemoNotch 31% + 系统负载 49% + 数据
+  年龄"1 分钟前")。"app 在跑"态实测;"不在跑"态由同一回退路径覆盖(年龄
+  标注)。"与 UI 排行互证"归 04 收口目验(答案直接来自库,同源无第二口径)。
+- **README**(英/中)加 MCP 配置节:客户端 json 指向 bundle 内可执行。
+- **两个环境坑记档**(判断类,票面为首出处):
+  1. **`@_exported import GRDB` 勿用于动态 PulseCore**:实测让 app 全量
+     Debug 编译挂 SwiftUI 协议一致性(LabelStyle/ButtonStyle "does not
+     conform"——可执行侧无碍,坏的是 import 动态库的 app target,干净
+     develop 对照绿)。改 `public typealias PulseDatabase = Database`。
+  2. **swiftlint exclude 漏新包 .build 会 SIGILL 崩溃**(132,无违规输出,
+     极易误判):`.swiftlint.yml` 已补 `Packages/PulseMCP/.build`。
+  3. Xcode 27.1 偶发构建 flake "exit code 0 but produced no further
+     output"(干净仓库可复现,重跑即绿)——check/pre-commit 构建段加
+     build.sh 同款签名 flags(与 build.sh 一致性),flake 记档观察,
+     未加重试逻辑。

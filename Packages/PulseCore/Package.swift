@@ -9,7 +9,13 @@ let package = Package(
     platforms: [.macOS("26.0")],
     // 动态库:app 与宿主内单测共用同一份(静态库会在 app 与测试包里各链一份,同名类型
     // 两套元数据,类型判断对不上即崩);GRDB 只静态链进这一个动态库,经 PulseCore 重新导出。
-    products: [.library(name: "PulseCore", type: .dynamic, targets: ["PulseCore"])],
+    // 静态产品(PulseCoreStatic,p3-root-mcp/02):独立进程 pulse-mcp 专用——
+    // 全静态单一可执行,零 dylib 随行;不同进程不共享地址空间,不与 app 侧
+    // 动态库的"同名类型"约束冲突。
+    products: [
+        .library(name: "PulseCore", type: .dynamic, targets: ["PulseCore"]),
+        .library(name: "PulseCoreStatic", type: .static, targets: ["PulseCore"]),
+    ],
     dependencies: [.package(url: "https://github.com/groue/GRDB.swift", from: "7.0.0")],
     targets: [
         .target(

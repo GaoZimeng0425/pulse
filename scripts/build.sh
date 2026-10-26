@@ -53,6 +53,12 @@ xcodebuild build \
 APP_BUNDLE="$BUILD_DIR/Build/Products/Release/$APP_NAME.app"
 [ -d "$APP_BUNDLE" ] || { echo "❌ 未找到产物 $APP_BUNDLE" >&2; exit 1; }
 
+# MCP stdio server(p3-root-mcp/02):全静态单一可执行,嵌 bundle 随 app 分发;
+# 必须在重签前进 bundle(--deep 签名覆盖它)。
+echo "==> 构建 pulse-mcp(MCP stdio server)..."
+swift build -c release --package-path Packages/PulseMCP -q
+cp "Packages/PulseMCP/.build/release/pulse-mcp" "$APP_BUNDLE/Contents/MacOS/pulse-mcp"
+
 if [ "$SIGNING_IDENTITY" != "-" ]; then
   echo "==> 重签($SIGNING_IDENTITY)..."
   codesign --force --deep --sign "$SIGNING_IDENTITY" "$APP_BUNDLE"
