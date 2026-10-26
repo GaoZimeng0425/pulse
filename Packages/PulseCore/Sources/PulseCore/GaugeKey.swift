@@ -23,6 +23,9 @@ public enum GaugeKey: String, CaseIterable, Hashable, Sendable {
     case powerRam = "pow_ram"
     /// 五路功率平均瓦数(SoC 域)。
     case powerSoc = "pow_soc"
+    /// 全机 Energy Impact 合计(powermetrics 合成能耗影响分,无量纲;
+    /// p3-root-mcp/03 特权助手采集,助手缺席不产行)。
+    case energyImpact = "energy_impact"
 
     /// 五路功率域 ↔ 键。
     public static func power(_ domain: PowerDomain) -> GaugeKey {

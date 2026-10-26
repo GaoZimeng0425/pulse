@@ -20,6 +20,7 @@ extension HistoryMetricKey {
         case .disk: "internaldrive"
         case .temperature: "thermometer.medium"
         case .gpu: "circle.hexagongrid.fill"
+        case .energy: "bolt.fill"
         case .power: "bolt.fill"
         }
     }
@@ -194,7 +195,7 @@ struct HistoryTabView: View {
         switch metric {
         case .network, .disk:
             return "该时段无吞吐记录(Pulse 未运行或网络/磁盘读数缺席)——历史留空,不补零"
-        case .temperature, .gpu, .power:
+        case .temperature, .gpu, .power, .energy:
             return "该时段传感器读数缺席,或 Pulse 未运行——历史留空,不补零"
         case .systemLoad, .cpu, .memory:
             return "所选时间段内 Pulse 未运行——历史留空,不补零"
