@@ -1,8 +1,9 @@
 # Pulse SwiftFormat configuration(基线取自 NemoNotch 同款,风格口径保持一致)
 --swiftversion 6.0
 
-# 根目录 build/ 是 xcodebuild 产物;.build(隐藏目录)swiftformat 默认跳过
---exclude build
+# 根目录 build/ 是 xcodebuild 产物;.build(隐藏目录)swiftformat 默认跳过;
+# .worktrees = 仓库内 agent worktree 副本(2026-10-26 起驻地,AGENTS.md 分支节),不格式化
+--exclude build,.worktrees
 
 # Indentation
 --indent 4

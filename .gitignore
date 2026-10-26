@@ -15,3 +15,7 @@ xcuserdata/
 
 # Claude Code 子代理的临时 worktree
 .claude/worktrees/
+
+# agent 并行会话的 worktree——建在项目根内(Pulse 归因按路径前缀,/tmp 会 miss;
+# 规矩见 AGENTS.md 分支节),搜索工具按 gitignore 自动跳过
+.worktrees/
