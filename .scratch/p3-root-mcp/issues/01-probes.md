@@ -23,11 +23,11 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] 特权安装路径有实机结论:自签 + SMJobBless 成/败实证,或 SMAppService
-      daemon 注册走通,或如实记录失败模式与推荐回退(文献轮已定主路与 gap,
-      实机轮见 Agent Brief)
+- [x] 特权安装路径有实机结论:SMAppService daemon 注册走通(docs/probes/09
+      三证:uid=0 标记/进程/launchd running;现有自签身份无 Team ID 直接过,
+      无需重建证书——register() 的 Code=1 是等用户批准的中间态,status 为准)
 - [x] root 独有数据实测落档:powermetrics per-app GPU/能耗真输出(用户 sudo
       参与)+ 免 root IOReport 对照,"值/不值"有数据支撑
       (2026-10-26 实机轮:Energy Impact 硬增量成立 / per-app GPU 本机疑似
@@ -147,3 +147,27 @@ CN= Pulse Local Code Signing, O= Pulse)无 OU 字段——签名里的 Team iden
 **用户参与点(实机轮须用户在场):**
 - register() 触发时系统会弹一次后台项安装授权窗,须用户点允许;
 - 证书重建(仅失败路径)会触发 TCC 全量重授权,须用户拍板并亲手重授。
+
+**2026-10-26 ①实机轮执行完毕(探针票 DONE,docs/probes/09 源码+输出落档)**:
+
+- **主路成立,且比预期更顺**:现有自签身份(`TeamIdentifier=not set` 双端实锤)
+  **直接通过** SMAppService daemon 注册——无需重建带 OU 的证书、无 TCC 重授权、
+  无付费开发者账号、app 侧零 entitlement。文献轮担心的 gap 实测不是阻碍。
+- **首次注册交互**:register() 返回 Code=1 "Operation not permitted" 但 status
+  走到 requiresApproval = 注册已进 BTM;用户在系统设置批准一次(Touch ID/密码)
+  后 daemon 即以 root 启动。**成败判据看 status,不看 register() 返回值**。
+- **三证**:root 标记 uid=0 / 进程 pgrep 命中 / launchd `state=running`
+  (BundleProgram 相对路径被正确解析)。
+- **升级路径**:app 重编译+重签+重装(cdhash 变)后 status 仍 enabled——
+  自签身份名不变时日常发版不丢 daemon 授权;换证书名才是丢授权边界。
+- **卸载路径**:app 内 unregister() 一步干净(notRegistered、launchd 服务
+  消失、无孤儿),无需系统设置手动操作。
+- **留给消费票的不确定性**(已收窄到两点):XPC 对端校验在无 Team ID 时
+  用证书指纹/自定义 requirement 表达(Procexp PeerValidation 路数);
+  Energy Impact 采集节奏(轮询 vs 事件)。
+
+**三路终态汇总**:① SMAppService daemon 主路实证走通(probe 09);
+② root 硬增量 = Energy Impact 一项,per-app GPU 本机存疑待重负载复测,
+网络/全机功率已被免 root 覆盖(probe 08);③ MCP 全线绿灯(官方 swift-sdk
++ WAL 历史库 + sample_min 66 万行弹药)。下一步 = 立消费票(root helper
+本体 / MCP server / Agents 用量卡)走 grill → spec。
