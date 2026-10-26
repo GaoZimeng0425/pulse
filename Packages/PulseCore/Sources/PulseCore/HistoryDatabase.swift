@@ -1,6 +1,12 @@
 import Foundation
 import GRDB
 
+/// 外部读者(pulse-mcp)用的 Database 别名。不走 `@_exported import GRDB`
+/// 再导出——实测它会让 app 全量 Debug 编译挂 SwiftUI 协议一致性
+/// (LabelStyle/ButtonStyle "does not conform",2026-10-26;静态链的
+/// 可执行无碍,坏的是 import 动态 PulseCore 的 app target)。
+public typealias PulseDatabase = Database
+
 /// 历史库(工单 03,spec 实现决策「存储」):GRDB 单连接 SQLite,
 /// 库文件 `~/Library/Application Support/Pulse/history.sqlite`,WAL 模式。
 ///
@@ -78,6 +84,22 @@ public enum HistoryDatabase {
         let queue = try DatabaseQueue()
         try migrator().migrate(queue)
         return queue
+    }
+
+    /// 外部读者(p3-root-mcp/02:pulse-mcp):只读连接既有库;文件不存在返回
+    /// nil(调用方如实报"无数据")。**绝不创建、绝不迁移**——写者与 schema
+    /// 演进归 app 单写者。只读由 `PRAGMA query_only` 硬保证;连接不用
+    /// SQLite readonly 模式(WAL 的 -shm 在 app 异常退出残留时需要可创建,
+    /// readonly 模式会打不开——query_only 挡数据写,-shm 创建不属于数据写,
+    /// 两者兼得)。GRDB 写路径在该 PRAGMA 下的表现是抛错或 no-op(实测行为面
+    /// 钉在 InsightQueryTests:行数不变),不承诺具体哪种。
+    public static func openReader(at url: URL = defaultURL) throws -> DatabaseQueue? {
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        var configuration = Configuration()
+        configuration.prepareDatabase { db in
+            try db.execute(sql: "PRAGMA query_only = 1")
+        }
+        return try DatabaseQueue(path: url.path, configuration: configuration)
     }
 
     /// 窄表迁移标识(备份探测与测试造旧库共用)。

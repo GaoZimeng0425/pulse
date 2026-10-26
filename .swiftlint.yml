@@ -27,3 +27,4 @@ excluded:
   - .scratch
   - .claude
   - Packages/PulseCore/.build              # SwiftPM 拉的依赖源码(GRDB),不是自有代码
+  - Packages/PulseMCP/.build             # 同上(pulse-mcp 的 swift-sdk 依赖源码;漏排会扫到 swiftlint SIGILL 崩溃,2026-10-26 实测)

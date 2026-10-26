@@ -80,6 +80,22 @@ Launch at login, menu bar slots, project roots, file logs (`~/.Pulse/logs`, rota
 
 <p align="center"><img src="docs/screenshots/settings.png" width="60%" alt="settings window"></p>
 
+### MCP: let your AI assistant read Pulse
+
+The app bundle ships `pulse-mcp`, a stdio [Model Context Protocol](https://modelcontextprotocol.io) server that answers from Pulse's history database (works even when the app isn't running — answers carry a data-age stamp). Three tools: `why_cpu_high` (top process groups over a lookback window), `current_metrics`, and `history_query` (8 metrics × 4 windows, up to 30 days).
+
+Point any MCP client at the bundled binary:
+
+```json
+{
+  "mcpServers": {
+    "pulse": {
+      "command": "/Applications/Pulse.app/Contents/MacOS/pulse-mcp"
+    }
+  }
+}
+```
+
 ## Resource budget
 
 Built for a machine you actually work on:

@@ -80,6 +80,22 @@ dev server 盘点器从 argv 识别 vite / next dev / webpack-dev-server / tsc �
 
 <p align="center"><img src="docs/screenshots/settings.png" width="60%" alt="设置窗口"></p>
 
+### MCP:让 AI 助手直接查 Pulse
+
+app 内置 `pulse-mcp`——stdio 方式的 [Model Context Protocol](https://modelcontextprotocol.io) server,读 Pulse 历史库作答(app 没在运行也能答,答案自带数据年龄标注)。三个工具:`why_cpu_high`(回看窗口内 CPU 最高的进程组)、`current_metrics`(当前读数)、`history_query`(8 指标 × 4 时间窗,最长 30 天)。
+
+任何 MCP 客户端指向内置可执行即可:
+
+```json
+{
+  "mcpServers": {
+    "pulse": {
+      "command": "/Applications/Pulse.app/Contents/MacOS/pulse-mcp"
+    }
+  }
+}
+```
+
 ## 资源预算
 
 给真正在干活的机器用:
