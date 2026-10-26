@@ -1,0 +1,27 @@
+# 04: Agents 用量卡 + per-app GPU 复测定论 + P3 收口
+
+**What to build:** 三件事收尾整个 P3 档:
+
+- **① Agents 用量卡**:Energy Impact 数据的 UI 呈现——AI/agent 进程
+  (zap / ZCode / Claude / ollama 等常见模式)按能耗聚合,落在合适的 tab
+  (形态与位置 grill 拍,数值须走 DESIGN.md 令牌表)。分组口径与 P0 分组
+  引擎的 category 机制复用,规则可配 vs 内置表待 grill。
+- **② per-app GPU 复测定论**:探针②的悬案——重 GPU 负载下(跑一段真实
+  GPU 任务)再采一轮 `powermetrics --show-process-gpu`,定论该列在本机
+  可用与否:可用 → 顺路加卡;不可用 → 如实记档放弃(caveat 与 Stats 参考
+  repo 一致,不算失败)。
+- **③ 收口**:02 的 MCP 真连记录(client 实际问答样例落档)+ 全档目验
+  汇总摆给用户 + helper 在跑的稳态复测(对照 ~1% 基线,节奏矩阵纪律)。
+
+**Blocked by:** 03(Energy Impact 数据源);② 不依赖 03 可先行。
+
+**Status:** needs-triage
+
+- [ ] Agents 用量卡有真数(跑 agent 会话时能耗数值变动),位置/形态过 grill
+- [ ] per-app GPU 复测有定论:可用(加卡)或记档放弃,二选一落档
+- [ ] MCP 真连问答样例落档(至少 why_cpu_high 一例,答案与 UI 互证)
+- [ ] 稳态复测(helper 在跑)对基线无异常增量,如实记档
+- [ ] 全档目验项汇总在票面,摆给用户
+
+**待拍板点(grill):** 卡的位置与形态(外设 tab?系统页?)、agent 分组
+口径(内置表 vs 用户可配)、若 03 被拍不做本票的替代数据源(能耗估算或砍)。
