@@ -66,7 +66,7 @@ echo "==> 构建 pulse-helper(特权助手 daemon)..."
 swift build -c release --package-path Packages/PulseHelper -q
 mkdir -p "$APP_BUNDLE/Contents/Library/LaunchDaemons"
 cp "Packages/PulseHelper/.build/release/pulse-helper" "$APP_BUNDLE/Contents/Library/LaunchDaemons/pulse-helper"
-cp "Packages/PulseHelper/com.gaozimeng.pulse.helper.plist" "$APP_BUNDLE/Contents/Library/LaunchDaemons/"
+cp "Packages/PulseHelper/com.gaozimeng.pulse.helper2.plist" "$APP_BUNDLE/Contents/Library/LaunchDaemons/"
 chmod 755 "$APP_BUNDLE/Contents/Library/LaunchDaemons/pulse-helper"
 
 if [ "$SIGNING_IDENTITY" != "-" ]; then
