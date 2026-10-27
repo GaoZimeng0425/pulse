@@ -197,3 +197,16 @@ status 才是判据。
   至链路全绿后下一票再决定去留;app 侧补拉取恢复成功翻转日志。
 - 本地验证口径:用户态手动跑 helper,collect 退出码 64 → 1(权限错=参数
   已对,root 下即 0)。
+
+**2026-10-27 终局定案:plist 回相对路径,批准链是唯一活路**:
+
+- 全天对拍:两条实证成功组合均为**相对路径 + 用户批准链路部署**(探针 09、
+  当日 14:52 running);绝对路径被快速重注册链拒(BundleProgram 不允许
+  绝对路径 lint + Launch Constraint Violation,launchd "removing service
+  since consistent failure");相对路径被快速链以原文 exec 拒(EX_CONFIG)。
+  **快速重注册链路两条都死,批准链 + 相对路径是唯一实证组合**。
+- 运维口径(换 bundle 后):关开关 → `sudo launchctl bootout system/
+  com.gaozimeng.pulse.helper` → 等 30s → 开开关 → 系统设置重新批准一次
+  (配置变即新后台项);spawn 卡退避时 `sudo launchctl kickstart` 强拉。
+- 今天下午 14:52 的 running(pid 69234)即批准链成功实证——之后的失败全部
+  是换 bundle 后未重新批准所致。
