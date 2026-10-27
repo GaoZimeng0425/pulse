@@ -15,11 +15,6 @@
     <string>Contents/Library/LaunchDaemons/pulse-helper</string>
     <key>RunAtLoad</key>
     <true/>
-    <key>MachServices</key>
-    <dict>
-        <key>com.gaozimeng.pulse.helper</key>
-        <true/>
-    </dict>
     <key>AssociatedBundleIdentifiers</key>
     <array>
         <string>com.gaozimeng.pulse</string>

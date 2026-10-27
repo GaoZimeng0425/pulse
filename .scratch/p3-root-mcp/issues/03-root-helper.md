@@ -210,3 +210,18 @@ status 才是判据。
   (配置变即新后台项);spawn 卡退避时 `sudo launchctl kickstart` 强拉。
 - 今天下午 14:52 的 running(pid 69234)即批准链成功实证——之后的失败全部
   是换 bundle 后未重新批准所致。
+
+**2026-10-27 终局(第五验):XPC 全线弃用,helper 改文件通信(探针 09 亲儿子形状)**:
+
+- 机制全景拼齐:带 `MachServices` 的自签 helper 在本机 macOS 26 被 xpcproxy
+  以 `EX_CONFIG(78)/Launch Constraint` 拒(0 秒退出,throttle 重试);此前
+  14:52 的"running"是撞上垂死进程的假象,数据从未落库。**全天唯一真实
+  成功 = 探针 09 组合:无 MachServices + 相对路径 + 批准链(root marker
+  实证)**——而探针 09 恰恰没有 XPC。
+- **定案**:helper 去 NSXPCListener/MachServices/对端校验,60s 采集后把
+  JSON 写 `/var/run/com.gaozimeng.pulse.helper.json`(root 域,用户态不可
+  伪造;伪造面=root=出信任边界,记档);app 侧 client 改读文件(形状与
+  值域防御,坏文件不进管线)。XPC/竞速超时/SecCode 校验代码全删——
+  通信面更小、更好测(文件解析可单测,XPC 环境不可)。
+- 注:XPC 版的三个教训(DR 含 identifier 永拒 / 无超时挂死 / pipe 死锁)
+  已随代码移除,但记档保留——将来若回 XPC 必须全部带上。
