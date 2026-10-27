@@ -83,7 +83,9 @@ final class HelperService: NSObject, EnergyHelperProtocol, NSXPCListenerDelegate
     }
 
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection newConnection: NSXPCConnection) -> Bool {
-        guard PeerValidator.connectionIsTrusted(newConnection) else { return false }
+        let trusted = PeerValidator.connectionIsTrusted(newConnection)
+        PowermetricsParser.debugLog("XPC 连接 pid=\(newConnection.processIdentifier) 判定=\(trusted)")
+        guard trusted else { return false }
         newConnection.exportedInterface = NSXPCInterface(with: EnergyHelperProtocol.self)
         newConnection.exportedObject = self
         newConnection.resume()
@@ -91,7 +93,9 @@ final class HelperService: NSObject, EnergyHelperProtocol, NSXPCListenerDelegate
     }
 
     func run() {
+        PowermetricsParser.debugLog("启动:首轮采集开始")
         collector.collect() // 首轮立即(注册批准后 RunAtLoad 拉起即有数)
+        PowermetricsParser.debugLog("启动:首轮采集完成,\(collector.samples.count) 行")
         let listener = NSXPCListener(machServiceName: label)
         listener.delegate = self
         listener.resume()

@@ -59,6 +59,9 @@ final class EnergyImpactFeature: MonitorFeature {
             }
             return
         }
+        if lastFetchFailed {
+            LogService.info("特权助手拉取恢复", category: "Energy")
+        }
         lastFetchFailed = false
         guard let result else { return } // 编译器收窄(catch 路径已 return)
         let aggregated = Self.aggregate(result.samples)
