@@ -255,3 +255,22 @@ status 才是判据。
 - **换新 Label(helper2)试验(进行中)**:BTM 按 Label 记条目,新 Label =
   全新干净条目(探针效应),旧污染条目留作死条目不管;零授权成本,
   plist 文件名/Label/app plistName 三处同换。
+
+**2026-10-27 20:27 结项验收(helper2 试验成功,全链路实证)**:
+
+- **换新 Label = 主案证实**:用户最终一次批准(开关关→开 + Touch ID)后
+  daemon 以 root 起跑(pid 6489)——bundle id 沉积主案成立,新 Label 绕开
+  污染条目即通。**运维口径记档:今后动 daemon 的 plist/Label/关联键 =
+  触发重批;只重编 helper 二进制或整个 app 则不用**(本轮重装 app 后
+  daemon 未受任何影响,实证)。
+- **全链路验证**:/var/run 快照 60s 刷新(205 行,epochMs 正确)→ app
+  EnergyImpactFeature 每分钟落一行 gauge_min(energy_impact)→ 与 GPU/
+  功率等键同拍。采集偶发一轮壁钟超时被 5s 守卫正确 terminate,下轮自愈。
+- **收尾真 bug(已修 @796899a)**:powermetrics 尾部 ALL_TASKS/DEAD_TASKS
+  汇总伪行(pid<0)混进聚合 = 双重计数,真机首日总值虚高约 2.4 倍
+  (20:41 行 28215 vs 修复后 7853);app 侧 aggregate 过滤 pid<0
+  (不动 helper 二进制,守护进程签名零触碰)+ 单测钉死;快照真进程和
+  9156 ≈ 落库 7853 互证通过。823 例绿,已装机。
+- **数值量级记档**:powermetrics Energy Impact 是千级量纲(探针 08 档案
+  ALL_TASKS 1949;构建负载下真进程和 8k-13k 波动),非活动监视器 0-100
+  口径——04 票 Agents 卡展示时按此预期。
