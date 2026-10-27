@@ -142,3 +142,18 @@ status 才是判据。
   单包逐一加改通配)。
 - **待装机验收(用户参与点)**:开关开启 → 系统设置批准(Touch ID)→
   历史页能耗曲线出数据;helper 常驻成本实测挂 04 收口统一做。
+
+**2026-10-26 首装机验收揭出两个 XPC bug,已修(822 例复绿)**:
+
+- **helper 校验永拒**:"对端满足我的 designated requirement"含 identifier
+  (pulse-helper),app identifier 不同必然被拒——校验改为**双端叶证书
+  SHA-256 比对**(pid → proc_pidpath → SecStaticCodeCreateWithPath →
+  SecCodeCopySigningInformation 证书链 leaf),同证书即同签名体系,
+  identifier 不再参与。
+- **client 无超时挂死**:helper 拒连时连接静默断、reply 永不到达,
+  continuation 永挂 = 首次拉取死整条轮询——fetchLatest 加 5s 竞速超时
+  (FinishOnce 单次完成守卫);失败日志翻转才记(未装期不刷屏);
+  client→server 方向校验收窄记档(launchd mach 名独占 + BTM 同源验签
+  已保证 server 身份,双向校验留后续)。
+- 复装后须开关关→开一次让 launchd 换新 helper 二进制(同身份签名,
+  探针 09 实证不重弹授权)。

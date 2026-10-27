@@ -1,5 +1,4 @@
 import Foundation
-import ServiceManagement
 
 // MARK: - 特权助手 XPC client(p3-root-mcp/03)
 
@@ -12,22 +11,21 @@ protocol EnergyHelperClientProtocol {
 }
 
 /// 特权助手拉模式 client:每分钟一次短连接(连接开销可忽略,helper 重启自愈)。
-/// 连接要求 helper 满足本 app 的 designated requirement(运行时从自身签名取,
-/// 自签身份无 Team ID,以证书指纹 DR 表达——与 helper 侧 PeerValidator 对称,
-/// 双向校验)。@unchecked Sendable:无共享可变状态(每次调用独立短连接,
-/// 全局部变量),跨 actor 调用安全。
+/// **超时必须**(2026-10-26 首装机实踩:helper 校验拒时连接静默断,reply 永不
+/// 到达,无超时 = 首次拉取永久挂起、整条轮询死掉)。client→server 校验 v1
+/// 不做(记档收窄):server 端 mach service 名由 launchd 命名空间独占且注册
+/// 链路(BTM 同源验签)已保证身份;恶意 server 须先 root 劫持 launchd,已出
+/// 信任边界。双向校验后续可补。@unchecked Sendable:无共享可变状态(每次
+/// 调用独立短连接,全局部变量),跨 actor 调用安全。
 final class EnergyHelperClient: @unchecked Sendable {
     private let machServiceName = "com.gaozimeng.pulse.helper"
 
-    /// 拉最新一轮采样;失败(未装 / 未批准 / helper 未跑 / 校验拒)抛错。
-    func fetchLatest() async throws -> (samples: [(pid: Int, name: String, impact: Double)], collectedAt: Date) {
+    typealias Samples = [(pid: Int, name: String, impact: Double)]
+
+    /// 拉最新一轮采样;失败(未装 / 未批准 / helper 未跑 / 5s 超时)抛错,
+    /// 调用方按轮重试。
+    func fetchLatest() async throws -> (samples: Samples, collectedAt: Date) {
         let connection = NSXPCConnection(machServiceName: machServiceName, options: .privileged)
-        if let requirement = Self.ownDesignatedRequirementString() {
-            connection.setCodeSigningRequirement(requirement)
-        } else {
-            // 拿不到自身 DR = 无法建立信任锚,fail-closed(与 helper 侧同纪律)。
-            throw HelperClientError.validationUnavailable
-        }
         connection.remoteObjectInterface = NSXPCInterface(with: EnergyHelperClientProtocol.self)
         connection.resume()
         defer { connection.invalidate() }
@@ -37,48 +35,51 @@ final class EnergyHelperClient: @unchecked Sendable {
         else {
             throw HelperClientError.connectionFailed
         }
-        // Swift 6 Sendable:字典数组非 Sendable,在 XPC 回调线程当场折成
-        // 全 Sendable 行再跨 continuation 边界(残缺行丢——helper 侧只产
-        // 三键齐全的字典,防御性 compactMap)。
+        // 单 continuation + 锁防双 resume:XPC 应答与超时两路竞速,先到先得;
+        // 败者晚到时 continuation 已消费,守卫吞掉。Swift 6 Sendable:字典数组
+        // 非 Sendable,在 XPC 回调线程当场折成全 Sendable 行再跨边界(残缺行
+        // 丢——helper 侧只产三键齐全的字典,防御性 compactMap)。
         return try await withCheckedThrowingContinuation { continuation in
+            let finish = FinishOnce()
             proxy.latestSamples { samples, epochMs in
-                let rows: [(pid: Int, name: String, impact: Double)] = samples.compactMap { dict in
+                let rows: EnergyHelperClient.Samples = samples.compactMap { dict in
                     guard let pid = (dict["pid"] as? NSNumber)?.intValue,
                           let name = dict["name"] as? String,
                           let impact = (dict["impact"] as? NSNumber)?.doubleValue
                     else { return nil }
                     return (pid, name, impact)
                 }
-                continuation.resume(
-                    returning: (rows, Date(timeIntervalSince1970: epochMs.doubleValue / 1000))
+                finish.complete(
+                    continuation,
+                    with: .success((rows, Date(timeIntervalSince1970: epochMs.doubleValue / 1000)))
                 )
+            }
+            Task.detached {
+                try? await Task.sleep(for: .seconds(5))
+                finish.complete(continuation, with: .failure(HelperClientError.timedOut))
             }
         }
     }
+}
 
-    /// 自身 designated requirement 的字符串形(setCodeSigningRequirement 入参);
-    /// 取不到返回 nil(fail-closed 由调用方处理)。
-    private static func ownDesignatedRequirementString() -> String? {
-        var selfRef: SecCode?
-        guard SecCodeCopySelf(SecCSFlags(), &selfRef) == errSecSuccess, let own = selfRef else { return nil }
-        let ownPath = URL(fileURLWithPath: Bundle.main.bundlePath + "/Contents/MacOS/Pulse")
-        var staticRef: SecStaticCode?
-        guard SecStaticCodeCreateWithPath(ownPath as CFURL, SecCSFlags(), &staticRef) == errSecSuccess,
-              let staticCode = staticRef
-        else { return nil }
-        var requirementRef: SecRequirement?
-        guard SecCodeCopyDesignatedRequirement(staticCode, SecCSFlags(), &requirementRef) == errSecSuccess,
-              let requirement = requirementRef
-        else { return nil }
-        var requirementString: CFString?
-        guard SecRequirementCopyString(requirement, SecCSFlags(), &requirementString) == errSecSuccess,
-              let string = requirementString as String?
-        else { return nil }
-        return string
+/// 双路竞速的单次完成守卫:NSLock + 一次性标记,后到者静默丢弃。
+private final class FinishOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var finished = false
+
+    func complete(
+        _ continuation: CheckedContinuation<(samples: EnergyHelperClient.Samples, collectedAt: Date), Error>,
+        with result: Result<(samples: EnergyHelperClient.Samples, collectedAt: Date), Error>
+    ) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !finished else { return }
+        finished = true
+        continuation.resume(with: result)
     }
 }
 
 enum HelperClientError: Error {
-    case validationUnavailable
     case connectionFailed
+    case timedOut
 }

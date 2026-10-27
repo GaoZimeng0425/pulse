@@ -45,8 +45,22 @@ final class EnergyImpactFeature: MonitorFeature {
         pollTask = nil
     }
 
+    private var lastFetchFailed = false
+
     private func pollOnce() async {
-        guard let result = try? await fetch() else { return }
+        let result: (samples: [(pid: Int, name: String, impact: Double)], collectedAt: Date)?
+        do {
+            result = try await fetch()
+        } catch {
+            // 翻转才记(读路径健康状态沿):未装期间每分钟一条 error 会刷屏。
+            if !lastFetchFailed {
+                LogService.error("特权助手拉取失败(未装/未批准/超时):\(error.localizedDescription)", category: "Energy")
+                lastFetchFailed = true
+            }
+            return
+        }
+        lastFetchFailed = false
+        guard let result else { return } // 编译器收窄(catch 路径已 return)
         let aggregated = Self.aggregate(result.samples)
         guard !aggregated.isEmpty else { return }
         let total = aggregated.reduce(0) { $0 + $1.impact }
