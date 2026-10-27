@@ -171,3 +171,17 @@ status 才是判据。
   管道完全绕开。
 - client 失败统一走 5s 超时出口(connectionFailed 与 timedOut 不细分,
   日志精度足够,记档)。
+
+**2026-10-27 首装机四验收口:BTM 相对路径不解析定案 + toggle"点两次"UI bug,均修(822 例复绿)**:
+
+- **BundleProgram 相对路径弃用,plist 改绝对路径**:BTM 日志实锤——已信任
+  app 的快速重注册把相对路径**原文**写入 BTMConfigExecutablePath(launchd
+  exec 相对路径 EX_CONFIG 死循环);只有首次"用户批准"链路才解析成绝对
+  路径(解释探针 09 与昨天首装为何成功、换 bundle 重注册全失败)。app
+  位置固定 /Applications(本地自用前提),绝对路径一劳永逸;分发版再回迁。
+- **设置页 toggle"点两次"bug(用户报)**:此前 Toggle 仅在 enabled 时 ON,
+  register 落 requiresApproval 开关即弹回 = "点了没反应,第二次才亮"。
+  改 get = status != .notRegistered(待批准也算已提交),批准与否走三态
+  文案;顺带删掉从登录项抄来的多余 suppress 机制(Binding.set 只由用户
+  交互触发,程序改 @State 不会调 set),加待批准期 3s 轮询——批准完成
+  自动点亮"运行中",不用重开设置页。

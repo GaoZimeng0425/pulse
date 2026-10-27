@@ -25,7 +25,9 @@ struct GeneralSettingsView: View {
     /// 特权助手(p3-root-mcp/03)三态镜像:与登录项同款"系统是唯一事实源"
     /// 模式——开关动作即时 register/unregister,显示从 SMAppService 读回。
     @State private var helperStatus: PrivilegedHelperStatus = .notRegistered
-    @State private var helperSuppressNextChange = false
+    /// 待批准期间的 3s 轮询(批准动作发生在系统设置,app 侧只能轮询知道);
+    /// 批准完成(enabled)或回到未装即自停。
+    @State private var helperPollTask: Task<Void, Never>?
     @State private var reportCopied = false
     @State private var copyFeedbackTask: Task<Void, Never>?
 
@@ -62,12 +64,11 @@ struct GeneralSettingsView: View {
             }
             Section("特权助手") {
                 Toggle("能耗归因(Root 助手)", isOn: Binding(
-                    get: { helperStatus == .enabled },
+                    // 待批准也算"已提交"(ON):此前只在 enabled 时 ON,register 落
+                    // requiresApproval 开关即弹回 = 用户要"点两次"(2026-10-27
+                    // 用户报的真 bug);批准与否由下方三态文案表达。
+                    get: { helperStatus != .notRegistered },
                     set: { enabled in
-                        if helperSuppressNextChange {
-                            helperSuppressNextChange = false
-                            return
-                        }
                         PrivilegedHelperStatus.setInstalled(enabled)
                         refreshHelperStatus()
                     }
@@ -169,11 +170,24 @@ struct GeneralSettingsView: View {
         launchAtLogin = value
     }
 
-    /// 特权助手状态读回(镜像统一走 suppress,与登录项同款防重入)。
+    /// 特权助手状态读回;待批准期间起 3s 轮询(批准动作发生在系统设置,
+    /// app 侧只能轮询感知),离开待批准态即停。
     private func refreshHelperStatus() {
         let status = PrivilegedHelperStatus.current()
-        helperSuppressNextChange = true
         helperStatus = status
+        helperPollTask?.cancel()
+        guard status == .requiresApproval else { return }
+        helperPollTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(3))
+                guard !Task.isCancelled else { return }
+                let next = PrivilegedHelperStatus.current()
+                if next != .requiresApproval {
+                    helperStatus = next
+                    return
+                }
+            }
+        }
     }
 
     private func openLoginItemsPane() {
