@@ -225,3 +225,23 @@ status 才是判据。
   通信面更小、更好测(文件解析可单测,XPC 环境不可)。
 - 注:XPC 版的三个教训(DR 含 identifier 永拒 / 无超时挂死 / pipe 死锁)
   已随代码移除,但记档保留——将来若回 XPC 必须全部带上。
+
+**2026-10-27 晚第六轮(root helper spawn 拒绝主案收束,待 root 诊断定案)**:
+
+- **排除矩阵**(全部有实证):powermetrics 参数(退出 64→修)、采集管道死锁
+  (→文件版)、XPC 三 bug(DR identifier 永拒/无超时挂死/已随文件版全删)、
+  plist 相对 vs 绝对路径(两形态分别被两条注册链拒)、签名 runtime 选项与
+  identifier 对齐(补签验证仍拒)、LaunchServices 定点清理重注册(仍拒)。
+- **决定性对照**:探针 09 工程当日原样复跑**再次成功**(root marker,
+  pid 48806)——同机同证书同形状全对齐后,Pulse 本体仍 spawn 拒
+  (`OS_REASON_CODESIGNING`)。**主案锁定 = com.gaozimeng.pulse 这个
+  bundle id 的系统级历史污染**(ad-hoc 时代 46 次注册沉积在 BTM 后台任务
+  数据库,无 root 不可见不可定点清)。
+- **下一步(root 诊断一次定案)**:`sudo sfltool dumpbtm | grep -A 25
+  gaozimeng > /tmp/btm-pulse.txt` 看记录全貌 → 三选一:定点清 BTM 条目 /
+  Pulse 换干净 bundle id(通知等授权重授一轮)/ plist 去
+  AssociatedBundleIdentifiers 试脱离关联。
+- **当晚净交付**:helper 文件通信版(探针形状,-176 行)合入;探针 09
+  复现工程临时拉起后已清干净;MCP 副线完整交付——ZCode 配置已加 pulse
+  server(用户重启会话生效)、设置页「AI 助手查询(MCP)」区块(路径
+  一键复制)合入装机。
