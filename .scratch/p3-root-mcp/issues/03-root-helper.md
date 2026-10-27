@@ -185,3 +185,15 @@ status 才是判据。
   文案;顺带删掉从登录项抄来的多余 suppress 机制(Binding.set 只由用户
   交互触发,程序改 @State 不会调 set),加待批准期 3s 轮询——批准完成
   自动点亮"运行中",不用重开设置页。
+
+**2026-10-27 根因三号:powermetrics 参数不兼容(诊断日志照亮后实锤)**:
+
+- `--suppress-noop-events` 在 macOS 26 的 powermetrics **已不存在**(退出码
+  64 EX_USAGE,root 同样)——每轮采集恒失败、恒 0 行,数据永不落库。
+  参数回归 probe 08 验证过的原版(`-n 1 -i 1000 --show-process-energy` +
+  `-o 临时文件`);`-o` 本身无问题(本地二分:加 suppress 64 / 加 -o 仍 1=
+  用户态权限错)。
+- 诊断日志(/tmp/pulse-helper-debug.log,采集轮次/解析行数/XPC 判定)保留
+  至链路全绿后下一票再决定去留;app 侧补拉取恢复成功翻转日志。
+- 本地验证口径:用户态手动跑 helper,collect 退出码 64 → 1(权限错=参数
+  已对,root 下即 0)。

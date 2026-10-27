@@ -73,7 +73,7 @@ public final class EnergyCollector {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/powermetrics")
         process.arguments = [
-            "-n", "1", "-i", "1000", "--show-process-energy", "--suppress-noop-events",
+            "-n", "1", "-i", "1000", "--show-process-energy",
             "-o", outputFile.path,
         ]
         process.standardOutput = FileHandle.nullDevice
@@ -84,6 +84,9 @@ public final class EnergyCollector {
             PowermetricsParser.debugLog("collect: process.run 抛错 \(error)")
             return // 采集失败保留上一轮(调用方按 collectedAt 判龄)
         }
+        // 参数必须与 probe 08 验证过的原版一致:--suppress-noop-events 在
+        // macOS 26 的 powermetrics 已不存在(退出码 64 EX_USAGE,root 同样),
+        // 2026-10-27 诊断日志实锤——加了它每轮采集恒 0 行。
         // 壁钟防御:powermetrics -n 1 正常 ~1s;异常挂起 5s 强杀,本轮放弃。
         let deadline = Date().addingTimeInterval(5)
         while process.isRunning, Date() < deadline {
