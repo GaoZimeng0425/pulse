@@ -115,7 +115,7 @@ enum PrivilegedHelperStatus {
     case requiresApproval
     case enabled
 
-    static func current(plistName: String = "com.gaozimeng.pulse.helper.plist") -> PrivilegedHelperStatus {
+    static func current(plistName: String = "com.gaozimeng.pulse.helper2.plist") -> PrivilegedHelperStatus {
         switch SMAppService.daemon(plistName: plistName).status {
         case .enabled: .enabled
         case .requiresApproval: .requiresApproval
@@ -124,7 +124,7 @@ enum PrivilegedHelperStatus {
     }
 
     static func setInstalled(_ installed: Bool) {
-        let service = SMAppService.daemon(plistName: "com.gaozimeng.pulse.helper.plist")
+        let service = SMAppService.daemon(plistName: "com.gaozimeng.pulse.helper2.plist")
         if installed {
             try? service.register()
         } else {

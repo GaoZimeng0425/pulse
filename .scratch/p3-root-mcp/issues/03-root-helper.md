@@ -245,3 +245,13 @@ status 才是判据。
   复现工程临时拉起后已清干净;MCP 副线完整交付——ZCode 配置已加 pulse
   server(用户重启会话生效)、设置页「AI 助手查询(MCP)」区块(路径
   一键复制)合入装机。
+
+**2026-10-27 深夜续:BTM dump 后两试验**:
+
+- **去 AssociatedBundleIdentifiers = 死路**(已回退):SMAppService 靠该键
+  认领 daemon,去掉后 register 无声失败、系统设置也不显示条目——BTM dump
+  同时证实批准/启用早就在(enabled, allowed),探针同样相对 Executable
+  Path 跑通 → 路径与关联均非关键,沉积主案聚焦 Label 名下条目。
+- **换新 Label(helper2)试验(进行中)**:BTM 按 Label 记条目,新 Label =
+  全新干净条目(探针效应),旧污染条目留作死条目不管;零授权成本,
+  plist 文件名/Label/app plistName 三处同换。

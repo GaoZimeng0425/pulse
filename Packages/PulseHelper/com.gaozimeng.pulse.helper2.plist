@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.gaozimeng.pulse.helper</string>
+    <string>com.gaozimeng.pulse.helper2</string>
     <!-- 2026-10-27 BTM dump 定案:批准/启用都在(enabled, allowed),探针同样
          相对 Executable Path 却跑通——路径无关;真差异 = com.gaozimeng.pulse
          名下多条 Generation 沉积(3/9/16384 并存)。去 AssociatedBundleIdentifiers
@@ -20,5 +20,9 @@
     <string>Contents/Library/LaunchDaemons/pulse-helper</string>
     <key>RunAtLoad</key>
     <true/>
+    <key>AssociatedBundleIdentifiers</key>
+    <array>
+        <string>com.gaozimeng.pulse</string>
+    </array>
 </dict>
 </plist>
