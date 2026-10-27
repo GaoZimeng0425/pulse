@@ -76,13 +76,15 @@ final class EnergyImpactFeature: MonitorFeature {
         host?.broadcast(.gauges([.energyImpact: total]))
     }
 
-    /// 同名进程求和(纯函数,单测钉口径)。
+    /// 同名进程求和(纯函数,单测钉口径)。**pid < 0 的伪行不进聚合**
+    /// (powermetrics 尾部 ALL_TASKS/DEAD_TASKS 是全系统汇总行,与逐进程行
+    /// 相加等于双重计数;真机首日 2026-10-27 实测总值虚高约 2.4 倍)。
     nonisolated static func aggregate(_ samples: [(pid: Int, name: String, impact: Double)]) -> [(
         name: String,
         impact: Double
     )] {
         var byName: [String: Double] = [:]
-        for sample in samples where sample.impact > 0 {
+        for sample in samples where sample.pid >= 0 && sample.impact > 0 {
             byName[sample.name, default: 0] += sample.impact
         }
         return byName.map { (name: $0.key, impact: $0.value) }

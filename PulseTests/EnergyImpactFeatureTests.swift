@@ -20,6 +20,23 @@ final class EnergyImpactFeatureTests: XCTestCase {
         XCTAssertNil(byName["不存在的名字"])
     }
 
+    /// 真机首日实案(2026-10-27):powermetrics 尾部 ALL_TASKS/DEAD_TASKS 是
+    /// 汇总伪行(pid 为负),混进聚合会让全机合计虚高约 2.4 倍(双重计数)。
+    func testAggregateDropsPseudoRowsWithNegativePid() {
+        let samples: [(pid: Int, name: String, impact: Double)] = [
+            (-2, "ALL_TASKS", 15239.14),
+            (-1, "DEAD_TASKS", 4060.16),
+            (769, "sentineld_helper", 3675.54),
+            (415, "WindowServer", 1656.98),
+        ]
+        let byName = Dictionary(uniqueKeysWithValues: EnergyImpactFeature.aggregate(samples)
+            .map { ($0.name, $0.impact) })
+        XCTAssertNil(byName["ALL_TASKS"])
+        XCTAssertNil(byName["DEAD_TASKS"])
+        XCTAssertEqual(byName["sentineld_helper"] ?? 0, 3675.54, accuracy: 0.001)
+        XCTAssertEqual(byName["WindowServer"] ?? 0, 1656.98, accuracy: 0.001)
+    }
+
     func testAggregateEmptyInputReturnsEmpty() {
         XCTAssertTrue(EnergyImpactFeature.aggregate([]).isEmpty)
     }
