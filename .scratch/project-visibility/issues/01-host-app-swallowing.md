@@ -1,6 +1,6 @@
 # 01 — 宿主 App(Zap / ZCode)吞掉项目进程,排行看不出哪个项目占用多
 
-**Status:** needs-triage
+**Status:** done(2026-10-27 用户拍板结项,残余接受)
 
 ## 背景(用户 2026-10-23 目验反馈原话)
 
@@ -122,3 +122,8 @@ hosted 测试挂死回退)、.gitignore + swiftformat/swiftlint 排除、smoke �
 Spotlight 拆组(及一切后台服务桶细分)**暂不做**——用户拍板"暂时这样",
 下钻明细已够用。本票继续挂 needs-triage,剩余范围 = 非 worktree 的 cwd miss
 三类(draft 目录 / 项目父目录 / home 与根),等用户想要再 grill。
+
+**2026-10-27 用户拍板「尾巴结了」,结项**:残余的非 worktree cwd miss
+(draft 目录 / 项目父目录 / home 下直接跑的进程归属不命中)接受不修;
+主修(worktree 驻地改 `.worktrees/`,cwd 天然命中根)已在 1d6099b/fe07a54
+落地并日常运转。G(Spotlight 拆独立组)此前已拍"暂时不做"(2026-10-26)。

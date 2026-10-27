@@ -15,7 +15,7 @@
 
 **Blocked by:** 03(Energy Impact 数据源);② 不依赖 03 可先行。
 
-**Status:** needs-triage
+**Status:** ready-for-agent(2026-10-27 立票即分诊:03 已结项解除阻塞;GPU 复测与稳态复测无依赖可先行;卡位置/形态单点问用户)
 
 - [ ] Agents 用量卡有真数(跑 agent 会话时能耗数值变动),位置/形态过 grill
 - [ ] per-app GPU 复测有定论:可用(加卡)或记档放弃,二选一落档
