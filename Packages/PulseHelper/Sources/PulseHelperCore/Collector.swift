@@ -4,6 +4,19 @@ import Foundation
 // executable 只留 XPC 服务与校验。
 
 public enum PowermetricsParser {
+    /// 诊断日志(root 可写 /tmp;正式产品形态收敛后可降级/移除)。
+    public static func debugLog(_ message: String) {
+        let line = "\(Date()) [pulse-helper] \(message)\n"
+        let url = URL(fileURLWithPath: "/tmp/pulse-helper-debug.log")
+        if let handle = try? FileHandle(forWritingTo: url) {
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: Data(line.utf8))
+        } else {
+            try? Data(line.utf8).write(to: url)
+        }
+    }
+
     /// 解析 `powermetrics -n 1 --show-process-energy…` 的 Running tasks 表。
     /// **语义锚定,不依赖列数**:表头列名是多词(`Energy Impact`、
     /// `(<2 ms, 2-5 ms)`),按表头数列数不可靠——改为:行尾 token =
@@ -68,6 +81,7 @@ public final class EnergyCollector {
         do {
             try process.run()
         } catch {
+            PowermetricsParser.debugLog("collect: process.run 抛错 \(error)")
             return // 采集失败保留上一轮(调用方按 collectedAt 判龄)
         }
         // 壁钟防御:powermetrics -n 1 正常 ~1s;异常挂起 5s 强杀,本轮放弃。
@@ -76,14 +90,22 @@ public final class EnergyCollector {
             Thread.sleep(forTimeInterval: 0.05)
         }
         if process.isRunning {
+            PowermetricsParser.debugLog("collect: 壁钟超时,terminate")
             process.terminate()
             process.waitUntilExit()
             return
         }
-        guard process.terminationStatus == 0 else { return }
+        guard process.terminationStatus == 0 else {
+            PowermetricsParser.debugLog("collect: 退出码 \(process.terminationStatus)")
+            return
+        }
         defer { try? FileManager.default.removeItem(at: outputFile) }
-        guard let data = try? Data(contentsOf: outputFile) else { return }
+        guard let data = try? Data(contentsOf: outputFile) else {
+            PowermetricsParser.debugLog("collect: 输出文件读不到 \(outputFile.path)")
+            return
+        }
         let parsed = PowermetricsParser.parse(String(data: data, encoding: .utf8) ?? "")
+        PowermetricsParser.debugLog("collect: 解析 \(parsed.count) 行(输出 \(data.count) 字节)")
         guard !parsed.isEmpty else { return }
         samples = parsed
         collectedAt = Date()
