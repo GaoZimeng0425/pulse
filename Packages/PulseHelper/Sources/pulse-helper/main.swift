@@ -4,6 +4,7 @@
 // = launchd label)。app 不在跑 = 没人拉 = 数据自然丢弃(与历史库空段纪律
 // 同构)。对端校验:连接方必须与本 daemon 同证书签名(anchor SHA-256),
 // Procexp PeerValidation 路数——无 Team ID 的自签身份用证书指纹表达。
+import CryptoKit
 import Foundation
 import PulseHelperCore
 import ServiceManagement
@@ -26,33 +27,39 @@ protocol EnergyHelperProtocol {
 // MARK: - 对端校验(证书 anchor SHA-256;Procexp PeerValidation 路数)
 
 enum PeerValidator {
-    /// 连接方(app)与本 daemon 是否同一签名体系:对端必须满足本 daemon 的
-    /// designated requirement(探针 09 组合 = app 与 helper 同自签身份 → 同 DR)。
-    /// 拿不到签名信息 = 拒(fail-closed)。pid 取自 NSXPCConnection.processIdentifier
-    /// (auditToken 未向 Swift 桥接)——pid 复用竞态为既知局限,采集只读数据
-    /// 面上可接受(Procexp 同路)。
+    /// 连接方(app)与本 daemon 是否**同一签名证书**:比对双侧代码签名的
+    /// 叶证书 SHA-256(证书链 leaf)。不走"对端满足我的 designated
+    /// requirement"——DR 含 identifier(本 daemon = pulse-helper),app 的
+    /// identifier 不同必然被拒(2026-10-26 首装机实踩:校验永拒 → 数据
+    /// 断流)。同证书 = 探针 09 组合的双端同身份签名;拿不到签名信息 =
+    /// 拒(fail-closed)。
     static func connectionIsTrusted(_ connection: NSXPCConnection) -> Bool {
-        var peerCode: SecCode?
-        let pid = NSNumber(value: Int(connection.processIdentifier))
-        let attributes = [kSecGuestAttributePid: pid] as CFDictionary
-        guard SecCodeCopyGuestWithAttributes(nil, attributes, SecCSFlags(), &peerCode) == errSecSuccess,
-              let peer = peerCode
-        else { return false }
-        var selfRef: SecCode?
-        guard SecCodeCopySelf(SecCSFlags(), &selfRef) == errSecSuccess else { return false }
-        // 自身的 designated requirement 走静态码 API(公开转换缺失,从自身
-        // 可执行路径创建——daemon 由 launchd 按 bundle 内绝对路径拉起,
-        // arguments[0] 即真实路径)。
+        // pid → 可执行路径 → 静态码:SecCodeCopySigningInformation 只收
+        // SecStaticCode,而 pid 侧没有公开的 SecCode 转换,统一走路径创建。
+        var path = [CChar](repeating: 0, count: 4096)
+        guard proc_pidpath(Int32(connection.processIdentifier), &path, UInt32(path.count)) > 0 else { return false }
+        let executablePath = URL(fileURLWithPath: String(cString: path)).resolvingSymlinksInPath()
         let ownPath = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
-        var ownStatic: SecStaticCode?
-        guard SecStaticCodeCreateWithPath(ownPath as CFURL, SecCSFlags(), &ownStatic) == errSecSuccess,
-              let staticCode = ownStatic
+        guard let own = Self.leafCertificateSHA256(ofExecutableAt: ownPath),
+              let peer = Self.leafCertificateSHA256(ofExecutableAt: executablePath)
         else { return false }
-        var requirementRef: SecRequirement?
-        guard SecCodeCopyDesignatedRequirement(staticCode, SecCSFlags(), &requirementRef) == errSecSuccess,
-              let requirement = requirementRef
-        else { return false }
-        return SecCodeCheckValidity(peer, SecCSFlags(), requirement) == errSecSuccess
+        return own == peer
+    }
+
+    /// 可执行文件的叶证书(签名链第 0 张)DER 数据 SHA-256。
+    private static func leafCertificateSHA256(ofExecutableAt url: URL) -> Data? {
+        var staticRef: SecStaticCode?
+        guard SecStaticCodeCreateWithPath(url as CFURL, SecCSFlags(), &staticRef) == errSecSuccess,
+              let code = staticRef
+        else { return nil }
+        var infoDict: CFDictionary?
+        guard SecCodeCopySigningInformation(code, SecCSFlags(), &infoDict) == errSecSuccess,
+              let info = infoDict as? [String: Any],
+              let certificates = info[kSecCodeInfoCertificates as String] as? [SecCertificate],
+              let leaf = certificates.first
+        else { return nil }
+        let der = SecCertificateCopyData(leaf) as Data
+        return Data(SHA256.hash(data: der))
     }
 }
 
