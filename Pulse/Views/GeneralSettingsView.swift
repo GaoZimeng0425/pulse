@@ -106,6 +106,16 @@ struct GeneralSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section("AI 助手查询(MCP)") {
+                LabeledContent("本地服务") {
+                    Button("复制配置路径") { copyMcpPath() }
+                }
+                Text(
+                    "AI 客户端(Claude / ZCode 等支持 MCP 的工具)指向 Pulse 内置服务后,可直接询问\"为什么 CPU 高\"、当前读数与 30 天内趋势;Pulse 不在运行也能回答(答案标注数据时间)。"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
             Section("关于") {
                 LabeledContent("版本", value: versionText)
             }
@@ -194,6 +204,15 @@ struct GeneralSettingsView: View {
         if let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") {
             NSWorkspace.shared.open(url)
         }
+    }
+
+    /// MCP 配置路径一键复制:客户端配置 JSON 的 command 值。
+    private func copyMcpPath() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(
+            "/Applications/Pulse.app/Contents/MacOS/pulse-mcp", forType: .string
+        )
+        LogService.info("MCP 配置路径已复制", category: "Settings")
     }
 
     private func openLogsFolder() {
