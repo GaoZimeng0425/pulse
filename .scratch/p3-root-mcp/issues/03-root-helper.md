@@ -157,3 +157,17 @@ status 才是判据。
   已保证 server 身份,双向校验留后续)。
 - 复装后须开关关→开一次让 launchd 换新 helper 二进制(同身份签名,
   探针 09 实证不重弹授权)。
+
+**2026-10-27 首装机三验:launchd 路径缓存 + 采集 pipe 死锁两坑,均已修(822 例复绿)**:
+
+- **换 bundle 后快速重注册 = launchd 残留旧路径**:build.sh 的 rm -rf 换装后,
+  未 unregister 直接重开开关 → launchd job 持旧解析路径(EX_CONFIG 死循环
+  "Could not find and/or execute program")。**运维口径:换 bundle 后须
+  先关开关(或 sudo launchctl bootout system/com.gaozimeng.pulse.helper)**
+  再开,全新注册才重新解析。探针 09 没暴露此坑(当时同一 bundle 不动)。
+- **采集器 pipe 死锁**:powermetrics 输出走 stdout 管道在 launchd daemon
+  环境实测互塞死锁(helper 卡首轮 collect,XPC 永无应答,client 超时)。
+  改 **-o 临时文件** 输出 + stdout/stderr 接 nullDevice + 5s 壁钟防御,
+  管道完全绕开。
+- client 失败统一走 5s 超时出口(connectionFailed 与 timedOut 不细分,
+  日志精度足够,记档)。

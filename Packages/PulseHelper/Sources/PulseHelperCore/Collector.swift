@@ -50,22 +50,39 @@ public final class EnergyCollector {
     public init() {}
 
     public func collect() {
+        // 输出走 powermetrics 的 -o 临时文件,stdout/stderr 全部接 nullDevice:
+        // 管道方案在 launchd daemon 环境实测死锁(2026-10-27 首装机二验——
+        // helper 卡死首轮 collect,client 5s 超时,零子进程退出;经典 pipe
+        // 缓冲互塞,readDataToEndOfFile 永等)。文件路径完全绕开管道。
+        let outputFile = FileManager.default.temporaryDirectory
+            .appendingPathComponent("pulse-helper-powermetrics-\(getpid()).txt")
+        try? FileManager.default.removeItem(at: outputFile)
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/powermetrics")
         process.arguments = [
             "-n", "1", "-i", "1000", "--show-process-energy", "--suppress-noop-events",
+            "-o", outputFile.path,
         ]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
         do {
             try process.run()
         } catch {
             return // 采集失败保留上一轮(调用方按 collectedAt 判龄)
         }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
+        // 壁钟防御:powermetrics -n 1 正常 ~1s;异常挂起 5s 强杀,本轮放弃。
+        let deadline = Date().addingTimeInterval(5)
+        while process.isRunning, Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        if process.isRunning {
+            process.terminate()
+            process.waitUntilExit()
+            return
+        }
         guard process.terminationStatus == 0 else { return }
+        defer { try? FileManager.default.removeItem(at: outputFile) }
+        guard let data = try? Data(contentsOf: outputFile) else { return }
         let parsed = PowermetricsParser.parse(String(data: data, encoding: .utf8) ?? "")
         guard !parsed.isEmpty else { return }
         samples = parsed
