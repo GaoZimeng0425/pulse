@@ -4,8 +4,13 @@
 <dict>
     <key>Label</key>
     <string>com.gaozimeng.pulse.helper</string>
+    <!-- 绝对路径(2026-10-27 实测定案):BundleProgram 相对路径在"已信任 app
+         快速重注册"路径下不被 BTM 解析(BTMConfigExecutablePath 存相对原文,
+         launchd exec 失败 EX_CONFIG);首次批准链路才会解析。app 位置固定
+         /Applications(本地自用前提),绝对路径绕开整个解析问题;若将来
+         分发再回迁相对路径并处理两种注册路径。 -->
     <key>BundleProgram</key>
-    <string>Contents/Library/LaunchDaemons/pulse-helper</string>
+    <string>/Applications/Pulse.app/Contents/Library/LaunchDaemons/pulse-helper</string>
     <key>RunAtLoad</key>
     <true/>
     <key>MachServices</key>
