@@ -4,7 +4,12 @@
 <dict>
     <key>Label</key>
     <string>com.gaozimeng.pulse.helper</string>
-    <!-- 相对路径(2026-10-27 全天对拍定案):只有两条实证成功组合——
+    <!-- 2026-10-27 BTM dump 定案:批准/启用都在(enabled, allowed),探针同样
+         相对 Executable Path 却跑通——路径无关;真差异 = com.gaozimeng.pulse
+         名下多条 Generation 沉积(3/9/16384 并存)。去 AssociatedBundleIdentifiers
+         让 helper 以独立条目注册,脱离带包袱的父身份号;代价 = 系统设置里
+         显示为独立后台项(不挂 Pulse 名下),观感小缺点记档。
+         相对路径(2026-10-27 全天对拍定案):只有两条实证成功组合——
          相对路径 + 用户批准链路部署(探针 09 与当日 14:52 两次)。绝对路径
          被快速重注册链拒(BundleProgram lint 警告 + Launch Constraint
          Violation 移除);相对路径被快速重注册链以原文 exec 拒(EX_CONFIG)。
@@ -15,9 +20,5 @@
     <string>Contents/Library/LaunchDaemons/pulse-helper</string>
     <key>RunAtLoad</key>
     <true/>
-    <key>AssociatedBundleIdentifiers</key>
-    <array>
-        <string>com.gaozimeng.pulse</string>
-    </array>
 </dict>
 </plist>
