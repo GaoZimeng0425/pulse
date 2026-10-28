@@ -92,7 +92,9 @@ struct MetricTabStack<Ranking: View>: View {
             ContainersCardView(reading: monitor.containers.reading, isCompact: isCompact)
         case .battery:
             // 电池页(工单 p1-history/02):六项读数主卡 + 能耗影响排行
-            // (工单 module-rankings/01,只读);组排行与电池无关,不放。
+            // (工单 module-rankings/01,只读;CPU 时间估算口径)+ AI 助手能耗
+            // (p3-root-mcp/04,root Energy Impact 真值,60s 一档);组排行与
+            // 电池无关,不放。
             MetricMainCardView(model: model.batteryModel, isCompact: isCompact)
             ModuleRankingCardView(
                 title: "能耗影响",
@@ -100,6 +102,18 @@ struct MetricTabStack<Ranking: View>: View {
                 rows: monitor.rankings.energyRows,
                 accent: Metric.battery.accentColor,
                 cadenceNote: "5 秒一档",
+                isCompact: isCompact
+            )
+            ModuleRankingCardView(
+                title: "AI 助手",
+                valueLabel: "能耗",
+                rows: AgentEnergyTable.rankingRows(monitor.energyImpact.reading?.agents ?? []),
+                accent: Metric.battery.accentColor,
+                cadenceNote: "60 秒一档",
+                emptyMessage: RankingEmptyMessage(
+                    title: "暂无数据",
+                    detail: "开启 设置 → 通用 → 特权助手 后出数"
+                ),
                 isCompact: isCompact
             )
         case .disk:
