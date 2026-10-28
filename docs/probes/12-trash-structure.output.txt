@@ -1,0 +1,40 @@
+== ① ~/.Trash 结构 ==
+total 32
+drwx------+   3 aa00930  staff     96 Oct 28 10:15 .
+drwxr-xr-x@ 193 aa00930  staff   6176 Oct 28 18:38 ..
+-rw-r--r--@   1 aa00930  staff  14340 Oct 28 10:15 .DS_Store
+条目数: 1
+ 16K	/Users/aa00930/.Trash
+
+== ② 各卷 .Trashes 结构 ==
+-- /.Trashes(启动卷真身,经 / 直达)
+ls: /.Trashes: No such file or directory
+   本用户(501)条目数: 0
+-- /Volumes/Macintosh HD
+   (无 .Trashes 或不可读)
+-- /Volumes/Recovery
+   (无 .Trashes 或不可读)
+
+== ③ 权限模型 ==
+在 /.Trashes 下建本 UID 目录(预期允许或已存在):
+mkdir: /.Trashes: Read-only file system
+建别人的 UID 目录(预期 EPERM——sticky bit 只许动自己的):
+mkdir: /.Trashes: No such file or directory
+动启动卷 /.Trashes 权限位: stat: /.Trashes: stat: No such file or directory
+本机可写外置卷(有才有跨卷场景): Macintosh HD 
+(无外置卷 → 跨卷 .Trashes 行为留待外置卷在场时补测,如实记档)
+
+== ④ NSWorkspace.recycle:文件与目录 ==
+/var/folders/vg/bh148nn10gz7xw4b97pz7brh0000gn/T/tmp.KsDol9VgYb/p4probe-file.txt -> OK 去向=/Users/aa00930/.Trash/p4probe-file.txt 63ms
+/var/folders/vg/bh148nn10gz7xw4b97pz7brh0000gn/T/tmp.KsDol9VgYb/p4probe-dir -> OK 去向=/Users/aa00930/.Trash/p4probe-dir 1ms
+回收后 ~/.Trash 新增(找 p4probe):
+p4probe-dir
+p4probe-file.txt
+源目录残留: 0 项
+ Finder 恢复验证(把文件捞回来):
+p4probe-dir
+ p4probe-file.txt
+(废纸篓里的 p4probe 项请随手清掉,或留着 08 票手工观察)
+
+== ⑤ 跨卷废纸篓(有外置卷才有效) ==
+可写外置卷: Recovery 

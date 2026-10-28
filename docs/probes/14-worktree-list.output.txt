@@ -1,0 +1,37 @@
+== ① pulse 仓(有活跃 worktree:.worktrees/p4-probes) ==
+worktree /Users/aa00930/Documents/Learn/macos/pulse
+HEAD 9bddba3dfcaf806070c65978f53c38fecef68090
+branch refs/heads/develop
+
+worktree /Users/aa00930/Documents/Learn/macos/pulse/.worktrees/p4-probes
+HEAD 9bddba3dfcaf806070c65978f53c38fecef68090
+branch refs/heads/feat/p4-probes
+
+-- 普通格式:
+/Users/aa00930/Documents/Learn/macos/pulse                      9bddba3 [develop]
+/Users/aa00930/Documents/Learn/macos/pulse/.worktrees/p4-probes 9bddba3 [feat/p4-probes]
+
+== ② SwarmAgents 仓(目录列表里有两个 -wt- 并排目录,疑似孤儿) ==
+worktree /Users/aa00930/Documents/Learn/macos/SwarmAgents
+HEAD 39d329a1a2525571691d9dcd84ce4b4006a0772e
+branch refs/heads/develop
+
+worktree /Users/aa00930/Documents/Learn/macos/SwarmAgents-wt-pretext-spike
+HEAD 4c5998366273e1b0c8e84458cde49cb35329bd6d
+branch refs/heads/spike/pretext-accuracy
+
+worktree /Users/aa00930/Documents/Learn/macos/SwarmAgents-wt-scroll-semantics
+HEAD 9a533c9d4452a52c88292186380d15660b42b0f0
+branch refs/heads/feat/virtual-list-scroll-semantics
+
+-- 登记里的 worktree 路径 vs 磁盘上的并排目录:
+/Users/aa00930/Documents/Learn/macos/SwarmAgents
+/Users/aa00930/Documents/Learn/macos/SwarmAgents-wt-pretext-spike
+/Users/aa00930/Documents/Learn/macos/SwarmAgents-wt-scroll-semantics
+
+== ③ 判定验证 ==
+  SwarmAgents-wt-pretext-spike: git 登记中(不是孤儿)
+  SwarmAgents-wt-scroll-semantics: git 登记中(不是孤儿)
+
+== ④ worktree 残留的真实形状(prunable/detached 样本) ==
+(空 = 当前无 detached/prunable 样本,输出形状仍以 ①② 为准)

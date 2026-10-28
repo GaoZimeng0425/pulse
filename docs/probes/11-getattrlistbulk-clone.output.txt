@@ -1,0 +1,83 @@
+env: Version 27.0.1 (Build 26A434) · probe 11 · p4-cleaner/01
+
+========== 0. 返回缓冲对齐规则定标(file 组 LINKCOUNT u32 + TOTALSIZE off_t) ==========
+  raw[0..24]: 10 00 00 00 01 00 00 00 a0 86 01 00 00 00 00 00 00 00 00 00 00 00 00 00
+  按 4 字节对齐解读: linkcount=16 total=429496729600001
+  按自然对齐解读:   linkcount=16 total=100000 | 真值 size=100000 linkcount=1
+  判定: 两种都不匹配——人工看 raw
+
+========== 1. 单发 getattrlist + cmnext(样本 /etc/hosts) ==========
+  PRIVATESIZE: OK 长度头=12 值@4=4096 预期宽=off_t 8B raw=0c 00 00 00 00 10 00 00 00 00 00 00 00 00 00 00
+  CLONE_REFCNT: OK 长度头=8 值@4=1 预期宽=u32 4B? raw=08 00 00 00 01 00 00 00 00 00 00 00 00 00 00 00
+  CLONEID: OK 长度头=12 值@4=123262197 预期宽=u64 8B? raw=0c 00 00 00 f5 d4 58 07 00 00 00 00 00 00 00 00
+  不带 FSOPT_ATTR_CMN_EXTENDED 请求 PRIVATESIZE → errno=22(期望 EINVAL=22,证明旗必须)
+
+========== 2. APFS 克隆口径(clonefile + PRIVATESIZE/CLONE_REFCNT) ==========
+  原件(8MB 随机写入)     : size=8388608 blocks=16384(alloc=8388608B) | PRIVATESIZE=8388608B | CLONE_REFCNT=1
+  克隆(clonefile 后未改) : size=8388608 blocks=16384(alloc=8388608B) | PRIVATESIZE=0B | CLONE_REFCNT=2
+  克隆(追加 1MB 触发 CoW): size=9437184 blocks=18432(alloc=9437184B) | PRIVATESIZE=1048576B | CLONE_REFCNT=1
+  原件(克隆改写后复测)   : size=8388608 blocks=16384(alloc=8388608B) | PRIVATESIZE=0B | CLONE_REFCNT=1
+  验证目标:删任一副本能回收的 ≈ 各自 PRIVATESIZE;共享块谁都不独占
+
+========== 3. firmlink 与 st_dev(根卷=密封系统卷,数据卷=Data) ==========
+  /                          dev=16777229 ino=2
+  /System                    dev=16777229 ino=1152921500311879703
+  /System/Volumes/Data       dev=16777229 ino=1152921500311879682
+  /Users                     dev=16777229 ino=18495
+  /Library                   dev=16777229 ino=123243983
+  /private/var               dev=16777229 ino=123247476
+  /Applications              dev=16777229 ino=123247660
+  /Users/aa00930             dev=16777229 ino=50737
+  /private/tmp               dev=16777229 ino=166189257
+  —— 根目录一级子项里 dev ≠ 根 dev 的(firmlink 跳变)——
+    /home: dev=889192451
+    /dev: dev=2276588900
+    (共 22 个一级子项,跳变列出 ≤12 个)
+
+========== 4. getattrlistbulk(/Applications):27 上须带 RETURNED_ATTRS;cmnext 走批量 ==========
+    Thaw.app               VDIR fileid=166986258 flags=0 total=0 priv=-1 lstat=96 ✓
+    herdrm.app             VDIR fileid=162664119 flags=0 total=0 priv=-1 lstat=96 ✓
+    Visual Studio Code.app VDIR fileid=172402325 flags=0 total=0 priv=-1 lstat=96 ✓
+    Glaze                  VDIR fileid=3762005 flags=0 total=0 priv=-1 lstat=64 ✓
+    Easydict.app           VDIR fileid=78660635 flags=0 total=0 priv=-1 lstat=96 ✓
+    CleanShot X.app        VDIR fileid=6461591 flags=0 total=0 priv=-1 lstat=96 ✓
+    DockDoor.app           VDIR fileid=3784703 flags=0 total=0 priv=-1 lstat=96 ✓
+    VoiceOS.app            VDIR fileid=144538629 flags=0 total=0 priv=-1 lstat=96 ✓
+  [4a] 首条 raw: 48 00 00 00 0b 00 04 82 00 00 00 00 08 00 00 00 00 00 00 00 00 00 00 00 24 00 00 00 09 00 00 00 0d 00 00 01 02 00 00 00 00 00 00 00 12 02 f4 09 00 00 00 00 00 00 00 00 00 00 00 00 54 68 61 77
+  [4a] 解析 8 条 mismatch=0
+    [cmnext] Thaw.app priv=0B
+    [cmnext] herdrm.app priv=0B
+    [cmnext] Visual Studio Code.app priv=0B
+    [cmnext] Glaze priv=0B
+    [cmnext] Easydict.app priv=0B
+    [cmnext] CleanShot X.app priv=0B
+    [cmnext] DockDoor.app priv=0B
+    [cmnext] VoiceOS.app priv=0B
+  [4b] bulk+cmnext 解析 8 条(priv=-1 表示该条目没给,如目录)
+
+========== 4. getattrlistbulk(/etc):27 上须带 RETURNED_ATTRS;cmnext 走批量 ==========
+    manpaths               VREG fileid=123262204 flags=0x20 total=36 priv=-1 lstat=36 ✓
+    rc.common              VREG fileid=123261997 flags=0x20 total=1560 priv=-1 lstat=1560 ✓
+    auto_master            VREG fileid=123262216 flags=0 total=195 priv=-1 lstat=195 ✓
+    csh.login              VREG fileid=123262645 flags=0 total=121 priv=-1 lstat=121 ✓
+    syslog.conf            VREG fileid=123262083 flags=0x20 total=96 priv=-1 lstat=96 ✓
+    krb5.keytab            VREG fileid=20844 flags=0 total=1946 priv=-1 lstat=1946 ✓
+    sudoers.d              VDIR fileid=123247444 flags=0 total=0 priv=-1 lstat=64 ✓
+    ssl                    VDIR fileid=123247445 flags=0 total=0 priv=-1 lstat=192 ✓
+  [4a] 首条 raw: 58 00 00 00 0b 00 04 82 00 00 00 00 00 00 00 00 07 00 00 00 00 00 00 00 30 00 00 00 09 00 00 00 0d 00 00 01 01 00 00 00 20 00 00 00 fc d4 58 07 00 00 00 00 01 00 00 00 24 00 00 00 00 00 00 00
+  [4a] 解析 8 条 mismatch=0
+    [cmnext] manpaths priv=0B
+    [cmnext] rc.common priv=0B
+    [cmnext] auto_master priv=4096B
+    [cmnext] csh.login priv=4096B
+    [cmnext] syslog.conf priv=0B
+    [cmnext] krb5.keytab priv=4096B
+    [cmnext] sudoers.d priv=0B
+    [cmnext] ssl priv=0B
+  [4b] bulk+cmnext 解析 8 条(priv=-1 表示该条目没给,如目录)
+
+========== 5. dataless(SF_DATALESS):~/Library/Mobile Documents ==========
+  扫描 45 项(目录 45):SF_DATALESS 置位 = 0 项 
+
+========== 6. EINTR/errno 台账:两层 walk /Users/aa00930/Library/Caches ==========
+  条目=201 errno 直方图=(EINTR=4;为 0 → 本机常态无 EINTR)
