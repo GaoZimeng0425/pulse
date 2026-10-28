@@ -1,0 +1,449 @@
+proc_pidpath 1200 failed(0)
+proc_pidpath 2425 failed(0)
+proc_pidpath 7622 failed(0)
+proc_pidpath 7845 failed(0)
+proc_pidpath 7847 failed(0)
+proc_pidpath 7872 failed(0)
+proc_pidpath 8013 failed(0)
+proc_pidpath 8037 failed(0)
+proc_pidpath 8061 failed(0)
+proc_pidpath 43546 failed(0)
+proc_pidpath 2785 failed(0)
+proc_pidpath 2940 failed(0)
+proc_pidpath 2938 failed(0)
+proc_pidpath 2975 failed(0)
+proc_pidpath 3104 failed(0)
+proc_pidpath 3128 failed(0)
+proc_pidpath 3152 failed(0)
+proc_pidpath 90248 failed(0)
+proc_pidpath 90284 failed(0)
+proc_pidpath 90290 failed(0)
+proc_pidpath 90344 failed(0)
+proc_pidpath 90447 failed(0)
+proc_pidpath 90462 failed(0)
+proc_pidpath 90464 failed(0)
+proc_pidpath 43597 failed(0)
+proc_pidpath 74357 failed(0)
+proc_pidpath 93594 failed(0)
+proc_pidpath 15268 failed(0)
+Machine model: Mac16,1
+OS version: 26A434
+Boot arguments: 
+Boot time: Mon Oct 26 16:43:23 2026
+
+proc_pidpath 1200 failed(0)
+proc_pidpath 2425 failed(0)
+proc_pidpath 7622 failed(0)
+proc_pidpath 7845 failed(0)
+proc_pidpath 7847 failed(0)
+proc_pidpath 7872 failed(0)
+proc_pidpath 8013 failed(0)
+proc_pidpath 8037 failed(0)
+proc_pidpath 8061 failed(0)
+proc_pidpath 43546 failed(0)
+proc_pidpath 2785 failed(0)
+proc_pidpath 2940 failed(0)
+proc_pidpath 2938 failed(0)
+proc_pidpath 2975 failed(0)
+proc_pidpath 3104 failed(0)
+proc_pidpath 3128 failed(0)
+proc_pidpath 3152 failed(0)
+proc_pidpath 90248 failed(0)
+proc_pidpath 90284 failed(0)
+proc_pidpath 90290 failed(0)
+proc_pidpath 90344 failed(0)
+proc_pidpath 90447 failed(0)
+proc_pidpath 90462 failed(0)
+proc_pidpath 90464 failed(0)
+proc_pidpath 43597 failed(0)
+proc_pidpath 74357 failed(0)
+proc_pidpath 93594 failed(0)
+proc_pidpath 15268 failed(0)
+Second underflow occured.
+
+
+*** Sampled system activity (Wed Oct 28 10:44:41 2026 +0800) (2014.51ms elapsed) ***
+
+*** Running tasks ***
+
+Name                               ID     CPU ms/s  User%  Deadlines (<2 ms, 2-5 ms)  Wakeups (Intr, Pkg idle)  GPU ms/s
+sentineld_helper                   769    1215.36   15.10  0.00    0.00               0.00    0.00              0.00      
+WindowServer                       415    359.96    58.19  175.25  0.00               585.31  0.00              0.00      
+DEAD_TASKS                         -1     298.79    42.94  5.96    0.00               16.38   0.00              0.00      
+ZCode Helper                       14951  117.40    95.48  12.41   0.00               15.39   0.00              0.00      
+zap-oss                            791    37.96     80.26  41.70   0.99               109.71  0.00              0.00      
+sentineld_guard                    809    23.55     98.54  0.00    0.00               0.50    0.00              0.00      
+AXVisualSupportAgent               62613  49.06     63.42  0.00    0.00               6.53    0.00              0.00      
+ZCode Helper                       2269   207.14    48.36  0.00    0.00               123.12  0.00              0.00      
+bird                               83917  135.04    57.59  0.00    0.00               0.00    0.00              0.00      
+NeteaseMusic Helper (Renderer)     26098  236.96    95.09  0.99    0.00               1.49    0.00              0.00      
+sentineld                          572    11.67     73.86  0.00    0.00               2.98    0.00              0.00      
+kernel_task                        0      204.89    0.00   513.82  0.00               3910.50 0.00              0.00      
+tokscale                           43547  5.38      79.27  0.00    0.00               9.93    0.00              0.00      
+herdr                              7111   7.10      79.68  2.98    4.96               46.67   0.00              0.00      
+ZCode Helper (Renderer)            2562   97.17     90.84  1.99    2.98               17.38   0.00              0.00      
+Doubao Browser Helper (Renderer)   2209   109.59    89.49  0.99    0.99               22.34   0.00              0.00      
+powermetrics                       62605  6.68      6.31   0.00    0.00               0.50    0.00              0.00      
+launchservicesd                    387    24.53     67.83  0.00    0.00               0.99    0.00              0.00      
+launchd                            1      83.58     2.54   0.00    0.00               0.50    0.00              0.00      
+VTDecoderXPCService                1066   57.33     33.22  0.00    0.00               3.97    0.00              0.00      
+ContainerMetadataExtractor         83965  22.85     63.27  0.00    0.00               0.00    0.00              0.00      
+WaifuXWallpaperExtension           1051   46.10     58.26  0.00    0.00               58.08   0.00              0.00      
+ZCode Helper                       63553  24.54     90.71  20.35   0.00               23.33   0.00              0.00      
+Pulse                              14775  22.10     63.99  0.00    0.00               6.45    0.00              0.00      
+MenuBarAgent                       793    18.17     92.54  0.00    0.00               0.50    0.00              0.00      
+Input Source Pro                   2566   11.99     61.03  0.00    0.00               0.99    0.00              0.00      
+loginwindow                        419    11.43     92.42  0.00    0.00               0.50    0.00              0.00      
+sharedfilelistd                    892    1.30      41.88  0.00    0.00               0.00    0.00              0.00      
+cfprefsd                           716    2.49      35.07  0.00    0.00               0.00    0.00              0.00      
+Thaw                               20229  9.22      80.87  0.00    0.00               5.96    0.00              0.00      
+Doubao Browser Helper (Renderer)   2216   8.57      96.89  0.00    0.50               3.48    0.00              0.00      
+herdr                              7110   1.77      33.49  1.49    1.99               34.25   0.00              0.00      
+Doubao Browser Helper (Renderer)   2370   9.41      93.81  0.00    0.00               3.97    0.00              0.00      
+tccd                               416    8.74      39.97  0.00    0.00               0.00    0.00              0.00      
+adb                                92240  1.01      20.61  0.00    0.00               0.99    0.00              0.00      
+com.apple.DriverKit-AppleBCMWLAN   539    23.66     69.16  0.00    0.00               169.29  0.00              0.00      
+corplink-service                   568    18.03     23.54  356.94  0.99               364.89  0.00              0.00      
+notifyd                            409    8.82      33.32  0.00    0.00               0.00    0.00              0.00      
+cfprefsd                           418    1.18      43.21  0.00    0.00               0.00    0.00              0.00      
+ZCode Helper                       2603   7.22      62.83  1.49    0.00               2.98    0.00              0.00      
+runningboardd                      420    5.35      68.81  0.00    0.00               1.99    0.00              0.00      
+linkd                              784    1.14      53.29  0.00    0.00               0.00    0.00              0.00      
+Doubao Browser                     2190   7.84      64.81  0.00    0.00               5.46    0.00              0.00      
+wifip2pd                           696    14.67     75.23  0.00    0.00               0.00    0.00              0.00      
+distnoted                          709    1.20      48.23  0.00    0.00               0.00    0.00              0.00      
+pulse-mcp                          60608  10.01     55.83  0.00    0.00               81.42   0.00              0.00      
+Doubao Browser Helper              2205   12.88     71.69  0.00    0.00               60.57   0.00              0.00      
+trustd                             774    0.51      80.87  0.00    0.00               0.99    0.00              0.00      
+locationd                          392    7.81      78.21  0.00    0.00               1.49    0.00              0.00      
+tccd                               757    0.48      44.00  0.00    0.00               0.00    0.00              0.00      
+WeChat                             1048   11.49     85.44  1.99    1.49               79.93   0.00              0.00      
+pboard                             750    0.95      49.58  0.00    0.00               0.00    0.00              0.00      
+bluetoothd                         408    10.32     77.71  0.00    0.00               0.50    0.00              0.00      
+NeteaseMusic Helper (GPU)          26093  10.20     76.67  0.00    0.00               60.57   0.00              0.00      
+Doubao Browser Helper              2206   5.42      75.37  0.00    0.00               9.43    0.00              0.00      
+logd                               342    6.31      45.33  0.00    0.00               0.00    0.00              0.00      
+gpu-stress                         62505  0.47      42.25  0.00    0.00               0.99    0.00              0.00      
+com.northpolesec.santa.daemon      574    3.69      58.51  0.50    0.00               3.97    0.00              0.00      
+trustd                             448    2.87      87.41  0.00    0.00               0.00    0.00              0.00      
+NemoNotch                          55822  5.85      61.69  0.00    0.00               19.36   0.00              0.00      
+searchpartyd                       527    5.48      75.36  0.00    0.00               0.00    0.00              0.00      
+diskarbitrationd                   375    0.61      65.59  0.00    0.00               0.00    0.00              0.00      
+pulse-helper                       6489   2.23      57.59  0.00    0.00               6.95    0.00              0.00      
+Raycast                            2432   4.45      51.42  0.00    0.00               6.45    0.00              0.00      
+ControlCenter                      907    3.35      64.90  0.00    0.00               0.99    0.00              0.00      
+appleeventsd                       537    0.67      36.12  0.00    0.00               0.00    0.00              0.00      
+lsd                                755    0.82      48.32  0.00    0.00               0.00    0.00              0.00      
+ZCode                              806    1.15      74.12  0.50    0.00               1.49    0.00              0.00      
+com.raycast.macos.Pasteboard       2731   1.30      81.98  0.00    0.00               0.99    0.00              0.00      
+Vela                               75981  1.96      93.41  0.00    0.00               0.00    0.00              0.00      
+PerfPowerServices                  41724  3.08      76.81  0.00    0.00               0.00    0.00              0.00      
+gamepolicyd                        533    1.02      60.49  0.00    0.00               1.99    0.00              0.00      
+opendirectoryd                     385    2.17      38.28  0.00    0.00               0.50    0.00              0.00      
+Arc                                9753   3.56      51.51  0.50    0.00               23.33   0.00              0.00      
+ZCode Helper                       93005  0.50      59.43  4.96    0.00               7.94    0.00              0.00      
+Finder                             1129   2.18      29.10  0.00    0.00               1.49    0.00              0.00      
+Dock                               1126   1.47      54.73  0.00    0.00               0.00    0.00              0.00      
+ZCode Helper                       2825   1.74      41.79  3.97    0.00               4.96    0.00              0.00      
+WindowManager                      736    1.80      66.34  0.00    0.00               0.50    0.00              0.00      
+ZCode Helper                       15203  0.27      58.47  2.98    0.00               3.97    0.00              0.00      
+clocksyncd                         475    2.61      49.77  0.00    0.00               0.00    0.00              0.00      
+com.apple.WebKit.WebContent        2575   3.04      71.30  0.00    0.00               14.89   0.00              0.00      
+perl                               55840  2.26      88.36  0.00    0.00               0.00    0.00              0.00      
+mds_stores                         629    1.87      53.55  0.00    0.00               0.00    0.00              0.00      
+diagnosticd                        2569   1.06      51.27  0.00    0.00               0.00    0.00              0.00      
+com.apple.CodeSigningHelper        511    0.82      23.32  0.00    0.00               0.00    0.00              0.00      
+BiomeAgent                         756    0.83      69.93  0.00    0.00               0.00    0.00              0.00      
+nearbyd                            867    1.86      66.10  0.00    0.00               0.50    0.00              0.00      
+diagnostics_agent                  2324   0.87      43.68  0.00    0.00               0.00    0.00              0.00      
+mds                                372    1.46      49.11  0.00    0.00               2.48    0.00              0.00      
+sharingd                           833    1.84      77.13  0.00    0.00               0.00    0.00              0.00      
+fseventsd                          347    1.64      25.72  0.00    0.00               5.46    0.00              0.00      
+corebrightnessd                    411    1.50      52.31  0.00    0.00               0.99    0.00              0.00      
+mdworker_shared                    60638  1.12      64.32  0.00    0.00               0.00    0.00              0.00      
+CleanMyMac_5_Menu                  2412   0.52      66.09  0.00    0.00               0.99    0.00              0.00      
+apsd                               386    1.29      56.37  0.00    0.00               0.50    0.00              0.00      
+node                               2599   1.30      35.23  1.99    0.00               13.90   0.00              0.00      
+CorpLinkExtension                  567    1.30      51.54  0.00    0.00               17.87   0.00              0.00      
+mediaremoted                       348    1.25      87.32  0.00    0.00               0.00    0.00              0.00      
+coreservicesd                      440    0.29      34.41  0.00    0.00               0.00    0.00              0.00      
+DoubaoIme                          67327  1.42      22.93  0.00    0.00               22.34   0.00              0.00      
+ZCode Helper                       2771   0.69      67.85  0.50    0.00               0.99    0.00              0.00      
+contentlinkingd                    16533  0.45      55.74  0.00    0.00               0.50    0.00              0.00      
+callservicesd                      70745  0.56      58.79  0.00    0.00               0.00    0.00              0.00      
+com.apple.SafariPlatformSupport.   1315   0.05      63.06  0.00    0.00               0.00    0.00              0.00      
+ThemeWidgetControlViewService      25519  0.05      56.99  0.00    0.00               0.00    0.00              0.00      
+WeApp                              51495  0.29      74.66  0.00    0.00               0.50    0.00              0.00      
+com.apple.WebKit.GPU               2573   1.03      65.27  0.00    0.00               11.91   0.00              0.00      
+WeChatAppEx Helper (Renderer)      27331  0.30      76.24  0.00    0.00               0.50    0.00              0.00      
+WeChatAppEx Helper (Renderer)      6923   0.29      80.79  0.00    0.00               0.50    0.00              0.00      
+WeChatAppEx Helper (Renderer)      44179  1.02      81.92  0.00    0.00               4.47    0.00              0.00      
+ContextStoreAgent                  762    0.28      65.33  0.00    0.00               0.00    0.00              0.00      
+siriactionsd                       83919  0.41      57.94  0.00    0.00               0.00    0.00              0.00      
+contextstored                      383    0.66      65.51  0.00    0.00               0.50    0.00              0.00      
+NeteaseMusic                       25811  0.45      61.54  0.00    0.00               2.48    0.00              0.00      
+ZCode Helper                       2832   0.61      52.46  3.97    0.00               4.96    0.00              0.00      
+ZCode Helper                       92802  0.59      52.77  3.97    0.00               4.96    0.00              0.00      
+Slack                              1116   0.63      71.17  0.00    0.00               1.99    0.00              0.00      
+CorplinkNe                         2410   0.79      36.02  0.00    0.00               1.99    0.00              0.00      
+WeChatAppEx Helper (Renderer)      6922   0.24      77.66  0.00    0.00               0.50    0.00              0.00      
+ZCode Helper                       9054   0.60      48.26  3.97    0.00               4.96    0.00              0.00      
+AMPDeviceDiscoveryAgent            1142   0.28      33.63  0.00    0.00               0.00    0.00              0.00      
+UURemoteServer                     1965   0.52      68.46  0.00    0.00               10.43   0.00              0.00      
+UserEventAgent                     733    0.23      5.09   0.00    0.00               0.00    0.00              0.00      
+dasd                               396    0.62      66.94  0.00    0.00               0.99    0.00              0.00      
+distnoted                          399    0.30      48.17  0.00    0.00               0.00    0.00              0.00      
+Browser Helper (Renderer)          30967  0.63      95.50  0.00    0.00               2.98    0.00              0.00      
+CorpLinkExtension                  678    0.26      52.31  0.00    0.00               2.48    0.00              0.00      
+airportd                           486    0.63      48.94  0.00    0.00               1.49    0.00              0.00      
+remotepairingd                     97951  0.29      87.92  0.00    0.00               0.00    0.00              0.00      
+Browser Helper (Renderer)          69422  0.73      93.50  0.00    0.00               2.48    0.00              0.00      
+CorpLinkExtension                  674    0.55      51.85  0.00    0.00               2.98    0.00              0.00      
+analyticsd                         459    0.21      51.96  0.00    0.00               0.50    0.00              0.00      
+CorpLinkExtension                  675    0.34      51.34  0.00    0.00               2.48    0.00              0.00      
+CorpLinkExtension                  679    0.41      52.82  0.00    0.00               2.48    0.00              0.00      
+Siri AI                            1144   0.16      84.17  0.00    0.00               0.00    0.00              0.00      
+osqueryd                           6172   0.35      30.36  0.00    0.00               1.99    0.00              0.00      
+CommCenter                         42738  0.20      48.09  0.00    0.00               0.00    0.00              0.00      
+CleanMyMac_5_HealthMonitor         2426   0.11      60.85  0.00    0.00               0.00    0.00              0.00      
+CorpLinkExtension                  681    0.33      55.13  0.00    0.00               2.48    0.00              0.00      
+duetexpertd                        783    0.27      47.65  0.00    0.00               0.00    0.00              0.00      
+symptomsd                          487    0.29      57.91  0.00    0.00               0.00    0.00              0.00      
+AMPLibraryAgent                    7791   0.22      20.69  0.00    0.00               0.50    0.00              0.00      
+identityservicesd                  790    0.30      38.34  0.00    0.00               0.50    0.00              0.00      
+UURemote                           1125   0.30      56.51  0.00    0.00               4.47    0.00              0.00      
+CorpLinkExtension                  677    0.27      49.93  0.00    0.00               2.48    0.00              0.00      
+ZCode Helper                       7187   0.13      71.51  0.00    0.00               0.50    0.00              0.00      
+orbit                              2375   0.33      48.62  2.98    0.00               3.48    0.00              0.00      
+CorpLinkExtension                  676    0.27      49.32  0.00    0.00               2.48    0.00              0.00      
+Doubao                             1407   0.33      74.64  0.00    0.00               0.99    0.00              0.00      
+watchdogd                          369    0.17      32.00  0.00    0.00               0.50    0.00              0.00      
+CorpLinkExtension                  680    0.25      55.62  0.00    0.00               2.48    0.00              0.00      
+Doubao Browser Helper              2212   0.20      66.82  0.00    0.00               8.44    0.00              0.00      
+node                               60835  0.02      85.58  0.50    0.00               0.99    0.00              0.00      
+Browser Helper                     9759   0.12      56.29  0.00    0.00               0.50    0.00              0.00      
+ObsidianQuickLook                  26861  0.09      55.75  0.00    0.00               0.00    0.00              0.00      
+syspolicyd                         500    0.10      33.99  0.00    0.00               0.99    0.00              0.00      
+XprotectService                    20026  0.09      15.38  0.00    0.00               0.50    0.00              0.00      
+Browser Helper (Renderer)          9789   0.25      91.00  0.00    0.00               1.49    0.00              0.00      
+Slack Helper (Renderer)            2239   0.15      84.88  0.00    0.00               1.49    0.00              0.00      
+com.apple.SafariPlatformSupport.   6877   0.08      50.77  0.00    0.00               0.00    0.00              0.00      
+com.apple.SafariPlatformSupport.   10930  0.11      57.64  0.00    0.00               0.00    0.00              0.00      
+configd                            356    0.19      18.30  0.00    0.00               0.00    0.00              0.00      
+fluxdown-agent                     9802   0.17      47.89  0.00    0.00               7.94    0.00              0.00      
+QuickLookUIService                 1139   0.12      51.57  0.00    0.00               0.00    0.00              0.00      
+com.apple.SafariPlatformSupport.   6882   0.11      56.57  0.00    0.00               0.00    0.00              0.00      
+Doubao Browser Helper              2208   0.07      69.44  0.00    0.00               0.50    0.00              0.00      
+audioaccessoryd                    740    0.20      77.60  0.00    0.00               0.00    0.00              0.00      
+fskitd                             893    0.24      49.33  0.00    0.00               0.00    0.00              0.00      
+mDNSResponder                      473    0.12      54.28  1.49    0.00               3.48    0.00              0.00      
+CursorUIViewService                1308   0.06      61.28  0.00    0.00               0.00    0.00              0.00      
+fileproviderd                      824    0.12      52.51  0.00    0.00               1.49    0.00              0.00      
+Browser Helper                     9836   0.22      65.30  0.00    0.00               0.50    0.00              0.00      
+WeChatAppEx Helper (GPU)           2331   0.20      47.31  0.00    0.00               0.50    0.00              0.00      
+com.apple.SafariPlatformSupport.   6272   0.08      61.00  0.00    0.00               0.00    0.00              0.00      
+rapportd                           765    0.14      80.83  0.00    0.00               0.00    0.00              0.00      
+fleet-desktop                      6175   0.19      33.89  3.97    0.00               5.46    0.00              0.00      
+com.apple.SafariPlatformSupport.   28053  0.10      56.32  0.00    0.00               0.00    0.00              0.00      
+WirelessRadioManagerd              522    0.16      54.04  0.00    0.00               0.00    0.00              0.00      
+Doubao Browser Helper              2848   0.16      59.09  0.00    0.00               7.94    0.00              0.00      
+ZCode Computer Use                 5410   0.10      48.21  0.50    0.00               0.99    0.00              0.00      
+ThemeWidgetControlViewService      8401   0.14      49.71  0.00    0.00               0.00    0.00              0.00      
+SafariBookmarksSyncAgent           67506  0.10      22.34  0.00    0.00               0.99    0.00              0.00      
+com.apple.SafariPlatformSupport.   91111  0.11      58.03  0.00    0.00               0.00    0.00              0.00      
+DeviceFS                           97970  0.15      63.53  0.00    0.00               0.00    0.00              0.00      
+cameracaptured                     552    0.06      35.43  0.00    0.00               1.99    0.00              0.00      
+Purge                              92454  0.08      48.47  0.00    0.00               0.50    0.00              0.00      
+CorpLink                           1119   0.15      66.90  0.50    0.00               0.99    0.00              0.00      
+Browser Helper                     9758   0.14      63.86  0.00    0.00               1.49    0.00              0.00      
+fluxdownd                          9808   0.12      50.06  0.00    0.00               3.97    0.00              0.00      
+WeChatAppEx Helper                 2330   0.04      69.53  0.00    0.00               0.99    0.00              0.00      
+distnoted                          1102   0.03      33.54  0.00    0.00               0.00    0.00              0.00      
+thermalmonitord                    382    0.13      41.66  0.00    0.00               0.99    0.00              0.00      
+networkserviceproxy                83918  0.12      75.98  0.00    0.00               0.50    0.00              0.00      
+distnoted                          1058   0.03      36.55  0.00    0.00               0.00    0.00              0.00      
+imagent                            843    0.07      43.04  0.00    0.00               0.50    0.00              0.00      
+distnoted                          3285   0.03      31.78  0.00    0.00               0.00    0.00              0.00      
+distnoted                          896    0.03      38.55  0.00    0.00               0.00    0.00              0.00      
+fontd                              811    0.03      20.03  0.00    0.00               0.50    0.00              0.00      
+analyticsagent                     53332  0.11      16.57  0.00    0.00               0.50    0.00              0.00      
+distnoted                          2346   0.03      37.41  0.00    0.00               0.00    0.00              0.00      
+distnoted                          27041  0.02      36.49  0.00    0.00               0.00    0.00              0.00      
+securityd                          390    0.07      51.86  0.00    0.00               0.00    0.00              0.00      
+distnoted                          711    0.02      37.06  0.00    0.00               0.00    0.00              0.00      
+MTLCompilerService                 62554  0.04      14.35  0.00    0.00               0.50    0.00              0.00      
+distnoted                          6481   0.03      36.98  0.00    0.00               0.00    0.00              0.00      
+Slack Helper                       1555   0.12      62.27  0.00    0.00               0.99    0.00              0.00      
+distnoted                          871    0.02      39.21  0.00    0.00               0.00    0.00              0.00      
+distnoted                          87614  0.03      37.21  0.00    0.00               0.00    0.00              0.00      
+distnoted                          635    0.02      41.23  0.00    0.00               0.00    0.00              0.00      
+distnoted                          857    0.02      38.82  0.00    0.00               0.00    0.00              0.00      
+distnoted                          627    0.03      34.40  0.00    0.00               0.00    0.00              0.00      
+Browser Helper                     24818  0.11      62.85  0.00    0.00               0.50    0.00              0.00      
+Doubao Browser Helper (Renderer)   2374   0.06      84.04  0.00    0.00               1.49    0.00              0.00      
+distnoted                          624    0.04      36.82  0.00    0.00               0.00    0.00              0.00      
+promotedcontentd                   45301  0.10      35.50  0.00    0.00               0.50    0.00              0.00      
+WeChatAppEx                        2322   0.07      83.39  0.00    0.00               0.99    0.00              0.00      
+distnoted                          549    0.05      34.65  0.00    0.00               0.00    0.00              0.00      
+NeteaseMusic Helper                26096  0.08      29.27  0.00    0.00               0.50    0.00              0.00      
+UserEventAgent                     345    0.02      27.80  0.00    0.00               0.00    0.00              0.00      
+spotlightknowledged.updater        962    0.03      27.00  0.00    0.00               0.50    0.00              0.00      
+distnoted                          564    0.05      33.99  0.00    0.00               0.00    0.00              0.00      
+com.sentinelone.network-monitori   652    0.05      68.68  0.00    0.00               0.00    0.00              0.00      
+distnoted                          547    0.06      32.55  0.00    0.00               0.00    0.00              0.00      
+axassetsd                          71508  0.07      49.23  0.00    0.00               0.50    0.00              0.00      
+UURemoteService                    1830   0.07      53.20  0.00    0.00               0.99    0.00              0.00      
+distnoted                          542    0.06      32.04  0.00    0.00               0.00    0.00              0.00      
+amsondevicestoraged                69609  0.02      31.23  0.00    0.00               0.50    0.00              0.00      
+Browser Helper (Renderer)          30892  0.02      50.75  0.00    0.00               0.00    0.00              0.00      
+authd                              507    0.06      15.89  0.00    0.00               0.50    0.00              0.00      
+universalaccessd                   747    0.06      51.48  0.00    0.00               0.50    0.00              0.00      
+distnoted                          514    0.05      35.70  0.00    0.00               0.00    0.00              0.00      
+mediaanalysisd                     59898  0.02      27.38  0.00    0.00               0.50    0.00              0.00      
+Slack Helper                       1560   0.07      67.58  0.00    0.00               0.99    0.00              0.00      
+Browser Helper (Renderer)          30957  0.02      55.11  0.00    0.00               0.00    0.00              0.00      
+distnoted                          510    0.05      37.57  0.00    0.00               0.00    0.00              0.00      
+universalAccessAuthWarn            89445  0.02      22.02  0.00    0.00               0.50    0.00              0.00      
+rtcreportingd                      18220  0.04      47.29  0.00    0.00               0.99    0.00              0.00      
+ctkahp                             2287   0.05      27.24  0.00    0.00               0.50    0.00              0.00      
+CorpLink Helper (GPU)              1166   0.01      27.24  0.00    0.00               0.50    0.00              0.00      
+iconservicesagent                  21823  0.02      30.05  0.00    0.00               0.50    0.00              0.00      
+UURemoteDaemon                     571    0.03      53.66  0.00    0.00               0.50    0.00              0.00      
+amsengagementd                     45300  0.05      46.34  0.00    0.00               0.50    0.00              0.00      
+ZCode Helper                       2277   0.04      91.70  0.00    0.00               0.50    0.00              0.00      
+mDNSResponderHelper                513    0.02      41.37  0.00    0.00               0.99    0.00              0.00      
+ctkd                               45204  0.03      24.83  0.00    0.00               0.50    0.00              0.00      
+remindd                            7778   0.03      28.19  0.00    0.00               0.50    0.00              0.00      
+CoreLocationAgent                  804    0.03      25.10  0.00    0.00               0.50    0.00              0.00      
+DockHelper                         50496  0.03      18.50  0.00    0.00               0.50    0.00              0.00      
+ctkahp                             61956  0.03      25.52  0.00    0.00               0.50    0.00              0.00      
+NotificationCenter                 856    0.03      21.38  0.00    0.00               0.50    0.00              0.00      
+Mail                               1123   0.02      26.04  0.00    0.00               0.50    0.00              0.00      
+syslogd                            380    0.02      17.50  0.00    0.00               0.50    0.00              0.00      
+com.apple.cmio.registerassistant   412    0.02      24.47  0.00    0.00               0.50    0.00              0.00      
+WeChatAppEx Helper                 6919   0.03      83.26  0.00    0.00               0.50    0.00              0.00      
+com.raycast.macos.Accessibility    2680   0.02      22.13  0.00    0.00               0.99    0.00              0.00      
+replayd                            43338  0.02      24.69  0.00    0.00               0.50    0.00              0.00      
+Slack Helper                       2257   0.01      66.57  0.00    0.00               0.50    0.00              0.00      
+Browser Helper                     9761   0.01      51.66  0.00    0.00               0.50    0.00              0.00      
+Browser Helper (Renderer)          10231  0.01      61.54  0.00    0.00               0.50    0.00              0.00      
+Browser Helper (Renderer)          30625  0.01      60.77  0.00    0.00               0.50    0.00              0.00      
+ALL_TASKS                          -2     3760.76   44.53  1175.97 14.89              6192.08 0.00              0.00      
+
+
+**** Battery and backlight usage ****
+
+Battery: percent_charge: 80
+
+
+**** Network activity ****
+
+out: 108.21 packets/s, 63747.05 bytes/s
+in:  135.02 packets/s, 19307.93 bytes/s
+
+
+**** Disk activity ****
+
+read: 40.21 ops/s 1339.91 KBytes/s
+write: 427.90 ops/s 10052.39 KBytes/s
+
+****  Interrupt distribution ****
+
+CPU 0:
+	Total IRQ: 7720.99 interrupts/sec
+	|-> IPI: 5294.09 interrupts/sec
+	|-> TIMER: 541.07 interrupts/sec
+CPU 1:
+	Total IRQ: 6336.04 interrupts/sec
+	|-> IPI: 5014.62 interrupts/sec
+	|-> TIMER: 594.19 interrupts/sec
+CPU 2:
+	Total IRQ: 4851.80 interrupts/sec
+	|-> IPI: 3933.96 interrupts/sec
+	|-> TIMER: 632.91 interrupts/sec
+CPU 3:
+	Total IRQ: 3450.97 interrupts/sec
+	|-> IPI: 2868.69 interrupts/sec
+	|-> TIMER: 417.47 interrupts/sec
+CPU 4:
+	Total IRQ: 2532.63 interrupts/sec
+	|-> IPI: 2077.93 interrupts/sec
+	|-> TIMER: 360.39 interrupts/sec
+CPU 5:
+	Total IRQ: 1852.56 interrupts/sec
+	|-> IPI: 1434.59 interrupts/sec
+	|-> TIMER: 364.36 interrupts/sec
+CPU 6:
+	Total IRQ: 4469.08 interrupts/sec
+	|-> IPI: 3789.01 interrupts/sec
+	|-> TIMER: 348.47 interrupts/sec
+CPU 7:
+	Total IRQ: 4216.91 interrupts/sec
+	|-> IPI: 3621.73 interrupts/sec
+	|-> TIMER: 362.37 interrupts/sec
+CPU 8:
+	Total IRQ: 4121.60 interrupts/sec
+	|-> IPI: 3623.71 interrupts/sec
+	|-> TIMER: 305.29 interrupts/sec
+CPU 9:
+	Total IRQ: 4173.72 interrupts/sec
+	|-> IPI: 3721.50 interrupts/sec
+	|-> TIMER: 348.97 interrupts/sec
+
+
+
+**** Processor usage ****
+
+E-Cluster Online: 100%
+E-Cluster HW active frequency: 1707 MHz
+E-Cluster HW active residency:  74.27% (900 MHz: .70% 1080 MHz:  54% 1476 MHz: 2.9% 1860 MHz: 8.4% 2172 MHz: 6.1% 2496 MHz: 2.5% 2808 MHz:  13% 2892 MHz:  13%)
+E-Cluster idle residency:  25.73%
+CPU 0 frequency: 1717 MHz
+CPU 0 active residency:  52.35% (900 MHz: .23% 1080 MHz:  28% 1476 MHz: 1.8% 1860 MHz: 4.6% 2172 MHz: 2.9% 2496 MHz: 1.3% 2808 MHz: .42% 2892 MHz:  13%)
+CPU 0 idle residency:  47.65%
+CPU 1 frequency: 1762 MHz
+CPU 1 active residency:  43.88% (900 MHz: .06% 1080 MHz:  23% 1476 MHz: 1.3% 1860 MHz: 4.0% 2172 MHz: 3.1% 2496 MHz: 1.1% 2808 MHz: .35% 2892 MHz:  11%)
+CPU 1 idle residency:  56.12%
+CPU 2 frequency: 1809 MHz
+CPU 2 active residency:  34.83% (900 MHz: .06% 1080 MHz:  17% 1476 MHz: 1.3% 1860 MHz: 3.3% 2172 MHz: 2.0% 2496 MHz: 1.1% 2808 MHz: .39% 2892 MHz: 9.9%)
+CPU 2 idle residency:  65.17%
+CPU 3 frequency: 1887 MHz
+CPU 3 active residency:  28.01% (900 MHz: .02% 1080 MHz:  12% 1476 MHz: 1.2% 1860 MHz: 3.1% 2172 MHz: 2.0% 2496 MHz: 1.1% 2808 MHz: .32% 2892 MHz: 8.5%)
+CPU 3 idle residency:  71.99%
+CPU 4 frequency: 1922 MHz
+CPU 4 active residency:  20.13% (900 MHz: .04% 1080 MHz: 8.2% 1476 MHz: .74% 1860 MHz: 2.3% 2172 MHz: 1.4% 2496 MHz: .55% 2808 MHz: .21% 2892 MHz: 6.7%)
+CPU 4 idle residency:  79.87%
+CPU 5 frequency: 1968 MHz
+CPU 5 active residency:  18.40% (900 MHz: .03% 1080 MHz: 7.2% 1476 MHz: .74% 1860 MHz: 1.6% 2172 MHz: 1.2% 2496 MHz: .48% 2808 MHz: .19% 2892 MHz: 6.8%)
+CPU 5 idle residency:  81.60%
+
+P-Cluster HW active frequency: 3991 MHz
+P-Cluster HW active residency:  99.99% (912 MHz:   0% 1260 MHz:   0% 1512 MHz:   0% 1800 MHz:   0% 2088 MHz:   0% 2352 MHz:   0% 2616 MHz:   0% 2868 MHz:   0% 3096 MHz:   0% 3300 MHz:   0% 3468 MHz:   0% 3624 MHz:   0% 3756 MHz:   0% 3876 MHz: .01% 3936 MHz:  31% 3984 MHz:  34% 4044 MHz:  35% 4104 MHz:   0% 4416 MHz:   0% 4464 MHz:   0%)
+P-Cluster idle residency:   0.01%
+CPU 6 frequency: 4461 MHz
+CPU 6 active residency:  51.88% (912 MHz:   0% 1260 MHz:   0% 1512 MHz:   0% 1800 MHz:   0% 2088 MHz:   0% 2352 MHz:   0% 2616 MHz:   0% 2868 MHz:   0% 3096 MHz:   0% 3300 MHz:   0% 3468 MHz:   0% 3624 MHz:   0% 3756 MHz:   0% 3876 MHz:   0% 3936 MHz:   0% 3984 MHz:   0% 4044 MHz:   0% 4104 MHz: .36% 4416 MHz: .24% 4464 MHz:  51%)
+CPU 6 idle residency:  48.12%
+CPU 7 frequency: 4458 MHz
+CPU 7 active residency:  52.02% (912 MHz:   0% 1260 MHz:   0% 1512 MHz:   0% 1800 MHz:   0% 2088 MHz:   0% 2352 MHz:   0% 2616 MHz:   0% 2868 MHz:   0% 3096 MHz:   0% 3300 MHz:   0% 3468 MHz:   0% 3624 MHz:   0% 3756 MHz:   0% 3876 MHz:   0% 3936 MHz:   0% 3984 MHz:   0% 4044 MHz:   0% 4104 MHz: .72% 4416 MHz: .72% 4464 MHz:  51%)
+CPU 7 idle residency:  47.98%
+CPU 8 frequency: 4461 MHz
+CPU 8 active residency:  51.55% (912 MHz:   0% 1260 MHz:   0% 1512 MHz:   0% 1800 MHz:   0% 2088 MHz:   0% 2352 MHz:   0% 2616 MHz:   0% 2868 MHz:   0% 3096 MHz:   0% 3300 MHz:   0% 3468 MHz:   0% 3624 MHz:   0% 3756 MHz:   0% 3876 MHz:   0% 3936 MHz:   0% 3984 MHz:   0% 4044 MHz:   0% 4104 MHz: .31% 4416 MHz: .97% 4464 MHz:  50%)
+CPU 8 idle residency:  48.45%
+CPU 9 frequency: 4458 MHz
+CPU 9 active residency:  50.26% (912 MHz:   0% 1260 MHz:   0% 1512 MHz:   0% 1800 MHz:   0% 2088 MHz:   0% 2352 MHz:   0% 2616 MHz:   0% 2868 MHz:   0% 3096 MHz:   0% 3300 MHz:   0% 3468 MHz:   0% 3624 MHz:   0% 3756 MHz:   0% 3876 MHz:   0% 3936 MHz:   0% 3984 MHz:   0% 4044 MHz:   0% 4104 MHz: .73% 4416 MHz: .78% 4464 MHz:  49%)
+CPU 9 idle residency:  49.74%
+
+CPU Power: 8492 mW
+GPU Power: 15970 mW
+ANE Power: 0 mW
+Combined Power (CPU + GPU + ANE): 24463 mW
+
+**** GPU usage ****
+
+GPU HW active frequency: 1578 MHz
+GPU HW active residency: 100.00% (338 MHz:   0% 618 MHz:   0% 796 MHz:   0% 928 MHz:   0% 952 MHz:   0% 1056 MHz:   0% 1053 MHz:   0% 1170 MHz:   0% 1152 MHz:   0% 1278 MHz:   0% 1204 MHz:   0% 1338 MHz:   0% 1326 MHz:   0% 1470 MHz:   0% 1578 MHz: 100%)
+GPU SW requested state: (P1 :   0% P2 :   0% P3 :   0% P4 :   0% P5 :   0% P6 :   0% P7 :   0% P8 :   0% P9 :   0% P10 : 100% P11 :   0% P12 :   0% P13 :   0% P14 :   0% P15 :   0%)
+GPU SW state: (SW_P1 :   0% SW_P2 :   0% SW_P3 :   0% SW_P4 :   0% SW_P5 :   0% SW_P6 :   0% SW_P7 :   0% SW_P8 :   0% SW_P9 :   0% SW_P10 : 100% SW_P11 :   0% SW_P12 :   0% SW_P13 :   0% SW_P14 :   0% SW_P15 :   0%)
+GPU idle residency:   0.00%
+GPU Power: 15981 mW
+

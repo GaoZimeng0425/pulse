@@ -18,7 +18,7 @@
 **Status:** ready-for-agent(2026-10-27 立票即分诊:03 已结项解除阻塞;GPU 复测与稳态复测无依赖可先行;卡位置/形态单点问用户)
 
 - [ ] Agents 用量卡有真数(跑 agent 会话时能耗数值变动),位置/形态过 grill
-- [ ] per-app GPU 复测有定论:可用(加卡)或记档放弃,二选一落档
+- [x] per-app GPU 复测有定论:**不可用,记档放弃**(docs/probes/10,双条件互证)
 - [ ] MCP 真连问答样例落档(至少 why_cpu_high 一例,答案与 UI 互证)
 - [ ] 稳态复测(helper 在跑)对基线无异常增量,如实记档
 - [ ] 全档目验项汇总在票面,摆给用户
@@ -50,3 +50,9 @@
   **待办:关窗安静态+热身后重测一轮**(150s,指纹须 0)。
 - **余项**:② GPU 复测等用户一条 sudo(/tmp/gpu-stress 已备);全档目验清单
   ——电池页 AI 助手卡有数与排行观感、历史页能耗曲线、MCP 重启会话后真连。
+
+**2026-10-28 ②定论:per-app GPU 本机不可用,记档放弃(docs/probes/10)**:
+用户 sudo 实测——专用 Metal 计算压载 gpu-stress(pid 62505,CPU 仅 0.47ms/s
+证 GPU-bound)在表内而 GPU ms/s=0.00;WindowServer/"NeteaseMusic Helper
+(GPU)" 同样全 0。与探针 08(GPU 50% 活跃全表 0)互证:该列在 Mac16,1/
+macOS 26A434 恒 0 死列。**不加 per-app GPU 卡**,与 stats repo M4 caveat 一致。
