@@ -17,11 +17,23 @@ public struct SpaceScanOptions: Sendable, Equatable {
     public var excludedPathPrefixes: [String]
     /// 深度护栏(dust 教训的递归防御位)。超深目录入台账、标 partial,不崩。
     public var maxDepth: Int
+    /// 文件节点是否进树(`children`)。false = 文件只聚合进父目录的计数与字节,
+    /// 树里只留目录节点。真机全卷 ≈340 万项、文件级节点约 278 B/个,全量驻留 ≈900 MB,
+    /// 只留目录(≈10%)≈90 MB(p4-cleaner/04 合成探针 /tmp/p4-mem-probe.swift 实测)。
+    /// 开发者垃圾(规则只认目录)与空间地图(目录粒度)都不需要文件节点;默认 true
+    /// 保持 02 票的树形状不变,按需关。
+    public var retainFileNodes: Bool
 
-    public init(roots: [String], excludedPathPrefixes: [String] = [], maxDepth: Int = 256) {
+    public init(
+        roots: [String],
+        excludedPathPrefixes: [String] = [],
+        maxDepth: Int = 256,
+        retainFileNodes: Bool = true
+    ) {
         self.roots = roots
         self.excludedPathPrefixes = excludedPathPrefixes
         self.maxDepth = maxDepth
+        self.retainFileNodes = retainFileNodes
     }
 }
 
@@ -76,6 +88,39 @@ public struct SpaceNode: Sendable {
         self.datalessCount = datalessCount
         self.isPartial = isPartial
         self.children = children
+    }
+}
+
+public extension SpaceNode {
+    /// 从本节点出发按路径分量下钻(只走目录 children,按 `name` 精确匹配)。
+    /// `path` 须等于本节点路径或在其之下;任一层缺席返回 nil(不猜、不创建)。
+    func descendant(atPath path: String) -> SpaceNode? {
+        let target = PathNormalization.normalize(path)
+        let base = PathNormalization.normalize(self.path)
+        if target == base {
+            return self
+        }
+        let prefix = base == "/" ? "/" : base + "/"
+        guard target.hasPrefix(prefix) else { return nil }
+        let remainder = target.dropFirst(prefix.count)
+        var node = self
+        for component in remainder.split(separator: "/", omittingEmptySubsequences: true) {
+            guard let next = node.children.first(where: { $0.name == component && $0.kind == .directory }) else {
+                return nil
+            }
+            node = next
+        }
+        return node
+    }
+
+    /// 在一组扫描根里定位路径:取能覆盖该路径的那棵树再下钻(根重叠已由引擎去重,最多命中一棵)。
+    static func locate(path: String, in trees: [SpaceNode]) -> SpaceNode? {
+        for tree in trees {
+            if let hit = tree.descendant(atPath: path) {
+                return hit
+            }
+        }
+        return nil
     }
 }
 
@@ -208,10 +253,8 @@ private final class Walker {
     }
 
     func isExcluded(_ path: String) -> Bool {
-        options.excludedPathPrefixes.contains { prefix in
-            let p = SpaceScanEngine.norm(prefix)
-            return path == p || path.hasPrefix(p + "/")
-        }
+        // 与删除侧(CleanPlan)共用同一判定——"扫描与删除两处生效"靠一份代码而非两份抄写。
+        CleanExclusions.isExcluded(path, by: options.excludedPathPrefixes)
     }
 
     func finish() {
@@ -305,17 +348,21 @@ private final class Walker {
                     node.allReclaimableAccounting = false
                 }
                 node.fallbackBytes += entry.allocatedSize
-                node.children.append(SpaceNode(
-                    name: entry.name,
-                    path: childPath,
-                    kind: .file,
-                    accountedBytes: bytes,
-                    reclaimableBytes: entry.reclaimableSize ?? 0,
-                    fallbackBytes: entry.allocatedSize,
-                    allReclaimableAccounting: entry.reclaimableSize != nil,
-                    fileCount: 1,
-                    datalessCount: entry.isDataless ? 1 : 0
-                ))
+                // 文件节点可选不进树(内存量级,见 SpaceScanOptions.retainFileNodes);
+                // 上面的计数与字节已聚合进父目录,树的数字不因此改变。
+                if options.retainFileNodes {
+                    node.children.append(SpaceNode(
+                        name: entry.name,
+                        path: childPath,
+                        kind: .file,
+                        accountedBytes: bytes,
+                        reclaimableBytes: entry.reclaimableSize ?? 0,
+                        fallbackBytes: entry.allocatedSize,
+                        allReclaimableAccounting: entry.reclaimableSize != nil,
+                        fileCount: 1,
+                        datalessCount: entry.isDataless ? 1 : 0
+                    ))
+                }
 
             case .symlink:
                 // 不跟随(spec:dust 默认同款);链接本体字节可忽略,单独计数上屏。

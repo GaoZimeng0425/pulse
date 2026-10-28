@@ -31,14 +31,24 @@ struct MainWindowView: View {
     @State private var tabSelection: MetricTabSelection
     /// 工具栏搜索框:窗口本地会话态,与 tab 选中同层;过滤纯视图层,不动数据。
     @State private var searchQuery: String = ""
-    /// 清理页状态(p4-cleaner/03):按需扫描自持,不挂 MonitorFeatures;关窗即销毁
-    /// (MainWindowGate),无常驻采集——稳态零增量由架构保证而非闸门。
-    @State private var cleanerModel = CleanerModel()
+    /// 清理页状态(p4-cleaner/03 + 04):按需扫描自持,不挂 MonitorFeatures;关窗即销毁
+    /// (MainWindowGate),无常驻采集——稳态零增量由架构保证而非闸门。排除目录与设置页
+    /// 同一实例;清理历史写进采样历史的同一库。
+    @State private var cleanerModel: CleanerModel
 
-    init(monitor: SystemMonitor, initialTab: MetricTab = .overview, alertRouter: AlertNotificationRouter? = nil) {
+    init(
+        monitor: SystemMonitor,
+        initialTab: MetricTab = .overview,
+        alertRouter: AlertNotificationRouter? = nil,
+        cleanExclusions: CleanExclusionsStore = CleanExclusionsStore(load: { [] }, persist: { _ in })
+    ) {
         self.monitor = monitor
         self.alertRouter = alertRouter
         _model = State(initialValue: DashboardModel(monitor: monitor))
+        _cleanerModel = State(initialValue: CleanerModel(
+            exclusions: cleanExclusions,
+            history: monitor.history.cleanHistory
+        ))
         // 展示轴随电池可用性(工单 02):无内建电池的机器不含电池页。
         // 窗口新建/重建时先取路由落点(点通知时窗口可能还没开)。
         _tabSelection = State(initialValue: MetricTabSelection(

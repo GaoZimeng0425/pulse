@@ -1,13 +1,13 @@
 import PulseCore
 import SwiftUI
 
-// MARK: - 清理页(p4-cleaner/03):手动全卷扫描闭环 + 三子药丸壳
+// MARK: - 清理页(p4-cleaner/03 扫描闭环 + 04 删除管线):三子药丸壳
 
 //
-// 子页内容:开发者垃圾 = p4-cleaner/04、空间地图 = p4-cleaner/07、清理历史 =
-// p4-cleaner/04/08——本票交付扫描状态卡 + 结果摘要卡(真数据),占位卡走
-// CardEmptyState(DESIGN.md 卡片家族,不手写空态)。整页只读,零删除控件
-// (删除管线 04 票接入)。
+// 子页内容:开发者垃圾 = JunkListSection(04,CleanerJunkViews.swift)、空间地图 =
+// 03 的扫描状态卡 + 结果摘要卡(旭日图 07 票接入 `mapSection`)、清理历史 =
+// CleanHistorySection(04 列表 + 明细;「清空废纸篓」按钮 08 票)。空态一律走
+// CardEmptyState(DESIGN.md 卡片家族,不手写空态)。
 
 enum CleanerSubTab: String, CaseIterable, Hashable {
     case junk
@@ -39,9 +39,9 @@ struct CleanerTabView: View {
             }
             subPillBar
             switch subTab {
-            case .junk: junkPlaceholder
+            case .junk: JunkListSection(model: model)
             case .map: mapSection
-            case .history: historyPlaceholder
+            case .history: CleanHistorySection(model: model)
             }
         }
     }
@@ -75,7 +75,9 @@ struct CleanerTabView: View {
         case let .scanning(stats):
             return "正在扫描 · \(stats.entriesSeen) 项 · \(PulseFormat.memory(UInt64(max(0, stats.accountedBytes))))"
         case let .finished(result):
-            return "上次扫描 \(result.cancelled ? "已取消(部分)" : "完成") · \(scanDurationText) · 实际占用口径"
+            // 清理后树不重扫(树只是快照),摘要数字会偏大——如实提示,不悄悄改数。
+            let cleaned = model.recycledPaths.isEmpty ? "" : " · 本次已清理 \(model.recycledPaths.count) 项,重新扫描刷新数字"
+            return "上次扫描 \(result.cancelled ? "已取消(部分)" : "完成") · \(scanDurationText) · 实际占用口径" + cleaned
         }
     }
 
@@ -158,7 +160,8 @@ struct CleanerTabView: View {
     /// 进度没有已知总量(全卷文件数因机器而异),条只做"有进展"的视觉信号:
     /// 用一个缓慢逼近 1 的伪进度(不伪造百分比数字——假数不上屏,防御性数据纪律)。
     private func scanProgressFraction(_ stats: ScanStats) -> Double {
-        let guess = 650_000.0 // 探针 15 的本机量级,仅定进度条斜率
+        // 探针 15 全量复测:本机全卷 ≈340 万项(03 票写的 65 万是采样外推错误,早顶 95% 帽)。
+        let guess = 3_400_000.0
         return min(0.95, Double(stats.entriesSeen) / guess)
     }
 
@@ -211,21 +214,5 @@ struct CleanerTabView: View {
         let mixed = result.trees.contains { !$0.allReclaimableAccounting }
         let base = "大小按实际占用口径:APFS 克隆与快照共享部分不重复计,硬链接只计一次。"
         return mixed ? base + " 本卷部分文件未提供克隆明细,按块大小回退计入。" : base
-    }
-
-    private var junkPlaceholder: some View {
-        CardEmptyState(
-            title: "开发者垃圾清单在下一票接入",
-            detail: "白名单识别 · 两档安全标签 · 确认后进废纸篓(p4-cleaner/04)"
-        )
-        .cardShell(compact: false)
-    }
-
-    private var historyPlaceholder: some View {
-        CardEmptyState(
-            title: "清理历史在删除管线落地后开放",
-            detail: "每次清理的时间、释放量与逐项去向(p4-cleaner/04/08)"
-        )
-        .cardShell(compact: false)
     }
 }

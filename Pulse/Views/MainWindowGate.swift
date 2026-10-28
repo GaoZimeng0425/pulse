@@ -16,11 +16,13 @@ import SwiftUI
 struct MainWindowGate: View {
     let monitor: SystemMonitor
     let alertRouter: AlertNotificationRouter
+    /// 清理页排除目录(p4-cleaner/04):app 级单实例,与设置页「清理」同源。
+    let cleanExclusions: CleanExclusionsStore
 
     var body: some View {
         Group {
             if monitor.mainWindowVisible {
-                MainWindowView(monitor: monitor, alertRouter: alertRouter)
+                MainWindowView(monitor: monitor, alertRouter: alertRouter, cleanExclusions: cleanExclusions)
             } else {
                 // 与 Window 场景 defaultSize 同尺寸:窗框在恢复 / 深链路径上不跳动。
                 Color.clear.frame(width: 880, height: 620)

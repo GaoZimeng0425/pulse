@@ -9,6 +9,8 @@ import SwiftUI
 /// (页少)、整窗玻璃、本地化键(Pulse 全中文硬编码)。
 struct SettingsView: View {
     let rootsStore: ProjectRootsStore
+    /// 清理页排除目录(p4-cleaner/04):与主窗口清理页右键排除同一实例。
+    let cleanExclusions: CleanExclusionsStore
     /// 采样管线(工单 11):诊断报告的统计数据源,透传给通用页。
     let monitor: SystemMonitor
 
@@ -65,6 +67,7 @@ struct SettingsView: View {
         case .alerts: AlertSettingsView(center: monitor.alerts)
         case .projectRoots: ProjectRootsSettingsView(store: rootsStore)
         case .menuBar: MenuBarBadgeSettingsView()
+        case .cleaner: CleanerSettingsView(store: cleanExclusions)
         }
     }
 }
@@ -76,6 +79,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     case alerts
     case projectRoots
     case menuBar
+    case cleaner
 
     var id: String {
         rawValue
@@ -87,6 +91,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .alerts: "告警"
         case .projectRoots: "项目根目录"
         case .menuBar: "菜单栏"
+        case .cleaner: "清理"
         }
     }
 
@@ -96,6 +101,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .alerts: "bell.badge"
         case .projectRoots: "folder.badge.gearshape"
         case .menuBar: "menubar.rectangle"
+        case .cleaner: "trash"
         }
     }
 
@@ -105,6 +111,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .alerts: Color(red: 0.95, green: 0.62, blue: 0.20)
         case .projectRoots: Color(red: 0.30, green: 0.55, blue: 0.95)
         case .menuBar: Color(red: 0.58, green: 0.40, blue: 0.92)
+        case .cleaner: Color(red: 0.98, green: 0.70, blue: 0.15)
         }
     }
 
@@ -114,6 +121,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .alerts: Color(red: 0.85, green: 0.35, blue: 0.10)
         case .projectRoots: Color(red: 0.15, green: 0.35, blue: 0.75)
         case .menuBar: Color(red: 0.42, green: 0.22, blue: 0.78)
+        case .cleaner: Color(red: 0.85, green: 0.52, blue: 0.00)
         }
     }
 }
@@ -156,6 +164,7 @@ private struct SidebarIconView: View {
 #Preview("设置窗") {
     SettingsView(
         rootsStore: ProjectRootsStore(load: { ["~/Documents/Learn"] }, persist: { _ in }),
+        cleanExclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
         monitor: .preview()
     )
 }

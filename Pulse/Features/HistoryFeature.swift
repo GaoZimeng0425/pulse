@@ -26,6 +26,9 @@ final class HistoryFeature: MonitorFeature {
 
     private let engine: HistoryEngine?
     private let clock: @Sendable () -> Date
+    /// 清理历史(p4-cleaner/04,GLOSSARY「清理历史」):与采样历史共用同一库文件与队列。
+    /// 引擎缺席(库打开失败)→ nil:清理照常执行,只是不记历史,清理页如实说明。
+    let cleanHistory: CleanHistoryStore?
     @ObservationIgnored private var feed = HistoryFeed()
     /// 串行写入流的一笔:轮次落库,或项目根对账(改根迁移组身份)——同一条流保证
     /// 对账与落库按发生次序生效。
@@ -42,6 +45,7 @@ final class HistoryFeature: MonitorFeature {
     init(engine: HistoryEngine?, clock: @escaping @Sendable () -> Date = { Date() }) {
         self.engine = engine
         self.clock = clock
+        cleanHistory = engine?.database.map { CleanHistoryStore(database: $0) }
     }
 
     // MARK: - MonitorFeature

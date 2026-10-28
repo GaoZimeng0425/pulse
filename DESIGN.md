@@ -167,6 +167,8 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.row-meter}` | 64pt | 行内电量条宽(全尺寸档,蓝牙设备行) |
 | `{layout.row-host-icon}` | 14pt | 下钻进程行宿主 App 徽标图标边长(project-visibility/02;徽标文字随行 `{typography.caption}` secondary,图标-文字间距 `{spacing.inline}`) |
 | `{layout.overview-card-min-width}` | 340pt | 总览卡自适应网格的单卡最小宽(主窗口列数 1–4 由它派生:列数 = 内容宽容纳的最多列,340 + 列距 16,上限 4) |
+| `{layout.sheet-width}` | 460pt | 确认清单 sheet 定宽(清理页「清理…」,p4-cleaner/04;原型 B 变体同值) |
+| `{layout.sheet-list-max-height}` | 220pt | 确认清单 sheet 内逐行列表的最大高(超出滚动,总量与按钮恒在视口内) |
 
 窗口:主窗口最小 **720×560**(spec 钉死),默认 880×620;弹窗定宽 **360pt**
 (`DashboardView.width`)。工具栏内容必须按 720 最小窗宽预算(见 §Do's and Don'ts)。
@@ -232,6 +234,18 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   图标 18、名称 / 数值 12.5、meter 52、数值列同法按 12.5pt 量宽、行内距 5;卡 `{rounded.card-compact}` 12
   + `{spacing.card-padding-compact}` 12;全尺寸卡 `{rounded.card}` 18 + `{spacing.card-padding}` 16。
   排行卡不配节标题(主窗口也不配「当前最忙」节标题)。
+- **清理清单行**(p4-cleaner/04,`CleanerJunkViews.swift`):借排行列表行配方
+  (`RankingListMetrics` 全套:图标 22 / 名称 13 medium + 副文 10.5 secondary / meter 110
+  榜首归一 / 数值 13 semibold 等宽定宽列 / 行内距 6×7),行首加系统 checkbox;行选中底 =
+  `{colors.surface-card-high}` 70% + `{rounded.inner}` 10。**安全档 chip**(`TierChip`)=
+  状态 chip 配方(胶囊、tint 15% 底 + 同色文字、`{typography.micro}` 10.5 semibold),
+  两态:可安全清理 = `{colors.state-positive}`、先检查 = `{colors.state-warning}`——映射的是
+  GLOSSARY「安全档」(删除安全语义),不是负载警示,只在此组件出。勾选动作条 =
+  `{colors.surface-card-high}` + `{rounded.card-compact}` 12,内距 8×12,右侧
+  「清除勾选」bordered + 「清理…」borderedProminent(所在页指标色);确认清单走
+  `{layout.sheet-width}` 460 定宽 sheet(标题 `{typography.section-title}`、逐行同清单行减
+  checkbox、页脚总量 `{typography.card-title}` + 口径注记,`{layout.sheet-list-max-height}`
+  220 滚动)。清单默认全不勾;右键行 = 排除该目录 / 在 Finder 中显示。
 - **AreaTrendChartView**:56 点、线 2px 指标色、线下渐变 32%→0、4 条 8% 网格线、
   2% 左垫底;**StripChartView**:44 柱、36pt 高。二者都是自绘 Canvas,不引 Charts。
 - **PillTabBar(通用药丸 tab 条,用户拍板 2026-10-22:tab 是通用组件样式)**:
