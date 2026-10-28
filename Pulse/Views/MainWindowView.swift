@@ -31,6 +31,9 @@ struct MainWindowView: View {
     @State private var tabSelection: MetricTabSelection
     /// 工具栏搜索框:窗口本地会话态,与 tab 选中同层;过滤纯视图层,不动数据。
     @State private var searchQuery: String = ""
+    /// 清理页状态(p4-cleaner/03):按需扫描自持,不挂 MonitorFeatures;关窗即销毁
+    /// (MainWindowGate),无常驻采集——稳态零增量由架构保证而非闸门。
+    @State private var cleanerModel = CleanerModel()
 
     init(monitor: SystemMonitor, initialTab: MetricTab = .overview, alertRouter: AlertNotificationRouter? = nil) {
         self.monitor = monitor
@@ -201,16 +204,23 @@ struct MainWindowView: View {
 
     /// tab 内容:与弹窗共用一份(MetricTabStack),主窗口用全尺寸档;组排行卡
     /// 带搜索过滤与可排序进程表。
+    @ViewBuilder
     private var tabBody: some View {
-        MetricTabStack(
-            tab: tabSelection.current,
-            isCompact: false,
-            monitor: monitor,
-            model: model,
-            content: content,
-            onSelectTab: { tabSelection.current = $0 }
-        ) {
-            rankingCard
+        // 清理页(p4-cleaner/03):整页自持(按需扫描,无 MonitorFeatures 卡片栈),
+        // 不进 MetricTabStack;弹窗侧不会走到(popoverAxis 已排除)。
+        if tabSelection.current == .cleaner {
+            CleanerTabView(model: cleanerModel)
+        } else {
+            MetricTabStack(
+                tab: tabSelection.current,
+                isCompact: false,
+                monitor: monitor,
+                model: model,
+                content: content,
+                onSelectTab: { tabSelection.current = $0 }
+            ) {
+                rankingCard
+            }
         }
     }
 

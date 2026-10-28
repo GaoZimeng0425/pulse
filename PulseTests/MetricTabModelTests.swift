@@ -29,6 +29,7 @@ final class MetricTabModelTests: XCTestCase {
                 "network",
                 "containers",
                 "battery",
+                "cleaner", // p4-cleaner/03:主窗口专属清理页,弹窗不入列(popoverAxis)
                 "history",
             ]
         )
@@ -37,7 +38,7 @@ final class MetricTabModelTests: XCTestCase {
     func testTabTitlesAreChinese() {
         // 药丸 tab 文字与无障碍标签共用中文文案。
         let titles = MetricTab.allCases.map(\.title)
-        XCTAssertEqual(titles, ["总览", "CPU", "内存", "GPU", "传感器", "外设", "磁盘", "网络", "容器", "电池", "历史"])
+        XCTAssertEqual(titles, ["总览", "CPU", "内存", "GPU", "传感器", "外设", "磁盘", "网络", "容器", "电池", "清理", "历史"])
     }
 
     func testTabSymbolsAreDistinct() {
@@ -104,12 +105,16 @@ final class MetricTabModelTests: XCTestCase {
         selection.moveRight()
         XCTAssertEqual(selection.current, .battery)
         selection.moveRight()
+        XCTAssertEqual(selection.current, .cleaner)
+        selection.moveRight()
         XCTAssertEqual(selection.current, .history)
     }
 
     func testMoveLeftRetreatsInDisplayOrder() {
-        // ← 键左移:历史 → 电池 → 容器 → 网络 → 磁盘 → 外设 → 传感器 → GPU → 内存 → CPU → 总览。
+        // ← 键左移:历史 → 清理 → 电池 → 容器 → 网络 → 磁盘 → 外设 → 传感器 → GPU → 内存 → CPU → 总览。
         var selection = MetricTabSelection(current: .history)
+        selection.moveLeft()
+        XCTAssertEqual(selection.current, .cleaner)
         selection.moveLeft()
         XCTAssertEqual(selection.current, .battery)
         selection.moveLeft()
@@ -154,15 +159,15 @@ final class MetricTabModelTests: XCTestCase {
         // (每台 Mac 都有),无电池只隐藏电池页;历史页(工单 04)同为主窗口常驻轴。
         XCTAssertEqual(
             MetricTab.displayAxis(hasBattery: false),
-            [.overview, .cpu, .memory, .gpu, .sensors, .peripherals, .disk, .network, .containers, .history]
+            [.overview, .cpu, .memory, .gpu, .sensors, .peripherals, .disk, .network, .containers, .cleaner, .history]
         )
     }
 
     func testKeyboardMovesFollowAxisWithoutBattery() {
-        // 无电池机器:轴不含电池页(含 GPU/传感器/外设/容器,共 10 页),→ 走
-        // 9 步到历史右端,再 → 夹紧停下(不跳空)。
+        // 无电池机器:轴不含电池页(含 GPU/传感器/外设/容器/清理,共 11 页),
+        // → 走 10 步到历史右端,再 → 夹紧停下(不跳空)。
         var selection = MetricTabSelection(axis: MetricTab.displayAxis(hasBattery: false))
-        for _ in 0 ..< 9 {
+        for _ in 0 ..< 10 {
             selection.moveRight()
         }
         XCTAssertEqual(selection.current, .history)

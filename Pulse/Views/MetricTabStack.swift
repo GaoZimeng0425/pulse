@@ -146,6 +146,10 @@ struct MetricTabStack<Ranking: View>: View {
         case .history:
             // 历史页(工单 p1-history/04):指标 × 时间范围走势,查询走引擎 actor。
             HistoryTabView(monitor: monitor, isCompact: isCompact)
+        case .cleaner:
+            // 清理页整页自持(p4-cleaner/03):主窗口在 MainWindowView 直接特例、
+            // 不进本栈;弹窗轴已排除。此分支理论不可达,空组仅保 switch 完备。
+            EmptyView()
         }
     }
 

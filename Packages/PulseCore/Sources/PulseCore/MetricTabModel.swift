@@ -16,6 +16,9 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
     case network
     case containers
     case battery
+    /// 清理页(p4-cleaner/03):主窗口专属——弹窗不入列(spec「菜单栏徽标与弹窗不动」,
+    /// `popoverAxis` 排除;主窗口轴 `displayAxis` 含它,排在电池后、历史前)。
+    case cleaner
     case history
 
     public var id: String {
@@ -35,6 +38,7 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .network: "网络"
         case .containers: "容器"
         case .battery: "电池"
+        case .cleaner: "清理"
         case .history: "历史"
         }
     }
@@ -52,6 +56,7 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .network: "network"
         case .containers: "cube.box.fill"
         case .battery: "battery.100percent"
+        case .cleaner: "sparkles"
         case .history: "clock.arrow.circlepath"
         }
     }
@@ -72,6 +77,7 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .network: .network
         case .containers: .containers
         case .battery: .battery
+        case .cleaner: .disk
         case .history: .cpu
         }
     }
@@ -81,6 +87,11 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
     /// 渲染序与键盘 ←/→ 的移动范围(两端夹紧的端点随之收缩)。
     public static func displayAxis(hasBattery: Bool) -> [MetricTab] {
         hasBattery ? allCases : allCases.filter { $0 != .battery }
+    }
+
+    /// 弹窗轴(p4-cleaner/03):弹窗不入清理页——spec 实现决定「菜单栏徽标与弹窗不动」。
+    public static func popoverAxis(hasBattery: Bool) -> [MetricTab] {
+        displayAxis(hasBattery: hasBattery).filter { $0 != .cleaner }
     }
 }
 
@@ -164,7 +175,7 @@ public extension MetricTab {
         case .sensors: [.smc]
         case .peripherals: [.bluetooth]
         case .containers: [.containers]
-        case .cpu, .memory, .disk, .network, .battery, .history: []
+        case .cpu, .memory, .disk, .network, .battery, .cleaner, .history: []
         }
     }
 }
@@ -243,7 +254,7 @@ public struct MetricTabContent: Equatable, Sendable {
         let ranked: [ProcessGroup]
         let metric: GroupCardMetric
         switch tab {
-        case .overview, .cpu, .gpu, .sensors, .peripherals, .disk, .network, .containers, .battery, .history:
+        case .overview, .cpu, .gpu, .sensors, .peripherals, .disk, .network, .containers, .battery, .cleaner, .history:
             ranked = Leaderboard.ranked(groups, by: \.cpuPercent, id: \.id)
             metric = .cpu
         case .memory:
