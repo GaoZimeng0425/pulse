@@ -10,7 +10,7 @@ import PulseCore
 /// ① 内存文件系统:path → 子项列表 或 枚举失败。
 /// 记录每一次枚举请求路径(spy 面):断言「排除的目录没被碰」「双访目录只走了先到的路径」。
 public actor FakeCleanDirectoryEnumerator: CleanDirectoryEnumerator {
-    public enum Listing {
+    public enum Listing: Sendable {
         case entries([FsEntrySnapshot])
         case failure(CleanEnumerateFailure)
     }
@@ -116,6 +116,42 @@ public enum CleanFixture {
 
     public static func symlink(_ name: String) -> FsEntrySnapshot {
         FsEntrySnapshot(name: name, kind: .symlink, deviceID: 16_777_229, fileID: nextFileID())
+    }
+
+    /// 铺一棵假家目录(p4-cleaner/04 白名单测试的蓝本):`directories` = 家目录相对路径 →
+    /// 该目录里放一个多大的文件(0 = 空目录),中间目录自动补齐。返回可直接喂
+    /// `FakeCleanDirectoryEnumerator(listings:)` 的表;扫描根传 `home` 即得到以家目录为根的树。
+    /// 目录 fileID 用全局计数(引擎按 (dev, fileID) 防双访,fileID 0 会被当无效跳过)。
+    public static func homeListings(
+        home: String,
+        directories: [String: Int64]
+    ) -> [String: FakeCleanDirectoryEnumerator.Listing] {
+        var childDirs: [String: [String]] = [home: []]
+        var leafBytes: [String: Int64] = [:]
+        for (relative, bytes) in directories.sorted(by: { $0.key < $1.key }) {
+            var parent = home
+            for component in relative.split(separator: "/", omittingEmptySubsequences: true) {
+                let name = String(component)
+                let child = parent + "/" + name
+                if childDirs[parent]?.contains(name) != true {
+                    childDirs[parent, default: []].append(name)
+                }
+                if childDirs[child] == nil {
+                    childDirs[child] = []
+                }
+                parent = child
+            }
+            leafBytes[parent] = bytes
+        }
+        var listings: [String: FakeCleanDirectoryEnumerator.Listing] = [:]
+        for (path, names) in childDirs {
+            var entries = names.map { directory($0, fileID: nextFileID()) }
+            if let bytes = leafBytes[path], bytes > 0 {
+                entries.append(file("payload.bin", logical: bytes, allocated: bytes, reclaimable: bytes))
+            }
+            listings[path] = .entries(entries)
+        }
+        return listings
     }
 
     // 唯一可变状态由 NSLock 串行化,锁内无 await(并发纪律;@unchecked 前提即此)。

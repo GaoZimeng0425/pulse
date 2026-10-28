@@ -28,7 +28,9 @@ public typealias PulseDatabase = Database
 /// - `gauge_min` / `gauge_hour`(p2-review/09):传感器仪表窄表,每类量一行
 ///   `(ts, key, avg, max)`,加新量零迁移(见 `GaugeKey`);同分钟 7 天/小时 30 天留存;
 /// - `metadata`(v2):键值杂项——现存上一版项目根快照(改根时据此迁移组身份,
-///   arch-review-2026-10-18/03 乙3)。
+///   arch-review-2026-10-18/03 乙3);
+/// - `clean_run` / `clean_item`(p4-cleaner/04):清理历史,一次清理一行 run + 逐项一行
+///   item,永久保留(读写见 CleanHistoryStore)。
 ///
 /// 测试不设缝(Testing Decisions):内存库 / 临时目录库直接对真 SQLite 断言。
 public enum HistoryDatabase {
@@ -263,14 +265,46 @@ public enum HistoryDatabase {
                 }
             }
         }
+        // 清理历史(p4-cleaner/04,GLOSSARY「清理历史」):一次清理一行 run + 逐项一行 item,
+        // 永久保留、无留存清理(ADR-0008:事后追溯的唯一记录)。只加表不改旧表,零单向门。
+        // 读写在 CleanHistoryStore;pulse-mcp 只读连接自然可见。
+        migrator.registerMigration(cleanHistoryMigrationID) { db in
+            try db.execute(sql: """
+            CREATE TABLE clean_run (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                started_at   INTEGER NOT NULL,
+                finished_at  INTEGER NOT NULL,
+                item_count   INTEGER NOT NULL,
+                freed_bytes  INTEGER NOT NULL,
+                failed_count INTEGER NOT NULL
+            )
+            """)
+            try db.execute(sql: """
+            CREATE TABLE clean_item (
+                run_id      INTEGER NOT NULL REFERENCES clean_run(id),
+                path        TEXT    NOT NULL,
+                title       TEXT    NOT NULL,
+                bytes       INTEGER NOT NULL,
+                tier        TEXT    NOT NULL,
+                rule_id     TEXT    NOT NULL,
+                destination TEXT,
+                failure     TEXT
+            )
+            """)
+            try db.execute(sql: "CREATE INDEX clean_item_run ON clean_item(run_id)")
+        }
 
         return migrator
     }
+
+    /// 清理历史迁移标识(p4-cleaner/04)。
+    static let cleanHistoryMigrationID = "p4-cleaner-04-clean-history"
 
     // MARK: 表名单(测试与自检共用)
 
     public static let tableNames = [
         "sample_min", "sample_hour", "system_min", "system_hour",
         "gauge_min", "gauge_hour", "lineage", "groups", "metadata",
+        "clean_run", "clean_item",
     ]
 }

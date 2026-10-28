@@ -246,6 +246,59 @@ final class SpaceScanEngineTests: XCTestCase {
         XCTAssertEqual(result.trees[0].datalessCount, 1)
         XCTAssertEqual(result.trees[0].fileCount, 1)
     }
+
+    // MARK: 文件节点不进树(p4-cleaner/04 内存量级:全卷 340 万项全量驻留 ≈900 MB)
+
+    /// `retainFileNodes: false`:树里只剩目录节点,目录上的计数与字节与全量树逐位相同。
+    func testDirectoryOnlyTreeKeepsAggregatesIdentical() async {
+        let listings: [String: FakeCleanDirectoryEnumerator.Listing] = [
+            "/r": .entries([
+                CleanFixture.file("a.bin", allocated: 512, reclaimable: 512),
+                CleanFixture.directory("sub", fileID: 301),
+                CleanFixture.symlink("link"),
+            ]),
+            "/r/sub": .entries([
+                CleanFixture.file("b.bin", allocated: 1024, reclaimable: nil),
+                CleanFixture.file("c.bin", allocated: 0, reclaimable: 0, dataless: true),
+            ]),
+        ]
+        let full = await engine.scan(SpaceScanOptions(roots: ["/r"]), using: FakeCleanDirectoryEnumerator(listings: listings))
+        let dirsOnly = await engine.scan(
+            SpaceScanOptions(roots: ["/r"], retainFileNodes: false),
+            using: FakeCleanDirectoryEnumerator(listings: listings)
+        )
+
+        let fullRoot = full.trees[0], slimRoot = dirsOnly.trees[0]
+        XCTAssertEqual(slimRoot.children.map(\.name), ["sub"], "只剩目录子节点")
+        XCTAssertTrue(slimRoot.children[0].children.isEmpty)
+        XCTAssertEqual(fullRoot.children.map(\.name), ["a.bin", "sub"], "默认形状不变(02 票的树)")
+        XCTAssertEqual(slimRoot.accountedBytes, fullRoot.accountedBytes)
+        XCTAssertEqual(slimRoot.reclaimableBytes, fullRoot.reclaimableBytes)
+        XCTAssertEqual(slimRoot.fallbackBytes, fullRoot.fallbackBytes)
+        XCTAssertEqual(slimRoot.fileCount, fullRoot.fileCount)
+        XCTAssertEqual(slimRoot.directoryCount, fullRoot.directoryCount)
+        XCTAssertEqual(slimRoot.symlinkCount, fullRoot.symlinkCount)
+        XCTAssertEqual(slimRoot.datalessCount, fullRoot.datalessCount)
+        XCTAssertEqual(slimRoot.allReclaimableAccounting, fullRoot.allReclaimableAccounting)
+        XCTAssertEqual(dirsOnly.stats, full.stats)
+    }
+
+    // MARK: 树内定位(白名单匹配器的入口)
+
+    func testDescendantLocatesDirectoryByPath() async {
+        let fs = FakeCleanDirectoryEnumerator(listings: [
+            "/Users": .entries([CleanFixture.directory("t", fileID: 11)]),
+            "/Users/t": .entries([CleanFixture.directory("Library", fileID: 12), CleanFixture.file("Library.txt")]),
+            "/Users/t/Library": .entries([CleanFixture.directory("Caches", fileID: 13)]),
+        ])
+        let trees = await engine.scan(SpaceScanOptions(roots: ["/Users"]), using: fs).trees
+
+        XCTAssertEqual(SpaceNode.locate(path: "/Users/t/Library/Caches/", in: trees)?.path, "/Users/t/Library/Caches")
+        XCTAssertEqual(SpaceNode.locate(path: "/Users", in: trees)?.name, "Users")
+        XCTAssertNil(SpaceNode.locate(path: "/Users/t/Library.txt", in: trees), "文件不是目录节点")
+        XCTAssertNil(SpaceNode.locate(path: "/Users/t/Nope", in: trees))
+        XCTAssertNil(SpaceNode.locate(path: "/Volumes/x", in: trees), "不在任何根之下")
+    }
 }
 
 // MARK: - 测试小件(Sendable 计数器 / 收集器;NSLock 同步域,锁内无 await——并发纪律)
