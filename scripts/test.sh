@@ -81,12 +81,17 @@ echo "🧪 xcodebuild test ${only_flag:-(全部)} — 完整日志: $log"
 
 # 输出整体重定向到日志而不是 tee:POSIX sh 拿不到管道里 xcodebuild 的退出码,
 # 而退出码正是要交付的证据。摘要与失败详情在结尾从日志中提取。
+# SPM 包克隆共享缓存:worktree 的 xcodebuild 是全新克隆,pinned revision 在代理网络下
+# 拉不动(2026-10-28 两个 worktree 连续复现,主仓 build/SourcePackages 已暖从不失败);
+# 全部 xcodebuild 指向同一缓存后,worktree 零网络解析。PULSE_SPM_CACHE 可覆盖。
+pkg_cache="${PULSE_SPM_CACHE:-$HOME/Library/Caches/pulse-swiftpm}"
 xcodebuild test \
   -project Pulse.xcodeproj \
   -scheme Pulse \
   -destination 'platform=macOS' \
   -derivedDataPath build \
-  $only_flag \
+ \
+  -clonedSourcePackagesDirPath "$pkg_cache"  $only_flag \
   > "$log" 2>&1
 status=$?
 

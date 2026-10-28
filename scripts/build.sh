@@ -40,12 +40,17 @@ cd "$(dirname "$0")/.."
 echo "==> Release 构建..."
 # xcodebuild 侧关掉签名(它只会 ad-hoc),产物由下方统一重签;Debug / 测试
 # 构建不走本链路,保持 ad-hoc(NemoNotch 同款分工:本地部署签名,CI/测试 ad-hoc)。
+# SPM 包克隆共享缓存:worktree 的 xcodebuild 是全新克隆,pinned revision 在代理网络下
+# 拉不动(2026-10-28 两个 worktree 连续复现,主仓 build/SourcePackages 已暖从不失败);
+# 全部 xcodebuild 指向同一缓存后,worktree 零网络解析。PULSE_SPM_CACHE 可覆盖。
+pkg_cache="${PULSE_SPM_CACHE:-$HOME/Library/Caches/pulse-swiftpm}"
 xcodebuild build \
   -project "$PROJECT" \
   -scheme "$SCHEME" \
   -configuration Release \
   -derivedDataPath "$BUILD_DIR" \
-  -quiet \
+ \
+  -clonedSourcePackagesDirPath "$pkg_cache"  -quiet \
   CODE_SIGN_IDENTITY="-" \
   CODE_SIGNING_REQUIRED=NO \
   CODE_SIGNING_ALLOWED=NO
