@@ -71,6 +71,7 @@ final class EnergyImpactFeature: MonitorFeature {
             top: aggregated.sorted { $0.impact > $1.impact }.prefix(10)
                 .map { EnergyImpactReading.Row(name: $0.name, impact: $0.impact) },
             totalImpact: total,
+            agents: AgentEnergyTable.group(aggregated.map { ($0.name, $0.impact) }),
             collectedAt: result.collectedAt
         )
         host?.broadcast(.gauges([.energyImpact: total]))
@@ -91,7 +92,7 @@ final class EnergyImpactFeature: MonitorFeature {
     }
 }
 
-/// 能耗影响读数(top 名聚合行 + 全机合计)。
+/// 能耗影响读数(top 名聚合行 + 全机合计 + 助手聚合行)。
 struct EnergyImpactReading: Sendable, Equatable {
     struct Row: Sendable, Equatable, Identifiable {
         let name: String
@@ -103,6 +104,8 @@ struct EnergyImpactReading: Sendable, Equatable {
 
     let top: [Row]
     let totalImpact: Double
+    /// 按内置助手表聚合的行(p3-root-mcp/04 电池页「AI 助手」卡数据源)。
+    let agents: [AgentEnergyEntry]
     let collectedAt: Date
 }
 

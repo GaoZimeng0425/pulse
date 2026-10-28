@@ -16,6 +16,9 @@ struct ModuleRankingCardView: View {
     let accent: Color
     /// 节拍注脚("5 秒一档" / "30 秒一档"):数据新鲜度的安静声明。
     let cadenceNote: String
+    /// 空态文案覆盖:默认按"首档采样后出数"说;数据有专属前置条件的卡
+    /// (AI 助手卡须先开特权助手)传自己的说法,前置条件变了文案才会对。
+    var emptyMessage: RankingEmptyMessage?
     /// 弹窗紧凑档。
     var isCompact = false
 
@@ -27,7 +30,8 @@ struct ModuleRankingCardView: View {
             isCompact: isCompact,
             isEmpty: rows.isEmpty,
             // 基线轮(首见不出数)、门控清账、全零空闲都落这里,不报警不催促。
-            emptyMessage: RankingEmptyMessage(title: "暂无数据", detail: "本页可见并完成首档采样后出数"),
+            emptyMessage: emptyMessage
+                ?? RankingEmptyMessage(title: "暂无数据", detail: "本页可见并完成首档采样后出数"),
             footnote: cadenceNote
         ) {
             ForEach(rows) { row in

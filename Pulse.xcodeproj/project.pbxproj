@@ -66,6 +66,7 @@
 		5C50195499CD0434F9BB20CB /* OverviewCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FA58858B993A1A243A26B63 /* OverviewCards.swift */; };
 		5E698B91C352218AEC7DF667 /* MetricAccentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD1902314E98C2C8F685D0D9 /* MetricAccentTests.swift */; };
 		5E918F632298B152858E0461 /* BluetoothSensorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A3A11CA7FAC45ECB8511C5B /* BluetoothSensorTests.swift */; };
+		5EFCC13BB4804E62AFD916B3 /* AgentEnergyTableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E2C1C579AAC70056E11EABF /* AgentEnergyTableTests.swift */; };
 		6164A801BF9C51036BBF73BC /* EnergyModelSensorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C01F3A4AB4BC765537F64DA /* EnergyModelSensorTests.swift */; };
 		616D7878CF54B2A29104277C /* ProcArgsParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 922EBEDDF974C9C5C567A5C8 /* ProcArgsParserTests.swift */; };
 		62894C55877E1831EA472420 /* GpuFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4822D29598222B0F5B29959A /* GpuFeature.swift */; };
@@ -146,6 +147,7 @@
 		F8BFD73A176A854B22A5F34E /* BluetoothFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFE3997D6A5E04C1873A7645 /* BluetoothFeature.swift */; };
 		F9A396D8A1532DCE83296553 /* LogServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A5BBAE60025E3EB318E411 /* LogServiceTests.swift */; };
 		FA39C087AD11F34D92DFDDFF /* KillEndToEndTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94AE23A1D17532F33018843D /* KillEndToEndTests.swift */; };
+		FA789253D93CF7D04F65CACD /* AgentEnergy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FB3411DD59194CA8264149E /* AgentEnergy.swift */; };
 		FDC1890BBEEC4851C1070282 /* AlertViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E21F1F65F4010BF7A6C0C88 /* AlertViews.swift */; };
 		FDE435939BE1165CF3D5121F /* ParentChainQueryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A05CDA8C1EBF16044C21BFD /* ParentChainQueryTests.swift */; };
 		FF152BDE6343A10B8627BC3C /* CocoaLumberjackSwift in Frameworks */ = {isa = PBXBuildFile; productRef = EB19A82C19BDD54230DEE6F8 /* CocoaLumberjackSwift */; };
@@ -215,6 +217,7 @@
 		39A94E49F6B1CA6A775BDD0E /* NetworkCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkCardViews.swift; sourceTree = "<group>"; };
 		3A992F5F503CAD7CB90DD838 /* LiveProcessSourceSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveProcessSourceSmokeTests.swift; sourceTree = "<group>"; };
 		3B385E37375A17C83745D0C7 /* BundleDisplayNameReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundleDisplayNameReader.swift; sourceTree = "<group>"; };
+		3E2C1C579AAC70056E11EABF /* AgentEnergyTableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentEnergyTableTests.swift; sourceTree = "<group>"; };
 		3FA58858B993A1A243A26B63 /* OverviewCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewCards.swift; sourceTree = "<group>"; };
 		41196C89D2456B23F701DF21 /* DevServerFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevServerFeature.swift; sourceTree = "<group>"; };
 		45A0A70732B983FE5B5426B0 /* RankingList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingList.swift; sourceTree = "<group>"; };
@@ -263,6 +266,7 @@
 		997E4A682EAB7F54A6FEB9BE /* GpuSensorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GpuSensorTests.swift; sourceTree = "<group>"; };
 		9E21F1F65F4010BF7A6C0C88 /* AlertViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertViews.swift; sourceTree = "<group>"; };
 		9F27F7F4AB085BB21BC93D75 /* LiveDiskSourceSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDiskSourceSmokeTests.swift; sourceTree = "<group>"; };
+		9FB3411DD59194CA8264149E /* AgentEnergy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentEnergy.swift; sourceTree = "<group>"; };
 		9FFEDF60F89066B8BB05A0EF /* SmcCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmcCardViews.swift; sourceTree = "<group>"; };
 		A311BFB8099AF93518F47C9B /* ProcArgsParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcArgsParser.swift; sourceTree = "<group>"; };
 		A8434AD3F303A7E024D2887D /* ProcessDrilldownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessDrilldownView.swift; sourceTree = "<group>"; };
@@ -385,6 +389,7 @@
 		6BBC8380317D62458772FCFE /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				9FB3411DD59194CA8264149E /* AgentEnergy.swift */,
 				556E90C2DDB739846AA22485 /* AlertCenter.swift */,
 				BA0853EEEEB0FB9F6834A00E /* AlertSettingsStore.swift */,
 				D60B90549169579BCCD01677 /* BatteryFeature.swift */,
@@ -521,6 +526,7 @@
 			isa = PBXGroup;
 			children = (
 				8C71FCD146BC0C56EF25AEE9 /* AcceptanceAnchorEndToEndTests.swift */,
+				3E2C1C579AAC70056E11EABF /* AgentEnergyTableTests.swift */,
 				71178307830FDF67F93A9523 /* AlertCenterTests.swift */,
 				02DA72B605936ABAB68101E8 /* AlertNotificationSmokeTests.swift */,
 				F24703C16273CB98970E4297 /* AlertSettingsStoreTests.swift */,
@@ -676,6 +682,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E4A99F8C1ACA71DF7876AF70 /* AcceptanceAnchorEndToEndTests.swift in Sources */,
+				5EFCC13BB4804E62AFD916B3 /* AgentEnergyTableTests.swift in Sources */,
 				25710F4D00266A1760713D57 /* AlertCenterTests.swift in Sources */,
 				CF06B9E60C578C995DAF72DC /* AlertNotificationSmokeTests.swift in Sources */,
 				20550F03DAEF45E3DEBE36E7 /* AlertSettingsStoreTests.swift in Sources */,
@@ -736,6 +743,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FA789253D93CF7D04F65CACD /* AgentEnergy.swift in Sources */,
 				D89F1D815D05E848BE31A83E /* AlertCenter.swift in Sources */,
 				8BDCC1FD5A8A1D0FA8E1BAD4 /* AlertNotification.swift in Sources */,
 				E3B976A319DD3E4CA4DF499F /* AlertSettingsStore.swift in Sources */,

@@ -107,6 +107,12 @@ final class SystemMonitor {
         features.devServers
     }
 
+    /// 特权助手能耗读数(p3-root-mcp/03):root Energy Impact 聚合,电池页
+    /// 「AI 助手」卡与设置页助手状态直读(p3-root-mcp/04)。
+    var energyImpact: EnergyImpactFeature {
+        features.energyImpact
+    }
+
     private let sampler: Sampler
     /// 唤醒通知观察者(与 app 同寿命,start 建立一次;monitor 是 app 唯一的
     /// @State 管线持有者,观察者随进程结束——闭包 weak self,无保留环,
