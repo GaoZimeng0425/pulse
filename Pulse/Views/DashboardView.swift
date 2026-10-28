@@ -43,7 +43,7 @@ struct DashboardView: View {
         // 展示轴随电池可用性(工单 p1-history/02),与主窗口同轴(含历史页)。
         _tabSelection = State(initialValue: MetricTabSelection(
             current: initialTab,
-            axis: MetricTab.displayAxis(hasBattery: monitor.battery.hasBattery)
+            axis: MetricTab.popoverAxis(hasBattery: monitor.battery.hasBattery)
         ))
     }
 
@@ -80,7 +80,7 @@ struct DashboardView: View {
         .background(Surface.window)
         // 首次电池读数落地 → 电池页入轴(工单 02);被隐藏的当前 tab 回落总览。
         .onChange(of: monitor.battery.hasBattery) { _, hasBattery in
-            tabSelection.setAxis(MetricTab.displayAxis(hasBattery: hasBattery))
+            tabSelection.setAxis(MetricTab.popoverAxis(hasBattery: hasBattery))
         }
         // tab 变更单点回报(图标条 / ←/→ / 内容切换都汇到这里)。
         .onChange(of: tabSelection.current) { _, tab in
