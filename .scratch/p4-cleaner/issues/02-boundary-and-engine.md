@@ -4,10 +4,21 @@
 
 **Blocked by:** 01(引擎元数据形状由探针结论钉死)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] 协议三件事齐;测试假实现(内存 FS / 废纸篓 spy / 活动表)同票交付
-- [ ] 口径测试:硬链接去重、克隆口径(按 01 结论的双分支)、跨挂载剪枝
-- [ ] 部分扫描台账:读不了的目录标 partial、汇总时如实上报,不出现假 0
-- [ ] 进度 / 取消语义测试:中途取消后已扫部分可用且标注不完整
-- [ ] PulseCore `swift test` 全绿,零真盘 I/O(测试负载最小化纪律)
+- [x] 协议三件事齐;测试假实现(内存 FS / 废纸篓 spy / 活动表)同票交付
+- [x] 口径测试:硬链接去重、克隆口径(按 01 结论的双分支)、跨挂载剪枝
+- [x] 部分扫描台账:读不了的目录标 partial、汇总时如实上报,不出现假 0
+- [x] 进度 / 取消语义测试:中途取消后已扫部分可用且标注不完整
+- [x] PulseCore `swift test` 全绿,零真盘 I/O(测试负载最小化纪律)
+
+
+## Comments
+
+**2026-10-28 实施完毕(feat/p4-engine,13 例新测试,包内 467 例全绿):**
+
+- **交付**:`CleanBoundary.swift`(FsEntrySnapshot 快照形状 + 三协议:CleanDirectoryEnumerator / CleanTrashExecutor / CleanActivitySource + 废纸篓战报类型)、`SpaceScanEngine.swift`(纯值引擎:空间树 / 台账 / 进度 / 取消 / 排除 / 深度护栏)、TestSupport `CleanFixture.swift`(内存 FS 假实现 + spy + 活动表,04/05/08 票测试继续取用)、13 例引擎测试。
+- **口径落地**:每文件 reclaimableSize(PRIVATESIZE)优先、allocatedSize(block)回退,节点带 allReclaimableAccounting 标志如实区分;绝不伪造 0。
+- **探针 11 修正落码**:验收项原文写的"跨挂载剪枝"(dust 假设)在 27 上前提不成立(根卷/Data 同 dev)——防双计改为 (deviceID, fileID) 目录访问集 + 文件硬链接同键去重,测试用 firmlink 双路径与重叠根双例钉死。验收项按此意图勾选。
+- **取消语义拍板实现**:取消点在每个目录入口;取消后已产出(部分)树保留可用、结果标 cancelled、不再枚举新目录——03 票进度条直接挂 progress 回调(每 2048 项 + 收尾)。
+- 排除根静默跳过(用户意图不进台账);枚举失败四分类入册(permissionDenied / vanished / tooDeep / other);符号链接不跟随零贡献;iCloud dataless 单独计数。
