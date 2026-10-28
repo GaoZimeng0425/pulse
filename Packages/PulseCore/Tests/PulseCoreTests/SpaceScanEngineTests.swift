@@ -262,7 +262,10 @@ final class SpaceScanEngineTests: XCTestCase {
                 CleanFixture.file("c.bin", allocated: 0, reclaimable: 0, dataless: true),
             ]),
         ]
-        let full = await engine.scan(SpaceScanOptions(roots: ["/r"]), using: FakeCleanDirectoryEnumerator(listings: listings))
+        let full = await engine.scan(
+            SpaceScanOptions(roots: ["/r"]),
+            using: FakeCleanDirectoryEnumerator(listings: listings)
+        )
         let dirsOnly = await engine.scan(
             SpaceScanOptions(roots: ["/r"], retainFileNodes: false),
             using: FakeCleanDirectoryEnumerator(listings: listings)

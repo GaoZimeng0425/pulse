@@ -70,9 +70,9 @@ final class CleanerModelTests: XCTestCase {
 
     private func makeHomeEnumerator(extra: [String: Int64] = [:]) -> FakeCleanDirectoryEnumerator {
         var dirs: [String: Int64] = [
-            "Library/Developer/Xcode/DerivedData": 28_000,
-            "Library/Caches/Homebrew": 3_100,
-            "Documents/DerivedData": 9_999, // 似是而非:不在白名单
+            "Library/Developer/Xcode/DerivedData": 28000,
+            "Library/Caches/Homebrew": 3100,
+            "Documents/DerivedData": 9999, // 似是而非:不在白名单
         ]
         dirs.merge(extra) { _, new in new }
         return FakeCleanDirectoryEnumerator(listings: CleanFixture.homeListings(home: home, directories: dirs))
@@ -80,7 +80,11 @@ final class CleanerModelTests: XCTestCase {
 
     private func waitForCleanFinished(_ model: CleanerModel) async {
         await waitUntil {
-            if case .finished = model.cleanPhase { true } else { false }
+            if case .finished = model.cleanPhase {
+                true
+            } else {
+                false
+            }
         }
     }
 
@@ -91,7 +95,7 @@ final class CleanerModelTests: XCTestCase {
         let spy = FakeCleanTrashExecutor(nextRecycleOutcome: TrashRecycleOutcome(
             recycled: [derivedPath: home + "/.Trash/DerivedData"]
         ))
-        let history = CleanHistoryStore(database: try HistoryDatabase.openInMemory())
+        let history = try CleanHistoryStore(database: HistoryDatabase.openInMemory())
         let model = CleanerModel(
             exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
             history: history,
@@ -101,7 +105,11 @@ final class CleanerModelTests: XCTestCase {
         model.startScan(using: makeHomeEnumerator(), roots: [home])
         await waitUntil { !model.isScanning }
 
-        XCTAssertEqual(model.candidates.map(\.ruleID), ["xcode.derivedData", "homebrew.cache"], "似是而非的 Documents/DerivedData 不出现")
+        XCTAssertEqual(
+            model.candidates.map(\.ruleID),
+            ["xcode.derivedData", "homebrew.cache"],
+            "似是而非的 Documents/DerivedData 不出现"
+        )
         XCTAssertTrue(model.selection.isEmpty, "默认全不勾")
         XCTAssertTrue(model.plan.isEmpty)
         model.requestClean()
@@ -121,7 +129,7 @@ final class CleanerModelTests: XCTestCase {
             return
         }
         XCTAssertTrue(historyRecorded)
-        XCTAssertEqual(report.freedBytes, 28_000)
+        XCTAssertEqual(report.freedBytes, 28000)
         XCTAssertTrue(report.failed.isEmpty)
         let calls = await spy.recycleCalls
         XCTAssertEqual(calls, [[derivedPath]], "spy 收到恰好选中的那一条,绝不多")
@@ -131,7 +139,7 @@ final class CleanerModelTests: XCTestCase {
 
         let runs = try await history.runs()
         XCTAssertEqual(runs.count, 1)
-        XCTAssertEqual(runs[0].freedBytes, 28_000)
+        XCTAssertEqual(runs[0].freedBytes, 28000)
         let items = try await history.items(runID: runs[0].id)
         XCTAssertEqual(items.map(\.path), [derivedPath], "历史写入与清单内容一致")
         XCTAssertEqual(items[0].outcome, .recycled(destination: home + "/.Trash/DerivedData"))
@@ -151,7 +159,7 @@ final class CleanerModelTests: XCTestCase {
         let spy = FakeCleanTrashExecutor(nextRecycleOutcome: TrashRecycleOutcome(
             failures: [derivedPath: "Operation not permitted"]
         ))
-        let history = CleanHistoryStore(database: try HistoryDatabase.openInMemory())
+        let history = try CleanHistoryStore(database: HistoryDatabase.openInMemory())
         let model = CleanerModel(history: history, trash: spy, homeDirectory: home)
         model.startScan(using: makeHomeEnumerator(), roots: [home])
         await waitUntil { !model.isScanning }
@@ -195,14 +203,14 @@ final class CleanerModelTests: XCTestCase {
     }
 
     /// 右键排除:清单即时收窄(不重扫)、勾选脱落、持久化;再扫描该目录不被碰。
-    func testExcludeNarrowsImmediatelyPersistsAndSkipsOnRescan() async {
+    func testExcludeNarrowsImmediatelyPersistsAndSkipsOnRescan() async throws {
         var persisted: [[String]] = []
         let exclusions = CleanExclusionsStore(load: { [] }, persist: { persisted.append($0) })
         let model = CleanerModel(exclusions: exclusions, trash: FakeCleanTrashExecutor(), homeDirectory: home)
         let fake = makeHomeEnumerator()
         model.startScan(using: fake, roots: [home])
         await waitUntil { !model.isScanning }
-        let homebrew = model.candidates.first { $0.ruleID == "homebrew.cache" }!
+        let homebrew = try XCTUnwrap(model.candidates.first { $0.ruleID == "homebrew.cache" })
         model.toggle(homebrew)
         XCTAssertEqual(model.plan.items.count, 1)
 

@@ -13,21 +13,21 @@ final class JunkRuleTableTests: XCTestCase {
     /// 每条内置规则的正例(家目录相对路径 → 字节)。**新增规则必须在这里补一条**,否则
     /// `testEveryBuiltinRuleHasAPositiveExample` 红——这就是 ADR-0008 说的"安全边界本体"的护栏。
     private let positiveExamples: [String: (path: String, bytes: Int64)] = [
-        "xcode.derivedData": ("Library/Developer/Xcode/DerivedData", 28_000),
-        "xcode.deviceSupport": ("Library/Developer/Xcode/iOS DeviceSupport", 8_000),
+        "xcode.derivedData": ("Library/Developer/Xcode/DerivedData", 28000),
+        "xcode.deviceSupport": ("Library/Developer/Xcode/iOS DeviceSupport", 8000),
         "xcode.caches": ("Library/Caches/com.apple.dt.Xcode", 700),
         "xcode.simulatorCaches": ("Library/Developer/CoreSimulator/Caches", 900),
-        "swiftpm.cache": ("Library/Caches/org.swift.swiftpm", 1_500),
-        "homebrew.cache": ("Library/Caches/Homebrew", 3_100),
-        "npm.cache": (".npm/_cacache", 1_800),
+        "swiftpm.cache": ("Library/Caches/org.swift.swiftpm", 1500),
+        "homebrew.cache": ("Library/Caches/Homebrew", 3100),
+        "npm.cache": (".npm/_cacache", 1800),
         "npm.npx": (".npm/_npx", 200),
-        "pnpm.store": ("Library/pnpm/store", 4_600),
+        "pnpm.store": ("Library/pnpm/store", 4600),
         "cocoapods.cache": ("Library/Caches/CocoaPods", 900),
-        "gradle.caches": (".gradle/caches", 2_300),
-        "jetbrains.caches": ("Library/Caches/JetBrains", 5_400),
-        "vscode.cache": ("Library/Application Support/Code/CachedData", 1_200),
+        "gradle.caches": (".gradle/caches", 2300),
+        "jetbrains.caches": ("Library/Caches/JetBrains", 5400),
+        "vscode.cache": ("Library/Application Support/Code/CachedData", 1200),
         "cursor.cache": ("Library/Application Support/Cursor/CachedData", 600),
-        "docker.desktopData": ("Library/Containers/com.docker.docker/Data", 21_600),
+        "docker.desktopData": ("Library/Containers/com.docker.docker/Data", 21600),
     ]
 
     /// 似是而非:名字像、位置像,但不是规则担保的那个目录。一个都不许出现。
@@ -99,7 +99,7 @@ final class JunkRuleTableTests: XCTestCase {
     func testLookalikeDirectoriesNeverAppear() async {
         var dirs = allExamples()
         for lookalike in lookalikes {
-            dirs[lookalike] = 9_999
+            dirs[lookalike] = 9999
         }
         let trees = await scanHome(dirs)
         let paths = Set(JunkMatcher.candidates(in: trees, home: home).map(\.path))
@@ -120,15 +120,18 @@ final class JunkRuleTableTests: XCTestCase {
 
     func testDeviceSupportVariantsEachBecomeOneUnit() async {
         let trees = await scanHome([
-            "Library/Developer/Xcode/iOS DeviceSupport": 8_000,
-            "Library/Developer/Xcode/watchOS DeviceSupport": 2_000,
-            "Library/Developer/Xcode/tvOS DeviceSupport": 1_000,
+            "Library/Developer/Xcode/iOS DeviceSupport": 8000,
+            "Library/Developer/Xcode/watchOS DeviceSupport": 2000,
+            "Library/Developer/Xcode/tvOS DeviceSupport": 1000,
             "Library/Developer/Xcode/DerivedData": 500,
         ])
         let candidates = JunkMatcher.candidates(in: trees, home: home)
         let deviceSupport = candidates.filter { $0.ruleID == "xcode.deviceSupport" }
 
-        XCTAssertEqual(deviceSupport.map(\.title), ["Xcode Device Support · iOS", "Xcode Device Support · watchOS", "Xcode Device Support · tvOS"])
+        XCTAssertEqual(
+            deviceSupport.map(\.title),
+            ["Xcode Device Support · iOS", "Xcode Device Support · watchOS", "Xcode Device Support · tvOS"]
+        )
         XCTAssertTrue(deviceSupport.allSatisfy { $0.tier == .checkFirst })
         XCTAssertEqual(candidates.first { $0.ruleID == "xcode.derivedData" }?.tier, .safe)
     }
@@ -139,7 +142,16 @@ final class JunkRuleTableTests: XCTestCase {
         XCTAssertTrue(JunkRuleTable.rule(id: "docker.desktopData")?.rationale.contains("镜像、容器与卷——删除后全部丢失") == true)
         XCTAssertEqual(JunkRuleTable.rule(id: "jetbrains.caches")?.tier, .checkFirst)
         XCTAssertEqual(JunkRuleTable.rule(id: "xcode.deviceSupport")?.tier, .checkFirst)
-        for id in ["xcode.derivedData", "homebrew.cache", "npm.cache", "pnpm.store", "cocoapods.cache", "gradle.caches", "vscode.cache", "cursor.cache"] {
+        for id in [
+            "xcode.derivedData",
+            "homebrew.cache",
+            "npm.cache",
+            "pnpm.store",
+            "cocoapods.cache",
+            "gradle.caches",
+            "vscode.cache",
+            "cursor.cache",
+        ] {
             XCTAssertEqual(JunkRuleTable.rule(id: id)?.tier, .safe, id)
         }
         XCTAssertTrue(JunkRuleTable.builtin.allSatisfy { $0.source.contains("MIT") }, "移植规则须注明出处与协议")
@@ -168,7 +180,7 @@ final class JunkRuleTableTests: XCTestCase {
         let candidates = JunkMatcher.candidates(in: trees, home: home)
         let derived = candidates.first { $0.ruleID == "xcode.derivedData" }
 
-        XCTAssertEqual(derived?.bytes, 28_000)
+        XCTAssertEqual(derived?.bytes, 28000)
         XCTAssertEqual(derived?.fileCount, 1)
         XCTAssertEqual(derived?.path, home + "/Library/Developer/Xcode/DerivedData")
         XCTAssertEqual(derived?.allReclaimableAccounting, true)
@@ -196,6 +208,6 @@ final class JunkRuleTableTests: XCTestCase {
         let trees = await scanHome(allExamples())
         let bytes = JunkMatcher.candidates(in: trees, home: home).map(\.bytes)
         XCTAssertEqual(bytes, bytes.sorted(by: >))
-        XCTAssertEqual(bytes.first, 28_000)
+        XCTAssertEqual(bytes.first, 28000)
     }
 }

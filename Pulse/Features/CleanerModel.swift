@@ -246,7 +246,9 @@ final class CleanerModel {
     }
 
     private var isFinishedPhase: Bool {
-        if case .finished = cleanPhase { return true }
+        if case .finished = cleanPhase {
+            return true
+        }
         return false
     }
 

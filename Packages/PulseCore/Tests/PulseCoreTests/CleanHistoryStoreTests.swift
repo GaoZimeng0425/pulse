@@ -5,7 +5,7 @@ import XCTest
 /// 清理历史(p4-cleaner/04):内存库上真 SQLite 断言——落库与清单内容一致、去向 / 失败
 /// 原因往返不丢、新的在前、空报告不落。Testing Decisions:历史库不设缝。
 final class CleanHistoryStoreTests: XCTestCase {
-    private func makeReport(start: TimeInterval = 1_000, items: [CleanRunItem]) -> CleanRunReport {
+    private func makeReport(start: TimeInterval = 1000, items: [CleanRunItem]) -> CleanRunReport {
         CleanRunReport(
             startedAt: Date(timeIntervalSince1970: start),
             finishedAt: Date(timeIntervalSince1970: start + 3),
@@ -16,7 +16,7 @@ final class CleanHistoryStoreTests: XCTestCase {
     private let recycledItem = CleanRunItem(
         path: "/Users/t/Library/Developer/Xcode/DerivedData",
         title: "Xcode DerivedData",
-        bytes: 28_000,
+        bytes: 28000,
         tier: .safe,
         ruleID: "xcode.derivedData",
         outcome: .recycled(destination: "/Users/t/.Trash/DerivedData")
@@ -24,14 +24,14 @@ final class CleanHistoryStoreTests: XCTestCase {
     private let failedItem = CleanRunItem(
         path: "/Users/t/Library/Containers/com.docker.docker/Data",
         title: "Docker Desktop 数据",
-        bytes: 21_600,
+        bytes: 21600,
         tier: .checkFirst,
         ruleID: "docker.desktopData",
         outcome: .failed(reason: "Operation not permitted")
     )
 
     func testRecordThenReadBackMatchesReport() async throws {
-        let store = CleanHistoryStore(database: try HistoryDatabase.openInMemory())
+        let store = try CleanHistoryStore(database: HistoryDatabase.openInMemory())
         let report = makeReport(items: [recycledItem, failedItem])
 
         let runID = try await store.record(report)
@@ -43,14 +43,14 @@ final class CleanHistoryStoreTests: XCTestCase {
         XCTAssertEqual(runs[0].startedAt, report.startedAt)
         XCTAssertEqual(runs[0].finishedAt, report.finishedAt)
         XCTAssertEqual(runs[0].itemCount, 2)
-        XCTAssertEqual(runs[0].freedBytes, 28_000, "失败项不计释放量")
+        XCTAssertEqual(runs[0].freedBytes, 28000, "失败项不计释放量")
         XCTAssertEqual(runs[0].failedCount, 1)
 
-        let items = try await store.items(runID: runID!)
+        let items = try await store.items(runID: XCTUnwrap(runID))
         XCTAssertEqual(items.map(\.path), [recycledItem.path, failedItem.path], "与确认清单同序")
         XCTAssertEqual(items[0].outcome, .recycled(destination: "/Users/t/.Trash/DerivedData"))
         XCTAssertEqual(items[0].tier, .safe)
-        XCTAssertEqual(items[0].bytes, 28_000)
+        XCTAssertEqual(items[0].bytes, 28000)
         XCTAssertEqual(items[0].ruleID, "xcode.derivedData")
         XCTAssertEqual(items[0].title, "Xcode DerivedData")
         XCTAssertEqual(items[1].outcome, .failed(reason: "Operation not permitted"))
@@ -69,15 +69,15 @@ final class CleanHistoryStoreTests: XCTestCase {
     }
 
     func testRunsListNewestFirstAndItemsScopedToRun() async throws {
-        let store = CleanHistoryStore(database: try HistoryDatabase.openInMemory())
-        let first = try await store.record(makeReport(start: 1_000, items: [recycledItem]))
-        let second = try await store.record(makeReport(start: 2_000, items: [failedItem]))
+        let store = try CleanHistoryStore(database: HistoryDatabase.openInMemory())
+        let first = try await store.record(makeReport(start: 1000, items: [recycledItem]))
+        let second = try await store.record(makeReport(start: 2000, items: [failedItem]))
 
         let runs = try await store.runs()
         XCTAssertEqual(runs.map(\.id), [second, first])
-        let firstItems = try await store.items(runID: first!)
+        let firstItems = try await store.items(runID: XCTUnwrap(first))
         XCTAssertEqual(firstItems.map(\.path), [recycledItem.path])
-        let secondItems = try await store.items(runID: second!)
+        let secondItems = try await store.items(runID: XCTUnwrap(second))
         XCTAssertEqual(secondItems.count, 1)
         let limited = try await store.runs(limit: 1)
         XCTAssertEqual(limited.count, 1)

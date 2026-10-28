@@ -20,7 +20,10 @@ final class CleanExclusionsStoreTests: XCTestCase {
 
     func testInitLoadsPersistedPathsNormalizedAndDeduped() {
         let defaults = makeDefaults()
-        defaults.set(["/Users/x/.gradle/", "/Users/x/.gradle", "/Users/x/.gradle/caches"], forKey: "cleanerExcludedPaths")
+        defaults.set(
+            ["/Users/x/.gradle/", "/Users/x/.gradle", "/Users/x/.gradle/caches"],
+            forKey: "cleanerExcludedPaths"
+        )
 
         XCTAssertEqual(CleanExclusionsStore(defaults: defaults).paths, ["/Users/x/.gradle"])
     }
@@ -34,7 +37,10 @@ final class CleanExclusionsStoreTests: XCTestCase {
         let store = CleanExclusionsStore(defaults: defaults)
         store.add("/Users/x/Library/Caches/JetBrains/")
         store.add("/Users/x/.npm")
-        XCTAssertEqual(CleanExclusionsStore(defaults: defaults).paths, ["/Users/x/Library/Caches/JetBrains", "/Users/x/.npm"])
+        XCTAssertEqual(
+            CleanExclusionsStore(defaults: defaults).paths,
+            ["/Users/x/Library/Caches/JetBrains", "/Users/x/.npm"]
+        )
 
         store.remove("/Users/x/.npm")
         XCTAssertEqual(CleanExclusionsStore(defaults: defaults).paths, ["/Users/x/Library/Caches/JetBrains"])

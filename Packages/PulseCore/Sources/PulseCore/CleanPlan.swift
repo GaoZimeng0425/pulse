@@ -113,7 +113,14 @@ public struct CleanRunItem: Sendable, Equatable {
     public let ruleID: String
     public let outcome: CleanItemOutcome
 
-    public init(path: String, title: String, bytes: Int64, tier: CleanSafetyTier, ruleID: String, outcome: CleanItemOutcome) {
+    public init(
+        path: String,
+        title: String,
+        bytes: Int64,
+        tier: CleanSafetyTier,
+        ruleID: String,
+        outcome: CleanItemOutcome
+    ) {
         self.path = path
         self.title = title
         self.bytes = bytes
@@ -123,7 +130,9 @@ public struct CleanRunItem: Sendable, Equatable {
     }
 
     public var isRecycled: Bool {
-        if case .recycled = outcome { return true }
+        if case .recycled = outcome {
+            return true
+        }
         return false
     }
 }
@@ -171,14 +180,13 @@ public enum CleanRunner {
         }
         let outcome = await executor.recycleToTrash(plan.items.map(\.path))
         let items = plan.items.map { candidate -> CleanRunItem in
-            let result: CleanItemOutcome
-            if let destination = outcome.recycled[candidate.path] {
-                result = .recycled(destination: destination)
+            let result: CleanItemOutcome = if let destination = outcome.recycled[candidate.path] {
+                .recycled(destination: destination)
             } else if let reason = outcome.failures[candidate.path] {
-                result = .failed(reason: reason)
+                .failed(reason: reason)
             } else {
                 // 执行器既没说成功也没说失败:按失败记,不默认成功。
-                result = .failed(reason: "执行器未报告结果")
+                .failed(reason: "执行器未报告结果")
             }
             return CleanRunItem(
                 path: candidate.path,

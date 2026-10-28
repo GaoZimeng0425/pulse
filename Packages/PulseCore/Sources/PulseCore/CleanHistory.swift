@@ -32,7 +32,9 @@ public struct CleanRunRecord: Sendable, Equatable, Identifiable {
 
 /// 一次清理里的一项(明细行)。
 public struct CleanItemRecord: Sendable, Equatable, Identifiable {
-    public var id: String { "\(runID):\(path)" }
+    public var id: String {
+        "\(runID):\(path)"
+    }
 
     public let runID: Int64
     public let path: String
@@ -42,7 +44,15 @@ public struct CleanItemRecord: Sendable, Equatable, Identifiable {
     public let ruleID: String
     public let outcome: CleanItemOutcome
 
-    public init(runID: Int64, path: String, title: String, bytes: Int64, tier: CleanSafetyTier, ruleID: String, outcome: CleanItemOutcome) {
+    public init(
+        runID: Int64,
+        path: String,
+        title: String,
+        bytes: Int64,
+        tier: CleanSafetyTier,
+        ruleID: String,
+        outcome: CleanItemOutcome
+    ) {
         self.runID = runID
         self.path = path
         self.title = title
@@ -96,7 +106,16 @@ public actor CleanHistoryStore {
                     INSERT INTO clean_item (run_id, path, title, bytes, tier, rule_id, destination, failure)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    arguments: [runID, item.path, item.title, item.bytes, item.tier.rawValue, item.ruleID, destination, failure]
+                    arguments: [
+                        runID,
+                        item.path,
+                        item.title,
+                        item.bytes,
+                        item.tier.rawValue,
+                        item.ruleID,
+                        destination,
+                        failure,
+                    ]
                 )
             }
             return runID

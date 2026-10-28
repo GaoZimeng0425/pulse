@@ -32,12 +32,18 @@ final class CleanExclusionsTests: XCTestCase {
     }
 
     func testWiderPrefixAbsorbsNarrowerOnes() {
-        let list = CleanExclusions.adding("/Users/t/Library", to: ["/Users/t/Library/Caches", "/Users/t/.npm", "/Users/t/Library/pnpm"])
+        let list = CleanExclusions.adding(
+            "/Users/t/Library",
+            to: ["/Users/t/Library/Caches", "/Users/t/.npm", "/Users/t/Library/pnpm"]
+        )
         XCTAssertEqual(list, ["/Users/t/.npm", "/Users/t/Library"])
     }
 
     func testRemoving() {
-        let list = CleanExclusions.removing("/Users/t/Library/Caches/", from: ["/Users/t/Library/Caches", "/Users/t/.npm"])
+        let list = CleanExclusions.removing(
+            "/Users/t/Library/Caches/",
+            from: ["/Users/t/Library/Caches", "/Users/t/.npm"]
+        )
         XCTAssertEqual(list, ["/Users/t/.npm"])
         XCTAssertEqual(CleanExclusions.removing("/nope", from: list), list)
     }

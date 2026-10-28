@@ -69,7 +69,12 @@ struct LiveCleanTrashExecutor: CleanTrashExecutor {
                     skipped += 1
                 }
             }
-            volumes.append(TrashVolumeEmptySummary(volume: volume, emptiedItems: emptied, freedBytes: freed, skippedItems: skipped))
+            volumes.append(TrashVolumeEmptySummary(
+                volume: volume,
+                emptiedItems: emptied,
+                freedBytes: freed,
+                skippedItems: skipped
+            ))
         }
         return TrashEmptySummary(volumes: volumes)
     }

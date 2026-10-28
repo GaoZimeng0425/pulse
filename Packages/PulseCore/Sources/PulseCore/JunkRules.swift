@@ -93,7 +93,13 @@ public struct JunkPathPattern: Sendable, Equatable {
 
     /// 是否含非字面分量(命中项的标题需带上实际目录名区分,如「iOS」)。
     var hasVariants: Bool {
-        components.contains { if case .suffix = $0 { true } else { false } }
+        components.contains {
+            if case .suffix = $0 {
+                true
+            } else {
+                false
+            }
+        }
     }
 }
 
@@ -152,7 +158,12 @@ public enum JunkRuleTable {
             id: "xcode.deviceSupport",
             group: .globalToolCache,
             title: "Xcode Device Support",
-            patterns: [JunkPathPattern([.literal("Library"), .literal("Developer"), .literal("Xcode"), .suffix(" DeviceSupport")])],
+            patterns: [JunkPathPattern([
+                .literal("Library"),
+                .literal("Developer"),
+                .literal("Xcode"),
+                .suffix(" DeviceSupport"),
+            ])],
             tier: .checkFirst,
             rationale: "Xcode 从 iPhone / Watch / TV / Vision Pro 复制来的调试符号。不丢数据,但下次连接该设备时会重新复制,一次要几分钟。",
             source: purgeApp,
@@ -315,7 +326,9 @@ public enum JunkRuleTable {
 
 /// 清单里的一个可删单元(= 命中规则的一个目录节点)。
 public struct JunkCandidate: Sendable, Identifiable, Equatable {
-    public var id: String { path }
+    public var id: String {
+        path
+    }
 
     public let ruleID: String
     public let group: JunkGroup
@@ -402,9 +415,10 @@ public enum JunkMatcher {
         for rule in rules {
             for pattern in rule.patterns {
                 for node in pattern.matches(from: homeNode) {
-                    guard !seenPaths.contains(node.path) else { continue }
-                    guard !CleanExclusions.isExcluded(node.path, by: excludedPathPrefixes) else { continue }
-                    guard node.accountedBytes > 0 || node.isPartial else { continue }
+                    guard !seenPaths.contains(node.path), !CleanExclusions.isExcluded(
+                        node.path,
+                        by: excludedPathPrefixes
+                    ), node.accountedBytes > 0 || node.isPartial else { continue }
                     seenPaths.insert(node.path)
                     out.append(JunkCandidate(rule: rule, node: node, pattern: pattern))
                 }
@@ -413,8 +427,12 @@ public enum JunkMatcher {
         let groupOrder = Dictionary(uniqueKeysWithValues: JunkGroup.allCases.enumerated().map { ($1, $0) })
         return out.sorted { a, b in
             let ga = groupOrder[a.group] ?? 0, gb = groupOrder[b.group] ?? 0
-            if ga != gb { return ga < gb }
-            if a.bytes != b.bytes { return a.bytes > b.bytes }
+            if ga != gb {
+                return ga < gb
+            }
+            if a.bytes != b.bytes {
+                return a.bytes > b.bytes
+            }
             return a.path < b.path
         }
     }

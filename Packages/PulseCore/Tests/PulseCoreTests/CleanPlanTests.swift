@@ -5,7 +5,12 @@ import XCTest
 /// 勾选态 → 确认清单 → 执行报告(p4-cleaner/04)。闸门语义:默认全不勾、排除在删除前
 /// 二次判定且只收窄、执行器回执逐项核对(未报到按失败)。废纸篓执行用 spy,绝不真删。
 final class CleanPlanTests: XCTestCase {
-    private func candidate(_ path: String, bytes: Int64 = 100, tier: CleanSafetyTier = .safe, reclaimable: Bool = true) -> JunkCandidate {
+    private func candidate(
+        _ path: String,
+        bytes: Int64 = 100,
+        tier: CleanSafetyTier = .safe,
+        reclaimable: Bool = true
+    ) -> JunkCandidate {
         JunkCandidate(
             ruleID: "rule." + (path as NSString).lastPathComponent,
             group: .globalToolCache,
@@ -23,10 +28,10 @@ final class CleanPlanTests: XCTestCase {
 
     private var candidates: [JunkCandidate] {
         [
-            candidate("/Users/t/Library/Developer/Xcode/DerivedData", bytes: 28_000),
-            candidate("/Users/t/Library/Caches/Homebrew", bytes: 3_100),
-            candidate("/Users/t/Library/Containers/com.docker.docker/Data", bytes: 21_600, tier: .checkFirst),
-            candidate("/Users/t/.npm/_cacache", bytes: 1_800, reclaimable: false),
+            candidate("/Users/t/Library/Developer/Xcode/DerivedData", bytes: 28000),
+            candidate("/Users/t/Library/Caches/Homebrew", bytes: 3100),
+            candidate("/Users/t/Library/Containers/com.docker.docker/Data", bytes: 21600, tier: .checkFirst),
+            candidate("/Users/t/.npm/_cacache", bytes: 1800, reclaimable: false),
         ]
     }
 
@@ -50,7 +55,7 @@ final class CleanPlanTests: XCTestCase {
 
         let plan = CleanPlan.make(selection: selection, candidates: candidates, excludedPathPrefixes: [])
         XCTAssertEqual(plan.items.map(\.path), [candidates[0].path, candidates[2].path], "确认清单与列表同序,不按点击先后")
-        XCTAssertEqual(plan.totalBytes, 28_000 + 21_600)
+        XCTAssertEqual(plan.totalBytes, 28000 + 21600)
         XCTAssertTrue(plan.allReclaimableAccounting)
     }
 
@@ -80,7 +85,11 @@ final class CleanPlanTests: XCTestCase {
         for c in candidates {
             selection.set(c, selected: true)
         }
-        let plan = CleanPlan.make(selection: selection, candidates: candidates, excludedPathPrefixes: ["/Users/t/Library/Caches"])
+        let plan = CleanPlan.make(
+            selection: selection,
+            candidates: candidates,
+            excludedPathPrefixes: ["/Users/t/Library/Caches"]
+        )
         XCTAssertEqual(plan.items.map(\.path), [candidates[0].path, candidates[2].path, candidates[3].path])
     }
 
@@ -90,12 +99,24 @@ final class CleanPlanTests: XCTestCase {
         for c in candidates {
             selection.set(c, selected: true)
         }
-        let full = Set(CleanPlan.make(selection: selection, candidates: candidates, excludedPathPrefixes: []).items.map(\.path))
-        for prefixes in [["/Users/t/Library"], ["/Users/t/.npm"], ["/Users/t"], ["/Users/other"], ["/Users/t/Library/Caches/", "/Users/t/.npm/_cacache"]] {
-            let narrowed = Set(CleanPlan.make(selection: selection, candidates: candidates, excludedPathPrefixes: prefixes).items.map(\.path))
+        let full = Set(CleanPlan.make(selection: selection, candidates: candidates, excludedPathPrefixes: []).items
+            .map(\.path))
+        for prefixes in [
+            ["/Users/t/Library"],
+            ["/Users/t/.npm"],
+            ["/Users/t"],
+            ["/Users/other"],
+            ["/Users/t/Library/Caches/", "/Users/t/.npm/_cacache"],
+        ] {
+            let narrowed = Set(CleanPlan.make(
+                selection: selection,
+                candidates: candidates,
+                excludedPathPrefixes: prefixes
+            ).items.map(\.path))
             XCTAssertTrue(narrowed.isSubset(of: full), "排除 \(prefixes) 让计划多出了项")
         }
-        XCTAssertTrue(CleanPlan.make(selection: selection, candidates: candidates, excludedPathPrefixes: ["/Users/t"]).isEmpty)
+        XCTAssertTrue(CleanPlan.make(selection: selection, candidates: candidates, excludedPathPrefixes: ["/Users/t"])
+            .isEmpty)
     }
 
     // MARK: 执行
@@ -117,7 +138,7 @@ final class CleanPlanTests: XCTestCase {
         XCTAssertEqual(report.items.count, 3)
         XCTAssertEqual(report.items[0].outcome, .recycled(destination: "/Users/t/.Trash/DerivedData"))
         XCTAssertEqual(report.items[2].outcome, .failed(reason: "Operation not permitted"))
-        XCTAssertEqual(report.freedBytes, 28_000 + 3_100, "失败项不计释放量")
+        XCTAssertEqual(report.freedBytes, 28000 + 3100, "失败项不计释放量")
         XCTAssertEqual(report.recycledPaths, [items[0].path, items[1].path])
         XCTAssertEqual(report.failed.map(\.path), [items[2].path])
         XCTAssertEqual(report.startedAt, Date(timeIntervalSince1970: 1001))

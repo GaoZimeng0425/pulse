@@ -73,7 +73,11 @@ private struct JunkListCard: View {
     private var confirmPresented: Binding<Bool> {
         Binding(
             get: {
-                if case .confirming = model.cleanPhase { true } else { false }
+                if case .confirming = model.cleanPhase {
+                    true
+                } else {
+                    false
+                }
             },
             set: { wanted in
                 if !wanted {
@@ -138,7 +142,9 @@ private struct JunkListCard: View {
     }
 
     private var isBusy: Bool {
-        if case .running = model.cleanPhase { return true }
+        if case .running = model.cleanPhase {
+            return true
+        }
         return false
     }
 
@@ -197,8 +203,9 @@ private struct JunkListCard: View {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(Surface.positive)
                     Text(report.failed.isEmpty
-                         ? "已移入废纸篓 \(report.recycled.count) 项 · 释放 \(PulseFormat.memory(UInt64(max(0, report.freedBytes))))"
-                         : "已移入废纸篓 \(report.recycled.count) 项 · 释放 \(PulseFormat.memory(UInt64(max(0, report.freedBytes)))) · \(report.failed.count) 项失败")
+                        ? "已移入废纸篓 \(report.recycled.count) 项 · 释放 \(PulseFormat.memory(UInt64(max(0, report.freedBytes))))"
+                        :
+                        "已移入废纸篓 \(report.recycled.count) 项 · 释放 \(PulseFormat.memory(UInt64(max(0, report.freedBytes)))) · \(report.failed.count) 项失败")
                         .font(.system(size: 12, weight: .medium))
                         .monospacedDigit()
                     Spacer()
