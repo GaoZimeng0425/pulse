@@ -1,0 +1,25 @@
+== ① Ollama 目录形状 ==
+1.1G	/Users/aa00930/.ollama/models
+-- manifests 树(前 12 行):
+/Users/aa00930/.ollama/models/manifests/registry.ollama.ai/library/bge-m3/latest
+-- blobs 条目数: 4
+
+== ② manifest JSON 样本 ==
+样本: /Users/aa00930/.ollama/models/manifests/registry.ollama.ai/library/bge-m3/latest
+{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","digest":"sha256:0c4c9c2a325fb1cdafec606e6809cb745f1cb26a6d919994400d27372303e276","size":337},"layers":[{"mediaType":"application/vnd.ollama.image.model","digest":"sha256:daec91ffb5dd0c27411bd71f29932917c49cf529a641d0168496c3a501e3062c","size":1157671200},{"mediaType":"application/vnd.ollama.image.license","digest":"sha256:a406579cd136771c705c521db86ca7d60a6f3de7c9b5460e6193a2df27861bde","size":1068},{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","digest":"sha256:7907646426070047a77226ac3e684fbbe8410524f7b4a74d02837e43f2146bab","size":563}]}
+== ③ 共享 blob 去重验证(全部模型两两) ==
+  模型数: 1 · blob 文件: 4 · blobs 总占用: 1.08 GiB
+  被多个模型引用的 blob: 0 个 · 共享字节: 0.00 GiB
+  → 同时删全部模型才回收 1.08 GiB;只删一个,共享层不释放 —— '真实可回收量'必须按 manifest 引用算
+    library/bge-m3/latest: 引用 4 个 blob,表观 1.08 GiB
+
+== ④ LM Studio / HuggingFace / 其他模型库在场性 ==
+  不存在: /Users/aa00930/.lmstudio
+  不存在: /Users/aa00930/.cache/lm-studio
+  不存在: /Users/aa00930/.cache/huggingface
+  不存在: /Users/aa00930/Library/Caches/huggingface
+  不存在: /Users/aa00930/.cache/whisper
+  不存在: /Users/aa00930/Library/Application Support/Jan
+  不存在: /Users/aa00930/GPT4All
+  HF_HOME=未设 HF_HUB_CACHE=未设
+  ollama 进程: 在跑(在跑的 ollama serve 模型目录在用——06 票在用保护素材)
