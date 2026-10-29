@@ -113,20 +113,28 @@ final class MenuBarController: NSObject {
     }
 
     private func openPanel() {
-        guard let button = statusItem.button, let buttonWindow = button.window else { return }
         // 可见性信号 AppKit 层直给:SwiftUI onAppear 在 AppKit 宿主里的触发
         // 时机不可依赖(首轮实测首开不触发,门控停在透明占位 = 弹窗空白)。
         monitor.setPopoverTab(lastTab)
         statusItem.button?.isHighlighted = true
 
         let size = panel.fittingSize
-        let buttonFrame = buttonWindow.convertToScreen(button.bounds)
+        // 锚 = 实际点击位置,不锚 button.window 的 frame:多屏各自带菜单栏时,
+        // 状态项在两块屏都有镜像,而 button.window 恒报其中一块屏的坐标
+        // (实测报外接屏 -583,1168)——用户点主屏镜像时,按 window frame 定位
+        // 面板会开到另一块屏上,看起来「点了没反应」(2026-10-29 实机回归)。
+        // mouseDown 触发时 NSEvent.mouseLocation 即点击点,必在用户看到徽标的
+        // 那块屏;auto-probe 无真点则鼠标在哪面板开在哪(离屏档随后自行挪走)。
+        let anchor = NSEvent.mouseLocation
         var origin = NSPoint(
-            x: buttonFrame.midX - size.width / 2,
-            y: buttonFrame.minY - size.height - 4
+            x: anchor.x - size.width / 2,
+            y: anchor.y - size.height - 12
         )
+        // 竖直口径:锚 y 是徽标中心(菜单栏内),面板**顶边**须贴锚点下方
+        // (anchor.y - height),不是垂直居中——居中会把上半截推出屏顶,
+        // 只剩下半截贴屏,看起来仍像没开(2026-10-29 用户实点回归)。
         // 屏幕边缘钳制(stats 同款):右缘出屏贴右,左缘出屏贴左。
-        if let screen = NSScreen.screens.first(where: { $0.frame.intersects(buttonFrame) }) ?? NSScreen.main {
+        if let screen = NSScreen.screens.first(where: { $0.frame.contains(anchor) }) ?? NSScreen.main {
             let maxX = screen.frame.maxX - size.width
             origin.x = min(max(origin.x, screen.frame.minX), max(maxX, screen.frame.minX))
             origin.y = max(origin.y, screen.frame.minY)
@@ -327,6 +335,10 @@ final class PopupPanel: NSPanel {
         animationBehavior = .none
         hidesOnDeactivate = false
         backgroundColor = .clear
+        // 弹窗层级(stats 同款):不设即 .normal,与前台应用窗口同层——面板
+        // 被 Code/浏览器等任何有窗口的应用盖住,「开了但看不见」
+        // (2026-10-29 用户实点回归,CUA 单窗截图能拍到、用户全屏看不见)。
+        level = .statusBar
         hasShadow = true
         standardWindowButton(.closeButton)?.isHidden = true
         standardWindowButton(.miniaturizeButton)?.isHidden = true
