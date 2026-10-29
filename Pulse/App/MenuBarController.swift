@@ -23,6 +23,9 @@ final class MenuBarController: NSObject {
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
     private var badgeConfigRaw: String
+    /// 弹窗上次所在 tab(收起前留底,重开还原;与门控视图内的 lastTab 同义,
+    /// 可见性信号移到 AppKit 层后由控制器持有)。
+    private var lastTab: MetricTab = .overview
 
     /// 与设置页同键共享(p1-history/09 槽位配置契约)。
     private static let badgeConfigKey = "settings.menuBarBadge"
@@ -46,6 +49,10 @@ final class MenuBarController: NSObject {
 
         statusItem.button?.target = self
         statusItem.button?.action = #selector(togglePopover)
+        // 首击直达:附件型 app(LSUIElement)点状态项的第一次点击默认被系统
+        // 拿去激活 app、动作不送达(stats 同款已知问题),改 mouseDown 触发后
+        // 激活与动作同击完成——「点两次才展开」即此坑。
+        statusItem.button?.sendAction(on: .leftMouseDown)
 
         monitor.start() // 幂等;app 拉起即采样(原标签视图 .task 迁居)
         badgeDisplay.start() // 徽标观察自续环(幂等;原 MenuBarLoadLabel.task 迁居)
@@ -109,6 +116,8 @@ final class MenuBarController: NSObject {
         if popover.isShown {
             popover.performClose(nil)
         } else {
+            // 先激活再展开:弹窗里的按钮/键盘交互需要 app 在前台。
+            NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
     }
@@ -162,10 +171,20 @@ final class MenuBarController: NSObject {
 }
 
 extension MenuBarController: NSPopoverDelegate {
-    /// 关闭的可靠信号:AppKit 层先清可见性旗标(门控视图 onDisappear 兜底,
-    /// 双保险;popover-leak/01 语义不变)。顺手清按钮高亮残留(transient 关闭
-    /// 后 NSStatusItem 不自动复位)。
+    /// 开启信号 AppKit 层直给:SwiftUI onAppear 在 NSHostingController 里的
+    /// 触发时机不可依赖(实测首开不触发,门控停在透明占位 = 弹窗空白)——
+    /// 展示前先置在场旗标并还原上次 tab,门控视图的 onAppear 降级为兜底。
+    func popoverWillShow(_ notification: Notification) {
+        monitor.setPopoverTab(lastTab)
+    }
+
+    /// 关闭的可靠信号:收起前留底当前 tab,再清可见性旗标(门控视图
+    /// onDisappear 兜底,双保险;popover-leak/01 语义不变)。顺手清按钮高亮
+    /// 残留(transient 关闭后 NSStatusItem 不自动复位)。
     func popoverWillClose(_ notification: Notification) {
+        if let tab = monitor.currentPopoverTab {
+            lastTab = tab
+        }
         monitor.setPopoverTab(nil)
         statusItem.button?.isHighlighted = false
     }
