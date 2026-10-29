@@ -6,7 +6,7 @@ import SwiftUI
 /// 配置以逗号连接的 rawValue 存 @AppStorage——与菜单栏标签视图同键共享,
 /// 改动即时生效、重启保留;非法值由 MenuBarBadgeConfiguration 解码侧回默认。
 struct MenuBarBadgeSettingsView: View {
-    /// 槽位配置(与 MenuBarLoadLabel 同键共享,UserDefaults 即时广播)。
+    /// 槽位配置(与菜单栏徽标同键共享,UserDefaults 即时广播,控制器读回重算)。
     @AppStorage("settings.menuBarBadge") private var configurationRaw = MenuBarBadgeConfiguration.default.rawValue
 
     /// 解码失败回默认(读路径的唯一降级点;写路径永远写合法值)。
