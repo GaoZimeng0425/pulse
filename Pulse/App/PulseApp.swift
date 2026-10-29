@@ -46,6 +46,8 @@ struct PulseApp: App {
     /// NSPopover 承载弹窗与徽标;原常驻标签视图的四件事(采样启动 / 项目根
     /// 变更 / 告警开窗 / 回前台授权同步)全部迁居其内,全 app 常在挂点不缺失。
     @State private var menuBar: MenuBarController
+    /// 常驻代理:拒绝「最后窗口关闭即终止」(见 MenuBarController.KeepAliveAppDelegate)。
+    @NSApplicationDelegateAdaptor(KeepAliveAppDelegate.self) private var keepAlive
 
     init() {
         _ = LogService.shared // 拉起即建文件日志通道(~/.Pulse/logs,含退出留痕观察者)
@@ -110,6 +112,11 @@ struct PulseApp: App {
                 .background(MainWindowOpenWindowCapture())
         }
         .defaultSize(width: 880, height: 620)
+        // 摘除 MenuBarExtra 后本场景成了首个窗口场景,macOS 启动即呈现主窗
+        // (实机 880×672 在屏=实锤)——原行为是常驻菜单栏、主窗只按需开,
+        // 抑制启动呈现回到原语义。开窗桥若因此不再启动即捕获(见
+        // MainWindowOpenWindowCapture 打点),退回「启动即藏」方案。
+        .defaultLaunchBehavior(.suppressed)
 
         // 设置窗(工单 07 → 2026-10-16 扩为系统设置式双栏,见 SettingsView):
         // 通用 + 告警(工单 P1-07)+ 项目根目录 + 清理(p4-cleaner/04 排除目录);入口在弹窗头部齿轮按钮。

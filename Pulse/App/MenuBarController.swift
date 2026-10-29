@@ -4,28 +4,48 @@ import SwiftUI
 
 /// 菜单栏宿主(popover-layout-loop/01 换轨,stats 路线):macOS 26 上
 /// MenuBarExtra(.window) 的弹窗打开期间,系统对其窗口树逐帧重排——弹窗内容
-/// 与徽标经 A/B/C 三轮对照全部证伪(静态内容照样 40-60%),NSPopover 探针承载
-/// 同款内容实测 0-1%(证据与哨兵日志见票)。唯一解是弃用 MenuBarExtra:
+/// 与徽标经 A/B/C 三轮对照全部证伪(静态内容照样 40-60%),AppKit 承载探针
+/// 实测 0-1%(证据与哨兵日志见票)。唯一解是弃用 MenuBarExtra。
 ///
-/// - 弹窗内容与可见性门控(MenuBarPopoverGate)原样复用;门控的 onDisappear
-///   之外,popoverWillClose 在 AppKit 层先清一次旗标(popover-leak/01 的教训:
-///   关闭信号必须双保险);
-/// - 徽标位图(渲染器 + LRU 缓存,值不变返回同一实例)原样复用,产物直接挂
-///   `button.image`——NSStatusBarButton 不剥位图颜色;
-/// - 原常驻 MenuBarExtra 标签视图承担的四件事(采样启动 / 项目根变更喂给
-///   归组 / 告警通知开主窗 / 回前台授权同步)全部迁居到本控制器——全 app
-///   唯一常在的挂点从 SwiftUI 视图换成 AppKit 对象,生命周期与 app 同寿。
+/// 面板按 stats 的 `PopupWindow` 架构(Kit/module/popup.swift)自制 NSPanel,
+/// 而非 NSPopover——首轮 NSPopover 版的三个实机 bug 全部由此免疫:
+/// - **不激活 app**:styleMask 含 `.nonactivatingPanel`,`makeKeyAndOrderFront`
+///   只取键盘焦点不拉 app 前台 → 点菜单永不把主窗口带出来(activate 系列
+///   首击被吞/连带开窗问题连根消失);
+/// - **收起靠失焦**:windowDidResignKey → orderOut(点外部/切 app 即收,
+///   与 transient 语义等价),hidesOnDeactivate = false 防 app 切换误收;
+/// - **点按直达**:按钮 mouseDown 触发(附件型 app 首击不再被激活吞)。
+///
+/// 其余职责与首轮一致:弹窗内容/可见性门控(MenuBarPopoverGate)原样复用,
+/// 可见性信号由本控制器在开/收两处直给(AppKit 时机,不赌 SwiftUI onAppear);
+/// 徽标位图(渲染器 + LRU 缓存)直挂 button.image;原常驻标签视图的四件事
+/// (采样启动 / 项目根变更 / 告警开窗 / 回前台授权同步)全部迁居于此。
 @MainActor
 final class MenuBarController: NSObject {
     private let monitor: SystemMonitor
     private let badgeDisplay: MenuBarBadgeDisplayModel
     private let rootsStore: ProjectRootsStore
     private let statusItem: NSStatusItem
-    private let popover = NSPopover()
-    private var badgeConfigRaw: String
+    /// 面板懒创建:首开才建。常驻菜单栏 app 启动即零可见窗,提前把
+    /// NSVisualEffectView + NSHostingView 塞进一个隐藏面板,等于让窗口服务
+    /// 从拉起就养着一棵可能自扰的视图树(40% 空转的头号嫌疑,懒创建一举排除)。
+    private lazy var panel: PopupPanel = {
+        // TEMP-EXPERIMENT(终局二分):debug.staticPanelContent=YES 时面板只挂
+        // 静态文本(可见性管线照常驱动)——0% = 内容管线纵火,40% = 面板机制。
+        let content: MenuBarPopoverGate? = UserDefaults.standard
+            .bool(forKey: "debug.staticPanelContent") ? nil : MenuBarPopoverGate(monitor: monitor)
+        let p = PopupPanel(content: content)
+        p.onResignKey = { [weak self] in self?.closePanel() }
+        return p
+    }()
+
     /// 弹窗上次所在 tab(收起前留底,重开还原;与门控视图内的 lastTab 同义,
     /// 可见性信号移到 AppKit 层后由控制器持有)。
     private var lastTab: MetricTab = .overview
+    private var badgeConfigRaw: String
+    /// 收起时刻:点状态按钮收面板时,面板失焦信号与按钮动作的先后不确定——
+    /// 短窗内二次到达的点击视为「收下」而非「重开」,防收面板变成关了又开。
+    private var closedAt: Date?
 
     /// 与设置页同键共享(p1-history/09 槽位配置契约)。
     private static let badgeConfigKey = "settings.menuBarBadge"
@@ -39,14 +59,12 @@ final class MenuBarController: NSObject {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
-        // 弹窗:transient = 点外部自动收起(stats 同款);内容即既有门控视图,
-        // 面板尺寸跟随 NSHostingController 的 preferredContentSize 自适应,
-        // 首开尺寸与门控内占位帧口径一致(DashboardView 定宽 360)。
-        popover.behavior = .transient
-        popover.delegate = self
-        popover.contentSize = CGSize(width: 360, height: 648)
-        popover.contentViewController = NSHostingController(rootView: MenuBarPopoverGate(monitor: monitor))
-
+        // TEMP-EXPERIMENT(popover-layout-loop/01 诊断):静态文本按钮旁路——
+        // 探针(纯文本按钮)0-1% vs 本 app(位图按钮)40% 的关键差异二分。
+        // defaults debug.staticBadge=YES 时不用位图、不挂徽标观察。
+        if UserDefaults.standard.bool(forKey: "debug.staticBadge") {
+            statusItem.button?.title = "◍"
+        }
         statusItem.button?.target = self
         statusItem.button?.action = #selector(togglePopover)
         // 首击直达:附件型 app(LSUIElement)点状态项的第一次点击默认被系统
@@ -54,72 +72,78 @@ final class MenuBarController: NSObject {
         // 激活与动作同击完成——「点两次才展开」即此坑。
         statusItem.button?.sendAction(on: .leftMouseDown)
 
+        // TEMP-EXPERIMENT(终止法医):willTerminate 时留调用栈——进程内
+        // terminate 与外部 Apple Event 送达的栈形完全不同,一测定谳。
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: nil
+        ) { _ in
+            LogService.info(
+                "terminate 栈:\n" + Thread.callStackSymbols.joined(separator: "\n"),
+                category: "PanelProbe"
+            )
+        }
+        // 常驻菜单栏 app 必须 GDPR 自动终止:面板收起后全 app 无可见窗,
+        // 系统把「空闲无窗」判为可回收直接优雅杀掉(实机:收面板毫秒级退出)。
+        ProcessInfo.processInfo.disableAutomaticTermination("menu-bar-resident")
         monitor.start() // 幂等;app 拉起即采样(原标签视图 .task 迁居)
+        let staticBadge = UserDefaults.standard.bool(forKey: "debug.staticBadge")
         badgeDisplay.start() // 徽标观察自续环(幂等;原 MenuBarLoadLabel.task 迁居)
-        updateBadgeImage()
-        armBadgeObservation()
+        if !staticBadge {
+            updateBadgeImage()
+            armBadgeObservation()
+        }
         armRootsObservation()
+        armNotificationObservers()
+        scheduleAutoProbe()
+    }
 
-        let center = NotificationCenter.default
-        // 告警通知点开 → 开主窗口(激活已由路由完成,这里只开窗)。
-        center.addObserver(
-            forName: AlertNotificationRouter.openMainWindowNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in MainWindowBridge.open() }
-        }
-        // 回前台同步授权现状:用户经「打开系统设置」改完切回来,通知降级提示
-        // 与蓝牙卡态即时更新(蓝牙是静默类属性读,不弹窗)。
-        center.addObserver(
-            forName: NSApplication.didBecomeActiveNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                await self.monitor.alerts.syncAuthorizationStatus()
-                self.monitor.bluetooth.refreshAuthorization()
-            }
-        }
-        // 槽位配置(设置页写 UserDefaults)→ 徽标重算。didChange 对任何 defaults
-        // 写入都响,读回配置键比对幂等收窄。
-        center.addObserver(
-            forName: UserDefaults.didChangeNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                let raw = UserDefaults.standard.string(forKey: Self.badgeConfigKey)
-                    ?? MenuBarBadgeConfiguration.default.rawValue
-                if raw != self.badgeConfigRaw {
-                    self.badgeConfigRaw = raw
-                    self.updateBadgeImage()
-                }
-            }
-        }
-        // 系统外观切换 → 徽标墨色随外观(渲染缓存键含外观,命中无损)。
-        DistributedNotificationCenter.default().addObserver(
-            forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in self?.updateBadgeImage() }
+    // MARK: - 面板开合
+
+    @objc private func togglePopover() {
+        if panel.isVisible {
+            closePanel()
+        } else if let closedAt, Date().timeIntervalSince(closedAt) < 0.3 {
+            // 失焦刚收过:这一下点击是「收下」的另一半,不再重开。
+            return
+        } else {
+            openPanel()
         }
     }
 
-    // MARK: - 弹窗开合
+    private func openPanel() {
+        guard let button = statusItem.button, let buttonWindow = button.window else { return }
+        // 可见性信号 AppKit 层直给:SwiftUI onAppear 在 AppKit 宿主里的触发
+        // 时机不可依赖(首轮实测首开不触发,门控停在透明占位 = 弹窗空白)。
+        monitor.setPopoverTab(lastTab)
+        statusItem.button?.isHighlighted = true
 
-    @objc private func togglePopover() {
-        guard let button = statusItem.button else { return }
-        if popover.isShown {
-            popover.performClose(nil)
-        } else {
-            // 先激活再展开:弹窗里的按钮/键盘交互需要 app 在前台。
-            NSApp.activate(ignoringOtherApps: true)
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        let size = panel.fittingSize
+        let buttonFrame = buttonWindow.convertToScreen(button.bounds)
+        var origin = NSPoint(
+            x: buttonFrame.midX - size.width / 2,
+            y: buttonFrame.minY - size.height - 4
+        )
+        // 屏幕边缘钳制(stats 同款):右缘出屏贴右,左缘出屏贴左。
+        if let screen = NSScreen.screens.first(where: { $0.frame.intersects(buttonFrame) }) ?? NSScreen.main {
+            let maxX = screen.frame.maxX - size.width
+            origin.x = min(max(origin.x, screen.frame.minX), max(maxX, screen.frame.minX))
+            origin.y = max(origin.y, screen.frame.minY)
         }
+        panel.setFrame(NSRect(origin: origin, size: size), display: false)
+        // 面板材质窗(visualEffectView)自带圆角与阴影,与系统弹窗观感一致。
+        panel.makeKeyAndOrderFront(nil)
+    }
+
+    private func closePanel() {
+        if let tab = monitor.currentPopoverTab {
+            lastTab = tab
+        }
+        monitor.setPopoverTab(nil)
+        closedAt = Date()
+        statusItem.button?.isHighlighted = false
+        panel.orderOut(nil)
     }
 
     // MARK: - 徽标
@@ -168,25 +192,164 @@ final class MenuBarController: NSObject {
             }
         }
     }
-}
 
-extension MenuBarController: NSPopoverDelegate {
-    /// 开启信号 AppKit 层直给:SwiftUI onAppear 在 NSHostingController 里的
-    /// 触发时机不可依赖(实测首开不触发,门控停在透明占位 = 弹窗空白)——
-    /// 展示前先置在场旗标并还原上次 tab,门控视图的 onAppear 降级为兜底。
-    func popoverWillShow(_ notification: Notification) {
-        monitor.setPopoverTab(lastTab)
+    private func armNotificationObservers() {
+        let center = NotificationCenter.default
+        // 告警通知点开 → 开主窗口(激活已由路由完成,这里只开窗)。
+        center.addObserver(
+            forName: AlertNotificationRouter.openMainWindowNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.closePanel()
+                MainWindowBridge.open()
+            }
+        }
+        // 回前台同步授权现状:用户经「打开系统设置」改完切回来,通知降级提示
+        // 与蓝牙卡态即时更新(蓝牙是静默类属性读,不弹窗)。
+        center.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                await self.monitor.alerts.syncAuthorizationStatus()
+                self.monitor.bluetooth.refreshAuthorization()
+            }
+        }
+        // 槽位配置(设置页写 UserDefaults)→ 徽标重算。didChange 对任何 defaults
+        // 写入都响,读回配置键比对幂等收窄。
+        center.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                let raw = UserDefaults.standard.string(forKey: Self.badgeConfigKey)
+                    ?? MenuBarBadgeConfiguration.default.rawValue
+                if raw != self.badgeConfigRaw {
+                    self.badgeConfigRaw = raw
+                    self.updateBadgeImage()
+                }
+            }
+        }
+        // 系统外观切换 → 徽标墨色随外观(渲染缓存键含外观,命中无损)。
+        DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.updateBadgeImage() }
+        }
     }
 
-    /// 关闭的可靠信号:收起前留底当前 tab,再清可见性旗标(门控视图
-    /// onDisappear 兜底,双保险;popover-leak/01 语义不变)。顺手清按钮高亮
-    /// 残留(transient 关闭后 NSStatusItem 不自动复位)。
-    func popoverWillClose(_ notification: Notification) {
-        if let tab = monitor.currentPopoverTab {
-            lastTab = tab
+    // MARK: - 程序化性能探针(popover-layout-loop/01 验收用)
+
+    /// `defaults write com.gaozimeng.pulse debug.autoOpenPanel -bool YES` 后,
+    /// 启动 8 秒自动开面板、再 45 秒自动收——面板开合全程序化,弹窗态 CPU
+    /// 验收不依赖人工点按(哨兵 + 采样自查)。生产环境不设此键即零副作用。
+    private func scheduleAutoProbe() {
+        guard UserDefaults.standard.bool(forKey: "debug.autoOpenPanel") else { return }
+        let offscreen = UserDefaults.standard.bool(forKey: "debug.autoOpenPanelOffscreen")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self] in
+            guard let self, !self.panel.isVisible else { return }
+            LogService.info("AUTO-PROBE 开面板\(offscreen ? "(离屏)" : "")", category: "PanelProbe")
+            openPanel()
+            if offscreen {
+                // 离屏档:渲染/布局照常,只是不挡用户鼠标(面板在屏外的
+                // visible 窗口,display cycle 照跑;完全遮挡可能省合成,
+                // 数值若临界再以在屏档复核)。
+                panel.setFrameOrigin(NSPoint(x: -4000, y: 800))
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 45) { [weak self] in
+                guard let self, panel.isVisible else { return }
+                LogService.info("AUTO-PROBE 收面板", category: "PanelProbe")
+                closePanel()
+            }
         }
-        monitor.setPopoverTab(nil)
-        statusItem.button?.isHighlighted = false
+    }
+}
+
+/// 弹窗面板(stats `PopupWindow` 同构,Kit/module/popup.swift):
+/// NSPanel + `.nonactivatingPanel` = 取焦点不激活 app(主窗口永不被连带),
+/// `hidesOnDeactivate = false` 防 app 切换误收;内容 = 毛玻璃底
+/// (NSVisualEffectView,.menu 材质,与系统弹窗观感一致)+ 门控视图宿主。
+final class PopupPanel: NSPanel {
+    /// 失焦即收(transient 语义):点外部 / 切 app 时面板失去键盘焦点。
+    var onResignKey: (() -> Void)?
+
+    private let hosting: NSHostingView<AnyView>
+
+    /// 面板理想尺寸:内容(fittingSize)优先,与门控占位帧口径一致的兜底。
+    var fittingSize: CGSize {
+        let fitting = hosting.fittingSize
+        return CGSize(
+            width: max(320, fitting.width),
+            height: max(480, min(fitting.height, 720))
+        )
+    }
+
+    init(content: MenuBarPopoverGate?) {
+        let root: AnyView = content.map { AnyView($0) } ?? AnyView(
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(0 ..< 14, id: \.self) { i in
+                    HStack { Text("静态探针行 \(i)")
+                        Spacer()
+                        Text("\(i * 7)%").monospacedDigit()
+                    }
+                }
+            }.padding(14).frame(width: 330, alignment: .leading)
+        )
+        hosting = NSHostingView(rootView: root)
+        let initial = CGSize(width: 360, height: 648)
+        hosting.frame = NSRect(origin: .zero, size: initial)
+        hosting.autoresizingMask = [.width, .height]
+
+        let effect = NSVisualEffectView(frame: NSRect(origin: .zero, size: initial))
+        effect.material = .menu
+        effect.blendingMode = .behindWindow
+        effect.state = .active
+        effect.autoresizingMask = [.width, .height]
+        effect.addSubview(hosting)
+
+        super.init(
+            contentRect: NSRect(origin: .zero, size: initial),
+            styleMask: [.titled, .fullSizeContentView, .nonactivatingPanel],
+            backing: .buffered,
+            defer: true
+        )
+        titleVisibility = .hidden
+        titlebarAppearsTransparent = true
+        isMovableByWindowBackground = false
+        animationBehavior = .none
+        hidesOnDeactivate = false
+        backgroundColor = .clear
+        hasShadow = true
+        standardWindowButton(.closeButton)?.isHidden = true
+        standardWindowButton(.miniaturizeButton)?.isHidden = true
+        standardWindowButton(.zoomButton)?.isHidden = true
+        contentView = effect
+    }
+
+    override var canBecomeKey: Bool {
+        true
+    }
+
+    override func resignKey() {
+        super.resignKey()
+        Task { @MainActor in self.onResignKey?() }
+    }
+}
+
+/// 常驻代理:面板收起后全 app 无可见窗,AppKit 的「最后窗口关闭即终止」
+/// 定时器(_scheduleCheckForTerminateAfterLastWindowClosed,2026-10-29 法医栈
+/// 实证)会把常驻菜单栏 app 杀掉——明确拒绝。SwiftUI 经 Adaptor 合并转发。
+final class KeepAliveAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
     }
 }
 
@@ -214,6 +377,9 @@ struct MainWindowOpenWindowCapture: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Color.clear.onAppear { MainWindowBridge.openWindow = openWindow }
+        Color.clear.onAppear {
+            MainWindowBridge.openWindow = openWindow
+            LogService.info("开窗桥已捕获", category: "PanelProbe")
+        }
     }
 }
