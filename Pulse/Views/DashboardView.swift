@@ -9,10 +9,6 @@ import SwiftUI
 /// (工单 08)不变。
 struct DashboardView: View {
     let monitor: SystemMonitor
-    /// 设置窗入口(工单 07):底部齿轮按钮。
-    @Environment(\.openSettings) private var openSettings
-    /// 主窗口入口:底部开窗按钮。
-    @Environment(\.openWindow) private var openWindow
 
     /// 弹窗宽度(OG 紧凑弹窗形态)。
     private static let width: CGFloat = 360
@@ -151,10 +147,15 @@ struct DashboardView: View {
     private var footer: some View {
         HStack(spacing: 6) {
             Button {
-                // LSUIElement 应用激活策略为 .accessory:openWindow 只建窗不抢前台,
+                // LSUIElement 应用激活策略为 .accessory:开窗只建窗不抢前台,
                 // 窗口会开在其他应用后面(实机反馈"点了没反应")——先激活再开窗。
+                // 开窗走广播由菜单栏控制器统一路由(收面板 + 经桥开主窗):
+                // NSPanel 宿主里环境 openWindow 是哑动作。
                 NSApplication.shared.activate(ignoringOtherApps: true)
-                openWindow(id: MainWindowSceneID.value)
+                NotificationCenter.default.post(
+                    name: AlertNotificationRouter.openMainWindowNotification,
+                    object: nil
+                )
             } label: {
                 Image(systemName: "macwindow")
             }
@@ -163,7 +164,11 @@ struct DashboardView: View {
             Spacer()
             Button {
                 NSApplication.shared.activate(ignoringOtherApps: true)
-                openSettings()
+                // 场景环境的 openSettings 在 NSPanel 宿主里不可用(见头部注释):
+                // 走系统标准动作,任一命中即可(macOS 14+ showSettingsWindow:)。
+                if !NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) {
+                    _ = NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+                }
             } label: {
                 Image(systemName: "gearshape")
             }

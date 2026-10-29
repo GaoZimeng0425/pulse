@@ -35,6 +35,7 @@
 		294EBD9BB566F85D7B9E80A6 /* MemoryStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6CB838FAB56E49D3DB8D34D /* MemoryStats.swift */; };
 		2C1C4AA05A53133216CF1E3B /* ProcArgsParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A311BFB8099AF93518F47C9B /* ProcArgsParser.swift */; };
 		2CCCA9B897A9A569F82F95BB /* LiveProcessSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06A4CAD37F3D2BE0A494F9DA /* LiveProcessSource.swift */; };
+		2D0E9BE7A0401A822DC62C47 /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD3B00277D6CF515AEA81E6C /* MenuBarController.swift */; };
 		2F681644821F7D9946A73E92 /* MetricTabModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9378B86940EBE30E057F718D /* MetricTabModelTests.swift */; };
 		31A4795EB7C03BA0FE9573D2 /* AppIconCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78EC09371E86E7408FA32ADC /* AppIconCacheTests.swift */; };
 		3486367464537B6192F7C2AF /* PulseApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AEE9CD05DD0A6FAA15E6014 /* PulseApp.swift */; };
@@ -299,6 +300,7 @@
 		B8B61FF7D57A239D0234D1A3 /* PowerCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerCardViews.swift; sourceTree = "<group>"; };
 		BA0853EEEEB0FB9F6834A00E /* AlertSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSettingsStore.swift; sourceTree = "<group>"; };
 		BA63CBA09D59DD528C7124CA /* StatusBadgeChipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadgeChipTests.swift; sourceTree = "<group>"; };
+		BD3B00277D6CF515AEA81E6C /* MenuBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarController.swift; sourceTree = "<group>"; };
 		BE86A48D24949B3D225394BD /* TestHostIsolationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHostIsolationTests.swift; sourceTree = "<group>"; };
 		C3ED9E7F6F40FF3D9167EACB /* BirthScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BirthScanner.swift; sourceTree = "<group>"; };
 		C52DB5F7C6F83EAC51BD568F /* LiveCleanDirectoryEnumeratorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCleanDirectoryEnumeratorTests.swift; sourceTree = "<group>"; };
@@ -392,6 +394,7 @@
 			children = (
 				2395D7D9D7A918F62EDFADD8 /* InertSources.swift */,
 				09C5195738D18D24F08D8281 /* LogService.swift */,
+				BD3B00277D6CF515AEA81E6C /* MenuBarController.swift */,
 				16E122CDE8CB7A49B14C617E /* MonitorAssembly.swift */,
 				0AEE9CD05DD0A6FAA15E6014 /* PulseApp.swift */,
 				B7B5ADC98A14B764E51366DB /* SystemMonitor.swift */,
@@ -836,6 +839,7 @@
 				4956480A7F13BF6F4CC7215F /* MenuBarBadgeComposer.swift in Sources */,
 				3871E7D6449E0799D45D40DD /* MenuBarBadgeDisplayModel.swift in Sources */,
 				6F81F0419525B5BABE9C8885 /* MenuBarBadgeSettingsView.swift in Sources */,
+				2D0E9BE7A0401A822DC62C47 /* MenuBarController.swift in Sources */,
 				28E10F6A5444AE34BD9A17C5 /* MenuBarPopoverGate.swift in Sources */,
 				D397A1C4ABDB5AE7AB188061 /* MeterBar.swift in Sources */,
 				1069B0AC6FD05BFF476483F6 /* MetricAccent.swift in Sources */,

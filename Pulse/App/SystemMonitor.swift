@@ -287,6 +287,13 @@ final class SystemMonitor {
         visibility.popover
     }
 
+    /// 弹窗当前所在 tab(nil = 关闭):菜单栏控制器(popover-layout-loop/01
+    /// 换轨)在弹窗收起前取值留底,重开时经 setPopoverTab 还原——可见性信号
+    /// 改由 AppKit 层直给后,tab 记忆也随控制器走。
+    var currentPopoverTab: MetricTab? {
+        visibility.popoverTab
+    }
+
     /// 主窗口是否在场(popover-leak/01 主窗口同病同修,视图门控的唯一读数):
     /// 单一事实源 = visibility;不参与采样节奏与 anyWindow 排行闸。
     var mainWindowVisible: Bool {

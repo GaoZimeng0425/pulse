@@ -40,6 +40,10 @@ struct MeterBar: View {
         }
         .frame(height: 6)
         .onChange(of: fraction) { _, newValue in
+            // 死区先判(popover-layout-loop/01):抖动不追平就不进事务、不起缓动,
+            // 面板开期帧钟才落得下来;跨阈值跳变照旧走 Vitals 同款 0.6s 缓动。
+            guard MeterDisplayHysteresis.shouldRetarget(displayed: displayedFraction, incoming: newValue)
+            else { return }
             withAnimation(Self.widthAnimation) {
                 displayedFraction = newValue
             }

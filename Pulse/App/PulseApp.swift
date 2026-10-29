@@ -42,8 +42,12 @@ struct PulseApp: App {
     @State private var badgeDisplay: MenuBarBadgeDisplayModel
     /// 告警通知路由(工单 07):UNUserNotificationCenter delegate,点通知直达。
     @State private var alertRouter: AlertNotificationRouter
-    /// 开窗环境(点通知广播的响应点在标签视图修饰链上)。
-    @Environment(\.openWindow) private var openWindow
+    /// 菜单栏宿主(popover-layout-loop/01 换轨,stats 路线):NSStatusItem +
+    /// NSPopover 承载弹窗与徽标;原常驻标签视图的四件事(采样启动 / 项目根
+    /// 变更 / 告警开窗 / 回前台授权同步)全部迁居其内,全 app 常在挂点不缺失。
+    @State private var menuBar: MenuBarController
+    /// 常驻代理:拒绝「最后窗口关闭即终止」(见 MenuBarController.KeepAliveAppDelegate)。
+    @NSApplicationDelegateAdaptor(KeepAliveAppDelegate.self) private var keepAlive
 
     init() {
         _ = LogService.shared // 拉起即建文件日志通道(~/.Pulse/logs,含退出留痕观察者)
@@ -53,7 +57,7 @@ struct PulseApp: App {
         _monitor = State(initialValue: monitor)
         // 原始读数折叠与标签旧 body 同源同口径(CPU / 内存 / 磁盘容量 / 网络速率);
         // 读数源的每次变化都驱动一次折算,折算结果不变就不发布。
-        _badgeDisplay = State(initialValue: MenuBarBadgeDisplayModel {
+        let badgeDisplay = MenuBarBadgeDisplayModel {
             MenuBarBadgeData(
                 cpuLoadPercent: monitor.systemCPULoad,
                 memory: monitor.memory,
@@ -61,11 +65,18 @@ struct PulseApp: App {
                 diskTotalBytes: monitor.disk.capacity?.containerTotalBytes,
                 networkRate: monitor.network.reading?.rates
             )
-        })
+        }
+        _badgeDisplay = State(initialValue: badgeDisplay)
         // delegate 必须在通知到达前挂上(app 拉起即挂;点开横幅 → 路由到主窗口)。
         let router = AlertNotificationRouter()
         UNUserNotificationCenter.current().delegate = router
         _alertRouter = State(initialValue: router)
+        // 菜单栏宿主:创建即接管状态项 / 弹窗 / 徽标与四件迁居事项。
+        _menuBar = State(initialValue: MenuBarController(
+            monitor: monitor,
+            badgeDisplay: badgeDisplay,
+            rootsStore: store
+        ))
         // 主窗口可见即守卫一次(2026-10-16 验收走查:外接屏断电时窗口被系统恢复到
         // 幻影屏坐标,AppKit 层观察比 SwiftUI 视图钩子更早更稳);启动后延迟一拍
         // 兜底覆盖状态恢复创建的窗口。
@@ -86,88 +97,33 @@ struct PulseApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra {
-            // 弹窗内容经可见性门控(popover-leak/01):关闭后视图树不再逐轮重算;
-            // onAppear/onDisappear(采样节奏 1s/5s)与 .task(start)都在门控根上。
-            MenuBarPopoverGate(monitor: monitor)
-        } label: {
-            MenuBarLoadLabel(display: badgeDisplay)
-                // 菜单栏标签常驻:app 拉起即开始采样(start 幂等)。
-                .task { monitor.start() }
-                // 设置窗(唯一的项目根编辑入口)增删后,标签视图在此捕获变更,
-                // 下一轮采样即以新根归组(工单 07,≤1 轮生效)。
-                .onChange(of: rootsStore.projectRoots) { _, roots in
-                    monitor.setProjectRoots(roots)
-                }
-                // 告警通知点开(工单 07):常驻的标签视图响应开窗广播——
-                // 激活已由路由完成,这里只负责 openWindow(环境值只存在于视图)。
-                .onReceive(NotificationCenter.default.publisher(
-                    for: AlertNotificationRouter.openMainWindowNotification
-                )) { _ in
-                    openWindow(id: MainWindowSceneID.value)
-                }
-                // 回前台同步授权现状:用户经「打开系统设置」改完切回来,通知降级提示
-                // 与蓝牙卡态即时更新(常驻标签是全 app 唯一常在的挂点)。蓝牙是静默
-                // 类属性读,不弹窗。
-                .onReceive(NotificationCenter.default.publisher(
-                    for: NSApplication.didBecomeActiveNotification
-                )) { _ in
-                    Task { await monitor.alerts.syncAuthorizationStatus() }
-                    monitor.bluetooth.refreshAuthorization()
-                }
-        }
-        .menuBarExtraStyle(.window)
+        // 菜单栏(弹窗 + 徽标)由 MenuBarController 承载(popover-layout-loop/01
+        // 换轨:macOS 26 上 MenuBarExtra(.window) 弹窗打开期间系统逐帧重排其
+        // 窗口树,内容/徽标三轮对照证伪后弃用,改 NSStatusItem + NSPopover)。
 
         // 主窗口(工单 P0.5-01):全部组 + 可排序进程表 + 详情下钻。
         // 入口在弹窗底部"打开主窗口"按钮(用户拍板:合并为单一菜单栏项);
         // 窗口内容不触碰 setPopoverTab:关窗只藏窗,采样节奏不受影响(spec)。
         // 内容经可见性门控(popover-leak/01 主窗口同病同修):关闭后视图树不再
-        // 逐轮重算;.task(start)在门控根上。
+        // 逐轮重算;.task(start)在门控根上。根部挂开窗桥捕获(AppKit 侧
+        // 告警路由/弹窗按钮经 MainWindowBridge 调用)。
         Window("Pulse", id: MainWindowSceneID.value) {
             MainWindowGate(monitor: monitor, alertRouter: alertRouter, cleanExclusions: cleanExclusions)
+                .background(MainWindowOpenWindowCapture())
         }
         .defaultSize(width: 880, height: 620)
+        // 摘除 MenuBarExtra 后本场景成了首个窗口场景,macOS 启动即呈现主窗
+        // (实机 880×672 在屏=实锤)——原行为是常驻菜单栏、主窗只按需开,
+        // 抑制启动呈现回到原语义。开窗桥若因此不再启动即捕获(见
+        // MainWindowOpenWindowCapture 打点),退回「启动即藏」方案。
+        .defaultLaunchBehavior(.suppressed)
 
         // 设置窗(工单 07 → 2026-10-16 扩为系统设置式双栏,见 SettingsView):
         // 通用 + 告警(工单 P1-07)+ 项目根目录 + 清理(p4-cleaner/04 排除目录);入口在弹窗头部齿轮按钮。
+        // 根部同挂开窗桥(主窗口内容若尚未建,这里兜底捕获)。
         Settings {
             SettingsView(rootsStore: rootsStore, cleanExclusions: cleanExclusions, monitor: monitor)
+                .background(MainWindowOpenWindowCapture())
         }
-    }
-}
-
-/// 菜单栏标签:槽位可配置(工单 09)——默认 CPU / RAM,小标签在数字上方;
-/// 槽位顺序、四选一从设置「菜单栏」页来(@AppStorage 同键共享,配置改动
-/// 即时生效、重启保留)。CPU 超 70% 变红,RAM 联动内存压力变色。
-///
-/// 数据源 = 显示快照模型(badge-hysteresis/01):迟滞后的读数是唯一输入,
-/// 原始读数每轮在模型内折算、值不变不赋值——本视图的属性图不再逐轮重评估,
-/// 位图缓存键随之稳定。colorScheme 与槽位配置两个低频依赖仍由视图直接观察。
-///
-/// 位图路径的由来(工单 09 实机走查修正):MenuBarExtra 的 label 会被系统重绘成
-/// NSStatusItem 内容,SwiftUI 的 foregroundStyle / AttributedString 颜色一律被
-/// 剥掉(实测 macOS 26 上数字永远是默认色,只有 Shape 能保住颜色)。因此徽标
-/// 用 ImageRenderer 预绘成**带颜色的位图**,以 `.renderingMode(.original)` 交给
-/// 系统——这是 SwiftUI 栈下唯一可靠的方式。渲染器见 MenuBarBadge.swift,合成逻辑见 MenuBarBadgeComposer.swift。
-struct MenuBarLoadLabel: View {
-    /// 显示快照模型(badge-hysteresis/01):见上方"数据源"说明;`.task` 启动观察。
-    let display: MenuBarBadgeDisplayModel
-    /// 菜单栏深浅外观:正常态文字用白/黑随外观,警示态固定系统色。
-    @Environment(\.colorScheme) private var colorScheme
-    /// 槽位配置(工单 09):与设置页同键共享,非法值回默认。
-    @AppStorage("settings.menuBarBadge") private var badgeConfigRaw = MenuBarBadgeConfiguration.default.rawValue
-
-    var body: some View {
-        let contents = MenuBarBadgeComposer.compose(
-            MenuBarBadgeConfiguration(rawValue: badgeConfigRaw) ?? .default,
-            data: display.data
-        )
-        Image(
-            nsImage: MenuBarBadgeRenderer.image(for: contents, colorScheme: colorScheme)
-        )
-        .renderingMode(.original)
-        .accessibilityLabel("系统状态")
-        .accessibilityValue(contents.map { "\($0.caption) \($0.text)" }.joined(separator: ","))
-        .task { display.start() }
     }
 }
