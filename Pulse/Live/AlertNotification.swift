@@ -176,12 +176,11 @@ enum AlertNotificationContent {
 
 /// UNUserNotificationCenter delegate:点开通知 → 激活 app → 记下落点 tab →
 /// 广播开主窗口。popover 无法程序化打开,深链一律落主窗口(spec 既定)。
-/// 激活与落点在这里;开窗动作由菜单栏控制器(popover-layout-loop/01 换轨后
-/// 的常驻挂点)响应广播、经 MainWindowBridge 调 openWindow 完成——两个动作
-/// 先激活后开窗,与弹窗"在窗口中打开"按钮同序。
+/// 激活与落点在这里;开窗动作由常驻视图(MenuBarExtra label,持 openWindow
+/// 环境)响应广播完成——两个动作先激活后开窗,与弹窗"在窗口中打开"按钮同序。
 @MainActor
 final class AlertNotificationRouter: NSObject, UNUserNotificationCenterDelegate {
-    /// 开窗广播名:菜单栏控制器监听它调用 openWindow(id: main)。
+    /// 开窗广播名:常驻视图监听它调用 openWindow(id: main)。
     static let openMainWindowNotification = Notification.Name("pulse.alert.openMainWindow")
     static let tabUserInfoKey = "tab"
 
