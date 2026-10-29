@@ -110,13 +110,13 @@ struct PulseApp: App {
         Window("Pulse", id: MainWindowSceneID.value) {
             MainWindowGate(monitor: monitor, alertRouter: alertRouter, cleanExclusions: cleanExclusions)
                 .background(MainWindowOpenWindowCapture())
+                .background(LaunchHiddenWindow())
         }
         .defaultSize(width: 880, height: 620)
-        // 摘除 MenuBarExtra 后本场景成了首个窗口场景,macOS 启动即呈现主窗
-        // (实机 880×672 在屏=实锤)——原行为是常驻菜单栏、主窗只按需开,
-        // 抑制启动呈现回到原语义。开窗桥若因此不再启动即捕获(见
-        // MainWindowOpenWindowCapture 打点),退回「启动即藏」方案。
-        .defaultLaunchBehavior(.suppressed)
+        // 摘除 MenuBarExtra 后本场景成了首个窗口场景,macOS 启动即呈现主窗。
+        // 不能用 .defaultLaunchBehavior(.suppressed):内容从未建 → 开窗桥永不
+        // 捕获 → 「打开主窗口」只激活不开窗(2026-10-29 实机回归,日志零捕获)。
+        // 改「启动即藏」:照常建窗让桥捕获,首帧前透明、随即关闭(LaunchHiddenWindow)。
 
         // 设置窗(工单 07 → 2026-10-16 扩为系统设置式双栏,见 SettingsView):
         // 通用 + 告警(工单 P1-07)+ 项目根目录 + 清理(p4-cleaner/04 排除目录);入口在弹窗头部齿轮按钮。
