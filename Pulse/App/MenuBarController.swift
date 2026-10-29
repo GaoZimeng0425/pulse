@@ -315,6 +315,9 @@ final class PopupPanel: NSPanel {
         let initial = CGSize(width: 360, height: 648)
         hosting.frame = NSRect(origin: .zero, size: initial)
         hosting.autoresizingMask = [.width, .height]
+        // 面板借 .titled + .fullSizeContentView 取圆角阴影,隐形标题栏仍算安全区:
+        // SwiftUI 会在内容顶部让出 ~28pt(tab 栏上方凭空一截空白,用户实见)。
+        hosting.safeAreaRegions = []
 
         let effect = NSVisualEffectView(frame: NSRect(origin: .zero, size: initial))
         effect.material = .menu
@@ -380,6 +383,33 @@ enum MainWindowBridge {
             // 桥未就绪的兜底:至少把 app 拉到前台(窗口从未建过且桥未捕获的
             // 窗口期,理论上只在启动首毫秒)。
             NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+}
+
+/// 主窗口「启动即藏」:常驻菜单栏 app 启动不呈现主窗,但窗口须真建一次——开窗桥
+/// 靠内容 onAppear 捕获 openWindow。进窗即(首帧前)透明,下一轮 close:走 close 而非
+/// orderOut,门控 onDisappear 才会触发(可见性归 nil,不留后台观看态)。每进程一次,
+/// 之后用户开窗不受影响。
+struct LaunchHiddenWindow: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        LaunchHiderView()
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
+private final class LaunchHiderView: NSView {
+    @MainActor private static var didHide = false
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard let window, !Self.didHide else { return }
+        Self.didHide = true
+        window.alphaValue = 0
+        DispatchQueue.main.async {
+            window.close()
+            window.alphaValue = 1
         }
     }
 }
