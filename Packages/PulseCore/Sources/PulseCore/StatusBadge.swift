@@ -43,12 +43,22 @@ public enum StatusBadgeRules {
         cpuPercent > groupHighLoadCPUThreshold ? .high : nil
     }
 
+    /// 最忙进程 chip 封顶字数:chip 按字数封顶、自身不被压缩,组名吃剩余宽度
+    /// (2026-10-30 用户拍板:组名尽量显示全,chip 要有上限)。
+    public static let hotProcessNameMaxLength = 18
+
     /// 组高负载时组内最忙进程的显示名(组行红色 chip,2026-10-30 用户拍板):
     /// 阈值与数值标红同源;引擎契约组内进程按 CPU% 降序,首个即最忙。未越线或空组 → nil。
+    /// 超过封顶字数时中间省略(保留前缀命名空间与后缀区分度)。
     public static func groupHotProcessName(_ group: ProcessGroup) -> String? {
         guard groupBadge(cpuPercent: group.cpuPercent) != nil, let top = group.processes.first else {
             return nil
         }
-        return PulseFormat.processName(executablePath: top.executablePath, argv: top.argv, pid: top.pid)
+        let name = PulseFormat.processName(executablePath: top.executablePath, argv: top.argv, pid: top.pid)
+        guard name.count > hotProcessNameMaxLength else {
+            return name
+        }
+        let kept = hotProcessNameMaxLength - 1
+        return "\(name.prefix((kept + 1) / 2))…\(name.suffix(kept / 2))"
     }
 }

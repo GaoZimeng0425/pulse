@@ -48,6 +48,25 @@ final class StatusBadgeTests: XCTestCase {
         XCTAssertNil(StatusBadgeRules.groupHotProcessName(group(cpu: 250, processes: [])))
     }
 
+    /// chip 封顶字数(2026-10-30 用户拍板):超长进程名中间省略到上限,chip 自身不再被压缩。
+    func testHotProcessNameIsCappedWithMiddleEllipsis() {
+        let long = group(cpu: 150, processes: [
+            RawProcess(pid: 10, parentPID: 1, executablePath: "/usr/bin/com.apple.WebKit.WebContent.Development"),
+        ])
+        let name = StatusBadgeRules.groupHotProcessName(long)
+        XCTAssertEqual(name?.count, StatusBadgeRules.hotProcessNameMaxLength)
+        XCTAssertEqual(name?.hasPrefix("com.apple"), true)
+        XCTAssertEqual(name?.hasSuffix("opment"), true)
+        XCTAssertEqual(name?.contains("…"), true)
+    }
+
+    func testShortHotProcessNameIsUntouched() {
+        let short = group(cpu: 150, processes: [
+            RawProcess(pid: 10, parentPID: 1, executablePath: "/usr/local/bin/node"),
+        ])
+        XCTAssertEqual(StatusBadgeRules.groupHotProcessName(short), "node")
+    }
+
     // MARK: 系统负载徽章(空载 ✓正常 / 高负载 / 中间静默)
 
     func testIdleSystemLoadGetsNormalBadge() {

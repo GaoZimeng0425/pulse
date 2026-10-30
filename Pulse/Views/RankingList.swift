@@ -219,12 +219,13 @@ struct RankingListRow<Badge: View, Trailing: View>: View {
 
     private var nameColumn: some View {
         VStack(alignment: .leading, spacing: 1) {
-            // 徽章靠名称区最右(贴 meter),不跟在名称尾巴后随名长漂移(2026-10-30 用户拍板)。
+            // 徽章靠名称区最右(贴 meter),不跟在名称尾巴后随名长漂移;名称吃剩余宽度、
+            // 尾部省略(开头是项目 / App 名,最该留;2026-10-30 用户拍板)。
             HStack(spacing: 4) {
                 Text(name)
                     .font(.system(size: RankingListMetrics.nameFontSize(compact: isCompact), weight: .medium))
                     .lineLimit(1)
-                    .truncationMode(.middle)
+                    .truncationMode(.tail)
                 Spacer(minLength: 0)
                 badge()
             }
