@@ -20,6 +20,9 @@ final class GroupRankingCardNSView: ObservingView {
     private let model: DashboardModel
     private let shell = RankingCardShell(title: "当前最忙")
     private var slots: [GroupRankingSlotView] = []
+    private var hoverTracking: NSTrackingArea?
+    private weak var hoveredRow: GroupRankingRowView?
+    private var clipObserver: NSObjectProtocol?
 
     init(tab: MetricTab, monitor: SystemMonitor, model: DashboardModel) {
         self.tab = tab
@@ -60,6 +63,81 @@ final class GroupRankingCardNSView: ObservingView {
         }
     }
 
+    // MARK: 悬停(全卡一个跟踪区)
+
+    // 上百行各挂 `.inVisibleRect` 跟踪区时,滚动的每一帧 AppKit 都要逐个重算
+    // (popover-appkit/09 采样:滚动主线程 ~13% 耗在 updateTrackingAreas)。改为卡片
+    // 一个跟踪区 + 按鼠标位置找行;滚动时鼠标不动、内容在动,跟随剪裁区变化重算。
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverTracking {
+            removeTrackingArea(hoverTracking)
+        }
+        let area = NSTrackingArea(
+            rect: .zero,
+            options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self
+        )
+        addTrackingArea(area)
+        hoverTracking = area
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        updateHover(windowPoint: event.locationInWindow)
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        updateHover(windowPoint: event.locationInWindow)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        setHovered(nil)
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let clipObserver {
+            NotificationCenter.default.removeObserver(clipObserver)
+            self.clipObserver = nil
+        }
+        guard window != nil, let clip = enclosingScrollView?.contentView else {
+            setHovered(nil)
+            return
+        }
+        clip.postsBoundsChangedNotifications = true
+        clipObserver = NotificationCenter.default.addObserver(
+            forName: NSView.boundsDidChangeNotification,
+            object: clip,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, let window = self.window else { return }
+                self.updateHover(windowPoint: window.mouseLocationOutsideOfEventStream)
+            }
+        }
+    }
+
+    private func updateHover(windowPoint: NSPoint) {
+        guard let window, window.isVisible,
+              let visible = enclosingScrollView?.contentView,
+              visible.bounds.contains(visible.convert(windowPoint, from: nil)),
+              bounds.contains(convert(windowPoint, from: nil))
+        else {
+            setHovered(nil)
+            return
+        }
+        let row = slots.lazy.map(\.row).first { $0.bounds.contains($0.convert(windowPoint, from: nil)) }
+        setHovered(row)
+    }
+
+    private func setHovered(_ row: GroupRankingRowView?) {
+        guard row !== hoveredRow else { return }
+        hoveredRow?.isHovering = false
+        row?.isHovering = true
+        hoveredRow = row
+    }
+
     private func syncSlotCount(_ count: Int) {
         while slots.count < count {
             let slot = GroupRankingSlotView()
@@ -97,7 +175,7 @@ private final class GroupRankingSlotView: NSStackView {
     var onSelectProcess: ((pid_t?) -> Void)?
     var onEndProcess: ((KillTarget) -> Void)?
 
-    private let row = GroupRankingRowView()
+    let row = GroupRankingRowView()
     private let drilldownWrap = FlippedView()
     private lazy var drilldown = PopoverDrilldownView()
     private var drilldownInstalled = false
@@ -155,26 +233,27 @@ private final class GroupRankingSlotView: NSStackView {
 // MARK: - 组行
 
 /// 组排行行(RankingRowView 紧凑档):通用行排版 + 交互——点行展开、悬停 / 展开时
-/// primary 5% 圆角 8 底、悬停出「结束整组」(不悬停时透明占位,行宽不跳)、右键同入口。
+/// primary 5% 圆角 8 底、悬停出「结束整组」(不悬停时隐藏,行宽不跳)、右键同入口。
 /// 组 CPU% > 100%(StatusBadgeRules 同一阈值)= 行尾 CPU 数值圈红,仅 CPU 口径。
+/// 悬停由卡片统一跟踪(`GroupRankingCardNSView`,全卡一个跟踪区),行本身不挂跟踪区。
 @MainActor
 private final class GroupRankingRowView: RankingRowNSView {
     var onToggle: ((GroupIdentity) -> Void)?
     var onEndGroup: ((ProcessGroup) -> Void)?
 
     private let endButton = NSButton()
-    private let chevron = ChevronView()
     private var group: ProcessGroup?
-    private var isHovering = false {
+    private var isExpanded = false
+
+    var isHovering = false {
         didSet {
-            if isHovering != oldValue {
-                endButton.alphaValue = isHovering ? 1 : 0
-                needsDisplay = true
-            }
+            guard isHovering != oldValue else { return }
+            endButton.isHidden = !isHovering
+            // 悬停提示只挂在当前悬停行:上百行各挂一个 toolTip 也是一份跟踪区开销。
+            endButton.toolTip = isHovering ? "结束整组(需确认)" : nil
+            needsDisplay = true
         }
     }
-
-    private var isExpanded = false
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -183,29 +262,24 @@ private final class GroupRankingRowView: RankingRowNSView {
         endButton.image = symbolImage("xmark.octagon", size: 11, weight: .semibold)
         endButton.imagePosition = .imageOnly
         endButton.contentTintColor = Surface.negative.ns
-        endButton.toolTip = "结束整组(需确认)"
-        endButton.alphaValue = 0
+        endButton.isHidden = true
         endButton.target = self
         endButton.action = #selector(endGroup)
-        endButton.fixed(width: 18, height: 18)
-        let controls = hstack([endButton, chevron], spacing: 2)
-        trailing.addSubview(controls)
-        NSLayoutConstraint.activate([
-            controls.trailingAnchor.constraint(equalTo: trailing.trailingAnchor),
-            controls.centerYAnchor.constraint(equalTo: trailing.centerYAnchor),
-        ])
+        addSubview(endButton)
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
-        addTrackingArea(NSTrackingArea(
-            rect: .zero,
-            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
-            owner: self
-        ))
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError()
+    }
+
+    override func layout() {
+        super.layout()
+        // 行尾列:结束按钮 18 + 间距 2 + 展开箭头 10,右对齐。
+        let trailing = trailingRect
+        endButton.frame = NSRect(x: trailing.maxX - 10 - 2 - 18, y: trailing.midY - 9, width: 18, height: 18)
     }
 
     func set(group: ProcessGroup, metric: GroupCardMetric, meterFraction: Double, isExpanded: Bool) {
@@ -234,7 +308,6 @@ private final class GroupRankingRowView: RankingRowNSView {
         )
         if isExpanded != self.isExpanded {
             self.isExpanded = isExpanded
-            chevron.isExpanded = isExpanded
             needsDisplay = true
         }
         endButton.setAccessibilityLabel("结束整组 \(group.name)")
@@ -243,27 +316,48 @@ private final class GroupRankingRowView: RankingRowNSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        guard isHovering || isExpanded else { return }
-        Ink.primary.withAlphaComponent(0.05).setFill()
-        NSBezierPath(roundedRect: bounds, xRadius: 8, yRadius: 8).fill()
+        if isHovering || isExpanded {
+            Ink.primary.withAlphaComponent(0.05).setFill()
+            NSBezierPath(roundedRect: bounds, xRadius: 8, yRadius: 8).fill()
+        }
+        super.draw(dirtyRect)
+        drawChevron()
+    }
+
+    private static let chevronRight = chevron("chevron.right")
+    private static let chevronDown = chevron("chevron.down")
+
+    /// 箭头图只建一次(每次绘制现建实测占滚动主线程 ~16%);tertiary 是动态色,绘制时按外观解析。
+    private static func chevron(_ name: String) -> NSImage? {
+        NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+            .withSymbolConfiguration(
+                NSImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
+                    .applying(NSImage.SymbolConfiguration(paletteColors: [Ink.tertiary]))
+            )
+    }
+
+    /// 展开箭头:chevron.right 10 semibold tertiary,展开时转 90°(rotationEffect 同义,
+    /// 无过渡动画);占行尾列最右 10pt。
+    private func drawChevron() {
+        guard let image = isExpanded ? Self.chevronDown : Self.chevronRight else { return }
+        let trailing = trailingRect
+        let size = image.size
+        let rect = NSRect(
+            x: trailing.maxX - 5 - size.width / 2,
+            y: trailing.midY - size.height / 2,
+            width: size.width,
+            height: size.height
+        )
+        image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
     }
 
     // MARK: 交互
 
-    override func mouseEntered(with event: NSEvent) {
-        isHovering = true
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        isHovering = false
-    }
-
-    /// 整行一个按钮:除结束按钮外,行内子视图一律不截获点击。
+    /// 整行一个按钮:除结束按钮外,行内一律由行本身接点击。
     override func hitTest(_ point: NSPoint) -> NSView? {
         guard frame.contains(point) else { return nil }
         let local = convert(point, from: superview)
-        let buttonPoint = endButton.convert(local, from: self)
-        if endButton.alphaValue > 0, endButton.bounds.contains(buttonPoint) {
+        if !endButton.isHidden, endButton.frame.contains(local) {
             return endButton
         }
         return self
@@ -296,58 +390,5 @@ private final class GroupRankingRowView: RankingRowNSView {
         if let group {
             onEndGroup?(group)
         }
-    }
-}
-
-/// 展开箭头:chevron.right 10 semibold tertiary,展开时顺时针转 90°(rotationEffect
-/// 同义,无过渡动画);列宽 10。
-@MainActor
-private final class ChevronView: FlippedView {
-    var isExpanded = false {
-        didSet {
-            if isExpanded != oldValue {
-                needsDisplay = true
-            }
-        }
-    }
-
-    private let image = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: nil)?
-        .withSymbolConfiguration(
-            NSImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
-                .applying(NSImage.SymbolConfiguration(paletteColors: [Ink.tertiary]))
-        )
-
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        fixed(width: 10, height: 18)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError()
-    }
-
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        nil
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let image, let context = NSGraphicsContext.current?.cgContext else { return }
-        let size = image.size
-        context.saveGState()
-        context.translateBy(x: bounds.midX, y: bounds.midY)
-        if isExpanded {
-            // 翻转坐标系(y 向下)里正角度即顺时针。
-            context.rotate(by: .pi / 2)
-        }
-        image.draw(
-            in: NSRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height),
-            from: .zero,
-            operation: .sourceOver,
-            fraction: 1,
-            respectFlipped: true,
-            hints: nil
-        )
-        context.restoreGState()
     }
 }

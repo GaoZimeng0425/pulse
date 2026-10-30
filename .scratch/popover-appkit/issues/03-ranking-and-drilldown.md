@@ -1,6 +1,6 @@
 # 03 组排行卡 + 进程下钻 + 模块排行卡
 
-Status: ready-for-agent
+Status: done(2026-10-30,feat/popover-appkit)
 Blocked by: 01
 
 ## 做什么

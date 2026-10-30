@@ -1,6 +1,6 @@
 # 08 历史页
 
-Status: ready-for-agent
+Status: done(2026-10-30,feat/popover-appkit)
 Blocked by: 01
 
 ## 做什么

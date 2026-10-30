@@ -1,6 +1,6 @@
 # 02 总览小卡 + 内存双环 + dev server 卡
 
-Status: ready-for-agent
+Status: done(2026-10-30,feat/popover-appkit)
 Blocked by: 01
 
 ## 做什么

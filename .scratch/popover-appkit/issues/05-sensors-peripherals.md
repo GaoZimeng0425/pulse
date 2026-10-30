@@ -1,6 +1,6 @@
 # 05 传感器派生卡 + 蓝牙设备卡 + 声音卡
 
-Status: ready-for-agent
+Status: done(2026-10-30,feat/popover-appkit)
 Blocked by: 01
 
 ## 做什么

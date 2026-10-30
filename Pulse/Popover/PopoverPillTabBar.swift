@@ -105,6 +105,10 @@ private final class PillNSView: FlippedView {
         translatesAutoresizingMaskIntoConstraints = false
         icon.translatesAutoresizingMaskIntoConstraints = false
         icon.setContentHuggingPriority(.required, for: .horizontal)
+        icon.setContentCompressionResistancePriority(.required, for: .horizontal)
+        // 放不下时只压选中药丸的文字(尾部省略),不让栈把整颗药丸挤掉:历史页指标条
+        // 9 项在 324pt 内放不下「图标 + 系统负载」(旧版同处文字被挤成竖排,popover-appkit/08)。
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         let content = hstack([icon, label], spacing: 5)
         addSubview(content)
         content.pin(to: self, insets: NSEdgeInsets(top: 5, left: 9, bottom: 5, right: 9))

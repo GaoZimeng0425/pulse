@@ -103,40 +103,43 @@ final class RankingCardShell: NSView {
 
 // MARK: - 行
 
-/// 排行行排版(RankingListRow 紧凑档):图标 18 + 名称(12.5 medium,中间省略)/ 副文
+/// 排行行(RankingListRow 紧凑档):图标 18 + 名称(12.5 medium,中间省略)/ 副文
 /// (10.5 secondary)| 弹性空白(≥8)| meter 52 + 定宽数值列 | 行尾 30pt 列(恒占位)。
-/// 只管排版与内容;交互由子类(组排行行)加在外面。
+///
+/// **整行一次 `draw` 画完、行高固定**(popover-appkit/09 实测):总览排行常有上百行,
+/// 每行拆成 8 个子视图时,每轮文字变化都触发全栈 Auto Layout、滚动时新露出的行逐个
+/// 重画,滚动实测 48%。单视图下刷新只标脏、零布局,屏外行的重画推迟到滚进视野。
+/// 交互(悬停 / 点击 / 结束按钮)由子类与卡片加在外面。
 @MainActor
 class RankingRowNSView: FlippedView {
-    let trailing = FlippedView()
-    private let icon = RankingIconView(size: RankingRowMetrics.iconSize)
-    private let nameLabel = makeLabel(font: PFont.text(RankingRowMetrics.valueFontSize, .medium))
-    private let subtitleLabel = makeLabel(font: PFont.text(10.5), color: Ink.secondary)
-    private let meter = MeterBarView(width: RankingRowMetrics.meterWidth)
-    private let value = RankingValueView()
+    private static let nameFont = PFont.text(RankingRowMetrics.valueFontSize, .medium)
+    private static let subtitleFont = PFont.text(10.5)
+    private static let valueFont = PFont.digits(RankingRowMetrics.valueFontSize, .semibold)
+    /// 文字行高与 NSTextField 标签的固有高度同口径(拆视图版实测行距不变)。
+    private static let nameHeight = NSTextField(labelWithString: "Ag").then { $0.font = nameFont }.intrinsicContentSize
+        .height
+    private static let subtitleHeight = NSTextField(labelWithString: "Ag").then { $0.font = subtitleFont }
+        .intrinsicContentSize.height
+    private static let textGap: CGFloat = 1
+    static let rowHeight = max(RankingRowMetrics.iconSize, nameHeight + textGap + subtitleHeight)
+        + RankingRowMetrics.rowVerticalInset * 2
+    /// 高负载圈红:同色 1pt 胶囊描边、负内距外扩 4pt(随文不占版)。
+    private static let ringOutset: CGFloat = 4
+    private static let minimumValueScale: CGFloat = 0.8
+
+    private var name = ""
+    private var subtitle = ""
+    private var icon: RankingIconSource?
+    private var iconImage: NSImage?
+    private var meterFraction: Double = 0
+    private var tint: NSColor = .clear
+    private var valueText = ""
+    private var alertsHighLoad = false
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         translatesAutoresizingMaskIntoConstraints = false
-        nameLabel.lineBreakMode = .byTruncatingMiddle
-        for label in [nameLabel, subtitleLabel] {
-            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-            label.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        }
-        let textColumn = vstack([nameLabel, subtitleLabel], spacing: 1)
-        textColumn.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        trailing.fixed(width: RankingRowMetrics.trailingWidth, height: 18)
-        let row = hstack(
-            [icon, textColumn, spacer(minLength: 8), meter, value, trailing],
-            spacing: RankingRowMetrics.spacing
-        )
-        addSubview(row)
-        row.pin(to: self, insets: NSEdgeInsets(
-            top: RankingRowMetrics.rowVerticalInset,
-            left: RankingRowMetrics.rowInset,
-            bottom: RankingRowMetrics.rowVerticalInset,
-            right: RankingRowMetrics.rowInset
-        ))
+        heightAnchor.constraint(equalToConstant: Self.rowHeight).isActive = true
     }
 
     @available(*, unavailable)
@@ -144,99 +147,68 @@ class RankingRowNSView: FlippedView {
         fatalError()
     }
 
-    /// 写一行内容:值未变的字段不动(采样轮刷新只改内容,不重建行)。
+    /// 行尾 30pt 列的矩形(子类在这里摆结束按钮 / 画展开箭头)。
+    var trailingRect: NSRect {
+        let width = RankingRowMetrics.trailingWidth
+        return NSRect(x: bounds.maxX - RankingRowMetrics.rowInset - width, y: 0, width: width, height: bounds.height)
+    }
+
+    /// 写一行内容:全部字段与上次相同则不重画(采样轮刷新只改内容,不重建行)。
     func setContent(
         name: String,
         subtitle: String,
-        icon iconSource: RankingIconView.Source,
+        icon: RankingIconSource,
         meterFraction: Double,
         tint: NSColor,
         valueText: String,
         alertsHighLoad: Bool
     ) {
-        nameLabel.setText(name)
-        subtitleLabel.setText(subtitle)
-        icon.source = iconSource
-        meter.fraction = meterFraction
-        meter.tint = tint
-        value.set(text: valueText, alerts: alertsHighLoad)
-    }
-}
-
-// MARK: - 图标
-
-/// 行图标:App 行取真实应用图标(AppIconCache 预栅格化缓存,与 SwiftUI 行同一取法),
-/// 其余取类别瓦片(CategoryIconTile 同配方:圆角 = 边长 × 0.24 的实心方块 + 白符号
-/// 边长 × 0.52 semibold)。来源未变不重画。
-@MainActor
-final class RankingIconView: FlippedView {
-    enum Source: Equatable {
-        case app(bundlePath: String)
-        case tile(symbolName: String, color: Color)
-    }
-
-    var source: Source? {
-        didSet {
-            guard source != oldValue else { return }
-            resolve()
+        if icon != self.icon {
+            self.icon = icon
+            iconImage = icon.image(size: RankingRowMetrics.iconSize)
             needsDisplay = true
         }
-    }
-
-    private let size: CGFloat
-    private var appImage: NSImage?
-    private var tileSymbol: NSImage?
-    private var tileColor: NSColor = .clear
-
-    init(size: CGFloat) {
-        self.size = size
-        super.init(frame: .zero)
-        fixed(width: size, height: size)
-        setContentHuggingPriority(.required, for: .horizontal)
-        setContentCompressionResistancePriority(.required, for: .horizontal)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError()
-    }
-
-    private func resolve() {
-        appImage = nil
-        tileSymbol = nil
-        switch source {
-        case let .app(bundlePath):
-            appImage = AppIconCache.icon(forBundle: bundlePath, pointSize: size)
-        case let .tile(symbolName, color):
-            tileColor = color.ns
-            tileSymbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
-                .withSymbolConfiguration(
-                    NSImage.SymbolConfiguration(pointSize: size * 0.52, weight: .semibold)
-                        .applying(NSImage.SymbolConfiguration(paletteColors: [.white]))
-                )
-        case nil:
-            break
-        }
+        guard name != self.name || subtitle != self.subtitle || meterFraction != self.meterFraction
+            || tint != self.tint || valueText != self.valueText || alertsHighLoad != self.alertsHighLoad
+        else { return }
+        self.name = name
+        self.subtitle = subtitle
+        self.meterFraction = meterFraction
+        self.tint = tint
+        self.valueText = valueText
+        self.alertsHighLoad = alertsHighLoad
+        needsDisplay = true
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        if let appImage {
-            appImage.draw(in: bounds, from: .zero, operation: .sourceOver, fraction: 1)
-            return
-        }
-        guard tileSymbol != nil || source != nil else { return }
-        tileColor.setFill()
-        let radius = size * 0.24
-        NSBezierPath(roundedRect: bounds, xRadius: radius, yRadius: radius).fill()
-        if let tileSymbol {
-            let symbolSize = tileSymbol.size
-            let rect = NSRect(
-                x: (bounds.width - symbolSize.width) / 2,
-                y: (bounds.height - symbolSize.height) / 2,
-                width: symbolSize.width,
-                height: symbolSize.height
-            )
-            tileSymbol.draw(
+        let s = RankingRowMetrics.spacing
+        let inset = RankingRowMetrics.rowInset
+        let midY = bounds.midY
+        let trailing = trailingRect
+        let valueRect = NSRect(
+            x: trailing.minX - s - RankingRowMetrics.valueWidth,
+            y: 0,
+            width: RankingRowMetrics.valueWidth,
+            height: bounds.height
+        )
+        let meterWidth = RankingRowMetrics.meterWidth
+        let meterRect = NSRect(x: valueRect.minX - s - meterWidth, y: midY - 3, width: meterWidth, height: 6)
+        let iconSize = RankingRowMetrics.iconSize
+        let iconRect = NSRect(x: inset, y: midY - iconSize / 2, width: iconSize, height: iconSize)
+        // 文字列吃剩余宽度:与 meter 之间隔 行间距 + 弹性空白(≥8)+ 行间距。
+        let textX = iconRect.maxX + s
+        let textWidth = max(0, meterRect.minX - s - 8 - s - textX)
+
+        drawIcon(in: iconRect)
+        drawText(textX: textX, width: textWidth)
+        drawMeter(in: meterRect)
+        drawValue(in: valueRect)
+    }
+
+    private func drawIcon(in rect: NSRect) {
+        switch icon {
+        case .app:
+            iconImage?.draw(
                 in: rect,
                 from: .zero,
                 operation: .sourceOver,
@@ -244,87 +216,94 @@ final class RankingIconView: FlippedView {
                 respectFlipped: true,
                 hints: nil
             )
+        case let .tile(_, color):
+            // CategoryIconTile 同配方:圆角 = 边长 × 0.24 的实心方块 + 白符号(边长 × 0.52 semibold)。
+            color.ns.setFill()
+            let radius = rect.width * 0.24
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+            if let symbol = iconImage {
+                let size = symbol.size
+                symbol.draw(
+                    in: NSRect(
+                        x: rect.midX - size.width / 2,
+                        y: rect.midY - size.height / 2,
+                        width: size.width,
+                        height: size.height
+                    ),
+                    from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil
+                )
+            }
+        case nil:
+            break
         }
     }
-}
 
-extension RankingIconView.Source {
-    /// App 行(有 bundle 路径)取应用图标;其余取类别瓦片。
-    static func make(bundlePath: String?, tileSymbol: String, tileColor: Color) -> Self {
-        if let bundlePath {
-            return .app(bundlePath: bundlePath)
-        }
-        return .tile(symbolName: tileSymbol, color: tileColor)
-    }
-}
-
-// MARK: - 数值列
-
-/// 定宽数值列:12.5 semibold 等宽数字、右对齐;超宽先缩字(最小 0.8,SwiftUI
-/// `.minimumScaleFactor(0.8)` 同义)再截断。高负载警示 = state-negative 数字 + 同色
-/// 1pt 胶囊描边、负内距外扩 4pt(随文不占版)——描边画在外扩 4pt 的内层视图里,
-/// 列宽与行高不动,重画范围也覆盖描边。
-@MainActor
-final class RankingValueView: FlippedView {
-    private let canvas = RankingValueCanvas()
-
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        let font = PFont.digits(RankingRowMetrics.valueFontSize, .semibold)
-        let lineHeight = ceil(font.ascender - font.descender + font.leading)
-        fixed(width: RankingRowMetrics.valueWidth, height: lineHeight)
-        setContentHuggingPriority(.required, for: .horizontal)
-        setContentCompressionResistancePriority(.required, for: .horizontal)
-        clipsToBounds = false
-        addSubview(canvas)
-        canvas.pin(to: self, insets: NSEdgeInsets(
-            top: -RankingValueCanvas.ringOutset,
-            left: -RankingValueCanvas.ringOutset,
-            bottom: -RankingValueCanvas.ringOutset,
-            right: -RankingValueCanvas.ringOutset
-        ))
+    private func drawText(textX: CGFloat, width: CGFloat) {
+        guard width > 0 else { return }
+        let blockHeight = Self.nameHeight + Self.textGap + Self.subtitleHeight
+        let top = bounds.midY - blockHeight / 2
+        Self.draw(
+            name,
+            font: Self.nameFont,
+            color: Ink.primary,
+            truncation: .byTruncatingMiddle,
+            in: NSRect(x: textX, y: top, width: width, height: Self.nameHeight)
+        )
+        Self.draw(
+            subtitle,
+            font: Self.subtitleFont,
+            color: Ink.secondary,
+            truncation: .byTruncatingTail,
+            in: NSRect(
+                x: textX,
+                y: top + Self.nameHeight + Self.textGap,
+                width: width,
+                height: Self.subtitleHeight
+            )
+        )
     }
 
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError()
+    private static func draw(
+        _ text: String,
+        font: NSFont,
+        color: NSColor,
+        truncation: NSLineBreakMode,
+        in rect: NSRect
+    ) {
+        let style = NSMutableParagraphStyle()
+        style.lineBreakMode = truncation
+        (text as NSString).draw(
+            with: rect,
+            options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
+            attributes: [.font: font, .foregroundColor: color, .paragraphStyle: style]
+        )
     }
 
-    func set(text: String, alerts: Bool) {
-        canvas.set(text: text, alerts: alerts)
-    }
-}
-
-@MainActor
-private final class RankingValueCanvas: FlippedView {
-    static let ringOutset: CGFloat = 4
-    private static let minimumScale: CGFloat = 0.8
-    private var text = ""
-    private var alerts = false
-
-    func set(text: String, alerts: Bool) {
-        guard text != self.text || alerts != self.alerts else { return }
-        self.text = text
-        self.alerts = alerts
-        needsDisplay = true
+    private func drawMeter(in rect: NSRect) {
+        let r = rect.height / 2
+        tint.withAlphaComponent(0.14).setFill()
+        NSBezierPath(roundedRect: rect, xRadius: r, yRadius: r).fill()
+        let width = rect.width * CGFloat(min(max(meterFraction, 0), 1))
+        guard width > 0 else { return }
+        tint.setFill()
+        NSBezierPath(
+            roundedRect: NSRect(x: rect.minX, y: rect.minY, width: width, height: rect.height),
+            xRadius: r,
+            yRadius: r
+        ).fill()
     }
 
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        nil
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let outset = Self.ringOutset
-        let column = bounds.insetBy(dx: outset, dy: outset)
-        let color = alerts ? Surface.negative.ns : Ink.primary
-        var font = PFont.digits(RankingRowMetrics.valueFontSize, .semibold)
+    /// 定宽数值列:右对齐;超宽先缩字(最小 0.8,`.minimumScaleFactor(0.8)` 同义)再截断。
+    private func drawValue(in column: NSRect) {
+        let color = alertsHighLoad ? Surface.negative.ns : Ink.primary
+        var font = Self.valueFont
         var attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
-        var size = (text as NSString).size(withAttributes: attributes)
+        var size = (valueText as NSString).size(withAttributes: attributes)
         if size.width > column.width {
-            let scale = max(Self.minimumScale, column.width / size.width)
+            let scale = max(Self.minimumValueScale, column.width / size.width)
             font = PFont.digits(RankingRowMetrics.valueFontSize * scale, .semibold)
             attributes[.font] = font
-            size = (text as NSString).size(withAttributes: attributes)
+            size = (valueText as NSString).size(withAttributes: attributes)
         }
         let width = min(size.width, column.width)
         let textRect = NSRect(
@@ -337,13 +316,52 @@ private final class RankingValueCanvas: FlippedView {
         style.lineBreakMode = .byTruncatingTail
         style.alignment = .right
         attributes[.paragraphStyle] = style
-        (text as NSString).draw(in: textRect, withAttributes: attributes)
-        guard alerts else { return }
+        (valueText as NSString).draw(in: textRect, withAttributes: attributes)
+        guard alertsHighLoad else { return }
         // strokeBorder:描边落在外扩矩形之内(半线宽内缩)。
-        let ring = textRect.insetBy(dx: -outset, dy: -outset).insetBy(dx: 0.5, dy: 0.5)
+        let ring = textRect.insetBy(dx: -Self.ringOutset, dy: -Self.ringOutset).insetBy(dx: 0.5, dy: 0.5)
         let path = NSBezierPath(roundedRect: ring, xRadius: ring.height / 2, yRadius: ring.height / 2)
         path.lineWidth = 1
         color.setStroke()
         path.stroke()
+    }
+}
+
+// MARK: - 图标来源
+
+/// 行图标:App 行取真实应用图标(AppIconCache 预栅格化缓存,与 SwiftUI 行同一取法),
+/// 其余取类别瓦片(底色在绘制时按外观解析;白符号预渲染一次)。
+enum RankingIconSource: Equatable {
+    case app(bundlePath: String)
+    case tile(symbolName: String, color: Color)
+
+    /// App 行(有 bundle 路径)取应用图标;其余取类别瓦片。
+    static func make(bundlePath: String?, tileSymbol: String, tileColor: Color) -> Self {
+        if let bundlePath {
+            return .app(bundlePath: bundlePath)
+        }
+        return .tile(symbolName: tileSymbol, color: tileColor)
+    }
+
+    /// App = 应用图标;瓦片 = 白色符号(瓦片底色另画)。
+    @MainActor
+    func image(size: CGFloat) -> NSImage? {
+        switch self {
+        case let .app(bundlePath):
+            AppIconCache.icon(forBundle: bundlePath, pointSize: size)
+        case let .tile(symbolName, _):
+            NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
+                .withSymbolConfiguration(
+                    NSImage.SymbolConfiguration(pointSize: size * 0.52, weight: .semibold)
+                        .applying(NSImage.SymbolConfiguration(paletteColors: [.white]))
+                )
+        }
+    }
+}
+
+private extension NSTextField {
+    func then(_ configure: (NSTextField) -> Void) -> NSTextField {
+        configure(self)
+        return self
     }
 }

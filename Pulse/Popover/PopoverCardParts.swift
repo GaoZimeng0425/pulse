@@ -218,6 +218,17 @@ final class EmptyStateView: NSStackView {
         addArrangedSubview(detailLabel)
         addArrangedSubview(actionButton)
         setCustomSpacing(6, after: detailLabel)
+        // 说明可多行:宽度不超过空态本身,折行宽度随布局实测更新(见 layout)。
+        detailLabel.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor).isActive = true
+        detailLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    }
+
+    override func layout() {
+        super.layout()
+        // 多行标签的固有高度按 preferredMaxLayoutWidth 折行;不给就按单行量宽,撑出卡外。
+        if detailLabel.preferredMaxLayoutWidth != bounds.width {
+            detailLabel.preferredMaxLayoutWidth = bounds.width
+        }
     }
 
     @available(*, unavailable)

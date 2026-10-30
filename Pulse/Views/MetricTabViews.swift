@@ -126,43 +126,6 @@ extension View {
     }
 }
 
-/// 弹窗顶部图标 tab(工单 03,参考文档 §2.1:无文字、title 提示):
-/// 选中态 = 该指标强调色 15% 胶囊 + 强调色图标(§1.1 选中 tab 配方)。
-/// 渲染序 = 选中态的展示轴(工单 02:无电池机器不含电池页)。
-/// 槽位单行满宽均分(P2 扩到 11 枚后的修复):弹窗内容区 332pt,原 32pt 定宽
-/// 槽 11 枚要 392pt,右端被裁切;改由 HStack 均分——枚数再多只收窄不溢出,
-/// 与主窗口工具栏「720 预算优先,不触发溢出菜单」同一哲学。
-struct MetricIconTabBar: View {
-    @Binding var selection: MetricTabSelection
-
-    var body: some View {
-        HStack(spacing: 4) {
-            ForEach(selection.axis) { tab in
-                let isSelected = selection.current == tab
-                Button {
-                    selection.current = tab
-                } label: {
-                    Image(systemName: tab.symbolName)
-                        .font(.system(size: 13, weight: .medium))
-                        .frame(maxWidth: .infinity, minHeight: 26)
-                        .foregroundStyle(isSelected ? tab.accent.accentColor : Color.secondary)
-                        .background(
-                            isSelected ? tab.accent.accentColor.opacity(0.15) : Color.clear,
-                            in: .capsule
-                        )
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .help(tab.title)
-                .accessibilityLabel(tab.title)
-                .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .metricTabKeyboard($selection)
-    }
-}
-
 /// 主窗口药丸 tab:通用 `PillTabBar` 的工具栏用法薄封装(用户拍板 2026-10-22
 /// tab 收敛为通用组件)——未选中纯图标、选中图标+文字(P1 验收走查拍板:7 个
 /// tab 后工具栏把中间某枚药丸的文字压缩成省略号,压缩只压一处、其余完好的怪象
@@ -319,7 +282,6 @@ struct MetricMainCardView: View {
 #Preview("tab 条") {
     @Previewable @State var selection = MetricTabSelection()
     return VStack(spacing: 16) {
-        MetricIconTabBar(selection: $selection)
         MetricPillTabBar(selection: $selection)
         Text("当前:\(selection.current.title)")
             .font(.caption)

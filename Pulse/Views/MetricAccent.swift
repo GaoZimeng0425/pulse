@@ -8,9 +8,17 @@ extension Metric {
     /// 浅深自适应强调色:浅色外观取 light、深色取 dark(令牌表即色值)。
     /// 动态 NSColor provider 让同一 `Color` 随系统外观切换;浅深切换的观感
     /// 属预览 + 手动验收(spec 测试决策:UI 不写单元测试)。
+    ///
+    /// 每个指标只建一次(popover-appkit/09):计算属性每读一次就新建一个动态 NSColor,
+    /// 两次读取互不相等——AppKit 面板「颜色没变就不重画」的判断因此永远落空,
+    /// 每轮采样把上百行排行全部标脏。缓存后同一指标恒为同一实例。
     var accentColor: Color {
-        Color.dynamic(light: accent.light, dark: accent.dark)
+        Self.accentColors[self] ?? Color.dynamic(light: accent.light, dark: accent.dark)
     }
+
+    private static let accentColors: [Metric: Color] = Dictionary(
+        uniqueKeysWithValues: allCases.map { ($0, Color.dynamic(light: $0.accent.light, dark: $0.accent.dark)) }
+    )
 }
 
 // MARK: - 表面令牌(工单 P0.6-05,参考文档 §1.1 中性色)

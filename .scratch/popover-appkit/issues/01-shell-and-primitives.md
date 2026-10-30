@@ -1,6 +1,6 @@
 # 01 外壳 + 刷新机制 + 卡片零件
 
-Status: ready-for-agent
+Status: done(2026-10-30,feat/popover-appkit)
 Blocked by: —
 
 ## 做什么

@@ -1,6 +1,6 @@
 # 04 指标主卡紧凑档(CPU / 内存 / GPU / ANE / 电池 / 磁盘 / 网络)
 
-Status: ready-for-agent
+Status: done(2026-10-30,feat/popover-appkit)
 Blocked by: 01
 
 ## 做什么

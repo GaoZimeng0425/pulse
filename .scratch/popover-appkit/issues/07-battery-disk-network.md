@@ -1,6 +1,6 @@
 # 07 电池页 / 磁盘页 / 网络页
 
-Status: ready-for-agent
+Status: done(2026-10-30,feat/popover-appkit)
 Blocked by: 01, 03, 04
 
 ## 做什么
