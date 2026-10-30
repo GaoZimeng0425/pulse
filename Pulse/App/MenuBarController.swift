@@ -16,7 +16,7 @@ import SwiftUI
 ///   与 transient 语义等价),hidesOnDeactivate = false 防 app 切换误收;
 /// - **点按直达**:按钮 mouseDown 触发(附件型 app 首击不再被激活吞)。
 ///
-/// 其余职责与首轮一致:弹窗内容/可见性门控(MenuBarPopoverGate)原样复用,
+/// 弹窗内容为 AppKit 原生实现(popover-appkit:SwiftUI 版开期 10–30%,AppKit 探针 2–4%),
 /// 可见性信号由本控制器在开/收两处直给(AppKit 时机,不赌 SwiftUI onAppear);
 /// 徽标位图(渲染器 + LRU 缓存)直挂 button.image;原常驻标签视图的四件事
 /// (采样启动 / 项目根变更 / 告警开窗 / 回前台授权同步)全部迁居于此。
@@ -30,14 +30,14 @@ final class MenuBarController: NSObject {
     /// NSVisualEffectView + NSHostingView 塞进一个隐藏面板,等于让窗口服务
     /// 从拉起就养着一棵可能自扰的视图树(40% 空转的头号嫌疑,懒创建一举排除)。
     private lazy var panel: PopupPanel = {
-        // TEMP-EXPERIMENT(终局二分):debug.staticPanelContent=YES 时面板只挂
-        // 静态文本(可见性管线照常驱动)——0% = 内容管线纵火,40% = 面板机制。
-        let content: MenuBarPopoverGate? = UserDefaults.standard
-            .bool(forKey: "debug.staticPanelContent") ? nil : MenuBarPopoverGate(monitor: monitor)
-        let p = PopupPanel(content: content)
+        let p = PopupPanel()
         p.onResignKey = { [weak self] in self?.closePanel() }
         return p
     }()
+
+    /// 两窗共用呈现模型的弹窗这一份(展开组、选中进程、处置汇总):控制器常驻持有,
+    /// 面板内容每次开合重建也不丢会话状态(原 MenuBarPopoverGate 的职责)。
+    private lazy var dashboardModel = DashboardModel(monitor: monitor)
 
     /// 弹窗上次所在 tab(收起前留底,重开还原;与门控视图内的 lastTab 同义,
     /// 可见性信号移到 AppKit 层后由控制器持有)。
@@ -113,10 +113,15 @@ final class MenuBarController: NSObject {
     }
 
     private func openPanel() {
-        // 可见性信号 AppKit 层直给:SwiftUI onAppear 在 AppKit 宿主里的触发
-        // 时机不可依赖(首轮实测首开不触发,门控停在透明占位 = 弹窗空白)。
+        // 可见性信号 AppKit 层直给;内容树每次开面板现建、收起即卸
+        // (popover-appkit:关着不留任何观察回路,popover-leak/01 同防)。
         monitor.setPopoverTab(lastTab)
         statusItem.button?.isHighlighted = true
+        let root = PopoverRootView(monitor: monitor, model: dashboardModel, initialTab: lastTab) { [weak self] tab in
+            self?.lastTab = tab
+            self?.monitor.setPopoverTab(tab)
+        }
+        panel.setContent(root)
 
         let size = panel.fittingSize
         // 锚 = 实际点击位置,不锚 button.window 的 frame:多屏各自带菜单栏时,
@@ -142,6 +147,8 @@ final class MenuBarController: NSObject {
         panel.setFrame(NSRect(origin: origin, size: size), display: false)
         // 面板材质窗(visualEffectView)自带圆角与阴影,与系统弹窗观感一致。
         panel.makeKeyAndOrderFront(nil)
+        // ←/→ 切 tab:根视图接键盘。
+        panel.makeFirstResponder(root)
     }
 
     private func closePanel() {
@@ -152,6 +159,7 @@ final class MenuBarController: NSObject {
         closedAt = Date()
         statusItem.button?.isHighlighted = false
         panel.orderOut(nil)
+        panel.setContent(nil)
     }
 
     // MARK: - 徽标
@@ -284,47 +292,31 @@ final class MenuBarController: NSObject {
 /// 弹窗面板(stats `PopupWindow` 同构,Kit/module/popup.swift):
 /// NSPanel + `.nonactivatingPanel` = 取焦点不激活 app(主窗口永不被连带),
 /// `hidesOnDeactivate = false` 防 app 切换误收;内容 = 毛玻璃底
-/// (NSVisualEffectView,.menu 材质,与系统弹窗观感一致)+ 门控视图宿主。
+/// (NSVisualEffectView,.menu 材质,与系统弹窗观感一致)+ AppKit 内容根视图。
 final class PopupPanel: NSPanel {
     /// 失焦即收(transient 语义):点外部 / 切 app 时面板失去键盘焦点。
     var onResignKey: (() -> Void)?
 
-    private let hosting: NSHostingView<AnyView>
+    private let effect: NSVisualEffectView
+    private var content: NSView?
 
-    /// 面板理想尺寸:内容(fittingSize)优先,与门控占位帧口径一致的兜底。
+    /// 面板理想尺寸:内容(Auto Layout fittingSize)优先,无内容时的兜底与原值一致。
     var fittingSize: CGSize {
-        let fitting = hosting.fittingSize
+        guard let content else { return CGSize(width: 360, height: 664) }
+        let fitting = content.fittingSize
         return CGSize(
             width: max(320, fitting.width),
             height: max(480, min(fitting.height, 720))
         )
     }
 
-    init(content: MenuBarPopoverGate?) {
-        let root: AnyView = content.map { AnyView($0) } ?? AnyView(
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(0 ..< 14, id: \.self) { i in
-                    HStack { Text("静态探针行 \(i)")
-                        Spacer()
-                        Text("\(i * 7)%").monospacedDigit()
-                    }
-                }
-            }.padding(14).frame(width: 330, alignment: .leading)
-        )
-        hosting = NSHostingView(rootView: root)
-        let initial = CGSize(width: 360, height: 648)
-        hosting.frame = NSRect(origin: .zero, size: initial)
-        hosting.autoresizingMask = [.width, .height]
-        // 面板借 .titled + .fullSizeContentView 取圆角阴影,隐形标题栏仍算安全区:
-        // SwiftUI 会在内容顶部让出 ~28pt(tab 栏上方凭空一截空白,用户实见)。
-        hosting.safeAreaRegions = []
-
-        let effect = NSVisualEffectView(frame: NSRect(origin: .zero, size: initial))
+    init() {
+        let initial = CGSize(width: 360, height: 664)
+        effect = NSVisualEffectView(frame: NSRect(origin: .zero, size: initial))
         effect.material = .menu
         effect.blendingMode = .behindWindow
         effect.state = .active
         effect.autoresizingMask = [.width, .height]
-        effect.addSubview(hosting)
 
         super.init(
             contentRect: NSRect(origin: .zero, size: initial),
@@ -347,6 +339,19 @@ final class PopupPanel: NSPanel {
         standardWindowButton(.miniaturizeButton)?.isHidden = true
         standardWindowButton(.zoomButton)?.isHidden = true
         contentView = effect
+    }
+
+    /// 换内容(nil = 卸下):内容贴满毛玻璃底,四边约束随面板 frame 走。
+    func setContent(_ view: NSView?) {
+        content?.removeFromSuperview()
+        content = view
+        guard let view else { return }
+        effect.addSubview(view)
+        view.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            view.leadingAnchor.constraint(equalTo: effect.leadingAnchor),
+            view.topAnchor.constraint(equalTo: effect.topAnchor),
+        ])
     }
 
     override var canBecomeKey: Bool {

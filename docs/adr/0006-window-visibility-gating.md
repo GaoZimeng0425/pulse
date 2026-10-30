@@ -1,5 +1,7 @@
 # 窗口内容按可见性门控:MonitorVisibility 三旗标与两道门(popover-leak/01)
 
+> 2026-10-30 更新(popover-appkit):弹窗已改 AppKit 原生,`MenuBarPopoverGate` 删除——面板内容每次打开现建、收起即从窗口卸下,观察回路随离窗停止(同一门控语义的 AppKit 形态);会话状态(tab 记忆、DashboardModel)由 `MenuBarController` 持有。主窗口门控不变。
+
 MenuBarExtra(`.window` 样式)的弹窗与 SwiftUI 的 Window 场景,**关闭后都不销毁内容视图树**——辅助功能已报 0 窗口,采样栈里排行 / 走势整页仍随采样轮逐轮重算(弹窗 77 点 / 15s、主窗口 25 点 / 15s,2026-10-21/22 实测)。用户点过一次窗口,之后的"稳态"就悄悄变观看态,常驻成本账全部失真。决定:两个场景的内容根各设一道**可见性门控**——不可见时只渲染一块与上次同尺寸的透明占位,**不读任何逐轮变化的 observable**,采样轮落地不再翻搅视图树;可见性信号收进 `MonitorVisibility`,单一事实源。
 
 **状态语义(三旗标,别混)**:

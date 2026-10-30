@@ -2,7 +2,7 @@ import SwiftUI
 
 // 主窗口内容门控(popover-leak/01 主窗口同病同修):Window 场景关闭后 SwiftUI
 // 不销毁内容视图树——AX 已 0 窗,排行行仍随采样轮逐轮重算(实测 25 点/15s,
-// 2026-10-21 验收指纹)。与弹窗门控(MenuBarPopoverGate)同款机制:按
+// 2026-10-21 验收指纹)。与原弹窗门控(MenuBarPopoverGate,popover-appkit 后弹窗改 AppKit 现建现卸)同款机制:按
 // monitor.mainWindowVisible(单一事实源 = MonitorVisibility.mainWindowTab 派生)
 // 条件渲染,隐藏时只放同尺寸透明占位,不读任何逐轮变化源。
 // p2-review/05:写路径收成 tab 槽——关窗 = nil 一次写清在场与所在页;进场
