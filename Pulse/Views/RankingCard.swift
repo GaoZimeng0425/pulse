@@ -180,7 +180,9 @@ struct RankingRowView: View {
 }
 
 /// 组行最忙进程 chip:状态 chip 配方(胶囊、state-negative 14% 底 + 同色字),只写进程名
-/// 不带图标省行宽;长名中间截断,上限宽度防把组名挤没。
+/// 不带图标省行宽。上限由 `StatusBadgeRules.hotProcessNameMaxLength` 按字数封顶,
+/// chip 取理想宽度不被压缩——宽度框(maxWidth)会贪占到上限、把组名挤成几个字
+/// (2026-10-30 用户反馈),所以不用。
 struct HotProcessChip: View {
     let name: String
     let compact: Bool
@@ -189,12 +191,11 @@ struct HotProcessChip: View {
         Text(name)
             .font(.system(size: compact ? 10 : 10.5, weight: .semibold))
             .lineLimit(1)
-            .truncationMode(.middle)
             .foregroundStyle(Surface.negative)
             .padding(.horizontal, compact ? 5 : 6)
             .padding(.vertical, 1)
             .background(Surface.negative.opacity(0.14), in: .capsule)
-            .frame(maxWidth: compact ? 150 : 200, alignment: .leading)
+            .fixedSize()
     }
 }
 
