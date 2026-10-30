@@ -109,8 +109,12 @@ private struct JunkListCard: View {
         let byGroup = Dictionary(grouping: candidates, by: \.group)
         return VStack(alignment: .leading, spacing: 2) {
             ForEach(JunkGroup.allCases.filter { byGroup[$0] != nil }, id: \.self) { group in
-                groupHeader(group, items: byGroup[group] ?? [])
-                ForEach(byGroup[group] ?? []) { candidate in
+                let items = byGroup[group] ?? []
+                // 整组勾选只吃组内「可安全清理」项(拍板 B):先检查项不参与组勾选,
+                // 组里没有安全档项就不画 checkbox(当前 15 条规则不会出现,05/06 加组后可能)。
+                let safeItems = items.filter { $0.tier == .safe }
+                groupHeader(group, items: items, safeItems: safeItems)
+                ForEach(items) { candidate in
                     JunkRow(
                         candidate: candidate,
                         leader: candidates.map(\.bytes).max() ?? 0,
@@ -125,9 +129,21 @@ private struct JunkListCard: View {
         }
     }
 
-    private func groupHeader(_ group: JunkGroup, items: [JunkCandidate]) -> some View {
+    private func groupHeader(
+        _ group: JunkGroup,
+        items: [JunkCandidate],
+        safeItems: [JunkCandidate]
+    ) -> some View {
         let sum = items.reduce(Int64(0)) { $0 + $1.bytes }
         return HStack {
+            if !safeItems.isEmpty {
+                GroupCheckBox(
+                    state: model.groupState(of: safeItems),
+                    disabled: isBusy,
+                    action: { model.toggleGroup(safeItems) }
+                )
+                .padding(.trailing, 2)
+            }
             Text(group.title)
             Spacer()
             Text(PulseFormat.memory(UInt64(max(0, sum))))
@@ -326,6 +342,53 @@ struct TierChip: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 2)
             .background(tint.opacity(0.15), in: .capsule)
+    }
+}
+
+// MARK: 组头三态 checkbox(整组勾选,2026-10-30 用户拍板 B)
+
+/// 组头的三态勾选框:系统 NSButton(allowsMixedState),渲染与行内系统 checkbox 同款
+/// (SwiftUI `Toggle` 没有混合态,画不出 mixed 虚线,所以包一层)。点击语义不走系统的
+/// off→mixed→on 轮巡:组勾选是「一键全选/全清」——none / mixed 点了全勾,all 点了全清
+/// (动作由模型 `toggleGroup` 决定,这里只报点击)。
+private struct GroupCheckBox: NSViewRepresentable {
+    let state: JunkSelection.GroupState
+    let disabled: Bool
+    let action: () -> Void
+
+    func makeNSView(context: Context) -> NSButton {
+        let button = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+        button.allowsMixedState = true
+        button.isBordered = false
+        button.toolTip = "勾选本组全部「可安全清理」项;「先检查」项需单独勾选"
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.clicked)
+        context.coordinator.action = action
+        return button
+    }
+
+    func updateNSView(_ button: NSButton, context: Context) {
+        button.state = switch state {
+        case .none: .off
+        case .mixed: .mixed
+        case .all: .on
+        }
+        button.isEnabled = !disabled
+        context.coordinator.action = action
+    }
+
+    /// Coordinator 持最新闭包(每次 update 覆盖);NSButton 主线程回调,无并发面。
+    /// 不加 private:NSViewRepresentable 要求 Coordinator 与 makeCoordinator 的可见性
+    /// 跟随遵循类型(本 struct 已是 private,嵌套类继承该层级即可)。
+    final class Coordinator: NSObject {
+        var action: () -> Void = {}
+        @objc func clicked() {
+            action()
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
     }
 }
 

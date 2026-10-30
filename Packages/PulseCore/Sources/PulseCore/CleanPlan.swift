@@ -53,6 +53,34 @@ public struct JunkSelection: Sendable, Equatable {
         let live = Set(candidates.map(\.path))
         paths = paths.intersection(live)
     }
+
+    // MARK: 整组勾选(2026-10-30 用户拍板 B:组头 checkbox 一键勾/清组内「可安全清理」项,
+
+    // 先检查项永不经组勾选进入——调用方只传 safe 档候选,这条约定钉死在这里)
+
+    /// 一组候选(或任意子集)的勾选三态:组头 checkbox 的显示与点击语义。
+    public enum GroupState: Sendable, Equatable {
+        case none
+        case mixed
+        case all
+    }
+
+    /// 子集勾选态:0 勾 = none,部分 = mixed,全勾 = all;空集 = none。
+    public func state(of candidates: [JunkCandidate]) -> GroupState {
+        guard !candidates.isEmpty else { return .none }
+        let selected = candidates.count { paths.contains($0.path) }
+        if selected == 0 {
+            return .none
+        }
+        return selected == candidates.count ? .all : .mixed
+    }
+
+    /// 批量设置,**只动这里传入的候选**(整组勾选的落点;其他组 / 其他档位不受影响)。
+    public mutating func set(_ selected: Bool, for candidates: [JunkCandidate]) {
+        for candidate in candidates {
+            set(candidate, selected: selected)
+        }
+    }
 }
 
 /// 确认清单(= 这次要移入废纸篓的东西)。

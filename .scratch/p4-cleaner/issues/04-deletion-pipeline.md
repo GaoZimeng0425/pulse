@@ -26,3 +26,12 @@
 - **顺手修**:进度条斜率 65 万 → 340 万;DESIGN.md 登记清单行 / TierChip / 动作条 / `{layout.sheet-width}` 460 / `{layout.sheet-list-max-height}` 220。
 - **流程记档**:`.worktrees/p4-junk` 里 hosted 测试 runner 连续两次"hung before establishing connection"(无崩溃报告;Documents 病复发),按交接回退到 `/tmp/pulse-p4-junk`(`--detach` 同 commit)跑 check.sh 全绿;zsh 不分词 `$files` 让首次 swiftformat 批量修复静默无效(xargs 后正常)。
 - **待用户目验**:①确认后文件真在 Finder 废纸篓且可恢复 ②清单 / 档位 chip / 动作条 / 确认 sheet / 结果卡 / 历史子页观感 ③设置页「清理」排除增删 ④右键排除后行消失。**待拍板**:整组勾选(见最终汇报摆的背景与优缺点)。
+
+**2026-10-30 拍板 B 落地(feat/p4-group-select):整组勾选做**——组头三态 checkbox
+(NSButton allowsMixedState,none/mixed 点击全勾、all 点击全清)**只吃组内「可安全清理」
+档的项**,先检查项永不被组勾选带上、必须逐个手勾;组内无 safe 档项不画。
+纯值层 `JunkSelection.GroupState / state(of:) / set(_:for:)`(批量设置只动传入候选),
+模型 `CleanerModel.groupState(of:) / toggleGroup(_:)`,UI `GroupCheckBox`。测试 +3(核心
+2:三态迁移 / 批量只动传入项;app 1:组勾选只带 safe、all 全清不碰组外勾、mixed 全勾)。
+DESIGN.md 清单行 bullet 已补组头三态 checkbox 条目。勾选框观感(与行内 checkbox 同款、
+mixed 虚线)归目验项 ②。
