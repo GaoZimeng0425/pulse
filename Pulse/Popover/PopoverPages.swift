@@ -26,14 +26,45 @@ enum PopoverPages {
             return [MetricMainCardNSView { model.cpuModel }, groupRanking(.cpu, context)]
         case .memory:
             return [MetricMainCardNSView { model.memoryModel }, groupRanking(.memory, context)]
+        case .sensors:
+            // 拍板例外(p2-review/04 A):弹窗只放派生卡,风扇卡与温度明细只在主窗口。
+            let smc = context.monitor.smc
+            return [SmcDerivedCardNSView { smc.reading }]
+        case .peripherals:
+            let sound = context.monitor.sound
+            return [
+                BluetoothDevicesCardNSView(feature: context.monitor.bluetooth),
+                SoundCardNSView { sound.reading },
+            ]
         case .gpu:
-            return [MetricMainCardNSView { model.gpuModel }, MetricMainCardNSView { model.aneModel }]
+            // 主卡 → pair{ANE 卡, 五路功率卡}(弹窗上下排,卡间距同页栈 8)。
+            let power = context.monitor.power
+            return [
+                MetricMainCardNSView { model.gpuModel },
+                MetricMainCardNSView { model.aneModel },
+                PowerDomainsCardNSView { power.reading },
+            ]
+        case .containers:
+            let containers = context.monitor.containers
+            return [ContainersCardNSView { containers.reading }]
         case .battery:
             return [MetricMainCardNSView { model.batteryModel }] + batteryRankings(context)
         case .disk:
-            return [MetricMainCardNSView { model.diskModel }, diskRanking(context)]
+            // 主卡 → pair{各卷明细, 本地快照}(弹窗上下排)→ 读写最多。
+            let disk = context.monitor.disk
+            return [
+                MetricMainCardNSView { model.diskModel },
+                DiskVolumeBreakdownCardNSView { disk.capacity },
+                DiskSnapshotsCardNSView { disk.capacity?.snapshots },
+                diskRanking(context),
+            ]
         case .network:
-            return [MetricMainCardNSView { model.networkModel }, networkRanking(context)]
+            let history = context.monitor.history
+            return [
+                MetricMainCardNSView { model.networkModel },
+                NetworkTotalsCardNSView { history.networkTotals },
+                networkRanking(context),
+            ]
         default:
             return [placeholder(tab)]
         }

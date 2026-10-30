@@ -30,6 +30,7 @@
 		20550F03DAEF45E3DEBE36E7 /* AlertSettingsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24703C16273CB98970E4297 /* AlertSettingsStoreTests.swift */; };
 		21BAA7AE4F5D186DD8EF781F /* GpuSensorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 997E4A682EAB7F54A6FEB9BE /* GpuSensorTests.swift */; };
 		21F287F65905BBC7604FE487 /* PopoverPages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0290F3111D8B9C1DA8F7DCB7 /* PopoverPages.swift */; };
+		22E039D2B95B3E2CEA650833 /* PopoverPeripheralCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AD5FC701B3FA22E846C1506 /* PopoverPeripheralCards.swift */; };
 		25710F4D00266A1760713D57 /* AlertCenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71178307830FDF67F93A9523 /* AlertCenterTests.swift */; };
 		26CA5B5B1921FF464893439C /* MenuBarBadgeDisplayModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D074B7F60170564351BEE7F /* MenuBarBadgeDisplayModelTests.swift */; };
 		28E10F6A5444AE34BD9A17C5 /* MenuBarPopoverGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61B8D8E52DBAB492B5EDA31E /* MenuBarPopoverGate.swift */; };
@@ -37,9 +38,11 @@
 		2C1C4AA05A53133216CF1E3B /* ProcArgsParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A311BFB8099AF93518F47C9B /* ProcArgsParser.swift */; };
 		2CCCA9B897A9A569F82F95BB /* LiveProcessSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06A4CAD37F3D2BE0A494F9DA /* LiveProcessSource.swift */; };
 		2D0E9BE7A0401A822DC62C47 /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD3B00277D6CF515AEA81E6C /* MenuBarController.swift */; };
+		2E4DF65C1C09058FDD263542 /* PopoverDetailRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1CAD35637A6CB6885274DB2 /* PopoverDetailRows.swift */; };
 		2F681644821F7D9946A73E92 /* MetricTabModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9378B86940EBE30E057F718D /* MetricTabModelTests.swift */; };
 		31A4795EB7C03BA0FE9573D2 /* AppIconCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78EC09371E86E7408FA32ADC /* AppIconCacheTests.swift */; };
 		3486367464537B6192F7C2AF /* PulseApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AEE9CD05DD0A6FAA15E6014 /* PulseApp.swift */; };
+		3490846D92D0A27B8D40DD54 /* PopoverDiskNetworkCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63E6541174A2403ECEA2C9CD /* PopoverDiskNetworkCards.swift */; };
 		36D010F32AA1EF9E90BE8074 /* PopoverCharts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6734E49BC978EC5080B7BAF0 /* PopoverCharts.swift */; };
 		3871E7D6449E0799D45D40DD /* MenuBarBadgeDisplayModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 073B425254E4BAF7B7E3744F /* MenuBarBadgeDisplayModel.swift */; };
 		3891285DCA8188E59A9EC34E /* GroupCategoryDisplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B7ADC75304AC8AC8EF1CED3 /* GroupCategoryDisplayTests.swift */; };
@@ -69,6 +72,7 @@
 		549EC237B5E5F830B3C652A2 /* PulseCore in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 679FABC27E634B3FA90955FE /* PulseCore */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		5665FC76EC2418D1B81682B1 /* MenuBarBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABC98F0C4A2054944D3B34AC /* MenuBarBadge.swift */; };
 		57D679777701897AD304570E /* LiveCleanDirectoryEnumerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FFE17F679EFFD8CCA29B0DC /* LiveCleanDirectoryEnumerator.swift */; };
+		5B096A44687D2D14850BAE18 /* PopoverSensorCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81918B4DE74946CFB502067F /* PopoverSensorCards.swift */; };
 		5B9A85A61547AE07B7BA4924 /* ContainerSensorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8576B450296CE59084093EDC /* ContainerSensorTests.swift */; };
 		5C50195499CD0434F9BB20CB /* OverviewCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FA58858B993A1A243A26B63 /* OverviewCards.swift */; };
 		5C575F8B58C4A820C8AE37A4 /* PopoverRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEB49AA568CDA26CAB6752BD /* PopoverRootView.swift */; };
@@ -82,6 +86,7 @@
 		67564384C3B69AC9097524CE /* MainWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 689A729F03DE35CA0C9E3D5D /* MainWindowView.swift */; };
 		6A5229101F7D0A32D3436F8A /* GeneralSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C9E00667C343ED4FBBFF8AE /* GeneralSettingsView.swift */; };
 		6AE1DE9970F8D5A45B4928F7 /* CleanExclusionsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BAF755934C2A24A5B2DD1FE /* CleanExclusionsStore.swift */; };
+		6BFBD7B58433735553B033E4 /* PopoverPowerContainerCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69DA1C3A32175077ED946985 /* PopoverPowerContainerCards.swift */; };
 		6D331913DA49D304F3CFFF3A /* CleanerModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123227853485E0064F73A518 /* CleanerModelTests.swift */; };
 		6F81F0419525B5BABE9C8885 /* MenuBarBadgeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D24F280DF9DF1C4BD1AE2729 /* MenuBarBadgeSettingsView.swift */; };
 		71EB9AFF0FA27487AB7EE515 /* CardFamily.swift in Sources */ = {isa = PBXBuildFile; fileRef = 793E152BCFF6DC45BB501438 /* CardFamily.swift */; };
@@ -270,10 +275,13 @@
 		614CDDAE340894E028545198 /* SoundCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundCardViews.swift; sourceTree = "<group>"; };
 		61B8D8E52DBAB492B5EDA31E /* MenuBarPopoverGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarPopoverGate.swift; sourceTree = "<group>"; };
 		6394DED2F224C5FC7939D499 /* GpuSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GpuSensor.swift; sourceTree = "<group>"; };
+		63E6541174A2403ECEA2C9CD /* PopoverDiskNetworkCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverDiskNetworkCards.swift; sourceTree = "<group>"; };
 		660FB2721DCBDC67C5B3E98A /* LineagePruningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineagePruningTests.swift; sourceTree = "<group>"; };
 		6734E49BC978EC5080B7BAF0 /* PopoverCharts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverCharts.swift; sourceTree = "<group>"; };
 		689A729F03DE35CA0C9E3D5D /* MainWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowView.swift; sourceTree = "<group>"; };
+		69DA1C3A32175077ED946985 /* PopoverPowerContainerCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverPowerContainerCards.swift; sourceTree = "<group>"; };
 		6A98A79159A39E317CC43DA0 /* NettopProcessRateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NettopProcessRateTests.swift; sourceTree = "<group>"; };
+		6AD5FC701B3FA22E846C1506 /* PopoverPeripheralCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverPeripheralCards.swift; sourceTree = "<group>"; };
 		6B06E911B136D09E8F6E569D /* LiveCoreTickSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCoreTickSource.swift; sourceTree = "<group>"; };
 		6B76926FB48518EBB58CAA6F /* LaunchdManifestFeatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchdManifestFeatureTests.swift; sourceTree = "<group>"; };
 		6C75CB2BD11EEDA12D6C898D /* DiskFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskFixture.swift; sourceTree = "<group>"; };
@@ -288,6 +296,7 @@
 		793E152BCFF6DC45BB501438 /* CardFamily.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardFamily.swift; sourceTree = "<group>"; };
 		797393589A818A7C3C18F34F /* CleanExclusionsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanExclusionsStoreTests.swift; sourceTree = "<group>"; };
 		7FFE17F679EFFD8CCA29B0DC /* LiveCleanDirectoryEnumerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCleanDirectoryEnumerator.swift; sourceTree = "<group>"; };
+		81918B4DE74946CFB502067F /* PopoverSensorCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverSensorCards.swift; sourceTree = "<group>"; };
 		84AFAFC8D33B01908457ADE1 /* BluetoothCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothCardViews.swift; sourceTree = "<group>"; };
 		8576B450296CE59084093EDC /* ContainerSensorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerSensorTests.swift; sourceTree = "<group>"; };
 		8736D3365DF444B47CF7E6E0 /* PopoverGroupRanking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverGroupRanking.swift; sourceTree = "<group>"; };
@@ -325,6 +334,7 @@
 		BA63CBA09D59DD528C7124CA /* StatusBadgeChipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadgeChipTests.swift; sourceTree = "<group>"; };
 		BD3B00277D6CF515AEA81E6C /* MenuBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarController.swift; sourceTree = "<group>"; };
 		BE86A48D24949B3D225394BD /* TestHostIsolationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHostIsolationTests.swift; sourceTree = "<group>"; };
+		C1CAD35637A6CB6885274DB2 /* PopoverDetailRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverDetailRows.swift; sourceTree = "<group>"; };
 		C3ED9E7F6F40FF3D9167EACB /* BirthScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BirthScanner.swift; sourceTree = "<group>"; };
 		C52DB5F7C6F83EAC51BD568F /* LiveCleanDirectoryEnumeratorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCleanDirectoryEnumeratorTests.swift; sourceTree = "<group>"; };
 		C53D2D1E33AFAC1704FD224A /* KillServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KillServiceTests.swift; sourceTree = "<group>"; };
@@ -436,14 +446,19 @@
 				7573868D9B5886FAAF6AD49B /* PopoverCardParts.swift */,
 				6734E49BC978EC5080B7BAF0 /* PopoverCharts.swift */,
 				07C069A61CBE336D6CCE5C2F /* PopoverChrome.swift */,
+				C1CAD35637A6CB6885274DB2 /* PopoverDetailRows.swift */,
+				63E6541174A2403ECEA2C9CD /* PopoverDiskNetworkCards.swift */,
 				1815FFD312726656AF46EAA1 /* PopoverDrilldown.swift */,
 				8736D3365DF444B47CF7E6E0 /* PopoverGroupRanking.swift */,
 				E6004D3CB3DEA4D97AA44B1F /* PopoverKit.swift */,
 				1C492EBDFE8C00E128162887 /* PopoverMetricCards.swift */,
 				37ADA770F35FFAE8184E1907 /* PopoverModuleRanking.swift */,
 				0290F3111D8B9C1DA8F7DCB7 /* PopoverPages.swift */,
+				6AD5FC701B3FA22E846C1506 /* PopoverPeripheralCards.swift */,
+				69DA1C3A32175077ED946985 /* PopoverPowerContainerCards.swift */,
 				9BE923CD66451BEBB4E8A801 /* PopoverRankingParts.swift */,
 				CEB49AA568CDA26CAB6752BD /* PopoverRootView.swift */,
+				81918B4DE74946CFB502067F /* PopoverSensorCards.swift */,
 			);
 			path = Popover;
 			sourceTree = "<group>";
@@ -906,14 +921,19 @@
 				B8616AAC36AD859334924B41 /* PopoverCardParts.swift in Sources */,
 				36D010F32AA1EF9E90BE8074 /* PopoverCharts.swift in Sources */,
 				D12F1C9585882EE38E0CA990 /* PopoverChrome.swift in Sources */,
+				2E4DF65C1C09058FDD263542 /* PopoverDetailRows.swift in Sources */,
+				3490846D92D0A27B8D40DD54 /* PopoverDiskNetworkCards.swift in Sources */,
 				7EE238BF0659B7EF9DCA097F /* PopoverDrilldown.swift in Sources */,
 				4F8F9E7DD368D7C61F386BAE /* PopoverGroupRanking.swift in Sources */,
 				7E2E1D7F3C4C371D4106D048 /* PopoverKit.swift in Sources */,
 				A41162CA9EF83D27816C4616 /* PopoverMetricCards.swift in Sources */,
 				C07624501CCE74F51588F177 /* PopoverModuleRanking.swift in Sources */,
 				21F287F65905BBC7604FE487 /* PopoverPages.swift in Sources */,
+				22E039D2B95B3E2CEA650833 /* PopoverPeripheralCards.swift in Sources */,
+				6BFBD7B58433735553B033E4 /* PopoverPowerContainerCards.swift in Sources */,
 				AB6FE576EE1B768DF693DD74 /* PopoverRankingParts.swift in Sources */,
 				5C575F8B58C4A820C8AE37A4 /* PopoverRootView.swift in Sources */,
+				5B096A44687D2D14850BAE18 /* PopoverSensorCards.swift in Sources */,
 				0CD8B452A8220B3185ECCD6A /* PowerCardViews.swift in Sources */,
 				B00EFA872F6F24256DB52BF2 /* PowerFeature.swift in Sources */,
 				2C1C4AA05A53133216CF1E3B /* ProcArgsParser.swift in Sources */,
