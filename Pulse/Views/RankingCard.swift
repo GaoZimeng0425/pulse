@@ -71,9 +71,10 @@ struct RankingCardView<Expanded: View>: View {
 }
 
 /// 组排行行:通用行配方 + 交互——点行展开、悬停底色与「结束整组」、右键同入口。
-/// 组 CPU% > 100%(StatusBadgeRules 同一阈值)不再挂行内"高负载"文字 chip——
-/// 挤占行宽遮挡信息(2026-10-26 用户目验反馈);改由行尾 CPU 数值圈红表达,
-/// 仅 CPU 口径(内存值不背 CPU 警示)。点击结束只是请求确认。
+/// 组 CPU% > 100%(StatusBadgeRules 同一阈值)时行尾 CPU 数值标红,名称后挂红色
+/// chip 写组内最忙进程名——一眼看出是谁在吃(2026-10-30 用户拍板 B;此前的
+/// "高负载"文字 chip 与数值圈红均已撤)。仅 CPU 口径(内存值不背 CPU 警示)。
+/// 点击结束只是请求确认。
 struct RankingRowView: View {
     let group: ProcessGroup
     let metric: GroupCardMetric
@@ -99,7 +100,11 @@ struct RankingRowView: View {
                 alertsHighLoad: metric == .cpu
                     && StatusBadgeRules.groupBadge(cpuPercent: group.cpuPercent) != nil,
                 isCompact: isCompact
-            ) {} trailing: {
+            ) {
+                if let hotProcessName {
+                    HotProcessChip(name: hotProcessName, compact: isCompact)
+                }
+            } trailing: {
                 trailingControls
             }
             .background(
@@ -116,18 +121,20 @@ struct RankingRowView: View {
         .accessibilityLabel(
             "\(group.name),\(group.processes.count) 进程,\(valueText)"
                 + (StatusBadgeRules.groupBadge(cpuPercent: group.cpuPercent) != nil ? ",高负载" : "")
+                + (hotProcessName.map { ",最忙进程 \($0)" } ?? "")
         )
         .accessibilityHint(isExpanded ? "收起组内进程列表" : "展开组内进程列表")
     }
 
     /// 结束按钮只在悬停时可见(占位不变,行宽不跳);chevron 常驻指示展开态。
     private var trailingControls: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: RankingListMetrics.trailingControlSpacing(compact: isCompact)) {
             Button(action: onEndGroup) {
+                let side = RankingListMetrics.endButtonSize(compact: isCompact)
                 Image(systemName: "xmark.octagon")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Surface.negative)
-                    .frame(width: 18, height: 18)
+                    .frame(width: side, height: side)
                     .contentShape(.rect)
             }
             .buttonStyle(.borderless)
@@ -140,6 +147,11 @@ struct RankingRowView: View {
                 .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 .frame(width: 10)
         }
+    }
+
+    /// 最忙进程名:仅 CPU 口径行,阈值与数值标红同源(StatusBadgeRules)。
+    private var hotProcessName: String? {
+        metric == .cpu ? StatusBadgeRules.groupHotProcessName(group) : nil
     }
 
     private var valueText: String {
@@ -163,6 +175,25 @@ struct RankingRowView: View {
             return Metric.memory.accentColor
         }
         return group.category.cardStyle.accentColor
+    }
+}
+
+/// 组行最忙进程 chip:状态 chip 配方(胶囊、state-negative 14% 底 + 同色字),只写进程名
+/// 不带图标省行宽;长名中间截断,上限宽度防把组名挤没。
+struct HotProcessChip: View {
+    let name: String
+    let compact: Bool
+
+    var body: some View {
+        Text(name)
+            .font(.system(size: compact ? 10 : 10.5, weight: .semibold))
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .foregroundStyle(Surface.negative)
+            .padding(.horizontal, compact ? 5 : 6)
+            .padding(.vertical, 1)
+            .background(Surface.negative.opacity(0.14), in: .capsule)
+            .frame(maxWidth: compact ? 120 : 160, alignment: .leading)
     }
 }
 

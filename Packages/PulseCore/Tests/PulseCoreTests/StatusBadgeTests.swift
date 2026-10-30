@@ -19,6 +19,35 @@ final class StatusBadgeTests: XCTestCase {
         XCTAssertNil(StatusBadgeRules.groupBadge(cpuPercent: 0))
     }
 
+    // MARK: 组高负载最忙进程(组行 chip,2026-10-30 用户拍板 B)
+
+    private func group(cpu: Double, processes: [RawProcess]) -> ProcessGroup {
+        ProcessGroup(
+            id: .project(root: "/Users/x/pulse", worktreeName: "main"), name: "pulse @ main",
+            processes: processes, cpuPercent: cpu, memoryBytes: 0
+        )
+    }
+
+    /// 高负载组取组内首个进程(引擎契约:进程 CPU% 降序)的显示名。
+    func testHighLoadGroupNamesTopProcess() {
+        let hot = group(cpu: 186, processes: [
+            RawProcess(
+                pid: 10,
+                parentPID: 1,
+                executablePath: "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend"
+            ),
+            RawProcess(pid: 11, parentPID: 1, executablePath: "/usr/local/bin/node"),
+        ])
+        XCTAssertEqual(StatusBadgeRules.groupHotProcessName(hot), "swift-frontend")
+    }
+
+    /// 阈值与数值标红同源:恰好 100% 不挂;空组不挂。
+    func testHotProcessNameFollowsGroupThreshold() {
+        let process = RawProcess(pid: 10, parentPID: 1, executablePath: "/usr/local/bin/node")
+        XCTAssertNil(StatusBadgeRules.groupHotProcessName(group(cpu: 100, processes: [process])))
+        XCTAssertNil(StatusBadgeRules.groupHotProcessName(group(cpu: 250, processes: [])))
+    }
+
     // MARK: 系统负载徽章(空载 ✓正常 / 高负载 / 中间静默)
 
     func testIdleSystemLoadGetsNormalBadge() {
