@@ -171,7 +171,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.sheet-list-max-height}` | 220pt | 确认清单 sheet 内逐行列表的最大高(超出滚动,总量与按钮恒在视口内) |
 
 窗口:主窗口最小 **720×560**(spec 钉死),默认 880×620;弹窗定宽 **360pt**
-(`PopoverRootView.width`)。工具栏内容必须按 720 最小窗宽预算(见 §Do's and Don'ts)。
+(`DashboardView.width`)。工具栏内容必须按 720 最小窗宽预算(见 §Do's and Don'ts)。
 主窗口总览网格是**响应式**的(用户拍板 2026-10-24):列数随窗宽自适应 1–4
 (720 最小宽下 1 列、744 起两列、约 1104 三列、约 1456 四列;`AdaptiveCardGrid`)。
 
@@ -236,6 +236,8 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   排行卡不配节标题(主窗口也不配「当前最忙」节标题)。
   **meter 条宽度无过渡动画**(读数到即重画;2026-10-29 用户拍板「体感不到的东西不应该
   存在」——0.6s 缓动让面板开期 CPU 36.5% vs 无动画 8.4%,popover-layout-loop/01)。
+  **行容器与弹窗滚动区一律 `LazyVStack`**(2026-10-30 popover-appkit/10 实测:排行常上百行,
+  普通 VStack 全建 → 弹窗开期鼠标移动 ~33% / 滚动 ~41%,惰性后 ~7% / ~25%;不得退回 VStack)。
 - **清理清单行**(p4-cleaner/04,`CleanerJunkViews.swift`):借排行列表行配方
   (`RankingListMetrics` 全套:图标 22 / 名称 13 medium + 副文 10.5 secondary / meter 110
   榜首归一 / 数值 13 semibold 等宽定宽列 / 行内距 6×7),行首加系统 checkbox;行选中底 =
@@ -279,8 +281,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 - **主窗口 / 弹窗同内容**(用户拍板 2026-10-20,取代早先「排行卡 / dev server /
   历史页弹窗不放」):每个 tab 的卡片组成与顺序只在 `MetricTabStack` 一处定义,两处
   只差排版档——弹窗卡用紧凑档、主窗口并排的两卡改上下排、节标题不画;组排行卡的
-  交互深度(主窗口搜索 + 可排序进程表)由宿主给。弹窗改 AppKit 后(popover-appkit)卡片序列
-  在 `PopoverPages` 另有一份,**新增卡片两处一起改**(`MetricTabStack` + `PopoverPages`)。
+  交互深度(主窗口搜索 + 可排序进程表)由宿主给。新增卡片只改 `MetricTabStack`。
   **唯一拍板例外**(p2-review/04 A,2026-10-24;spec Story 17):传感器 tab 弹窗只放
   派生读数卡(Average/Hottest + 最快风扇),风扇卡与温度明细卡只在主窗口——逐核明细
   会把 360pt 弹窗撑得不可用的高。
@@ -289,9 +290,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   (rpm−min)/(max−min) 钳 0…1,上下限不可用(max ≤ min)给空条;上下限标注
   「下限 N · 上限 M rpm」(`{typography.micro}` 10.5 tertiary):全部风扇相同时卡头注记写一次,
   不同时逐扇行下各写,两处不同时出现。派生卡最快风扇行多扇时数值前带扇名(「名 · 3200 rpm」)。
-- **弹窗(AppKit 原生,`Pulse/Popover/`,popover-appkit 2026-10-30)**:SwiftUI 版面板开期 10–30% CPU
-  (悬停命中检测 / 滚动逐帧重画 / 每轮全树 diff),换 AppKit 后外观数值不变、只改实现;零件与 SwiftUI
-  卡片家族一一对应(`PopoverCardParts` 等),**改弹窗样式时两套一起改**。定宽 360pt;底部操作"开窗靠左、设置+退出靠右"
+- **弹窗 DashboardView**:定宽 360pt;底部操作"开窗靠左、设置+退出靠右"
   (退出 = 纯图标,用户拍板)。顶部图标 tab 槽位**单行满宽均分**(P2 扩到
   11 枚后 32pt 定宽槽超出 332pt 内容区、右端裁切;均分只收窄不溢出,与主窗口
   工具栏 720 预算同一哲学)。页头 = 页名 + 本机一行「芯片 · 核数 · 内存」
@@ -337,14 +336,13 @@ chip 图标 9.5pt → micro 10.5;排行行 chevron 9pt → 10。
 - **设置窗侧栏的彩色渐变图标砖**:仿系统设置风格(SettingsView),属系统外观对齐,不走
   指标色 / 类别色。
 - **环形图用 Apple Charts(`SectorMark`),走势图自绘 Canvas**:环形的扇区几何与图例
-  交给 Charts 最省;走势是高频重绘的 44 柱 / 56 点,自绘可控成本——有意分工,不统一。弹窗 AppKit 版没有 Charts,
-  环形按同几何自绘(`PopoverRingCards`)。
+  交给 Charts 最省;走势是高频重绘的 44 柱 / 56 点,自绘可控成本——有意分工,不统一。
 - **菜单栏徽标强调色直写 `.orange/.red`**:位图经 ImageRenderer 预绘,本轮没有验证动态色
   在离屏渲染里能否按外观正确解析,暂留系统色、集中在 `MenuBarBadgeRenderer.color` 一处;
   要换成语义令牌须先实机验证深浅两种外观。
 
 仍挂账(动到对应文件时顺带收编):
 - 指标主卡全尺寸内距 `.padding(20)`(MetricTabViews)与 2×2 统计 `horizontalSpacing: 18`
-  不在令牌表,18 也不在 4pt 网格上;弹窗外框 14pt 内距(`PopoverRootView`)同。
+  不在令牌表,18 也不在 4pt 网格上;弹窗外框 `.padding(14)`(DashboardView)同。
   三者改动都可见,需与用户确认后再动。
 

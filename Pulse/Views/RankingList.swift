@@ -72,7 +72,10 @@ struct RankingListCard<Rows: View>: View {
     @ViewBuilder let rows: () -> Rows
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        // 惰性栈(popover-appkit/10):排行常有上百行,普通 VStack 全部建出,弹窗开期
+        // 悬停命中检测 / 滚动 / 每秒刷新都按全部行付费(鼠标移动 ~33%、滚动 ~41%);
+        // 惰性后只建视口内的行(→ ~7% / ~25%)。外层滚动区同为 LazyVStack 才生效。
+        LazyVStack(alignment: .leading, spacing: 2) {
             Text(title)
                 .font(.system(size: 12.5, weight: .semibold))
                 .foregroundStyle(accent)
