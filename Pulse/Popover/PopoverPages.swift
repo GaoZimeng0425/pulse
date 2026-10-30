@@ -21,22 +21,69 @@ enum PopoverPages {
         let model = context.model
         switch tab {
         case .overview:
-            return [overviewGrid(context)]
+            return [overviewGrid(context), groupRanking(.overview, context)]
         case .cpu:
-            return [MetricMainCardNSView { model.cpuModel }]
+            return [MetricMainCardNSView { model.cpuModel }, groupRanking(.cpu, context)]
         case .memory:
-            return [MetricMainCardNSView { model.memoryModel }]
+            return [MetricMainCardNSView { model.memoryModel }, groupRanking(.memory, context)]
         case .gpu:
             return [MetricMainCardNSView { model.gpuModel }, MetricMainCardNSView { model.aneModel }]
         case .battery:
-            return [MetricMainCardNSView { model.batteryModel }]
+            return [MetricMainCardNSView { model.batteryModel }] + batteryRankings(context)
         case .disk:
-            return [MetricMainCardNSView { model.diskModel }]
+            return [MetricMainCardNSView { model.diskModel }, diskRanking(context)]
         case .network:
-            return [MetricMainCardNSView { model.networkModel }]
+            return [MetricMainCardNSView { model.networkModel }, networkRanking(context)]
         default:
             return [placeholder(tab)]
         }
+    }
+
+    /// 「当前最忙」组排行卡(DashboardView.rankingCard 同义:榜单序 / 口径随 tab)。
+    private static func groupRanking(_ tab: MetricTab, _ context: PopoverPageContext) -> NSView {
+        GroupRankingCardNSView(tab: tab, monitor: context.monitor, model: context.model)
+    }
+
+    /// 电池页:能耗影响(CPU 时间估算,5s)+ AI 助手能耗(root Energy Impact,60s)。
+    private static func batteryRankings(_ context: PopoverPageContext) -> [NSView] {
+        let monitor = context.monitor
+        return [
+            ModuleRankingCardNSView(
+                title: "能耗影响",
+                valueLabel: "CPU 时间",
+                accent: Metric.battery.accentColor,
+                cadenceNote: "5 秒一档"
+            ) { monitor.rankings.energyRows },
+            ModuleRankingCardNSView(
+                title: "AI 助手",
+                valueLabel: "能耗",
+                accent: Metric.battery.accentColor,
+                cadenceNote: "60 秒一档",
+                emptyMessage: RankingEmptyMessage(title: "暂无数据", detail: "开启 设置 → 通用 → 特权助手 后出数")
+            ) { AgentEnergyTable.rankingRows(monitor.energyImpact.reading?.agents ?? []) },
+        ]
+    }
+
+    /// 磁盘页:读写最多(30s 一档)。
+    private static func diskRanking(_ context: PopoverPageContext) -> NSView {
+        let monitor = context.monitor
+        return ModuleRankingCardNSView(
+            title: "读写最多",
+            valueLabel: "读写",
+            accent: Metric.disk.accentColor,
+            cadenceNote: "30 秒一档"
+        ) { monitor.rankings.diskRows }
+    }
+
+    /// 网络页:每进程流量(nettop 归组,5s 一档)。
+    private static func networkRanking(_ context: PopoverPageContext) -> NSView {
+        let monitor = context.monitor
+        return ModuleRankingCardNSView(
+            title: "每进程流量",
+            valueLabel: "流量",
+            accent: Metric.network.accentColor,
+            cadenceNote: "5 秒一档"
+        ) { monitor.rankings.networkRows }
     }
 
     /// 总览模块卡网格:弹窗定宽固定 2 列、卡间距 8;电池卡随有无内建电池。
