@@ -14,13 +14,32 @@ import SwiftUI
 
 /// 行配方的度量(两档):卡、行、表头三处共用,改一处即全部对齐。
 enum RankingListMetrics {
-    /// 行尾列宽 = 结束按钮 18 + 间距 2 + 展开箭头 10;模块排行留同宽空列。
-    static let trailingWidth: CGFloat = 30
+    /// 行尾列宽 = 结束按钮 + 间距 + 展开箭头 10;模块排行留同宽空列。
+    /// 全尺寸 18 + 2 + 10;弹窗 14 + 0 + 10(2026-10-30 用户拍板:右侧图标收紧)。
+    static func trailingWidth(compact: Bool) -> CGFloat {
+        compact ? 24 : 30
+    }
+
+    /// 行尾结束按钮的点击框边长(图标字号不变,只收紧留白)。
+    static func endButtonSize(compact: Bool) -> CGFloat {
+        compact ? 14 : 18
+    }
+
+    static func trailingControlSpacing(compact: Bool) -> CGFloat {
+        compact ? 0 : 2
+    }
+
     /// 行内水平内距(表头与之对齐)。
     static let rowInset: CGFloat = 6
 
     static func spacing(compact: Bool) -> CGFloat {
         compact ? 8 : 10
+    }
+
+    /// meter → 数值、数值 → 行尾列的间距:弹窗收紧到 4(2026-10-30 用户拍板),
+    /// 全尺寸沿用通用间距。
+    static func valueSpacing(compact: Bool) -> CGFloat {
+        compact ? 4 : spacing(compact: false)
     }
 
     static func iconSize(compact: Bool) -> CGFloat {
@@ -31,8 +50,14 @@ enum RankingListMetrics {
         compact ? 52 : 110
     }
 
-    static func valueFontSize(compact: Bool) -> CGFloat {
+    /// 名称字号(数值弹窗档已单独调小,名称不随)。
+    static func nameFontSize(compact: Bool) -> CGFloat {
         compact ? 12.5 : 13
+    }
+
+    /// 数值字号:弹窗 11.5(2026-10-30 用户拍板"数字改小一点",原与名称同 12.5)。
+    static func valueFontSize(compact: Bool) -> CGFloat {
+        compact ? 11.5 : 13
     }
 
     /// 数值列**定宽**(全部排行共用):按最宽现实读数 "999.9 MB/s"(速率跨到 GB/s 前的
@@ -108,8 +133,8 @@ struct RankingListCard<Rows: View>: View {
         .padding(.leading, RankingListMetrics.rowInset)
         .padding(
             .trailing,
-            RankingListMetrics.rowInset + RankingListMetrics.spacing(compact: isCompact)
-                + RankingListMetrics.trailingWidth
+            RankingListMetrics.rowInset + RankingListMetrics.valueSpacing(compact: isCompact)
+                + RankingListMetrics.trailingWidth(compact: isCompact)
         )
         .padding(.bottom, 2)
     }
@@ -127,9 +152,9 @@ struct RankingListRow<Badge: View, Trailing: View>: View {
     let meterFraction: Double
     let tint: Color
     let valueText: String
-    /// 数值高负载警示(project-visibility/02 目验反馈,2026-10-26 用户拍板):
-    /// 数值圈红(state-negative 1pt 胶囊描边 + 同色数字)取代行内"高负载"文字
-    /// chip——chip 挤占行宽遮挡信息。仅 CPU 口径的组行会传 true(内存值不背 CPU 警示)。
+    /// 数值高负载警示:state-negative 红字(2026-10-26 圈红取代"高负载"文字 chip;
+    /// 2026-10-30 用户拍板去圈只留红字,最忙进程名改挂名称后 chip)。
+    /// 仅 CPU 口径的组行会传 true(内存值不背 CPU 警示)。
     var alertsHighLoad = false
     var isCompact = false
     @ViewBuilder let badge: () -> Badge
@@ -142,7 +167,7 @@ struct RankingListRow<Badge: View, Trailing: View>: View {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 4) {
                     Text(name)
-                        .font(.system(size: RankingListMetrics.valueFontSize(compact: isCompact), weight: .medium))
+                        .font(.system(size: RankingListMetrics.nameFontSize(compact: isCompact), weight: .medium))
                         .lineLimit(1)
                         .truncationMode(.middle)
                     badge()
@@ -153,26 +178,19 @@ struct RankingListRow<Badge: View, Trailing: View>: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
-            MeterBar(fraction: meterFraction, tint: tint)
-                .frame(width: RankingListMetrics.meterWidth(compact: isCompact))
-            Text(valueText)
-                .font(.system(size: RankingListMetrics.valueFontSize(compact: isCompact), weight: .semibold))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .foregroundStyle(alertsHighLoad ? Surface.negative : .primary)
-                // 警示圈随文不占版:负内距外扩 4pt,数值列竖线与行高不动(描边是
-                // 警示标记不是层级描边,DESIGN.md 状态 chip 节登记的拍板例外)。
-                .overlay {
-                    if alertsHighLoad {
-                        Capsule()
-                            .strokeBorder(Surface.negative, lineWidth: 1)
-                            .padding(-4)
-                    }
-                }
-                .frame(width: RankingListMetrics.valueWidth(compact: isCompact), alignment: .trailing)
-            trailing()
-                .frame(width: RankingListMetrics.trailingWidth, alignment: .trailing)
+            HStack(spacing: RankingListMetrics.valueSpacing(compact: isCompact)) {
+                MeterBar(fraction: meterFraction, tint: tint)
+                    .frame(width: RankingListMetrics.meterWidth(compact: isCompact))
+                Text(valueText)
+                    .font(.system(size: RankingListMetrics.valueFontSize(compact: isCompact), weight: .semibold))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .foregroundStyle(alertsHighLoad ? Surface.negative : .primary)
+                    .frame(width: RankingListMetrics.valueWidth(compact: isCompact), alignment: .trailing)
+                trailing()
+                    .frame(width: RankingListMetrics.trailingWidth(compact: isCompact), alignment: .trailing)
+            }
         }
         .padding(.horizontal, RankingListMetrics.rowInset)
         .padding(.vertical, isCompact ? 5 : 7)
