@@ -139,6 +139,7 @@
 		C550809223BC4A1E6D6225BD /* RankingCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA9D963B1DE0ED63855A6AAF /* RankingCard.swift */; };
 		C68DB25B631F3D04A529B82E /* SettingsWindowChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3DD97B8B77F12CD4DF6B3CB /* SettingsWindowChrome.swift */; };
 		C8AB0C6A391C20BB6FAB3B82 /* DiskFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5067DB98A38E61400019E48 /* DiskFeature.swift */; };
+		C9E0B185F0FEF6D8B6F04FC9 /* ObservedUpdaterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEEDFA2F8F762B53006CC921 /* ObservedUpdaterTests.swift */; };
 		CADC6FC231286ABD06F04C67 /* KillServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C53D2D1E33AFAC1704FD224A /* KillServiceTests.swift */; };
 		CB7A67E13563585930530C9B /* ObservedUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78D120127C210252D63975DA /* ObservedUpdater.swift */; };
 		CD3119D8DB34CB29A184EFC1 /* BatterySensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C592AC26CEC4C7129D0463B /* BatterySensor.swift */; };
@@ -350,6 +351,7 @@
 		E98C287752EFC374E2CC7F9A /* PowerFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerFeature.swift; sourceTree = "<group>"; };
 		EA32BC4006AFA168EE6CF9B5 /* RoundSpineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoundSpineTests.swift; sourceTree = "<group>"; };
 		EBB4FA4027487EAA178DE6EC /* StripChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StripChartView.swift; sourceTree = "<group>"; };
+		EEEDFA2F8F762B53006CC921 /* ObservedUpdaterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObservedUpdaterTests.swift; sourceTree = "<group>"; };
 		F000A4648F89E746459DC38B /* MenuBarBadgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarBadgeTests.swift; sourceTree = "<group>"; };
 		F037E709135740FF3012BA47 /* SyntheticProcessSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyntheticProcessSourceTests.swift; sourceTree = "<group>"; };
 		F24703C16273CB98970E4297 /* AlertSettingsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSettingsStoreTests.swift; sourceTree = "<group>"; };
@@ -633,6 +635,7 @@
 				6A98A79159A39E317CC43DA0 /* NettopProcessRateTests.swift */,
 				DE62A3533CA867B81B4B903B /* NettopWatchdogTests.swift */,
 				D594128FBC10276D6F62A60E /* NetworkSensorTests.swift */,
+				EEEDFA2F8F762B53006CC921 /* ObservedUpdaterTests.swift */,
 				4A05CDA8C1EBF16044C21BFD /* ParentChainQueryTests.swift */,
 				922EBEDDF974C9C5C567A5C8 /* ProcArgsParserTests.swift */,
 				992A92032D0B982D3C0006EB /* ProcessRankingSensorTests.swift */,
@@ -796,6 +799,7 @@
 				E51ED75C0AB66949E0707600 /* NettopWatchdogTests.swift in Sources */,
 				5052F645F62C479429754080 /* NetworkFixture.swift in Sources */,
 				B13A211B9FD087858718B9AE /* NetworkSensorTests.swift in Sources */,
+				C9E0B185F0FEF6D8B6F04FC9 /* ObservedUpdaterTests.swift in Sources */,
 				FDE435939BE1165CF3D5121F /* ParentChainQueryTests.swift in Sources */,
 				616D7878CF54B2A29104277C /* ProcArgsParserTests.swift in Sources */,
 				A1307D0D5CDA410E84C9AA0D /* ProcessRankingSensorTests.swift in Sources */,
