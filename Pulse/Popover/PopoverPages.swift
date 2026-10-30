@@ -21,11 +21,23 @@ enum PopoverPages {
         let model = context.model
         switch tab {
         case .overview:
-            return [overviewGrid(context), groupRanking(.overview, context)]
+            // 网格 → 内存双环(上下排)→ 当前最忙 → dev server(全部停止经 KillRequestFlow 关口)。
+            return [
+                overviewGrid(context),
+                RingCardNSView.memoryByType(context.monitor),
+                RingCardNSView.memoryByApp(model),
+                groupRanking(.overview, context),
+                DevServerCardNSView(monitor: context.monitor, model: model),
+            ]
         case .cpu:
             return [MetricMainCardNSView { model.cpuModel }, groupRanking(.cpu, context)]
         case .memory:
-            return [MetricMainCardNSView { model.memoryModel }, groupRanking(.memory, context)]
+            return [
+                MetricMainCardNSView { model.memoryModel },
+                RingCardNSView.memoryByType(context.monitor),
+                RingCardNSView.memoryByApp(model),
+                groupRanking(.memory, context),
+            ]
         case .sensors:
             // 拍板例外(p2-review/04 A):弹窗只放派生卡,风扇卡与温度明细只在主窗口。
             let smc = context.monitor.smc
@@ -65,6 +77,8 @@ enum PopoverPages {
                 NetworkTotalsCardNSView { history.networkTotals },
                 networkRanking(context),
             ]
+        case .history:
+            return [HistoryPageNSView(monitor: context.monitor)]
         default:
             return [placeholder(tab)]
         }
