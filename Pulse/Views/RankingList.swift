@@ -12,6 +12,29 @@ import SwiftUI
 // 卡形态:full = {rounded.card} 18 + {spacing.card-padding} 16;compact(弹窗)=
 // {rounded.card-compact} 12 + {spacing.card-padding-compact} 12。
 
+/// 数值列口径:同一张卡内各行同宽(竖线对齐),不同卡按自己的读数量宽。
+enum RankingValueColumn: CustomStringConvertible {
+    /// 组排行:CPU%(十余核满载 4 位)/ 内存。
+    case standard
+    /// 模块排行:速率与 CPU 时间(最宽 "999.9 MB/s")。
+    case rate
+
+    /// 量宽样本:各口径现实最宽读数。
+    var widestReadings: [String] {
+        switch self {
+        case .standard: ["9999%", "99.9 GB", "999 MB"]
+        case .rate: ["999.9 MB/s"]
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .standard: "标准"
+        case .rate: "速率"
+        }
+    }
+}
+
 /// 行配方的度量(两档):卡、行、表头三处共用,改一处即全部对齐。
 enum RankingListMetrics {
     /// 行尾列宽 = 结束按钮 + 间距 + 展开箭头 10;模块排行留同宽空列。
@@ -34,6 +57,11 @@ enum RankingListMetrics {
 
     static func spacing(compact: Bool) -> CGFloat {
         compact ? 8 : 10
+    }
+
+    /// 名称区 → meter 的最小间距:弹窗 4(2026-10-30 用户拍板 meter 左右收紧)。
+    static func meterLeadingGap(compact: Bool) -> CGFloat {
+        compact ? 4 : 8
     }
 
     /// meter → 数值、数值 → 行尾列的间距:弹窗收紧到 4(2026-10-30 用户拍板),
@@ -60,19 +88,30 @@ enum RankingListMetrics {
         compact ? 11.5 : 13
     }
 
-    /// 数值列**定宽**(全部排行共用):按最宽现实读数 "999.9 MB/s"(速率跨到 GB/s 前的
-    /// 最长串)以实际绘制字体量宽 + 2pt 余量。曾是最小宽度 64 / 48,速率文案逐行撑宽、
-    /// 把 meter 与名称区推得每行不同(2026-10-20 用户反馈);定宽后各排行同一竖线。
-    static func valueWidth(compact: Bool) -> CGFloat {
-        compact ? compactValueWidth : regularValueWidth
+    /// 数值列**定宽**:按该口径最宽现实读数以实际绘制字体量宽 + 2pt 余量。曾是最小宽度
+    /// 64 / 48,速率文案逐行撑宽、把 meter 与名称区推得每行不同(2026-10-20 用户反馈);
+    /// 定宽后同卡各行同一竖线。组排行曾与速率排行共用 "999.9 MB/s" 宽,CPU 读数短、
+    /// 右对齐后 meter 与数字隔一大截、名称区被挤窄(2026-10-30 用户反馈)→ 分两口径。
+    static func valueWidth(compact: Bool, column: RankingValueColumn = .rate) -> CGFloat {
+        switch (column, compact) {
+        case (.standard, true): compactStandardWidth
+        case (.standard, false): regularStandardWidth
+        case (.rate, true): compactRateWidth
+        case (.rate, false): regularRateWidth
+        }
     }
 
-    private static let regularValueWidth = measuredValueWidth(compact: false)
-    private static let compactValueWidth = measuredValueWidth(compact: true)
+    private static let regularStandardWidth = measuredValueWidth(compact: false, column: .standard)
+    private static let compactStandardWidth = measuredValueWidth(compact: true, column: .standard)
+    private static let regularRateWidth = measuredValueWidth(compact: false, column: .rate)
+    private static let compactRateWidth = measuredValueWidth(compact: true, column: .rate)
 
-    private static func measuredValueWidth(compact: Bool) -> CGFloat {
+    private static func measuredValueWidth(compact: Bool, column: RankingValueColumn) -> CGFloat {
         let font = NSFont.monospacedDigitSystemFont(ofSize: valueFontSize(compact: compact), weight: .semibold)
-        return ceil(("999.9 MB/s" as NSString).size(withAttributes: [.font: font]).width) + 2
+        let widest = column.widestReadings
+            .map { ($0 as NSString).size(withAttributes: [.font: font]).width }
+            .max() ?? 0
+        return ceil(widest) + 2
     }
 }
 
@@ -156,6 +195,8 @@ struct RankingListRow<Badge: View, Trailing: View>: View {
     /// 2026-10-30 用户拍板去圈只留红字,最忙进程名改挂名称后 chip)。
     /// 仅 CPU 口径的组行会传 true(内存值不背 CPU 警示)。
     var alertsHighLoad = false
+    /// 数值列口径:组排行传 .standard(读数短,列窄);模块排行默认 .rate。
+    var valueColumn = RankingValueColumn.rate
     var isCompact = false
     @ViewBuilder let badge: () -> Badge
     @ViewBuilder let trailing: () -> Trailing
@@ -164,36 +205,51 @@ struct RankingListRow<Badge: View, Trailing: View>: View {
         HStack(spacing: RankingListMetrics.spacing(compact: isCompact)) {
             icon
                 .frame(width: iconSize, height: iconSize)
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 4) {
-                    Text(name)
-                        .font(.system(size: RankingListMetrics.nameFontSize(compact: isCompact), weight: .medium))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    badge()
-                }
-                Text(subtitle)
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 8)
-            HStack(spacing: RankingListMetrics.valueSpacing(compact: isCompact)) {
-                MeterBar(fraction: meterFraction, tint: tint)
-                    .frame(width: RankingListMetrics.meterWidth(compact: isCompact))
-                Text(valueText)
-                    .font(.system(size: RankingListMetrics.valueFontSize(compact: isCompact), weight: .semibold))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .foregroundStyle(alertsHighLoad ? Surface.negative : .primary)
-                    .frame(width: RankingListMetrics.valueWidth(compact: isCompact), alignment: .trailing)
-                trailing()
-                    .frame(width: RankingListMetrics.trailingWidth(compact: isCompact), alignment: .trailing)
+            // 名称区吃满剩余宽度,meter 贴右;二者之间只留 meterLeadingGap(外层通用间距
+            // 只管图标→名称,否则名称→meter 会叠两份间距)。
+            HStack(spacing: RankingListMetrics.meterLeadingGap(compact: isCompact)) {
+                nameColumn
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                valueColumnView
             }
         }
         .padding(.horizontal, RankingListMetrics.rowInset)
         .padding(.vertical, isCompact ? 5 : 7)
+    }
+
+    private var nameColumn: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            HStack(spacing: 4) {
+                Text(name)
+                    .font(.system(size: RankingListMetrics.nameFontSize(compact: isCompact), weight: .medium))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                badge()
+            }
+            Text(subtitle)
+                .font(.system(size: 10.5))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+
+    private var valueColumnView: some View {
+        HStack(spacing: RankingListMetrics.valueSpacing(compact: isCompact)) {
+            MeterBar(fraction: meterFraction, tint: tint)
+                .frame(width: RankingListMetrics.meterWidth(compact: isCompact))
+            Text(valueText)
+                .font(.system(size: RankingListMetrics.valueFontSize(compact: isCompact), weight: .semibold))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .foregroundStyle(alertsHighLoad ? Surface.negative : .primary)
+                .frame(
+                    width: RankingListMetrics.valueWidth(compact: isCompact, column: valueColumn),
+                    alignment: .trailing
+                )
+            trailing()
+                .frame(width: RankingListMetrics.trailingWidth(compact: isCompact), alignment: .trailing)
+        }
     }
 
     private var iconSize: CGFloat {
