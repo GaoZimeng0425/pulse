@@ -21,11 +21,21 @@ enum PopoverPages {
         let model = context.model
         switch tab {
         case .overview:
-            return [overviewGrid(context)]
+            // 网格 → 内存双环(上下排)→ [排行卡] → dev server(全部停止经 KillRequestFlow 关口)。
+            return [
+                overviewGrid(context),
+                RingCardNSView.memoryByType(context.monitor),
+                RingCardNSView.memoryByApp(model),
+                DevServerCardNSView(monitor: context.monitor, model: model),
+            ]
         case .cpu:
             return [MetricMainCardNSView { model.cpuModel }]
         case .memory:
-            return [MetricMainCardNSView { model.memoryModel }]
+            return [
+                MetricMainCardNSView { model.memoryModel },
+                RingCardNSView.memoryByType(context.monitor),
+                RingCardNSView.memoryByApp(model),
+            ]
         case .gpu:
             return [MetricMainCardNSView { model.gpuModel }, MetricMainCardNSView { model.aneModel }]
         case .battery:
@@ -34,6 +44,8 @@ enum PopoverPages {
             return [MetricMainCardNSView { model.diskModel }]
         case .network:
             return [MetricMainCardNSView { model.networkModel }]
+        case .history:
+            return [HistoryPageNSView(monitor: context.monitor)]
         default:
             return [placeholder(tab)]
         }
