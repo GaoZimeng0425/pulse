@@ -49,7 +49,8 @@ struct DashboardView: View {
             MetricIconTabBar(selection: $tabSelection)
             pageHeader
             ScrollView {
-                VStack(spacing: 8) {
+                // 惰性栈(popover-appkit/10):卡片序列惰性,排行卡内部的行才能随视口按需建。
+                LazyVStack(spacing: 8) {
                     MetricTabStack(
                         tab: tabSelection.current,
                         isCompact: true,
