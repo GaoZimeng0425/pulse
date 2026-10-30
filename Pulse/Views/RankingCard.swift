@@ -99,6 +99,7 @@ struct RankingRowView: View {
                 valueText: valueText,
                 alertsHighLoad: metric == .cpu
                     && StatusBadgeRules.groupBadge(cpuPercent: group.cpuPercent) != nil,
+                valueColumn: .standard,
                 isCompact: isCompact
             ) {
                 if let hotProcessName {
@@ -193,7 +194,7 @@ struct HotProcessChip: View {
             .padding(.horizontal, compact ? 5 : 6)
             .padding(.vertical, 1)
             .background(Surface.negative.opacity(0.14), in: .capsule)
-            .frame(maxWidth: compact ? 120 : 160, alignment: .leading)
+            .frame(maxWidth: compact ? 150 : 200, alignment: .leading)
     }
 }
 
