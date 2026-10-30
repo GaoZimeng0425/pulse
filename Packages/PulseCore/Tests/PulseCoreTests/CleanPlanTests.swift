@@ -77,6 +77,40 @@ final class CleanPlanTests: XCTestCase {
         XCTAssertFalse(selection.contains(candidates[3]))
     }
 
+    // MARK: 整组勾选(2026-10-30 拍板 B):三态 + 批量设置只动传入的候选
+
+    /// 组三态:none → mixed → all 随勾选数变化;空集 = none。
+    func testGroupStateTransitions() {
+        let safe = [candidates[0], candidates[1]] // 两个 safe 档项
+        var selection = JunkSelection()
+        XCTAssertEqual(selection.state(of: safe), .none)
+        XCTAssertEqual(selection.state(of: []), .none, "空集按 none 处理(组里没有可安全清理项)")
+
+        selection.set(candidates[0], selected: true)
+        XCTAssertEqual(selection.state(of: safe), .mixed)
+
+        selection.set(candidates[1], selected: true)
+        XCTAssertEqual(selection.state(of: safe), .all)
+
+        selection.set(candidates[0], selected: false)
+        XCTAssertEqual(selection.state(of: safe), .mixed)
+    }
+
+    /// 批量设置只动传入的候选:组内全勾不清组外的勾,组内全清也不碰组外。
+    func testBulkSetOnlyTouchesGivenCandidates() {
+        let safe = [candidates[0], candidates[1]]
+        var selection = JunkSelection()
+        selection.set(candidates[2], selected: true) // 组外(先检查项,用户手勾)
+
+        selection.set(true, for: safe)
+        XCTAssertEqual(selection.state(of: safe), .all)
+        XCTAssertTrue(selection.contains(candidates[2]), "组勾选不碰组外的勾")
+
+        selection.set(false, for: safe)
+        XCTAssertEqual(selection.state(of: safe), .none)
+        XCTAssertTrue(selection.contains(candidates[2]), "组全清也不碰组外的勾")
+    }
+
     // MARK: 排除二次判定
 
     /// 票面"扫描与删除两处生效":已勾选的项若在删除前被排除,计划里不能有它。

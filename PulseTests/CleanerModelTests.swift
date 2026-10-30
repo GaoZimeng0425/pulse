@@ -241,6 +241,43 @@ final class CleanerModelTests: XCTestCase {
         XCTAssertEqual(model.plan.items.count, 1, "取消确认不动勾选")
     }
 
+    // MARK: 整组勾选(2026-10-30 拍板 B:只勾组内「可安全清理」项,先检查项单独勾)
+
+    func testGroupToggleSelectsOnlySafeTierAndCyclesBack() async {
+        let model = CleanerModel(trash: FakeCleanTrashExecutor(), homeDirectory: home)
+        model.startScan(
+            using: makeHomeEnumerator(extra: ["Library/Caches/JetBrains": 5400]),
+            roots: [home]
+        )
+        await waitUntil { !model.isScanning }
+
+        let safe = model.candidates.filter { $0.tier == .safe }
+        let checkFirst = model.candidates.filter { $0.tier == .checkFirst }
+        XCTAssertEqual(Set(safe.map(\.ruleID)), ["xcode.derivedData", "homebrew.cache"])
+        XCTAssertEqual(checkFirst.map(\.ruleID), ["jetbrains.caches"])
+
+        // none → 一键全勾:只勾 safe 档,先检查项不被带上
+        XCTAssertEqual(model.groupState(of: safe), .none)
+        model.toggleGroup(safe)
+        XCTAssertEqual(model.groupState(of: safe), .all)
+        XCTAssertEqual(model.plan.items.count, 2)
+        XCTAssertFalse(model.plan.items.contains { $0.tier == .checkFirst }, "先检查项必须逐个手勾")
+
+        // all → 一键全清:用户手勾的先检查项保留
+        model.toggle(checkFirst[0])
+        model.toggleGroup(safe)
+        XCTAssertEqual(model.groupState(of: safe), .none)
+        XCTAssertEqual(model.plan.items.map(\.ruleID), ["jetbrains.caches"], "组全清不碰组外的勾")
+
+        // mixed(手勾一个再点组头)→ 全勾
+        model.toggleGroup(safe)
+        model.toggle(safe[0])
+        XCTAssertEqual(model.groupState(of: safe), .mixed)
+        model.toggleGroup(safe)
+        XCTAssertEqual(model.groupState(of: safe), .all)
+        XCTAssertEqual(model.plan.items.count, 3)
+    }
+
     private func waitUntil(_ condition: @MainActor () -> Bool) async {
         for _ in 0 ..< 500 {
             if condition() {

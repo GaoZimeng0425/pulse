@@ -254,7 +254,11 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   「清除勾选」bordered + 「清理…」borderedProminent(所在页指标色);确认清单走
   `{layout.sheet-width}` 460 定宽 sheet(标题 `{typography.section-title}`、逐行同清单行减
   checkbox、页脚总量 `{typography.card-title}` + 口径注记,`{layout.sheet-list-max-height}`
-  220 滚动)。清单默认全不勾;右键行 = 排除该目录 / 在 Finder 中显示。
+  220 滚动)。清单默认全不勾;右键行 = 排除该目录 / 在 Finder 中显示。**组头三态
+  checkbox**(2026-10-30 用户拍板 B,`GroupCheckBox`):组标题前一枚系统 checkbox
+  (NSButton allowsMixedState,SwiftUI `Toggle` 无混合态才包一层),**只吃组内「可安全
+  清理」档的项**——none / mixed 点击全勾、all 点击全清,先检查项永不被组勾选带上、
+  必须逐个手勾;组内无安全档项则不画。
 - **AreaTrendChartView**:56 点、线 2px 指标色、线下渐变 32%→0、4 条 8% 网格线、
   2% 左垫底;**StripChartView**:44 柱、36pt 高。二者都是自绘 Canvas,不引 Charts。
 - **PillTabBar(通用药丸 tab 条,用户拍板 2026-10-22:tab 是通用组件样式)**:
