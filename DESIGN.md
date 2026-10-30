@@ -229,7 +229,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   CPU 读数右对齐、meter 与数字隔一大截且挤窄名称区,遂分两口径)/ **行尾恒留 30pt 列**(组排行放结束按钮 +
   展开箭头,模块排行留空)——所有排行的 meter 与数值在同一竖线上。组排行行高负载警示
   (组 CPU > 100%,阈值 `StatusBadgeRules` 同源)= **该行 CPU 数值 `{colors.state-negative}`
-  红字**(无描边)+ **名称后挂最忙进程 chip**(`HotProcessChip`:状态 chip 配方,
+  红字**(无描边)+ **名称后挂最忙进程 chip**(`HotProcessChip`,靠名称区最右贴 meter:状态 chip 配方,
   state-negative 14% 底 + 同色字,只写组内 CPU 最高进程的显示名、无图标,10 / 10.5
   semibold,中间截断,上限宽 150 / 200);仅 CPU 口径行,内存口径行不标(2026-10-30
   用户拍板 B:要一眼看出"哪个进程在吃";此前 2026-10-26 的"高负载"文字 chip 与
