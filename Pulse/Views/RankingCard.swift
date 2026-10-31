@@ -16,7 +16,7 @@ struct RankingCardView<Expanded: View>: View {
         case compact
     }
 
-    var title = "当前最忙"
+    var title = GroupRankingStyle.title
     let groups: [ProcessGroup]
     let metric: GroupCardMetric
     let cpuLeader: Double
@@ -32,8 +32,8 @@ struct RankingCardView<Expanded: View>: View {
     var body: some View {
         RankingListCard(
             title: title,
-            accent: metric == .cpu ? Metric.cpu.accentColor : Metric.memory.accentColor,
-            valueLabel: metric == .cpu ? "CPU" : "内存",
+            accent: GroupRankingStyle.accent(metric),
+            valueLabel: GroupRankingStyle.valueLabel(metric),
             isCompact: density == .compact,
             isEmpty: groups.isEmpty,
             emptyMessage: emptyMessage
@@ -43,33 +43,77 @@ struct RankingCardView<Expanded: View>: View {
             // 44%;探针 120 行每秒重排 4.9–8.9% → 2.4%)。按名次认行只刷新行内容;展开
             // 态按组 id 存在模型里,不受影响。
             ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
-                let isExpanded = expandedGroupIDs.contains(group.id)
-                VStack(spacing: 4) {
-                    RankingRowView(
-                        group: group,
-                        metric: metric,
-                        meterFraction: meterFraction(for: group),
-                        isExpanded: isExpanded,
-                        isCompact: density == .compact,
-                        onToggle: { onToggle(group.id) },
-                        onEndGroup: { onEndGroup(group) }
-                    )
-                    if isExpanded {
-                        expandedContent(group)
-                            .padding(.bottom, 6)
-                    }
-                }
+                RankingGroupCell(
+                    group: group,
+                    metric: metric,
+                    meterFraction: GroupRankingStyle.meterFraction(
+                        group, metric: metric, cpuLeader: cpuLeader, memoryLeaderBytes: memoryLeaderBytes
+                    ),
+                    isExpanded: expandedGroupIDs.contains(group.id),
+                    isCompact: density == .compact,
+                    onToggle: { onToggle(group.id) },
+                    onEndGroup: { onEndGroup(group) },
+                    expandedContent: { expandedContent(group) }
+                )
             }
         }
     }
+}
+
+/// 组排行卡的口径派生(标题色 / 表头指标名 / meter 归一):整卡与原生列表逐行拼装共用。
+enum GroupRankingStyle {
+    static let title = "当前最忙"
+
+    static func accent(_ metric: GroupCardMetric) -> Color {
+        metric == .cpu ? Metric.cpu.accentColor : Metric.memory.accentColor
+    }
+
+    static func valueLabel(_ metric: GroupCardMetric) -> String {
+        metric == .cpu ? "CPU" : "内存"
+    }
 
     /// meter 榜首归一(工单 p0.6-ui-alignment/02 口径,随口径换指标)。
-    private func meterFraction(for group: ProcessGroup) -> Double {
+    static func meterFraction(
+        _ group: ProcessGroup,
+        metric: GroupCardMetric,
+        cpuLeader: Double,
+        memoryLeaderBytes: UInt64
+    ) -> Double {
         switch metric {
         case .cpu:
             MeterNormalization.fraction(group.cpuPercent, leader: cpuLeader)
         case .memory:
             MeterNormalization.fraction(Double(group.memoryBytes), leader: Double(memoryLeaderBytes))
+        }
+    }
+}
+
+/// 组排行的一格:组行 + 展开时其下的组内进程(展开内容由调用方给)。
+struct RankingGroupCell<Expanded: View>: View {
+    let group: ProcessGroup
+    let metric: GroupCardMetric
+    let meterFraction: Double
+    let isExpanded: Bool
+    let isCompact: Bool
+    let onToggle: () -> Void
+    let onEndGroup: () -> Void
+    @ViewBuilder let expandedContent: () -> Expanded
+
+    var body: some View {
+        VStack(spacing: 4) {
+            RankingRowView(
+                group: group,
+                metric: metric,
+                meterFraction: meterFraction,
+                isExpanded: isExpanded,
+                isCompact: isCompact,
+                onToggle: onToggle,
+                onEndGroup: onEndGroup
+            )
+            if isExpanded {
+                expandedContent()
+                    .padding(.bottom, 6)
+            }
         }
     }
 }

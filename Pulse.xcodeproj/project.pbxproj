@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		005D31D5A553D3A1105FF607 /* MetricCardModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53973290E8EB9138A67B958C /* MetricCardModel.swift */; };
 		00782FC590CECF347756D123 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7139D7B174756F0CAD5B532C /* HistoryView.swift */; };
+		00830AABA431FA2E43DA8F07 /* NativeList.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9E66EF3F4924169F8F7E693 /* NativeList.swift */; };
 		040A86C6285D90BF16F5B5AA /* PulseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 679FABC27E634B3FA90955FE /* PulseCore */; };
 		04BFB76AC65777ABAFFF1897 /* LiveDiskSourceSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F27F7F4AB085BB21BC93D75 /* LiveDiskSourceSmokeTests.swift */; };
 		05709BE15A090DCA772345D5 /* GroupingEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D0353305807063B3A9F254 /* GroupingEngineTests.swift */; };
@@ -321,6 +322,7 @@
 		D60B90549169579BCCD01677 /* BatteryFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryFeature.swift; sourceTree = "<group>"; };
 		D6CB838FAB56E49D3DB8D34D /* MemoryStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryStats.swift; sourceTree = "<group>"; };
 		D764FB1CFE74208F7730C4FA /* MetricAccent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricAccent.swift; sourceTree = "<group>"; };
+		D9E66EF3F4924169F8F7E693 /* NativeList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeList.swift; sourceTree = "<group>"; };
 		DAD5923604EC0076DBCA7F94 /* ProjectRootsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRootsSettingsView.swift; sourceTree = "<group>"; };
 		DC7E021DBD973F60A3D713EE /* MetricTabStack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricTabStack.swift; sourceTree = "<group>"; };
 		DCF3D2ECCF35087812BF92C5 /* DiskSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskSensor.swift; sourceTree = "<group>"; };
@@ -537,6 +539,7 @@
 				DC7E021DBD973F60A3D713EE /* MetricTabStack.swift */,
 				9434FBDCD0EABA01ACDC0639 /* MetricTabViews.swift */,
 				2D83B99D1565E444748A7987 /* ModuleRankingCard.swift */,
+				D9E66EF3F4924169F8F7E693 /* NativeList.swift */,
 				39A94E49F6B1CA6A775BDD0E /* NetworkCardViews.swift */,
 				3FA58858B993A1A243A26B63 /* OverviewCards.swift */,
 				D5A07FFFA11CBCFAE4FED292 /* PillTabBar.swift */,
@@ -848,6 +851,7 @@
 				060D9322386EBB423055F963 /* MetricTabViews.swift in Sources */,
 				B590F624901FBA4BF2DB438F /* ModuleRankingCard.swift in Sources */,
 				A6DF542F79BD60BFE631FD62 /* MonitorAssembly.swift in Sources */,
+				00830AABA431FA2E43DA8F07 /* NativeList.swift in Sources */,
 				B482306A9746A2741DC459B4 /* NettopSource.swift in Sources */,
 				BC3F96643A2148359F32904E /* NetworkCardViews.swift in Sources */,
 				4C316564981903520DD003A2 /* NetworkFeature.swift in Sources */,

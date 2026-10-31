@@ -243,7 +243,11 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   存在」——0.6s 缓动让面板开期 CPU 36.5% vs 无动画 8.4%,popover-layout-loop/01)。
   **行容器与主窗口滚动区一律 `LazyVStack`**(2026-10-30 popover-appkit/10 实测:排行常上百行,
   普通 VStack 全建 → 弹窗开期鼠标移动 ~33% / 滚动 ~41%,惰性后 ~7% / ~25%;不得退回 VStack)。
-  **弹窗滚动区是 `List`**(2026-10-31 popover-list,用户拍板):每张卡一个 List 行,排行卡经
+  **弹窗滚动区是通用原生列表 `NativeList`**(2026-10-31 native-list,用户拍板):AppKit NSTableView
+  承载 SwiftUI 行——行视图按 kind 复用、行高缓存(排行行同 kind 量一次,卡片 / 展开行按 key 量)、
+  结构不变只换可见行内容、行宿主不参与键盘焦点链;卡片序列出自 `MetricTabStack.blocks`,排行拆卡头 /
+  每行 / 卡尾(`RankingListSlices`)。`popover.nativeList = NO` 回退到下述 List。
+  (回退形态)**弹窗滚动区 `List`**(2026-10-31 popover-list):每张卡一个 List 行,排行卡经
   环境值 `rankingRowsInList` 拆成卡头 / 每行 / 卡尾各一行,底色按段 `cardSlice` 切开拼回整卡
   (真机触控板滚动 LazyVStack 36–43%,sample 一半在每帧重出绘制指令、四分之一在重布局)。
   卡外 8pt 间距 = 首尾段底色外各 4 透明边,不用 listRowInsets 的 bottom(macOS 上被忽略)。
