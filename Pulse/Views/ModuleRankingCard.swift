@@ -34,7 +34,8 @@ struct ModuleRankingCardView: View {
                 ?? RankingEmptyMessage(title: "暂无数据", detail: "本页可见并完成首档采样后出数"),
             footnote: cadenceNote
         ) {
-            ForEach(rows) { row in
+            // 按名次认行(list-position-id,同 RankingCardView):重排只刷新行内容。
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 RankingListRow(
                     name: row.name,
                     subtitle: row.subtitle,
