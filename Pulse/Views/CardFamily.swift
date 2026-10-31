@@ -29,6 +29,32 @@ extension View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Surface.card, in: .rect(cornerRadius: CardMetrics.cornerRadius(compact: compact)))
     }
+
+    /// 卡壳切段(popover-list):一张卡拆成多个 List 行时,各段只画自己那截底色——
+    /// 卡头上圆角、卡尾下圆角、中段直角,拼起来与 `cardShell` 一致。内距由调用方给。
+    func cardSlice(_ slice: CardSlice, compact: Bool) -> some View {
+        let radius = CardMetrics.cornerRadius(compact: compact)
+        let top: CGFloat = slice == .top ? radius : 0
+        let bottom: CGFloat = slice == .bottom ? radius : 0
+        return frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                Surface.card,
+                in: UnevenRoundedRectangle(
+                    topLeadingRadius: top, bottomLeadingRadius: bottom,
+                    bottomTrailingRadius: bottom, topTrailingRadius: top
+                )
+            )
+    }
+}
+
+enum CardSlice {
+    case top, middle, bottom
+}
+
+extension EnvironmentValues {
+    /// 排行卡是否摊成 List 行(popover-list):弹窗滚动区是 List 时由宿主置 true,
+    /// 排行卡拆成卡头 / 每行 / 卡尾各占一行;默认 false = 整卡一个 LazyVStack(主窗口)。
+    @Entry var rankingRowsInList = false
 }
 
 /// 主卡头:22pt 指标徽章 + 卡标题(12.5 semibold,指标色)+ 右侧附件(可选)。

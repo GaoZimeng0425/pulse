@@ -48,22 +48,34 @@ struct DashboardView: View {
         return VStack(spacing: 10) {
             MetricIconTabBar(selection: $tabSelection)
             pageHeader
-            ScrollView {
-                // 惰性栈(popover-appkit/10):卡片序列惰性,排行卡内部的行才能随视口按需建。
-                LazyVStack(spacing: 8) {
-                    MetricTabStack(
-                        tab: tabSelection.current,
-                        isCompact: true,
-                        monitor: monitor,
-                        model: model,
-                        content: content,
-                        onSelectTab: { tabSelection.current = $0 }
-                    ) {
-                        rankingCard
-                    }
+            // 系统表格托底(popover-list,2026-10-31 用户拍板 List):LazyVStack 滚动时每帧
+            // 重布局 + 重出整块绘制指令,真机触控板滚动 36–43%(sample:render ~一半、
+            // layout ~四分之一)。List 只建可见行、滚动平移已画好的行。每张卡一个 List 行
+            // (上下行内距各 4 = 原卡间距 8),排行卡再拆成卡头 / 每行 / 卡尾各一行。
+            List {
+                MetricTabStack(
+                    tab: tabSelection.current,
+                    isCompact: true,
+                    monitor: monitor,
+                    model: model,
+                    content: content,
+                    onSelectTab: { tabSelection.current = $0 }
+                ) {
+                    rankingCard
                 }
+                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .environment(\.defaultMinListRowHeight, 1)
+            .environment(\.rankingRowsInList, true)
             .scrollIndicators(.never)
+            // plain List 的行左 8 / 右 9 内缩不受 listRowInsets 管(离屏探针实测),
+            // 负边距抵掉,卡片与页头 / 底排同宽。
+            .padding(.leading, -8)
+            .padding(.trailing, -9)
             .frame(height: Self.contentHeight)
             // 触发中的告警(工单 P1-07):授权被拒的降级出口 + 常态状态展示;
             // 无告警时不渲染。点开系统通知走主窗口深链,弹窗只做提示面。
