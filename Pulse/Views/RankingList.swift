@@ -134,30 +134,79 @@ struct RankingListCard<Rows: View>: View {
     /// 卡底注脚(数据节拍等);nil 不画。
     var footnote: String?
     @ViewBuilder let rows: () -> Rows
+    @Environment(\.rankingRowsInList) private var rowsInList
 
     var body: some View {
-        // 惰性栈(popover-appkit/10):排行常有上百行,普通 VStack 全部建出,弹窗开期
-        // 悬停命中检测 / 滚动 / 每秒刷新都按全部行付费(鼠标移动 ~33%、滚动 ~41%);
-        // 惰性后只建视口内的行(→ ~7% / ~25%)。外层滚动区同为 LazyVStack 才生效。
-        LazyVStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.system(size: 12.5, weight: .semibold))
-                .foregroundStyle(accent)
-                .padding(.bottom, 6)
+        if rowsInList {
+            listSlices
+        } else {
+            // 惰性栈(popover-appkit/10):排行常有上百行,普通 VStack 全部建出,弹窗开期
+            // 悬停命中检测 / 滚动 / 每秒刷新都按全部行付费(鼠标移动 ~33%、滚动 ~41%);
+            // 惰性后只建视口内的行(→ ~7% / ~25%)。外层滚动区同为 LazyVStack 才生效。
+            LazyVStack(alignment: .leading, spacing: 2) {
+                titleText
+                if isEmpty {
+                    CardEmptyState(title: emptyMessage.title, detail: emptyMessage.detail)
+                } else {
+                    columnHeader
+                    rows()
+                }
+                footnoteText
+            }
+            .cardShell(compact: isCompact)
+        }
+    }
+
+    /// 弹窗 List 形态(popover-list):卡拆成「卡头 / 每行 / 卡尾」三段各占一个 List 行,
+    /// 系统表格只建可见行、滚动时平移已画好的行;卡底色按段切开(卡头上圆角、卡尾下圆角,
+    /// 中段直角),拼起来与整卡一致。卡外 8pt 间距 = 首尾段底色外各留 4 透明边——不走
+    /// listRowInsets:macOS List 上下都取 top 值、bottom 被忽略(离屏探针实测)。
+    @ViewBuilder
+    private var listSlices: some View {
+        let padding = CardMetrics.padding(compact: isCompact)
+        VStack(alignment: .leading, spacing: 2) {
+            titleText
             if isEmpty {
                 CardEmptyState(title: emptyMessage.title, detail: emptyMessage.detail)
             } else {
                 columnHeader
-                rows()
-            }
-            if let footnote {
-                Text(footnote)
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.tertiary)
-                    .padding(.top, 6)
             }
         }
-        .cardShell(compact: isCompact)
+        .padding([.top, .horizontal], padding)
+        .padding(.bottom, 2)
+        .cardSlice(.top, compact: isCompact)
+        .padding(.top, 4)
+        .listRowInsets(EdgeInsets())
+        if !isEmpty {
+            rows()
+                .padding(.horizontal, padding)
+                .padding(.bottom, 2)
+                .cardSlice(.middle, compact: isCompact)
+                .listRowInsets(EdgeInsets())
+        }
+        // 无注脚时卡尾只剩下内距(VStack 包住,空内容也要占出这一段)。
+        VStack(alignment: .leading, spacing: 0) { footnoteText }
+            .padding([.bottom, .horizontal], padding)
+            .cardSlice(.bottom, compact: isCompact)
+            .padding(.bottom, 4)
+            .listRowInsets(EdgeInsets())
+    }
+
+    private var titleText: some View {
+        Text(title)
+            .font(.system(size: 12.5, weight: .semibold))
+            .foregroundStyle(accent)
+            .padding(.bottom, 6)
+    }
+
+    @ViewBuilder
+    private var footnoteText: some View {
+        if let footnote {
+            Text(footnote)
+                .font(.system(size: 10.5))
+                .foregroundStyle(.tertiary)
+                .padding(.top, 6)
+        }
     }
 
     /// 表头右列对齐数值列右缘(越过行尾列)。

@@ -241,8 +241,12 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   排行卡不配节标题(主窗口也不配「当前最忙」节标题)。
   **meter 条宽度无过渡动画**(读数到即重画;2026-10-29 用户拍板「体感不到的东西不应该
   存在」——0.6s 缓动让面板开期 CPU 36.5% vs 无动画 8.4%,popover-layout-loop/01)。
-  **行容器与弹窗滚动区一律 `LazyVStack`**(2026-10-30 popover-appkit/10 实测:排行常上百行,
+  **行容器与主窗口滚动区一律 `LazyVStack`**(2026-10-30 popover-appkit/10 实测:排行常上百行,
   普通 VStack 全建 → 弹窗开期鼠标移动 ~33% / 滚动 ~41%,惰性后 ~7% / ~25%;不得退回 VStack)。
+  **弹窗滚动区是 `List`**(2026-10-31 popover-list,用户拍板):每张卡一个 List 行,排行卡经
+  环境值 `rankingRowsInList` 拆成卡头 / 每行 / 卡尾各一行,底色按段 `cardSlice` 切开拼回整卡
+  (真机触控板滚动 LazyVStack 36–43%,sample 一半在每帧重出绘制指令、四分之一在重布局)。
+  卡外 8pt 间距 = 首尾段底色外各 4 透明边,不用 listRowInsets 的 bottom(macOS 上被忽略)。
 - **清理清单行**(p4-cleaner/04,`CleanerJunkViews.swift`):借排行列表行配方
   (`RankingListMetrics` 全套:图标 22 / 名称 13 medium + 副文 10.5 secondary / meter 110
   榜首归一 / 数值 13 semibold 等宽定宽列 / 行内距 6×7),行首加系统 checkbox;行选中底 =
