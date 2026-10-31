@@ -38,7 +38,11 @@ struct RankingCardView<Expanded: View>: View {
             isEmpty: groups.isEmpty,
             emptyMessage: emptyMessage
         ) {
-            ForEach(groups) { group in
+            // 按名次认行(list-position-id):排行每秒重排,按组认行时 List 底层表格把名次
+            // 变化当成删行 + 插行,逐行重建 / 测高 / 重算焦点链(真机总览页开着 10%、滚动
+            // 44%;探针 120 行每秒重排 4.9–8.9% → 2.4%)。按名次认行只刷新行内容;展开
+            // 态按组 id 存在模型里,不受影响。
+            ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
                 let isExpanded = expandedGroupIDs.contains(group.id)
                 VStack(spacing: 4) {
                     RankingRowView(
