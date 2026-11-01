@@ -16,7 +16,8 @@ public enum DiskFixture {
         important: Int64? = 209_550_000_000,
         free: Int64? = 202_940_000_000,
         rootDevice: String = "/dev/disk3s1s1",
-        includeDataVolume: Bool = true
+        includeDataVolume: Bool = true,
+        includeUpdateStagingDuplicate: Bool = false
     ) -> DiskCapacityRawReading {
         func volume(_ mount: String, _ device: String, fs: String = "apfs", used: UInt64?) -> MountedVolumeRaw {
             MountedVolumeRaw(mountPoint: mount, device: device, fileSystem: fs, usedBytes: used)
@@ -29,6 +30,14 @@ public enum DiskFixture {
             volume("/opt/homebrew", "map auto_home", fs: "autofs", used: nil), // 非 apfs:过滤
             volume("/System/Volumes/Update", "/dev/disk3s4", used: nil), // 同容器读失败:跳过
         ]
+        if includeUpdateStagingDuplicate {
+            // 更新预置挂载:系统卷本体(disk3s1)在 "/" 快照(disk3s1s1)之外再挂一次
+            // ——同一份块,make 必须按成员去重只计一次(2026-11-01 真机 mnt1 实案)。
+            mounted.insert(
+                volume("/System/Volumes/Update/mnt1", "/dev/disk3s1", used: macOSUsed),
+                at: 1
+            )
+        }
         if includeDataVolume {
             mounted.insert(volume("/System/Volumes/Data", "/dev/disk3s5", used: dataUsed), at: 0)
         }
