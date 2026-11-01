@@ -22,6 +22,11 @@ final class AlertCenterToastTests: XCTestCase {
         }
 
         func send(_ payload: NemoNotchToastPayload) async {
+            record(payload)
+        }
+
+        /// 锁的临界区收进同步私有方法(NSLock 禁 async 上下文,FakeAlertSender 同款纪律)。
+        private func record(_ payload: NemoNotchToastPayload) {
             lock.lock()
             defer { lock.unlock() }
             delivered.append(payload)
