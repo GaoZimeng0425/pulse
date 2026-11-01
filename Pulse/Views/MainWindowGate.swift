@@ -18,11 +18,18 @@ struct MainWindowGate: View {
     let alertRouter: AlertNotificationRouter
     /// 清理页排除目录(p4-cleaner/04):app 级单实例,与设置页「清理」同源。
     let cleanExclusions: CleanExclusionsStore
+    /// 清理扫描根(p4-cleaner/05):app 级单实例,与设置页「清理」同源。
+    let cleanScanRoots: CleanScanRootsStore
 
     var body: some View {
         Group {
             if monitor.mainWindowVisible {
-                MainWindowView(monitor: monitor, alertRouter: alertRouter, cleanExclusions: cleanExclusions)
+                MainWindowView(
+                    monitor: monitor,
+                    alertRouter: alertRouter,
+                    cleanExclusions: cleanExclusions,
+                    cleanScanRoots: cleanScanRoots
+                )
             } else {
                 // 与 Window 场景 defaultSize 同尺寸:窗框在恢复 / 深链路径上不跳动。
                 Color.clear.frame(width: 880, height: 620)

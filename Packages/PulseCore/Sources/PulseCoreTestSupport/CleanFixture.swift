@@ -68,16 +68,32 @@ public actor FakeCleanTrashExecutor: CleanTrashExecutor {
     }
 }
 
-/// ③ 活动表:固定前缀集(05 票在用保护测试用它切换「项目有没有终端在里面」)。
-public struct FakeCleanActivitySource: CleanActivitySource {
-    public var prefixes: [String]
+/// ③ 活动表:可变条目集(05 票在用保护测试用它切换「项目有没有终端在里面」,
+/// 以及「删除前重查」——两次调用之间改 entries 即可,判定永不缓存)。class 是
+/// 刻意的:模型捕获的是同一个实例,中途改表立刻被下一次现查看见。
+public final class FakeCleanActivitySource: CleanActivitySource, @unchecked Sendable {
+    private let lock = NSLock()
+    private var current: [CleanActivityEntry]
 
-    public init(prefixes: [String] = []) {
-        self.prefixes = prefixes
+    public init(entries: [CleanActivityEntry] = []) {
+        current = entries
     }
 
-    public func activePathPrefixes() -> [String] {
-        prefixes
+    public var entries: [CleanActivityEntry] {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return current
+        }
+        set {
+            lock.lock()
+            defer { lock.unlock() }
+            current = newValue
+        }
+    }
+
+    public func activeEntries() -> [CleanActivityEntry] {
+        entries
     }
 }
 
@@ -85,6 +101,7 @@ public struct FakeCleanActivitySource: CleanActivitySource {
 
 public enum CleanFixture {
     /// 造文件条目。deviceID 默认同一台「盘」;fileID 用递减全局计数避免无意同键。
+    /// `modified` = mtime epoch 秒(05 票项目年龄口径;默认 nil = 不参与年龄聚合)。
     public static func file(
         _ name: String,
         logical: Int64 = 100,
@@ -92,7 +109,8 @@ public enum CleanFixture {
         reclaimable: Int64? = 512,
         device: UInt32 = 16_777_229,
         fileID: UInt64? = nil,
-        dataless: Bool = false
+        dataless: Bool = false,
+        modified: Double? = nil
     ) -> FsEntrySnapshot {
         FsEntrySnapshot(
             name: name,
@@ -102,7 +120,8 @@ public enum CleanFixture {
             logicalSize: logical,
             allocatedSize: allocated,
             reclaimableSize: reclaimable,
-            isDataless: dataless
+            isDataless: dataless,
+            modifiedEpoch: modified
         )
     }
 
@@ -122,9 +141,12 @@ public enum CleanFixture {
     /// 该目录里放一个多大的文件(0 = 空目录),中间目录自动补齐。返回可直接喂
     /// `FakeCleanDirectoryEnumerator(listings:)` 的表;扫描根传 `home` 即得到以家目录为根的树。
     /// 目录 fileID 用全局计数(引擎按 (dev, fileID) 防双访,fileID 0 会被当无效跳过)。
+    /// `modifiedByDir` = 相对路径 → 该目录 payload 文件的 mtime(05 票年龄测试:
+    /// 项目文件老、产物文件新,年龄必须不看产物)。
     public static func homeListings(
         home: String,
-        directories: [String: Int64]
+        directories: [String: Int64],
+        modifiedByDir: [String: Double] = [:]
     ) -> [String: FakeCleanDirectoryEnumerator.Listing] {
         var childDirs: [String: [String]] = [home: []]
         var leafBytes: [String: Int64] = [:]
@@ -147,7 +169,14 @@ public enum CleanFixture {
         for (path, names) in childDirs {
             var entries = names.map { directory($0, fileID: nextFileID()) }
             if let bytes = leafBytes[path], bytes > 0 {
-                entries.append(file("payload.bin", logical: bytes, allocated: bytes, reclaimable: bytes))
+                let relative = String(path.dropFirst(home.count + 1))
+                entries.append(file(
+                    "payload.bin",
+                    logical: bytes,
+                    allocated: bytes,
+                    reclaimable: bytes,
+                    modified: modifiedByDir[relative]
+                ))
             }
             listings[path] = .entries(entries)
         }

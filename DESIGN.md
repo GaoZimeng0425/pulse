@@ -269,8 +269,22 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   220 滚动)。清单默认全不勾;右键行 = 排除该目录 / 在 Finder 中显示。**组头三态
   checkbox**(2026-10-30 用户拍板 B,`GroupCheckBox`):组标题前一枚系统 checkbox
   (NSButton allowsMixedState,SwiftUI `Toggle` 无混合态才包一层),**只吃组内「可安全
-  清理」档的项**——none / mixed 点击全勾、all 点击全清,先检查项永不被组勾选带上、
-  必须逐个手勾;组内无安全档项则不画。
+  清理」且非在用的项**——none / mixed 点击全勾、all 点击全清,先检查项与在用项
+  永不被组勾选带上;组内无可勾项则不画。**项目产物组与在用灰行**(p4-cleaner/05):
+  组头多一枚 segmented mini Picker「大小|新旧」(默认大小;新旧 = 最久未动在前,
+  年龄未知排最后),行副标末尾追加年龄人话(「今天动过 / N 天未动 / N 个月未动 /
+  N 年未动」,口径 = 项目内非产物文件的最后变动含 git 活动);未配扫描根时组位置
+  出一行 `{typography.caption}` 三级墨色引导文案(不硬造空组)。**在用保护行**:整行
+  55% 透明灰显、勾选位换锁形图标(`lock.fill` 三级墨色)、TierChip 位换 InUseChip
+  (同胶囊配方,`{colors.inkTertiary}` 灰——在用是客观状态,不是「先检查」的警示琥珀,
+  文案「在用保护 · 终端与构建正在此项目」由原因集拼出),点行无反应、右键排除保留。
+- **设置「清理」页**(04 排除目录 + 05 扫描根,`CleanerSettingsView.swift`):两节
+  Form。清理扫描根节 = 出厂建议清单(~/Documents / ~/Downloads / ~/Desktop /
+  ~/Developer / ~/Projects / ~/dev / ~/code / ~/src,展示 ~ 写法、存储展开归一后的
+  绝对路径)逐行 Toggle 勾选即加、取消即删,自添目录走文件夹选择器(自添行 =
+  目录图标 + 路径 + 减号删除,与排除行同款);**与「项目根目录」页的归组配置两套
+  独立、零共享**(用户拍板)。页脚说明文案钉死两条口径:项目 = 扫描根直接子目录、
+  在用项目永不进清理且每次清理前重查。
 - **空间地图卡**(p4-cleaner/07,`CleanerSunburstView.swift`):两环旭日
   `{layout.sunburst-diameter}` 340 定宽卡内居中;内环 = 当前根的子辈、外环 = 孙辈,
   叶子与密封块延伸占满外环。**内环配色 = 十个 `{colors.accent-*}` 令牌按序循环,

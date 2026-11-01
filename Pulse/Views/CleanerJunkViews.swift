@@ -107,12 +107,15 @@ private struct JunkListCard: View {
 
     private var groups: some View {
         let byGroup = Dictionary(grouping: candidates, by: \.group)
-        return VStack(alignment: .leading, spacing: 2) {
+        // 活动条目每次渲染现查一次(判定永不缓存),行级原因复用同一份。
+        let activity = model.currentActivityEntries()
+        return LazyVStack(alignment: .leading, spacing: 2) {
             ForEach(JunkGroup.allCases.filter { byGroup[$0] != nil }, id: \.self) { group in
                 let items = byGroup[group] ?? []
-                // 整组勾选只吃组内「可安全清理」项(拍板 B):先检查项不参与组勾选,
-                // 组里没有安全档项就不画 checkbox(当前 15 条规则不会出现,05/06 加组后可能)。
-                let safeItems = items.filter { $0.tier == .safe }
+                // 整组勾选只吃组内「可安全清理」且**非在用**的项(拍板 B + 在用保护):
+                // 先检查项、在用项都不参与组勾选,组里没有可勾项就不画 checkbox。
+                let safeItems = items
+                    .filter { $0.tier == .safe && model.inUseReasons(for: $0, entries: activity) == nil }
                 groupHeader(group, items: items, safeItems: safeItems)
                 ForEach(items) { candidate in
                     JunkRow(
@@ -120,13 +123,28 @@ private struct JunkListCard: View {
                         leader: candidates.map(\.bytes).max() ?? 0,
                         accent: accent,
                         isSelected: model.isSelected(candidate),
+                        inUseReasons: model.inUseReasons(for: candidate, entries: activity),
                         disabled: isBusy,
                         onToggle: { model.toggle(candidate) },
                         onExclude: { model.exclude(candidate.path) }
                     )
                 }
             }
+            if byGroup[.projectArtifacts] == nil {
+                scanRootsHint
+            }
         }
+    }
+
+    /// 项目产物组的空态(05):没配扫描根时给一条去设置的引导,不硬造空组。
+    private var scanRootsHint: some View {
+        Text(model.hasScanRoots
+            ? "项目产物:配置的扫描根在本次扫描里没有找到产物目录。"
+            : "项目产物:还没配置项目目录——设置 → 清理,勾选常见开发目录或自添(与归组的项目根互不影响)。")
+            .font(.system(size: 10.5))
+            .foregroundStyle(.tertiary)
+            .padding(.top, 6)
+            .padding(.horizontal, RankingListMetrics.rowInset)
     }
 
     private func groupHeader(
@@ -145,6 +163,23 @@ private struct JunkListCard: View {
                 .padding(.trailing, 2)
             }
             Text(group.title)
+            if group == .projectArtifacts {
+                // 大小 ⇄ 新旧(05 用户拍板:默认大小、可切新旧)。新旧 = 最久未动在前。
+                Picker(
+                    "排序",
+                    selection: Binding(
+                        get: { model.artifactSort },
+                        set: { model.artifactSort = $0 }
+                    )
+                ) {
+                    Text("大小").tag(CleanerModel.ProjectArtifactSort.size)
+                    Text("新旧").tag(CleanerModel.ProjectArtifactSort.age)
+                }
+                .pickerStyle(.segmented)
+                .controlSize(.mini)
+                .frame(width: 108)
+                .padding(.leading, 8)
+            }
             Spacer()
             Text(PulseFormat.memory(UInt64(max(0, sum))))
                 .foregroundStyle(.tertiary)
@@ -257,16 +292,29 @@ private struct JunkRow: View {
     let leader: Int64
     let accent: Color
     let isSelected: Bool
+    /// 在用保护原因(nil = 不在用;05)。在用行灰显、锁代替勾选、chip 换「在用保护 · 原因」。
+    let inUseReasons: CleanActivityReason?
     let disabled: Bool
     let onToggle: () -> Void
     let onExclude: () -> Void
 
+    private var isInUse: Bool {
+        inUseReasons != nil
+    }
+
     var body: some View {
         HStack(spacing: RankingListMetrics.spacing(compact: false)) {
-            Toggle("", isOn: Binding(get: { isSelected }, set: { _ in onToggle() }))
-                .toggleStyle(.checkbox)
-                .labelsHidden()
-                .disabled(disabled)
+            if isInUse {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .help("在用保护:该项目有进程活动,不参与本次清理")
+            } else {
+                Toggle("", isOn: Binding(get: { isSelected }, set: { _ in onToggle() }))
+                    .toggleStyle(.checkbox)
+                    .labelsHidden()
+                    .disabled(disabled)
+            }
             CategoryIconTile(
                 symbolName: candidate.symbolName,
                 color: candidate.tier == .safe ? accent : Surface.warning,
@@ -284,7 +332,11 @@ private struct JunkRow: View {
                     .textSelection(.enabled)
             }
             Spacer(minLength: 8)
-            TierChip(tier: candidate.tier)
+            if let reasons = inUseReasons {
+                InUseChip(reasons: reasons)
+            } else {
+                TierChip(tier: candidate.tier)
+            }
             MeterBar(
                 fraction: MeterNormalization.fraction(Double(candidate.bytes), leader: Double(leader)),
                 tint: accent
@@ -299,13 +351,14 @@ private struct JunkRow: View {
         }
         .padding(.horizontal, RankingListMetrics.rowInset)
         .padding(.vertical, 7)
+        .opacity(isInUse ? 0.55 : 1)
         .background(
             isSelected ? Surface.cardHigh.opacity(0.7) : Color.clear,
             in: .rect(cornerRadius: 10)
         )
         .contentShape(Rectangle())
         .onTapGesture {
-            if !disabled {
+            if !disabled, !isInUse {
                 onToggle()
             }
         }
@@ -317,11 +370,46 @@ private struct JunkRow: View {
                 NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: candidate.path)])
             }
         }
-        .help(candidate.rationale)
+        .help(isInUse ? "在用保护 · \(inUseReasons?.title ?? "")正在此项目——判定不缓存,删除前会重查" : candidate.rationale)
     }
 
     private var subtitle: String {
-        candidate.path + (candidate.isPartial ? " · 部分扫描" : "")
+        var parts = [candidate.path]
+        if candidate.isPartial {
+            parts.append("部分扫描")
+        }
+        if candidate.projectName != nil {
+            parts.append(ageText(now: Date().timeIntervalSince1970))
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// 项目年龄的人话(05 口径:项目内非产物文件的最后变动,含 git 活动)。
+    private func ageText(now: TimeInterval) -> String {
+        guard let epoch = candidate.newestChangeEpoch else { return "年龄未知" }
+        let days = Int((now - epoch) / 86400)
+        switch days {
+        case ..<1: return "今天动过"
+        case ..<30: return "\(days) 天未动"
+        case ..<365: return "\(days / 30) 个月未动"
+        default: return "\(days / 365) 年未动"
+        }
+    }
+}
+
+/// 在用保护 chip(GLOSSARY「在用保护」):与 TierChip 同配方,三级墨色灰——
+/// 不是「先检查」的警示琥珀(在用 = 客观状态,不是让用户小心的档位)。
+struct InUseChip: View {
+    let reasons: CleanActivityReason
+
+    var body: some View {
+        Text("在用保护 · \(reasons.title)正在此项目")
+            .font(.system(size: 10.5, weight: .semibold))
+            .foregroundStyle(Surface.inkTertiary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+            .background(Surface.inkTertiary.opacity(0.15), in: .capsule)
+            .lineLimit(1)
     }
 }
 
@@ -524,7 +612,8 @@ struct CleanHistorySection: View {
     }
 
     private var runsList: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        // 主窗口行容器收编 LazyVStack(DESIGN.md 规则;历史随时间只增不减,懒加载最划算)。
+        LazyVStack(alignment: .leading, spacing: 12) {
             CardHeader(symbolName: "clock.arrow.circlepath", title: "清理历史", tint: Metric.disk.accentColor) {
                 Text("\(model.historyRuns?.count ?? 0) 次")
                     .font(.system(size: 10.5))

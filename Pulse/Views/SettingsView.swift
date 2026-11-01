@@ -11,6 +11,8 @@ struct SettingsView: View {
     let rootsStore: ProjectRootsStore
     /// 清理页排除目录(p4-cleaner/04):与主窗口清理页右键排除同一实例。
     let cleanExclusions: CleanExclusionsStore
+    /// 清理扫描根(p4-cleaner/05):项目产物匹配的项目根;与归组 rootsStore 两套配置零共享。
+    let cleanScanRoots: CleanScanRootsStore
     /// 采样管线(工单 11):诊断报告的统计数据源,透传给通用页。
     let monitor: SystemMonitor
 
@@ -67,7 +69,7 @@ struct SettingsView: View {
         case .alerts: AlertSettingsView(center: monitor.alerts)
         case .projectRoots: ProjectRootsSettingsView(store: rootsStore)
         case .menuBar: MenuBarBadgeSettingsView()
-        case .cleaner: CleanerSettingsView(store: cleanExclusions)
+        case .cleaner: CleanerSettingsView(store: cleanExclusions, scanRoots: cleanScanRoots)
         }
     }
 }
@@ -165,6 +167,7 @@ private struct SidebarIconView: View {
     SettingsView(
         rootsStore: ProjectRootsStore(load: { ["~/Documents/Learn"] }, persist: { _ in }),
         cleanExclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
+        cleanScanRoots: CleanScanRootsStore(load: { [] }, persist: { _ in }),
         monitor: .preview()
     )
 }

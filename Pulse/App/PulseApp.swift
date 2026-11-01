@@ -34,6 +34,9 @@ struct PulseApp: App {
     /// 清理页排除目录(p4-cleaner/04):UserDefaults 持久;主窗口清理页右键与设置窗
     /// 「清理」页共用这一实例(排除只收窄,两处同源才不会各看一份)。
     @State private var cleanExclusions = CleanExclusionsStore()
+    /// 清理扫描根(p4-cleaner/05):UserDefaults 持久;主窗口清理页项目产物匹配与
+    /// 设置窗「清理」页共用这一实例(与归组项目根两套配置,零共享——用户拍板)。
+    @State private var cleanScanRoots = CleanScanRootsStore()
     /// 采样管线持有者:app 生命周期内常驻(@State 在 App 中只创建一次)。
     /// 拉起即喂入已持久化的项目根——重启后项目归因即刻可用。
     @State private var monitor: SystemMonitor
@@ -108,9 +111,14 @@ struct PulseApp: App {
         // 逐轮重算;.task(start)在门控根上。根部挂开窗桥捕获(AppKit 侧
         // 告警路由/弹窗按钮经 MainWindowBridge 调用)。
         Window("Pulse", id: MainWindowSceneID.value) {
-            MainWindowGate(monitor: monitor, alertRouter: alertRouter, cleanExclusions: cleanExclusions)
-                .background(MainWindowOpenWindowCapture())
-                .background(LaunchHiddenWindow())
+            MainWindowGate(
+                monitor: monitor,
+                alertRouter: alertRouter,
+                cleanExclusions: cleanExclusions,
+                cleanScanRoots: cleanScanRoots
+            )
+            .background(MainWindowOpenWindowCapture())
+            .background(LaunchHiddenWindow())
         }
         .defaultSize(width: 880, height: 620)
         // 摘除 MenuBarExtra 后本场景成了首个窗口场景,macOS 启动即呈现主窗。
@@ -122,8 +130,13 @@ struct PulseApp: App {
         // 通用 + 告警(工单 P1-07)+ 项目根目录 + 清理(p4-cleaner/04 排除目录);入口在弹窗头部齿轮按钮。
         // 根部同挂开窗桥(主窗口内容若尚未建,这里兜底捕获)。
         Settings {
-            SettingsView(rootsStore: rootsStore, cleanExclusions: cleanExclusions, monitor: monitor)
-                .background(MainWindowOpenWindowCapture())
+            SettingsView(
+                rootsStore: rootsStore,
+                cleanExclusions: cleanExclusions,
+                cleanScanRoots: cleanScanRoots,
+                monitor: monitor
+            )
+            .background(MainWindowOpenWindowCapture())
         }
     }
 }

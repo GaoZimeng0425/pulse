@@ -22,6 +22,9 @@ struct LiveCleanDirectoryEnumerator: CleanDirectoryEnumerator {
     private static let cmnName: UInt32 = 0x1
     private static let cmnDevID: UInt32 = 0x2
     private static let cmnObjType: UInt32 = 0x8
+    // ATTR_CMN_MODTIME = 0x400(attr.h 实值);打包位在 OBJTYPE 之后、FLAGS 之前,
+    // timespec 16B 紧跟无对齐垫——/tmp/mtime-probe 2026-11-01 逐字节对拍 stat 定谳。
+    private static let cmnModTime: UInt32 = 0x400
     private static let cmnFlags: UInt32 = 0x40000
     private static let cmnFileID: UInt32 = 0x0200_0000
     private static let fileLinkCount: UInt32 = 0x1
@@ -44,7 +47,7 @@ struct LiveCleanDirectoryEnumerator: CleanDirectoryEnumerator {
         var attrList = attrlist()
         attrList.bitmapcount = 5
         attrList.commonattr = Self.cmnReturned | Self.cmnName | Self.cmnDevID | Self.cmnObjType
-            | Self.cmnFlags | Self.cmnFileID
+            | Self.cmnModTime | Self.cmnFlags | Self.cmnFileID
         attrList.fileattr = Self.fileLinkCount | Self.fileTotalSize | Self.fileAllocSize
         attrList.dirattr = Self.dirAllocSize
         attrList.forkattr = Self.cmnextPrivateSize
@@ -124,6 +127,14 @@ struct LiveCleanDirectoryEnumerator: CleanDirectoryEnumerator {
             objType = readU32(b, cursor)
             cursor += 4
         }
+        // MODTIME(timespec:秒 + 纳秒,各 8B,紧跟 OBJTYPE 无垫——mtime-probe 验证)
+        var modifiedEpoch: Double?
+        if returnedCommon & Self.cmnModTime != 0 {
+            let seconds = readI64(b, cursor)
+            let nanoseconds = readI64(b, cursor + 8)
+            modifiedEpoch = Double(seconds) + Double(max(0, nanoseconds)) * 1e-9
+            cursor += 16
+        }
         var flags: UInt32 = 0
         if returnedCommon & Self.cmnFlags != 0 {
             flags = readU32(b, cursor)
@@ -190,7 +201,8 @@ struct LiveCleanDirectoryEnumerator: CleanDirectoryEnumerator {
             allocatedSize: allocatedSize,
             reclaimableSize: privateSize,
             linkCount: linkCount,
-            isDataless: flags & Self.sfDataless != 0
+            isDataless: flags & Self.sfDataless != 0,
+            modifiedEpoch: modifiedEpoch
         )
     }
 }
