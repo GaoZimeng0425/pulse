@@ -288,6 +288,34 @@ final class SpaceScanEngineTests: XCTestCase {
 
     // MARK: 树内定位(白名单匹配器的入口)
 
+    /// mtime 聚合口径(05):`newestChangeEpoch` = **本目录直属文件**的最大 mtime,
+    /// 不向父级传播(产物排除靠匹配器逐层取值,聚合反而会把产物 mtime 卷进项目年龄)。
+    func testNewestChangeEpochAggregatesOwnFilesOnly() async {
+        let fs = FakeCleanDirectoryEnumerator(listings: [
+            "/r": .entries([
+                CleanFixture.file("root-old.bin", allocated: 512, reclaimable: 512, modified: 100.0),
+                CleanFixture.file("root-new.bin", allocated: 512, reclaimable: 512, modified: 300.5),
+                CleanFixture.directory("sub", fileID: 401),
+            ]),
+            "/r/sub": .entries([
+                CleanFixture.file("sub-file.bin", allocated: 512, reclaimable: 512, modified: 200.0),
+            ]),
+        ])
+        let result = await engine.scan(
+            SpaceScanOptions(roots: ["/r"], retainFileNodes: false),
+            using: fs
+        )
+        let root = result.trees[0]
+        XCTAssertEqual(root.newestChangeEpoch, 300.5, "直属文件取最大,含小数纳秒")
+        XCTAssertEqual(root.children[0].newestChangeEpoch, 200.0, "子目录的直属文件归子目录")
+        // 无 mtime 的文件不伪造(nil 保持 nil)。
+        let fs2 = FakeCleanDirectoryEnumerator(listings: [
+            "/r": .entries([CleanFixture.file("a.bin", allocated: 512, reclaimable: 512)]),
+        ])
+        let result2 = await engine.scan(SpaceScanOptions(roots: ["/r"]), using: fs2)
+        XCTAssertNil(result2.trees[0].newestChangeEpoch)
+    }
+
     func testDescendantLocatesDirectoryByPath() async {
         let fs = FakeCleanDirectoryEnumerator(listings: [
             "/Users": .entries([CleanFixture.directory("t", fileID: 11)]),

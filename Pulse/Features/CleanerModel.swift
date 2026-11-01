@@ -57,24 +57,42 @@ final class CleanerModel {
     private var scanTask: Task<Void, Never>?
     private let engine = SpaceScanEngine()
     private let exclusions: CleanExclusionsStore
+    private let scanRoots: CleanScanRootsStore
     private let history: CleanHistoryStore?
     private let trash: any CleanTrashExecutor
+    private let activity: (any CleanActivitySource)?
     private let homeDirectory: String
+
+    /// 项目产物的排序(05,用户拍板:默认大小、可切新旧)。新旧 = 项目年龄升序
+    /// (最久未动在前),年龄未知排最后。
+    enum ProjectArtifactSort: Hashable {
+        case size
+        case age
+    }
+
+    var artifactSort: ProjectArtifactSort = .size
 
     /// - Parameters:
     ///   - exclusions: 排除目录(设置页同一实例;默认不落盘的空表给预览 / 测试)。
+    ///   - scanRoots: 清理扫描根(05;与归组项目根两套配置,零共享;设置页同一实例)。
     ///   - history: 清理历史(`monitor.history.cleanHistory`;nil = 历史库不可用)。
     ///   - trash: 废纸篓执行器(生产 Live;测试 spy——核心测试纪律:绝不真删)。
+    ///   - activity: 进程活动源(在用保护输入;生产 = monitor 的采样快照投影,
+    ///     测试 FakeCleanActivitySource;nil = 无活动源,在用保护按无活动处理)。
     ///   - homeDirectory: 规则表相对它展开;测试注入假家目录。
     init(
         exclusions: CleanExclusionsStore = CleanExclusionsStore(load: { [] }, persist: { _ in }),
+        scanRoots: CleanScanRootsStore = CleanScanRootsStore(load: { [] }, persist: { _ in }),
         history: CleanHistoryStore? = nil,
         trash: any CleanTrashExecutor = LiveCleanTrashExecutor(),
+        activity: (any CleanActivitySource)? = nil,
         homeDirectory: String = NSHomeDirectory()
     ) {
         self.exclusions = exclusions
+        self.scanRoots = scanRoots
         self.history = history
         self.trash = trash
+        self.activity = activity
         self.homeDirectory = PathNormalization.normalize(homeDirectory)
     }
 
@@ -164,17 +182,71 @@ final class CleanerModel {
         selection.retain(in: candidates)
     }
 
-    // MARK: 清单(04)
+    // MARK: 清单(04 全局缓存 + 05 项目产物)
 
-    /// 白名单命中的可删单元:跑在扫描树上,排除目录与本会话已回收的项不列。
-    /// 计算属性——读 `exclusions.paths` 让设置页加的排除即时反映,不必重扫。
+    /// 白名单命中的可删单元:全局缓存(04)+ 项目产物(05)都跑在同一棵扫描树上,
+    /// 排除目录与本会话已回收的项不列。计算属性——读 `exclusions.paths` /
+    /// `scanRoots.paths` / `artifactSort`,设置页改动即时反映,不必重扫。
     var candidates: [JunkCandidate] {
         guard let result else { return [] }
-        return JunkMatcher.candidates(
+        let excluded = exclusions.paths
+        let global = JunkMatcher.candidates(
             in: result.trees,
             home: homeDirectory,
-            excludedPathPrefixes: exclusions.paths
-        ).filter { !recycledPaths.contains($0.path) }
+            excludedPathPrefixes: excluded
+        )
+        var artifacts = ProjectArtifactMatcher.artifacts(
+            in: result.trees,
+            roots: scanRoots.paths,
+            excludedPathPrefixes: excluded
+        )
+        if artifactSort == .age {
+            // 新旧 = 最久未动在前;年龄未知(nil)排最后。
+            artifacts.sort { lhs, rhs in
+                switch (lhs.newestChangeEpoch, rhs.newestChangeEpoch) {
+                case let (l?, r?): l < r
+                case (_?, nil): true
+                case (nil, _?): false
+                default: lhs.path < rhs.path
+                }
+            }
+        }
+        return (global + artifacts)
+            .filter { !recycledPaths.contains($0.path) }
+    }
+
+    /// 配置了项目扫描根没有(设置页引导文案与项目产物空态的判据)。
+    var hasScanRoots: Bool {
+        !scanRoots.paths.isEmpty
+    }
+
+    // MARK: 在用保护(05:判定永不缓存,删除前重查)
+
+    /// 活动条目现查(清单视图一次渲染取一份逐行复用;`plan` 与单查接口各自现查)。
+    func currentActivityEntries() -> [CleanActivityEntry] {
+        activity?.activeEntries() ?? []
+    }
+
+    /// 候选的在用原因(nil = 不在用)。每次调用现查活动源——扫描时判定一次影响
+    /// 展示,删除前(经 `plan`)再查一次,两查之间活动变化如实反映。
+    func inUseReasons(for candidate: JunkCandidate) -> CleanActivityReason? {
+        inUseReasons(for: candidate, entries: currentActivityEntries())
+    }
+
+    /// 带现成活动条目的重载(同一次渲染里逐行复用,判定仍然来自当次现查)。
+    func inUseReasons(
+        for candidate: JunkCandidate,
+        entries: [CleanActivityEntry]
+    ) -> CleanActivityReason? {
+        CleanInUse.reasons(protectingPath: protectionPath(of: candidate), entries: entries)
+    }
+
+    /// 保护路径:项目产物按**项目目录**判(终端在项目根 = 保护整个项目的产物),
+    /// 其余按候选自身路径判(活动落在候选之内 = 在用)。
+    private func protectionPath(of candidate: JunkCandidate) -> String {
+        candidate.group == .projectArtifacts
+            ? (candidate.path as NSString).deletingLastPathComponent
+            : candidate.path
     }
 
     var excludedPathPrefixes: [String] {
@@ -207,9 +279,18 @@ final class CleanerModel {
         selection.set(selectAll, for: safeCandidates)
     }
 
-    /// 确认清单 = 选中 ∩ 清单 ∩ 非排除(CleanPlan 在此二次判定排除)。
+    /// 确认清单 = 选中 ∩ 清单 ∩ 非排除 ∩ **非在用**(CleanPlan 在此二次判定排除;
+    /// 在用判定此刻现查活动源——spec「删除前重查一次、判定永不缓存」的落点,
+    /// requestClean → confirmClean 各查一次)。
     var plan: CleanPlan {
-        CleanPlan.make(selection: selection, candidates: candidates, excludedPathPrefixes: exclusions.paths)
+        guard let activity else {
+            return CleanPlan.make(selection: selection, candidates: candidates, excludedPathPrefixes: exclusions.paths)
+        }
+        let entries = activity.activeEntries()
+        let usable = candidates.filter {
+            CleanInUse.reasons(protectingPath: protectionPath(of: $0), entries: entries) == nil
+        }
+        return CleanPlan.make(selection: selection, candidates: usable, excludedPathPrefixes: exclusions.paths)
     }
 
     /// 右键排除:持久化进设置,清单即时收窄,勾选随之收敛。

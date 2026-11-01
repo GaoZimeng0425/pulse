@@ -136,6 +136,9 @@ final class SystemMonitor {
     /// 主干纯内核:出生登记(扫描 / 回灌并入 + 采样轮兜底)、归组配置与下钻
     /// 构建;每轮 apply 产出 RoundContext。
     private var spine: RoundSpine
+    /// 在用保护输入板(p4-cleaner/05):每轮 apply 把最新快照的三元组投影写进来,
+    /// 清理页的活动源按需读(零新采集)。@unchecked Sendable 自带锁,无需隔离。
+    @ObservationIgnored let activityBoard = CleanActivityBoard()
     /// 功能模块(ADR-0003 扩展点):工厂构造后整份传入;每轮 onRound、可见性变化、
     /// 磁盘读数、传感器登记与启停都按 `registry` 顺序派发。组装接线,不参与观察。
     @ObservationIgnored private let features: MonitorFeatures
@@ -395,6 +398,10 @@ final class SystemMonitor {
         )
         let historyDuration = elapsedSince(historyStart)
         drilldown = context.drilldown
+        // 在用保护输入(p4-cleaner/05):同一份快照的三元组投影,清理页按需读。
+        activityBoard.update(context.update.snapshot.processes.map {
+            CleanActivitySample(executablePath: $0.executablePath, cwd: $0.cwd, argv: $0.argv)
+        })
         // 功能模块(ADR-0003 扩展点):既有发布状态落定之后,同一份上下文按登记顺序派发。
         let featuresStart = landingClock.now
         for feature in features.registry {

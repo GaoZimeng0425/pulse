@@ -33,6 +33,10 @@ public struct FsEntrySnapshot: Sendable, Equatable {
     public var linkCount: UInt32
     /// SF_DATALESS(iCloud 仅云端壳)。getattrlistbulk 不触发回源;计数上屏提示(03 票)。
     public var isDataless: Bool
+    /// ATTR_CMN_MODTIME(秒,含小数纳秒;05 票项目年龄口径)。nil = 文件系统没给,
+    /// 不参与年龄聚合(不伪造)。**目录自身的 mtime 不进年龄**(重装依赖会刷它)——
+    /// 引擎只聚合文件条目的 mtime,见 `SpaceNode.newestChangeEpoch`。
+    public var modifiedEpoch: Double?
 
     public init(
         name: String,
@@ -43,7 +47,8 @@ public struct FsEntrySnapshot: Sendable, Equatable {
         allocatedSize: Int64 = 0,
         reclaimableSize: Int64? = nil,
         linkCount: UInt32 = 1,
-        isDataless: Bool = false
+        isDataless: Bool = false,
+        modifiedEpoch: Double? = nil
     ) {
         self.name = name
         self.kind = kind
@@ -54,6 +59,7 @@ public struct FsEntrySnapshot: Sendable, Equatable {
         self.reclaimableSize = reclaimableSize
         self.linkCount = linkCount
         self.isDataless = isDataless
+        self.modifiedEpoch = modifiedEpoch
     }
 }
 
@@ -143,9 +149,57 @@ public struct TrashEmptySummary: Sendable, Equatable {
     }
 }
 
-/// ③ 进程活动查询:此刻有终端 / 构建进程在用的路径前缀。
+/// ③ 进程活动查询:此刻哪些路径有进程活动、是什么性质的活动。
 /// 05 票在用保护(三路判定)的输入;真实现复用采样器快照,零新采集。
-/// 返回的是**前缀**:任一可删项路径落在某前缀之下即在用。
+/// 判定口径:**活动落在项目之内**(路径前缀包含)即保护该项目——
+/// 终端 cd 在项目外(哪怕家目录)不保护任何项目。
 public protocol CleanActivitySource: Sendable {
-    func activePathPrefixes() -> [String]
+    /// 每条 = 一个有活动的路径前缀 + 该前缀上观察到的原因(可叠加)。
+    /// 实现必须在每次调用时重新判定(删除前重查、永不缓存,spec 在用保护口径)。
+    func activeEntries() -> [CleanActivityEntry]
+}
+
+/// 一处有进程活动的路径(前缀)与原因集合。
+public struct CleanActivityEntry: Sendable, Equatable {
+    public var path: String
+    public var reasons: CleanActivityReason
+
+    public init(path: String, reasons: CleanActivityReason) {
+        self.path = path
+        self.reasons = reasons
+    }
+}
+
+/// 在用原因(界面拼人话用):终端驻留 / 构建进程 / git 活动 / 路径被 argv 引用。
+public struct CleanActivityReason: OptionSet, Sendable, Hashable, RawRepresentable {
+    public let rawValue: UInt8
+    public init(rawValue: UInt8) {
+        self.rawValue = rawValue
+    }
+
+    public static let terminal = CleanActivityReason(rawValue: 1 << 0)
+    public static let build = CleanActivityReason(rawValue: 1 << 1)
+    public static let git = CleanActivityReason(rawValue: 1 << 2)
+    public static let referenced = CleanActivityReason(rawValue: 1 << 3)
+
+    /// 人话(按固定顺序拼:「终端与构建正在此项目」的原料)。
+    public var title: String {
+        var parts: [String] = []
+        if contains(.terminal) {
+            parts.append("终端")
+        }
+        if contains(.build) {
+            parts.append("构建")
+        }
+        if contains(.git) {
+            parts.append("git")
+        }
+        if contains(.referenced) {
+            parts.append("进程引用其路径")
+        }
+        if parts.isEmpty {
+            parts.append("进程")
+        }
+        return parts.joined(separator: "与")
+    }
 }

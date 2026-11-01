@@ -34,14 +34,16 @@ public enum CleanSafetyTier: String, Sendable, Codable, CaseIterable, Equatable 
     }
 }
 
-/// 规则域分组(清单按组分段)。首批只有全局工具缓存;项目产物 / AI 模型 / 孤儿 worktree
-/// 归 05 / 06 票,加 case 即扩组。
+/// 规则域分组(清单按组分段)。全局工具缓存(04)+ 项目产物(05);
+/// AI 模型 / 孤儿 worktree 归 06 票,加 case 即扩组。
 public enum JunkGroup: String, Sendable, CaseIterable, Equatable {
     case globalToolCache
+    case projectArtifacts
 
     public var title: String {
         switch self {
         case .globalToolCache: "全局工具缓存"
+        case .projectArtifacts: "项目产物"
         }
     }
 }
@@ -345,6 +347,11 @@ public struct JunkCandidate: Sendable, Identifiable, Equatable {
     public let allReclaimableAccounting: Bool
     public let rationale: String
     public let symbolName: String
+    /// 所属项目名(05 项目产物专用;全局缓存为 nil)。分组语义由它携带。
+    public let projectName: String?
+    /// 项目年龄(05:项目直属树内**非产物**文件的最后变动;全局缓存为 nil)。
+    /// 界面换算成「N 天未动」;排序「按新旧」以它为准(nil 排最后)。
+    public let newestChangeEpoch: Double?
 
     public init(
         ruleID: String,
@@ -357,7 +364,9 @@ public struct JunkCandidate: Sendable, Identifiable, Equatable {
         isPartial: Bool,
         allReclaimableAccounting: Bool,
         rationale: String,
-        symbolName: String
+        symbolName: String,
+        projectName: String? = nil,
+        newestChangeEpoch: Double? = nil
     ) {
         self.ruleID = ruleID
         self.group = group
@@ -370,6 +379,8 @@ public struct JunkCandidate: Sendable, Identifiable, Equatable {
         self.allReclaimableAccounting = allReclaimableAccounting
         self.rationale = rationale
         self.symbolName = symbolName
+        self.projectName = projectName
+        self.newestChangeEpoch = newestChangeEpoch
     }
 
     init(rule: JunkRule, node: SpaceNode, pattern: JunkPathPattern) {

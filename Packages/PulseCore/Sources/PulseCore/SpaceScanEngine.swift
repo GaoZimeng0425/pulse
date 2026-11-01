@@ -58,6 +58,12 @@ public struct SpaceNode: Sendable {
     public var datalessCount: Int
     /// 子树内有目录枚举失败 / 超深(部分扫描,如实标记不假装完整)。
     public var isPartial: Bool
+    /// **本目录直属文件** mtime 的最大值(05 票项目年龄口径;不含子孙目录——
+    /// 「产物该被年龄排除」靠匹配器 DFS 跳产物子树再逐层取本值,聚合反而会漏)。
+    /// nil = 本目录没有已知 mtime 的直属文件。目录自身 mtime 有意不算——重装依赖
+    /// (rm -rf node_modules 再装)会刷目录条目,而项目年龄不该被刷新(票面钉死)。
+    /// 含 git 活动:.git 下的文件(FETCH_HEAD 等)也是直属文件,天然计入。
+    public var newestChangeEpoch: Double?
     public var children: [SpaceNode]
 
     public init(
@@ -73,6 +79,7 @@ public struct SpaceNode: Sendable {
         symlinkCount: Int = 0,
         datalessCount: Int = 0,
         isPartial: Bool = false,
+        newestChangeEpoch: Double? = nil,
         children: [SpaceNode] = []
     ) {
         self.name = name
@@ -87,6 +94,7 @@ public struct SpaceNode: Sendable {
         self.symlinkCount = symlinkCount
         self.datalessCount = datalessCount
         self.isPartial = isPartial
+        self.newestChangeEpoch = newestChangeEpoch
         self.children = children
     }
 }
@@ -348,6 +356,10 @@ private final class Walker {
                     node.allReclaimableAccounting = false
                 }
                 node.fallbackBytes += entry.allocatedSize
+                // 文件 mtime 上卷进年龄聚合(目录 mtime 有意不计,见字段注释)。
+                if let modified = entry.modifiedEpoch {
+                    node.newestChangeEpoch = max(node.newestChangeEpoch ?? modified, modified)
+                }
                 // 文件节点可选不进树(内存量级,见 SpaceScanOptions.retainFileNodes);
                 // 上面的计数与字节已聚合进父目录,树的数字不因此改变。
                 if options.retainFileNodes {
@@ -360,7 +372,8 @@ private final class Walker {
                         fallbackBytes: entry.allocatedSize,
                         allReclaimableAccounting: entry.reclaimableSize != nil,
                         fileCount: 1,
-                        datalessCount: entry.isDataless ? 1 : 0
+                        datalessCount: entry.isDataless ? 1 : 0,
+                        newestChangeEpoch: entry.modifiedEpoch
                     ))
                 }
 

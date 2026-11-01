@@ -319,6 +319,105 @@ final class CleanerModelTests: XCTestCase {
         XCTAssertEqual(map.children.first { $0.name == "bin" }?.isSealed, true, "/bin 密封只读")
     }
 
+    // MARK: 项目产物 + 在用保护(05)
+
+    private func makeProjectsModel(
+        activity: FakeCleanActivitySource,
+        trash: FakeCleanTrashExecutor = FakeCleanTrashExecutor()
+    ) -> CleanerModel {
+        CleanerModel(
+            scanRoots: CleanScanRootsStore(load: { ["/Users/dev/code"] }, persist: { _ in }),
+            trash: trash,
+            activity: activity,
+            homeDirectory: "/Users/dev"
+        )
+    }
+
+    func testProjectArtifactsGroupedSortedAndAgeIgnoresReinstall() async {
+        let oldAge = 1_700_000_000.0 - 40 * 86400
+        let fake = FakeCleanDirectoryEnumerator(listings: CleanFixture.homeListings(
+            home: "/Users/dev",
+            directories: [
+                "code/old-app/node_modules": 800,
+                "code/old-app/src": 10,
+                "code/old-app/target": 300,
+                "code/new-tool/node_modules": 100,
+                "code/new-tool/src": 5,
+            ],
+            modifiedByDir: [
+                "code/old-app/node_modules": 1_700_100_000, // 产物文件新(像刚重装过依赖)
+                "code/old-app/src": oldAge,
+                "code/old-app/target": 1_700_050_000,
+                "code/new-tool/node_modules": 1_700_200_000,
+                "code/new-tool/src": 1_700_200_000,
+            ]
+        ))
+        let model = makeProjectsModel(activity: FakeCleanActivitySource())
+        model.startScan(using: fake, roots: ["/Users/dev"])
+        await waitUntil { !model.isScanning }
+
+        let artifacts = model.candidates.filter { $0.group == .projectArtifacts }
+        XCTAssertEqual(artifacts.map(\.path), [
+            "/Users/dev/code/old-app/node_modules",
+            "/Users/dev/code/old-app/target",
+            "/Users/dev/code/new-tool/node_modules",
+        ], "默认按大小,组内大到小")
+        XCTAssertEqual(artifacts.first?.projectName, "old-app")
+        XCTAssertEqual(
+            artifacts.first?.newestChangeEpoch.map { Int($0) },
+            Int(oldAge),
+            "年龄 = 项目源码的最后变动;产物自身 mtime 再新也不算(重装依赖不刷新年龄)"
+        )
+
+        model.artifactSort = .age
+        let byAge = model.candidates.filter { $0.group == .projectArtifacts }
+        XCTAssertEqual(byAge.map(\.projectName).first, "old-app", "按新旧 = 最久未动在前")
+        XCTAssertEqual(byAge.map(\.projectName).last, "new-tool")
+    }
+
+    func testInUseProjectFilteredFromPlanWithFreshRecheck() async throws {
+        let fake = FakeCleanDirectoryEnumerator(listings: CleanFixture.homeListings(
+            home: "/Users/dev",
+            directories: [
+                "code/old-app/node_modules": 800,
+                "code/new-app/node_modules": 400,
+            ]
+        ))
+        let oldPath = "/Users/dev/code/old-app/node_modules"
+        let newPath = "/Users/dev/code/new-app/node_modules"
+        let activity = FakeCleanActivitySource(entries: [])
+        let spy = FakeCleanTrashExecutor(nextRecycleOutcome: TrashRecycleOutcome(recycled: [
+            oldPath: "/Users/dev/.Trash/old",
+            newPath: "/Users/dev/.Trash/new",
+        ]))
+        let model = makeProjectsModel(activity: activity, trash: spy)
+        model.startScan(using: fake, roots: ["/Users/dev"])
+        await waitUntil { !model.isScanning }
+
+        let oldNM = try XCTUnwrap(model.candidates.first { $0.path == oldPath })
+        let newNM = try XCTUnwrap(model.candidates.first { $0.path == newPath })
+        XCTAssertNil(model.inUseReasons(for: oldNM), "无活动 = 不在用")
+
+        model.toggle(oldNM)
+        model.toggle(newNM)
+        XCTAssertEqual(model.plan.items.count, 2)
+
+        // 扫描后新开终端进项目(活动变化,不重扫):判定现查立即翻转——
+        // 在用项目绝不进删除计划(展示仍如实灰列)。
+        activity.entries = [CleanActivityEntry(path: "/Users/dev/code/old-app", reasons: [.terminal])]
+        XCTAssertEqual(model.inUseReasons(for: oldNM), [.terminal])
+        XCTAssertEqual(model.plan.items.map(\.path), [newPath], "计划此刻剔除在用项")
+        XCTAssertEqual(model.candidates.count, 2, "清单仍展示在用行(灰显),只是不可勾")
+
+        // 确认执行:只有不在用的那项真的去废纸篓。
+        model.requestClean()
+        XCTAssertEqual(model.cleanPhase, .confirming)
+        model.confirmClean()
+        await waitForCleanFinished(model)
+        let calls = await spy.recycleCalls
+        XCTAssertEqual(calls.map { Set($0) }, [Set([newPath])], "在用项绝不到执行器")
+    }
+
     private func waitUntil(_ condition: @MainActor () -> Bool) async {
         for _ in 0 ..< 500 {
             if condition() {
