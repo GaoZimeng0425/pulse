@@ -278,6 +278,47 @@ final class CleanerModelTests: XCTestCase {
         XCTAssertEqual(model.plan.items.count, 3)
     }
 
+    // MARK: 空间地图(07):显示树在扫描任务侧构建,firmlink 提升 + 密封折叠
+
+    func testScanBuildsMapTreesWithHoistingAndSealedFold() async throws {
+        // 真机树形复刻:Users 埋在 /System/Volumes/Data 之下(顶层 firmlink 被
+        // double-visit 跳过),System 自有 SSV 文件 80。
+        let fake = FakeCleanDirectoryEnumerator(listings: [
+            "/": .entries([
+                CleanFixture.directory("System", fileID: 100),
+                CleanFixture.directory("bin", fileID: 101),
+            ]),
+            "/System": .entries([
+                CleanFixture.file("ssv.bin", allocated: 80, reclaimable: 80),
+                CleanFixture.directory("Volumes", fileID: 102),
+            ]),
+            "/System/Volumes": .entries([CleanFixture.directory("Data", fileID: 103)]),
+            "/System/Volumes/Data": .entries([CleanFixture.directory("Users", fileID: 104)]),
+            "/System/Volumes/Data/Users": .entries([
+                CleanFixture.file("me.bin", allocated: 200, reclaimable: 200),
+            ]),
+            "/bin": .entries([CleanFixture.file("sh.bin", allocated: 4, reclaimable: 4)]),
+        ])
+        let model = CleanerModel()
+        model.startScan(using: fake, roots: ["/"])
+
+        await waitUntil { !model.isScanning }
+
+        guard case .finished = model.phase else {
+            XCTFail("应到 finished,实际 \(model.phase)")
+            return
+        }
+        let map = try XCTUnwrap(model.mapTrees.first)
+        XCTAssertEqual(map.name, "整卷")
+        let users = map.children.first { $0.name == "Users" }
+        XCTAssertEqual(users?.path, "/Users", "被埋的 Users 拼回顶层 + 规范路径")
+        XCTAssertEqual(users?.bytes, 200)
+        let sealed = map.children.first { $0.isSealed }
+        XCTAssertEqual(sealed?.name, "系统(密封)")
+        XCTAssertEqual(sealed?.bytes, 80, "System 余量 = 自有 SSV 文件,Data 子树不计两次")
+        XCTAssertEqual(map.children.first { $0.name == "bin" }?.isSealed, true, "/bin 密封只读")
+    }
+
     private func waitUntil(_ condition: @MainActor () -> Bool) async {
         for _ in 0 ..< 500 {
             if condition() {

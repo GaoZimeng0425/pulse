@@ -40,6 +40,10 @@ final class CleanerModel {
     private(set) var scanStartedAt: Date?
     private(set) var scanFinishedAt: Date?
 
+    /// 空间地图显示树(07):firmlink 提升 + 密封折叠后的每根一棵;扫描任务侧构建,
+    /// 与 `result` 同时落位。重进 tab 沿用,重新扫描才刷新(与 03 缓存同寿命)。
+    private(set) var mapTrees: [SpaceMapNode] = []
+
     private(set) var cleanPhase: CleanPhase = .idle
     private(set) var selection = JunkSelection()
     /// 本会话已移入废纸篓的路径:树里还挂着(不重扫),清单里不再列。
@@ -113,6 +117,7 @@ final class CleanerModel {
         scanStartedAt = Date()
         scanFinishedAt = nil
         phase = .scanning(ScanStats())
+        mapTrees = []
         // 重扫 = 新一轮真相:已回收集合清空(树会重新反映磁盘),勾选随清单收敛。
         recycledPaths = []
         if case .finished = cleanPhase {
@@ -140,7 +145,10 @@ final class CleanerModel {
                 },
                 isCancelled: { Task.isCancelled }
             )
-            await MainActor.run { self?.finish(result) }
+            // 显示树变换(firmlink 提升 + 密封折叠)整树一次,放在扫描任务里,
+            // 不占主线程;地图子页直接消费(03 缓存的第二读者)。
+            let mapTrees = SpaceMapTree.buildTrees(from: result.trees)
+            await MainActor.run { self?.finish(result, mapTrees: mapTrees) }
         }
     }
 
@@ -148,9 +156,10 @@ final class CleanerModel {
         scanTask?.cancel()
     }
 
-    private func finish(_ result: SpaceScanResult) {
+    private func finish(_ result: SpaceScanResult, mapTrees: [SpaceMapNode]) {
         scanFinishedAt = Date()
         phase = .finished(result)
+        self.mapTrees = mapTrees
         scanTask = nil
         selection.retain(in: candidates)
     }
