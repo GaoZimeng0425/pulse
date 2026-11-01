@@ -26,85 +26,97 @@ struct MetricTabStack<Ranking: View>: View {
     @ViewBuilder let ranking: () -> Ranking
 
     var body: some View {
+        ForEach(blocks) { block in
+            switch block.kind {
+            case let .card(view): view
+            case .groupRanking: ranking()
+            case let .moduleRanking(spec): ModuleRankingCardView(spec: spec, isCompact: isCompact)
+            }
+        }
+    }
+
+    /// 本 tab 的卡片序列(native-list):组成、顺序、数据出处的唯一出处——SwiftUI 宿主
+    /// (body)与原生列表(弹窗,逐卡 / 逐排行行拼装)读同一份。
+    var blocks: [MetricTabBlock] {
+        var builder = MetricTabBlockBuilder(tab: tab)
         switch tab {
         case .overview:
-            overviewGrid
-            sectionTitle("此刻")
-            pair {
+            builder.card("grid", overviewGrid)
+            sectionTitle("此刻", into: &builder)
+            builder.card("memory-pair", pair {
                 RingCardView.memoryByType(monitor.memory, isCompact: isCompact)
                 memoryByApp
-            }
-            ranking()
-            sectionTitle("开发服务")
+            })
+            builder.groupRanking()
+            sectionTitle("开发服务", into: &builder)
             // dev server 卡(工单 p1-history/08):全部停止只上抛请求,确认对话框
             // (KillRequestFlow 关口)把关后才发信号。
-            DevServerCardView(servers: monitor.devServers.servers, isCompact: isCompact) {
+            builder.card("dev-servers", DevServerCardView(servers: monitor.devServers.servers, isCompact: isCompact) {
                 model.requestStopAllDevServers(monitor.devServers.servers)
-            }
+            })
         case .cpu:
-            MetricMainCardView(model: model.cpuModel, isCompact: isCompact)
-            ranking()
+            builder.card("main", MetricMainCardView(model: model.cpuModel, isCompact: isCompact))
+            builder.groupRanking()
         case .memory:
-            MetricMainCardView(model: model.memoryModel, isCompact: isCompact)
-            pair {
+            builder.card("main", MetricMainCardView(model: model.memoryModel, isCompact: isCompact))
+            builder.card("memory-pair", pair {
                 RingCardView.memoryByType(monitor.memory, isCompact: isCompact)
                 memoryByApp
-            }
-            ranking()
+            })
+            builder.groupRanking()
         case .sensors:
             // 传感器页(p2-sensors/04):主窗口 = 派生读数 + 风扇 pair,温度明细折叠其下。
             // 弹窗是"两处一致"的**拍板例外**(p2-review/04 A,2026-10-24;spec Story 17
             // 「弹窗温度组只放派生值」):只画派生卡(Average/Hottest + 最快风扇),
             // 逐核明细会把 360pt 弹窗撑得不可用的高;风扇信息由派生卡的最快风扇行承载。
             if isCompact {
-                SmcDerivedCardView(reading: monitor.smc.reading, isCompact: true)
+                builder.card("derived", SmcDerivedCardView(reading: monitor.smc.reading, isCompact: true))
             } else {
-                pair {
+                builder.card("pair", pair {
                     SmcDerivedCardView(reading: monitor.smc.reading, isCompact: false)
                     SmcFansCardView(reading: monitor.smc.reading, isCompact: false)
-                }
-                SmcTempsDetailCardView(reading: monitor.smc.reading, isCompact: false)
+                })
+                builder.card("temps", SmcTempsDetailCardView(reading: monitor.smc.reading, isCompact: false))
             }
         case .peripherals:
             // 外设页(p2-sensors/05/06):蓝牙设备表(三源电量合并,可见 30s 扫描;
             // 默认关,卡片按钮 / 设置开关是唯一触发源——权限原则)+ 声音区(纯展示,
             // 事件驱动零轮询)。
-            BluetoothDevicesCardView(
+            builder.card("bluetooth", BluetoothDevicesCardView(
                 reading: monitor.bluetooth.reading,
                 accessState: monitor.bluetooth.accessState,
                 isCompact: isCompact,
                 onEnable: { monitor.bluetooth.setEnabled(true) },
                 onAuthorize: { monitor.bluetooth.requestAuthorization() }
-            )
-            SoundCardView(reading: monitor.sound.reading, isCompact: isCompact)
+            ))
+            builder.card("sound", SoundCardView(reading: monitor.sound.reading, isCompact: isCompact))
         case .gpu:
             // GPU 页(p2-sensors/02/03):利用率主卡 + ANE 卡与五路功率区
             // (同一 Energy Model 订阅,一鱼五吃);每 App GPU 归因是 P3(root
             // helper)的事,本页不设排行。
-            MetricMainCardView(model: model.gpuModel, isCompact: isCompact)
-            pair {
+            builder.card("main", MetricMainCardView(model: model.gpuModel, isCompact: isCompact))
+            builder.card("pair", pair {
                 MetricMainCardView(model: model.aneModel, isCompact: isCompact)
                 PowerDomainsCardView(reading: monitor.power.reading, isCompact: isCompact)
-            }
+            })
         case .containers:
             // 容器页(p2-sensors/07):docker.sock 单发快照表;数据卷占用行
             // 刻意不做(未拍板,spec Out of Scope)。
-            ContainersCardView(reading: monitor.containers.reading, isCompact: isCompact)
+            builder.card("containers", ContainersCardView(reading: monitor.containers.reading, isCompact: isCompact))
         case .battery:
             // 电池页(工单 p1-history/02):六项读数主卡 + 能耗影响排行
             // (工单 module-rankings/01,只读;CPU 时间估算口径)+ AI 助手能耗
             // (p3-root-mcp/04,root Energy Impact 真值,60s 一档);组排行与
             // 电池无关,不放。
-            MetricMainCardView(model: model.batteryModel, isCompact: isCompact)
-            ModuleRankingCardView(
+            builder.card("main", MetricMainCardView(model: model.batteryModel, isCompact: isCompact))
+            builder.moduleRanking("energy", ModuleRankingSpec(
                 title: "能耗影响",
                 valueLabel: "CPU 时间",
                 rows: monitor.rankings.energyRows,
                 accent: Metric.battery.accentColor,
-                cadenceNote: "5 秒一档",
-                isCompact: isCompact
-            )
-            ModuleRankingCardView(
+                cadenceNote: "5 秒一档"
+            ))
+            builder.moduleRanking("agents", ModuleRankingSpec(
                 title: "AI 助手",
                 valueLabel: "能耗",
                 rows: AgentEnergyTable.rankingRows(monitor.energyImpact.reading?.agents ?? []),
@@ -113,44 +125,42 @@ struct MetricTabStack<Ranking: View>: View {
                 emptyMessage: RankingEmptyMessage(
                     title: "暂无数据",
                     detail: "开启 设置 → 通用 → 特权助手 后出数"
-                ),
-                isCompact: isCompact
-            )
+                )
+            ))
         case .disk:
             // 磁盘页(工单 p1-history/05):主卡 + 各卷对账明细 + 快照列表 + 读写最多排行。
-            MetricMainCardView(model: model.diskModel, isCompact: isCompact)
-            pair {
+            builder.card("main", MetricMainCardView(model: model.diskModel, isCompact: isCompact))
+            builder.card("pair", pair {
                 DiskVolumeBreakdownView(capacity: monitor.disk.capacity, isCompact: isCompact)
                 DiskSnapshotsCardView(listing: monitor.disk.capacity?.snapshots, isCompact: isCompact)
-            }
-            ModuleRankingCardView(
+            })
+            builder.moduleRanking("disk", ModuleRankingSpec(
                 title: "读写最多",
                 valueLabel: "读写",
                 rows: monitor.rankings.diskRows,
                 accent: Metric.disk.accentColor,
-                cadenceNote: "30 秒一档",
-                isCompact: isCompact
-            )
+                cadenceNote: "30 秒一档"
+            ))
         case .network:
             // 网络页(工单 p1-history/06):主卡 + 流量累计明细 + 每进程流量排行(nettop 归组)。
-            MetricMainCardView(model: model.networkModel, isCompact: isCompact)
-            NetworkTotalsCardView(totals: monitor.history.networkTotals, isCompact: isCompact)
-            ModuleRankingCardView(
+            builder.card("main", MetricMainCardView(model: model.networkModel, isCompact: isCompact))
+            builder.card("totals", NetworkTotalsCardView(totals: monitor.history.networkTotals, isCompact: isCompact))
+            builder.moduleRanking("network", ModuleRankingSpec(
                 title: "每进程流量",
                 valueLabel: "流量",
                 rows: monitor.rankings.networkRows,
                 accent: Metric.network.accentColor,
-                cadenceNote: "5 秒一档",
-                isCompact: isCompact
-            )
+                cadenceNote: "5 秒一档"
+            ))
         case .history:
             // 历史页(工单 p1-history/04):指标 × 时间范围走势,查询走引擎 actor。
-            HistoryTabView(monitor: monitor, isCompact: isCompact)
+            builder.card("history", HistoryTabView(monitor: monitor, isCompact: isCompact))
         case .cleaner:
             // 清理页整页自持(p4-cleaner/03):主窗口在 MainWindowView 直接特例、
-            // 不进本栈;弹窗轴已排除。此分支理论不可达,空组仅保 switch 完备。
-            EmptyView()
+            // 不进本栈;弹窗轴已排除。此分支理论不可达,空序列仅保 switch 完备。
+            break
         }
+        return builder.blocks
     }
 
     /// 总览模块卡网格(用户拍板 2026-10-17:全部模块一屏可点,点卡跳对应 tab);
@@ -207,12 +217,42 @@ struct MetricTabStack<Ranking: View>: View {
     }
 
     /// 节标题只在主窗口画(弹窗卡片自带标题,17pt 节标题在 360pt 里喧宾夺主)。
-    @ViewBuilder
-    private func sectionTitle(_ title: String) -> some View {
+    private func sectionTitle(_ title: String, into builder: inout MetricTabBlockBuilder) {
         if !isCompact {
-            SectionTitle(title: title)
-                .padding(.top, 6)
+            builder.card("section-\(title)", SectionTitle(title: title).padding(.top, 6))
         }
+    }
+}
+
+/// tab 内容栈的一块:普通卡整块渲染;两种排行另列,原生列表逐行拼装(行才是长列表)。
+struct MetricTabBlock: Identifiable {
+    enum Kind {
+        case card(AnyView)
+        /// 组排行(当前最忙):由宿主给(弹窗 / 主窗口交互深度不同)。
+        case groupRanking
+        case moduleRanking(ModuleRankingSpec)
+    }
+
+    /// tab 前缀 + 卡名:切 tab 不复用上一页同名卡的视图身份。
+    let id: String
+    let kind: Kind
+}
+
+/// 卡片序列的拼装器(tab 前缀统一在这里加)。
+struct MetricTabBlockBuilder {
+    let tab: MetricTab
+    private(set) var blocks: [MetricTabBlock] = []
+
+    mutating func card(_ name: String, _ view: some View) {
+        blocks.append(MetricTabBlock(id: "\(tab)-\(name)", kind: .card(AnyView(view))))
+    }
+
+    mutating func groupRanking() {
+        blocks.append(MetricTabBlock(id: "\(tab)-group-ranking", kind: .groupRanking))
+    }
+
+    mutating func moduleRanking(_ name: String, _ spec: ModuleRankingSpec) {
+        blocks.append(MetricTabBlock(id: "\(tab)-\(name)", kind: .moduleRanking(spec)))
     }
 }
 

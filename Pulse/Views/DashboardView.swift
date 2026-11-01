@@ -24,6 +24,10 @@ struct DashboardView: View {
     @State private var tabSelection: MetricTabSelection
     /// tab 变更回报(popover-leak/01):弹窗门控层持有 tab 记忆,重开还原。
     private let onTabChange: ((MetricTab) -> Void)?
+    /// 原生列表开关(native-list):开 = 通用 AppKit 列表承载卡片与排行行;关 = SwiftUI
+    /// List(popover-list)。迁移期留作一键回退:`defaults write com.gaozimeng.pulse
+    /// popover.nativeList -bool NO`,重开弹窗生效。
+    @AppStorage("popover.nativeList") private var usesNativeList = true
 
     init(
         monitor: SystemMonitor,
@@ -48,6 +52,35 @@ struct DashboardView: View {
         return VStack(spacing: 10) {
             MetricIconTabBar(selection: $tabSelection)
             pageHeader
+            scrollContent
+                .frame(height: Self.contentHeight)
+            // 触发中的告警(工单 P1-07):授权被拒的降级出口 + 常态状态展示;
+            // 无告警时不渲染。点开系统通知走主窗口深链,弹窗只做提示面。
+            if !monitor.alerts.activeAlerts.isEmpty {
+                AlertBannerView(center: monitor.alerts, isCompact: true)
+            }
+            footer
+        }
+        .padding(14)
+        .frame(width: Self.width)
+        .background(Surface.window)
+        // 首次电池读数落地 → 电池页入轴(工单 02);被隐藏的当前 tab 回落总览。
+        .onChange(of: monitor.battery.hasBattery) { _, hasBattery in
+            tabSelection.setAxis(MetricTab.popoverAxis(hasBattery: hasBattery))
+        }
+        // tab 变更单点回报(图标条 / ←/→ / 内容切换都汇到这里)。
+        .onChange(of: tabSelection.current) { _, tab in
+            onTabChange?(tab)
+        }
+        .modifier(KillFailureAlert(report: $model.killFailureReport))
+    }
+
+    /// 内容滚动区:原生列表(默认)或 SwiftUI List(回退)。
+    @ViewBuilder
+    private var scrollContent: some View {
+        if usesNativeList {
+            NativeList(rows: nativeRows, resetToken: tabSelection.current)
+        } else {
             // 系统表格托底(popover-list,2026-10-31 用户拍板 List):LazyVStack 滚动时每帧
             // 重布局 + 重出整块绘制指令,真机触控板滚动 36–43%(sample:render ~一半、
             // layout ~四分之一)。List 只建可见行、滚动平移已画好的行。每张卡一个 List 行
@@ -76,26 +109,97 @@ struct DashboardView: View {
             // 负边距抵掉,卡片与页头 / 底排同宽。
             .padding(.leading, -8)
             .padding(.trailing, -9)
-            .frame(height: Self.contentHeight)
-            // 触发中的告警(工单 P1-07):授权被拒的降级出口 + 常态状态展示;
-            // 无告警时不渲染。点开系统通知走主窗口深链,弹窗只做提示面。
-            if !monitor.alerts.activeAlerts.isEmpty {
-                AlertBannerView(center: monitor.alerts, isCompact: true)
+        }
+    }
+
+    /// 原生列表的行(native-list):卡片一卡一行,排行拆成卡头 / 每行 / 卡尾。卡片序列
+    /// 与 SwiftUI 宿主同出 MetricTabStack.blocks。
+    private var nativeRows: [NativeListRow] {
+        let stack = MetricTabStack(
+            tab: tabSelection.current,
+            isCompact: true,
+            monitor: monitor,
+            model: model,
+            content: content,
+            onSelectTab: { tabSelection.current = $0 }
+        ) { EmptyView() }
+        return stack.blocks.flatMap { block -> [NativeListRow] in
+            switch block.kind {
+            case let .card(view):
+                // 卡外 8pt 间距 = 上下各 4 透明边(原生列表无行内距)。
+                [NativeListRow(kind: block.id, height: .measured(key: block.id)) {
+                    AnyView(view.padding(.vertical, 4))
+                }]
+            case .groupRanking:
+                groupRankingRows(id: block.id)
+            case let .moduleRanking(spec):
+                moduleRankingRows(id: block.id, spec: spec)
             }
-            footer
         }
-        .padding(14)
-        .frame(width: Self.width)
-        .background(Surface.window)
-        // 首次电池读数落地 → 电池页入轴(工单 02);被隐藏的当前 tab 回落总览。
-        .onChange(of: monitor.battery.hasBattery) { _, hasBattery in
-            tabSelection.setAxis(MetricTab.popoverAxis(hasBattery: hasBattery))
+    }
+
+    /// 组排行逐行:组行同高(按 kind 量一次),展开的组连同下钻自量。
+    private func groupRankingRows(id: String) -> [NativeListRow] {
+        let content = content
+        let header = RankingListHeader(
+            title: GroupRankingStyle.title,
+            accent: GroupRankingStyle.accent(content.metric),
+            valueLabel: GroupRankingStyle.valueLabel(content.metric),
+            isCompact: true,
+            isEmpty: content.ranking.isEmpty,
+            emptyMessage: RankingEmptyMessage(title: "暂无活动组", detail: "首轮采样尚未完成,或系统极端空闲")
+        )
+        var rows = [NativeListRow(kind: "\(id)-header", height: .measured(key: "\(id)-header-\(header.isEmpty)")) {
+            AnyView(RankingListSlices.Header(content: header, isCompact: true))
+        }]
+        for group in content.ranking {
+            let isExpanded = model.expandedGroupIDs.contains(group.id)
+            let cell = RankingGroupCell(
+                group: group,
+                metric: content.metric,
+                meterFraction: GroupRankingStyle.meterFraction(
+                    group, metric: content.metric,
+                    cpuLeader: content.cpuLeader, memoryLeaderBytes: content.memoryLeaderBytes
+                ),
+                isExpanded: isExpanded,
+                isCompact: true,
+                onToggle: { model.toggleExpansion(of: group.id) },
+                onEndGroup: { model.requestEndGroup(group) },
+                expandedContent: { drilldown(for: group) }
+            )
+            rows.append(isExpanded
+                ? NativeListRow(kind: "\(id)-row-expanded", height: .measured(key: "\(id)-x-\(group.id)")) {
+                    AnyView(cell.rankingRowSlice(compact: true))
+                }
+                : NativeListRow(kind: "\(id)-row", height: .uniform) {
+                    AnyView(cell.rankingRowSlice(compact: true))
+                })
         }
-        // tab 变更单点回报(图标条 / ←/→ / 内容切换都汇到这里)。
-        .onChange(of: tabSelection.current) { _, tab in
-            onTabChange?(tab)
+        rows.append(NativeListRow(kind: "\(id)-footer", height: .measured(key: "\(id)-footer")) {
+            AnyView(RankingListSlices.Footer(footnote: nil, isCompact: true))
+        })
+        return rows
+    }
+
+    /// 模块排行逐行(只读,行同高)。
+    private func moduleRankingRows(id: String, spec: ModuleRankingSpec) -> [NativeListRow] {
+        let header = RankingListHeader(
+            title: spec.title, accent: spec.accent, valueLabel: spec.valueLabel,
+            isCompact: true, isEmpty: spec.rows.isEmpty, emptyMessage: spec.resolvedEmptyMessage
+        )
+        var rows = [NativeListRow(kind: "\(id)-header", height: .measured(key: "\(id)-header-\(header.isEmpty)")) {
+            AnyView(RankingListSlices.Header(content: header, isCompact: true))
+        }]
+        rows += spec.rows.map { row in
+            NativeListRow(kind: "\(id)-row", height: .uniform) {
+                AnyView(ModuleRankingRowView(row: row, accent: spec.accent, isCompact: true)
+                    .rankingRowSlice(compact: true))
+            }
         }
-        .modifier(KillFailureAlert(report: $model.killFailureReport))
+        rows.append(NativeListRow(kind: "\(id)-footer", height: .measured(key: "\(id)-footer")) {
+            AnyView(RankingListSlices.Footer(footnote: spec.cadenceNote, isCompact: true))
+        })
+        return rows
     }
 
     /// 当前 tab 的展示内容(纯逻辑折叠):榜单序、组行口径、内存分段。
@@ -144,14 +248,20 @@ struct DashboardView: View {
             onToggle: model.toggleExpansion(of:),
             onEndGroup: model.requestEndGroup
         ) { group in
-            if let drilldown = monitor.drilldown {
-                ProcessDrilldownView(
-                    group: group,
-                    drilldown: drilldown,
-                    selectedProcessID: $model.selectedProcessID,
-                    onEndProcess: model.requestEndProcess
-                )
-            }
+            drilldown(for: group)
+        }
+    }
+
+    /// 组下钻(工单 06):只读最近一轮采样。
+    @ViewBuilder
+    private func drilldown(for group: ProcessGroup) -> some View {
+        if let drilldown = monitor.drilldown {
+            ProcessDrilldownView(
+                group: group,
+                drilldown: drilldown,
+                selectedProcessID: $model.selectedProcessID,
+                onEndProcess: model.requestEndProcess
+            )
         }
     }
 

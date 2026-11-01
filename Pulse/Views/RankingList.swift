@@ -144,68 +144,60 @@ struct RankingListCard<Rows: View>: View {
             // 悬停命中检测 / 滚动 / 每秒刷新都按全部行付费(鼠标移动 ~33%、滚动 ~41%);
             // 惰性后只建视口内的行(→ ~7% / ~25%)。外层滚动区同为 LazyVStack 才生效。
             LazyVStack(alignment: .leading, spacing: 2) {
-                titleText
-                if isEmpty {
-                    CardEmptyState(title: emptyMessage.title, detail: emptyMessage.detail)
-                } else {
-                    columnHeader
+                header
+                if !isEmpty {
                     rows()
                 }
-                footnoteText
+                RankingListFootnote(text: footnote)
             }
             .cardShell(compact: isCompact)
         }
     }
 
     /// 弹窗 List 形态(popover-list):卡拆成「卡头 / 每行 / 卡尾」三段各占一个 List 行,
-    /// 系统表格只建可见行、滚动时平移已画好的行;卡底色按段切开(卡头上圆角、卡尾下圆角,
-    /// 中段直角),拼起来与整卡一致。卡外 8pt 间距 = 首尾段底色外各留 4 透明边——不走
-    /// listRowInsets:macOS List 上下都取 top 值、bottom 被忽略(离屏探针实测)。
+    /// 系统表格只建可见行、滚动时平移已画好的行。三段即 `RankingListSlices`,原生列表
+    /// (native-list)也用同一套。
     @ViewBuilder
     private var listSlices: some View {
-        let padding = CardMetrics.padding(compact: isCompact)
+        RankingListSlices.Header(content: header, isCompact: isCompact)
+            .listRowInsets(EdgeInsets())
+        if !isEmpty {
+            rows()
+                .rankingRowSlice(compact: isCompact)
+                .listRowInsets(EdgeInsets())
+        }
+        RankingListSlices.Footer(footnote: footnote, isCompact: isCompact)
+            .listRowInsets(EdgeInsets())
+    }
+
+    private var header: RankingListHeader {
+        RankingListHeader(
+            title: title, accent: accent, valueLabel: valueLabel,
+            isCompact: isCompact, isEmpty: isEmpty, emptyMessage: emptyMessage
+        )
+    }
+}
+
+/// 排行卡头:标题 + 表头(空态时换成卡内空态)。
+struct RankingListHeader: View {
+    let title: String
+    let accent: Color
+    let valueLabel: String
+    let isCompact: Bool
+    let isEmpty: Bool
+    let emptyMessage: RankingEmptyMessage
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            titleText
+            Text(title)
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(accent)
+                .padding(.bottom, 6)
             if isEmpty {
                 CardEmptyState(title: emptyMessage.title, detail: emptyMessage.detail)
             } else {
                 columnHeader
             }
-        }
-        .padding([.top, .horizontal], padding)
-        .padding(.bottom, 2)
-        .cardSlice(.top, compact: isCompact)
-        .padding(.top, 4)
-        .listRowInsets(EdgeInsets())
-        if !isEmpty {
-            rows()
-                .padding(.horizontal, padding)
-                .padding(.bottom, 2)
-                .cardSlice(.middle, compact: isCompact)
-                .listRowInsets(EdgeInsets())
-        }
-        // 无注脚时卡尾只剩下内距(VStack 包住,空内容也要占出这一段)。
-        VStack(alignment: .leading, spacing: 0) { footnoteText }
-            .padding([.bottom, .horizontal], padding)
-            .cardSlice(.bottom, compact: isCompact)
-            .padding(.bottom, 4)
-            .listRowInsets(EdgeInsets())
-    }
-
-    private var titleText: some View {
-        Text(title)
-            .font(.system(size: 12.5, weight: .semibold))
-            .foregroundStyle(accent)
-            .padding(.bottom, 6)
-    }
-
-    @ViewBuilder
-    private var footnoteText: some View {
-        if let footnote {
-            Text(footnote)
-                .font(.system(size: 10.5))
-                .foregroundStyle(.tertiary)
-                .padding(.top, 6)
         }
     }
 
@@ -225,6 +217,61 @@ struct RankingListCard<Rows: View>: View {
                 + RankingListMetrics.trailingWidth(compact: isCompact)
         )
         .padding(.bottom, 2)
+    }
+}
+
+/// 排行卡底注脚(数据节拍等);nil 不画。
+struct RankingListFootnote: View {
+    let text: String?
+
+    var body: some View {
+        if let text {
+            Text(text)
+                .font(.system(size: 10.5))
+                .foregroundStyle(.tertiary)
+                .padding(.top, 6)
+        }
+    }
+}
+
+/// 排行卡切段(popover-list / native-list):一张卡拆成「卡头 / 每行 / 卡尾」各占
+/// 列表的一行,底色按段 `cardSlice` 切开(卡头上圆角、卡尾下圆角、中段直角),拼起来
+/// 与整卡一致。卡外 8pt 间距 = 首尾段底色外各留 4 透明边(macOS List 的
+/// listRowInsets 上下都取 top 值、bottom 被忽略,离屏探针实测;原生列表无行内距)。
+enum RankingListSlices {
+    struct Header: View {
+        let content: RankingListHeader
+        let isCompact: Bool
+
+        var body: some View {
+            content
+                .padding([.top, .horizontal], CardMetrics.padding(compact: isCompact))
+                .padding(.bottom, 2)
+                .cardSlice(.top, compact: isCompact)
+                .padding(.top, 4)
+        }
+    }
+
+    struct Footer: View {
+        let footnote: String?
+        let isCompact: Bool
+
+        var body: some View {
+            // 无注脚时卡尾只剩下内距(VStack 包住,空内容也要占出这一段)。
+            VStack(alignment: .leading, spacing: 0) { RankingListFootnote(text: footnote) }
+                .padding([.bottom, .horizontal], CardMetrics.padding(compact: isCompact))
+                .cardSlice(.bottom, compact: isCompact)
+                .padding(.bottom, 4)
+        }
+    }
+}
+
+extension View {
+    /// 排行中段一行:卡内水平内距 + 行距 2 + 直角卡底色。
+    func rankingRowSlice(compact: Bool) -> some View {
+        padding(.horizontal, CardMetrics.padding(compact: compact))
+            .padding(.bottom, 2)
+            .cardSlice(.middle, compact: compact)
     }
 }
 

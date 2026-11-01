@@ -7,7 +7,9 @@ import SwiftUI
 // 排行列表通用组件(RankingListCard / RankingListRow)上的只读排行:无悬停、不可展开、
 // 无结束入口(工单拍板),行尾列留空占位——与组排行的 meter / 数值同一竖线。
 
-struct ModuleRankingCardView: View {
+/// 模块排行卡的数据面(标题 / 指标名 / 行 / 强调色 / 节拍注脚 / 空态):整卡与原生列表
+/// 逐行拼装共用。
+struct ModuleRankingSpec {
     let title: String
     /// 表头右列指标名("CPU 时间" / "读写" / "流量")。
     let valueLabel: String
@@ -19,39 +21,57 @@ struct ModuleRankingCardView: View {
     /// 空态文案覆盖:默认按"首档采样后出数"说;数据有专属前置条件的卡
     /// (AI 助手卡须先开特权助手)传自己的说法,前置条件变了文案才会对。
     var emptyMessage: RankingEmptyMessage?
+
+    /// 基线轮(首见不出数)、门控清账、全零空闲都落默认文案,不报警不催促。
+    var resolvedEmptyMessage: RankingEmptyMessage {
+        emptyMessage ?? RankingEmptyMessage(title: "暂无数据", detail: "本页可见并完成首档采样后出数")
+    }
+}
+
+struct ModuleRankingCardView: View {
+    let spec: ModuleRankingSpec
     /// 弹窗紧凑档。
     var isCompact = false
 
     var body: some View {
         RankingListCard(
-            title: title,
-            accent: accent,
-            valueLabel: valueLabel,
+            title: spec.title,
+            accent: spec.accent,
+            valueLabel: spec.valueLabel,
             isCompact: isCompact,
-            isEmpty: rows.isEmpty,
-            // 基线轮(首见不出数)、门控清账、全零空闲都落这里,不报警不催促。
-            emptyMessage: emptyMessage
-                ?? RankingEmptyMessage(title: "暂无数据", detail: "本页可见并完成首档采样后出数"),
-            footnote: cadenceNote
+            isEmpty: spec.rows.isEmpty,
+            emptyMessage: spec.resolvedEmptyMessage,
+            footnote: spec.cadenceNote
         ) {
             // 按名次认行(list-position-id,同 RankingCardView):重排只刷新行内容。
-            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                RankingListRow(
-                    name: row.name,
-                    subtitle: row.subtitle,
-                    bundlePath: row.bundlePath,
-                    // "其他进程"桶(无类别)用通用符号瓦片,不冒充任何组类别。
-                    tileSymbol: row.fallbackCategory?.cardStyle.symbolName ?? "app.dashed",
-                    tileColor: row.fallbackCategory?.cardStyle.tileColor ?? Surface.inkTertiary,
-                    meterFraction: row.meterFraction,
-                    tint: accent,
-                    valueText: row.primaryText,
-                    isCompact: isCompact
-                )
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(row.name),\(row.subtitle),\(row.primaryText)")
+            ForEach(Array(spec.rows.enumerated()), id: \.offset) { _, row in
+                ModuleRankingRowView(row: row, accent: spec.accent, isCompact: isCompact)
             }
         }
+    }
+}
+
+/// 模块排行的一行(只读)。
+struct ModuleRankingRowView: View {
+    let row: ModuleRankingRow
+    let accent: Color
+    let isCompact: Bool
+
+    var body: some View {
+        RankingListRow(
+            name: row.name,
+            subtitle: row.subtitle,
+            bundlePath: row.bundlePath,
+            // "其他进程"桶(无类别)用通用符号瓦片,不冒充任何组类别。
+            tileSymbol: row.fallbackCategory?.cardStyle.symbolName ?? "app.dashed",
+            tileColor: row.fallbackCategory?.cardStyle.tileColor ?? Surface.inkTertiary,
+            meterFraction: row.meterFraction,
+            tint: accent,
+            valueText: row.primaryText,
+            isCompact: isCompact
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(row.name),\(row.subtitle),\(row.primaryText)")
     }
 }
 
@@ -85,19 +105,19 @@ struct ModuleRankingCardView: View {
         ),
     ]
     VStack(spacing: 16) {
-        ModuleRankingCardView(
+        ModuleRankingCardView(spec: ModuleRankingSpec(
             title: "能耗影响", valueLabel: "CPU 时间", rows: rows,
             accent: Metric.battery.accentColor, cadenceNote: "5 秒一档"
-        )
-        ModuleRankingCardView(
+        ))
+        ModuleRankingCardView(spec: ModuleRankingSpec(
             title: "读写最多", valueLabel: "读写", rows: [],
             accent: Metric.disk.accentColor, cadenceNote: "30 秒一档"
-        )
-        ModuleRankingCardView(
+        ))
+        ModuleRankingCardView(spec: ModuleRankingSpec(
             title: "能耗影响(紧凑)", valueLabel: "CPU 时间", rows: rows,
-            accent: Metric.battery.accentColor, cadenceNote: "5 秒一档", isCompact: true
-        )
-        .frame(width: 332)
+            accent: Metric.battery.accentColor, cadenceNote: "5 秒一档"
+        ), isCompact: true)
+            .frame(width: 332)
     }
     .padding(24)
     .frame(width: 620)
