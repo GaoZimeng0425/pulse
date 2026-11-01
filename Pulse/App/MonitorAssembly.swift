@@ -97,7 +97,8 @@ extension SystemMonitor {
                 network: NetworkFeature(),
                 alerts: AlertCenter(
                     store: AlertSettingsStore(),
-                    sender: LiveAlertNotificationSender()
+                    sender: LiveAlertNotificationSender(),
+                    toastSender: LiveNemoNotchToastSender()
                 ),
                 devServers: DevServerFeature(portScanner: LiveDevServerPortScanner()),
                 rankings: RankingsFeature(nettopSource: LiveNettopCSVSource()),

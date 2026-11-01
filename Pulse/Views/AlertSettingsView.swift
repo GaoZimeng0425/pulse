@@ -35,6 +35,16 @@ struct AlertSettingsView: View {
             ForEach(AlertKind.allCases.filter(\.isDataSourceWired)) { kind in
                 ruleSection(kind)
             }
+            Section("投递渠道") {
+                Toggle(isOn: toastDeliveryBinding) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("NemoNotch 卡片")
+                        Text("资源类告警同时经本机 NemoNotch 在刘海下弹卡片,点名最耗资源的进程;NemoNotch 未运行时静默跳过。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
             Section("说明") {
                 Text("触发条件:读数连续 3 次越阈(带持续时长的规则还要跨越该时长);恢复需连续 6 次回到阈值 ∓20% 之外(迟滞防抖,避免阈值附近抖动连环轰炸);同类告警触发后进入 10 分钟冷却期。")
                     .font(.caption)
@@ -68,6 +78,14 @@ struct AlertSettingsView: View {
         Binding(
             get: { center.store.config(for: kind).isEnabled },
             set: { center.setEnabled($0, for: kind) }
+        )
+    }
+
+    /// NemoNotch 投递开关绑定(无授权时序,直写 store)。
+    private var toastDeliveryBinding: Binding<Bool> {
+        Binding(
+            get: { center.store.toastDeliveryEnabled },
+            set: { center.store.setToastDeliveryEnabled($0) }
         )
     }
 

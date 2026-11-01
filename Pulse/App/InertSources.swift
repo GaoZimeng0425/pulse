@@ -270,8 +270,9 @@ extension AlertCenter {
     /// 惰性告警编排:规则全关(预设阈值)、配置不落盘、不碰 UserDefaults、不请求授权。
     static func inert() -> AlertCenter {
         AlertCenter(
-            store: AlertSettingsStore(load: { [:] }, persist: { _ in }),
-            sender: InertAlertNotificationSender()
+            store: AlertSettingsStore(load: { [:] }, persist: { _ in }, loadToastDelivery: { false }),
+            sender: InertAlertNotificationSender(),
+            toastSender: InertNemoNotchToastSender()
         )
     }
 }
