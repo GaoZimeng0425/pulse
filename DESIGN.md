@@ -170,6 +170,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.popover-ranking-limit}` | 20 行 | 弹窗各排行只列前 20 名,超出补「查看全部(另 N 项)」末行进主窗口(2026-11-01 popover-top20 用户拍板;主窗口不截断) |
 | `{layout.sheet-width}` | 460pt | 确认清单 sheet 定宽(清理页「清理…」,p4-cleaner/04;原型 B 变体同值) |
 | `{layout.sheet-list-max-height}` | 220pt | 确认清单 sheet 内逐行列表的最大高(超出滚动,总量与按钮恒在视口内) |
+| `{layout.sunburst-diameter}` | 340pt | 空间地图两环旭日图定宽(卡内水平居中;几何/两环半径比在 PulseCore `SunburstLayout`,p4-cleaner/07) |
 
 窗口:主窗口最小 **720×560**(spec 钉死),默认 880×620;弹窗定宽 **360pt**
 (`DashboardView.width`)。工具栏内容必须按 720 最小窗宽预算(见 §Do's and Don'ts)。
@@ -270,6 +271,20 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   (NSButton allowsMixedState,SwiftUI `Toggle` 无混合态才包一层),**只吃组内「可安全
   清理」档的项**——none / mixed 点击全勾、all 点击全清,先检查项永不被组勾选带上、
   必须逐个手勾;组内无安全档项则不画。
+- **空间地图卡**(p4-cleaner/07,`CleanerSunburstView.swift`):两环旭日
+  `{layout.sunburst-diameter}` 340 定宽卡内居中;内环 = 当前根的子辈、外环 = 孙辈,
+  叶子与密封块延伸占满外环。**内环配色 = 十个 `{colors.accent-*}` 令牌按序循环,
+  外环随父色**(零新色);「其他」合并块 = `{colors.surface-card-high}`(环形
+  "其他/空闲"段既有口径,悬浮标「含 N 项」)、**系统密封块 = `{colors.inkTertiary}`
+  不透明实心**(只读系统区,点击在卡内信息行解释、不可下钻)。弧间角向留缝、
+  弧与标签**不做任何动画**(meter 条同款纪律)。中心 = 当前根名 + 实际占用 +
+  「↩ 返回上级」(顶层则「点击色块下钻」提示);**悬浮提示 = 名字 + 路径 + 实际
+  占用 + 占整卷百分比**(分母 = 整卷树,不是环内归一化;锚在弧中角外侧并钳制
+  在图内)。面包屑逐级可点(`›` 分隔,末级加粗,末尾「回到整卷」);下钻状态由
+  CleanerTabView 持有(切子药丸不丢)。**v1 只读:卡上没有任何删除控件**,
+  唯一越界动作 = 头部「在 Finder 中显示」(ADR-0008 的 UI 边界)。树变换与弧几何
+  在 PulseCore `SpaceMap.swift`(firmlink 提升把 /System/Volumes/Data/* 拼回顶层、
+  System 余量折叠为密封块),视图只描边配色命中。
 - **AreaTrendChartView**:56 点、线 2px 指标色、线下渐变 32%→0、4 条 8% 网格线、
   2% 左垫底;**StripChartView**:44 柱、36pt 高。二者都是自绘 Canvas,不引 Charts。
 - **PillTabBar(通用药丸 tab 条,用户拍板 2026-10-22:tab 是通用组件样式)**:

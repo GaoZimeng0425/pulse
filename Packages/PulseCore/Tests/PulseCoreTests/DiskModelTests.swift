@@ -38,6 +38,24 @@ final class DiskModelTests: XCTestCase {
         XCTAssertGreaterThan(reading.accountedBytes, reading.containerUsedBytes)
     }
 
+    func testMemberKeyNormalizesSealedSnapshotDevice() {
+        // 密封系统卷快照(双层片)与其本体 = 同一容器成员;普通卷与裸容器设备原样。
+        XCTAssertEqual(DiskCapacity.memberKey(device: "/dev/disk3s1s1"), "disk3s1")
+        XCTAssertEqual(DiskCapacity.memberKey(device: "/dev/disk3s5"), "disk3s5")
+        XCTAssertEqual(DiskCapacity.memberKey(device: "/dev/disk3"), "disk3")
+        XCTAssertNil(DiskCapacity.memberKey(device: "map auto_home"))
+    }
+
+    func testUpdateStagingDuplicateMountCountedOnce() throws {
+        // 真机实案(2026-11-01):系统卷本体在更新预置期间挂到
+        // /System/Volumes/Update/mnt1,与 "/"(密封快照)同一份块——
+        // 不去重会让各卷之和恰多一个系统卷,对账不变式破裂。
+        let reading = try XCTUnwrap(DiskCapacity.make(from: DiskFixture.raw(includeUpdateStagingDuplicate: true)))
+        XCTAssertEqual(reading.accountedBytes, reading.containerUsedBytes, "同一份块只计一次")
+        XCTAssertFalse(reading.otherVolumes.contains { $0.mountPoint.contains("mnt1") }, "重复挂载不单独成行")
+        XCTAssertEqual(reading.otherVolumes.map(\.label), ["macOS", "虚拟内存", "Preboot"], "先到的挂载(/)代表该成员")
+    }
+
     func testReconciliationFiltersForeignFilesystemsAndFailedVolumes() throws {
         // 异容器 apfs 卷、非 apfs 挂载、同容器 getattrlist 失败卷:全部不入明细
         // (999 字节与 map auto_home 不出现;失败卷不伪造 0)。

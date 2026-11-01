@@ -92,6 +92,21 @@ public enum DiskCapacity {
         return String(name[..<end]).isEmpty ? nil : "disk" + String(digits[..<end])
     }
 
+    /// 设备名 → 容器**成员**键:密封系统卷快照设备(双层片,disk3s1s1 = 成员
+    /// disk3s1 的只读快照)与其本体是同一份物理块——更新预置期间本体会以
+    /// /System/Volumes/Update/mnt1 之类挂载点再挂一次,同一份块只许计一次
+    /// (2026-11-01 真机实案:各卷之和比容器已用恰多一个系统卷,对账冒烟红)。
+    /// "/dev/disk3s1s1" → "disk3s1";单层片(disk3s5)与裸容器设备原样;非 /dev/ nil。
+    public static func memberKey(device: String) -> String? {
+        guard let name = device.removePrefix("/dev/"), name.hasPrefix("disk") else { return nil }
+        let parts = name.dropFirst(4).split(separator: "s", omittingEmptySubsequences: true)
+        guard let disk = parts.first else { return nil }
+        if parts.count >= 2, let slice = parts.dropFirst().first {
+            return "disk\(disk)s\(slice)"
+        }
+        return "disk\(disk)"
+    }
+
     /// 已知挂载点的固定标签(petal disk.rs:226-237),其余取挂载点 basename。
     public static func label(forMountPoint mountPoint: String) -> String {
         switch mountPoint {
@@ -114,11 +129,15 @@ public enum DiskCapacity {
 
         // getmntinfo 全表 → 只留同容器 apfs 卷,每卷取 getattrlist 精确已用
         // (usedBytes 读失败的卷跳过,不伪造,petal `continue` 口径)。
+        // 同一容器成员(快照设备 + 本体重复挂载)先到先得,只计一次。
         var data: DiskVolumeUsage?
         var others: [DiskVolumeUsage] = []
+        var seenMembers = Set<String>()
         for volume in raw.mountedVolumes {
             guard volume.fileSystem == "apfs",
                   containerOf(device: volume.device) == container,
+                  let member = memberKey(device: volume.device),
+                  seenMembers.insert(member).inserted,
                   let used = volume.usedBytes
             else { continue }
             if volume.mountPoint == dataVolumeMountPoint {

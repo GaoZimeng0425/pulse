@@ -26,6 +26,9 @@ enum CleanerSubTab: String, CaseIterable, Hashable {
 struct CleanerTabView: View {
     let model: CleanerModel
     @State private var subTab: CleanerSubTab = .junk
+    /// 空间地图的导航态放在壳层(07):切子药丸再回来不丢下钻位置。
+    @State private var mapDrillPath: String?
+    @State private var mapTreeIndex = 0
 
     private var accent: Color {
         Metric.disk.accentColor
@@ -119,7 +122,7 @@ struct CleanerTabView: View {
 
     // MARK: 子页
 
-    /// 空间地图子页(03 票 = 结果摘要;旭日图 07 票接入)。
+    /// 空间地图子页(07 = 旭日图 + 03 的结果摘要;两卡读同一次扫描)。
     @ViewBuilder private var mapSection: some View {
         switch model.phase {
         case .idle:
@@ -133,7 +136,14 @@ struct CleanerTabView: View {
         case let .scanning(stats):
             scanningCard(stats)
         case let .finished(result):
-            summaryCard(result)
+            VStack(spacing: 12) {
+                SpaceMapSection(
+                    model: model,
+                    drillPath: $mapDrillPath,
+                    treeIndex: $mapTreeIndex
+                )
+                summaryCard(result)
+            }
         }
     }
 
