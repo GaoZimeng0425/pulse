@@ -13,13 +13,19 @@ final class AlertSettingsStore {
     /// UserDefaults 键:JSON 字典 {kindRawValue: {isEnabled, threshold}}。
     /// 键名即持久化契约,勿改(改了会丢用户配置)。
     static let storageKey = "alertRuleConfigs"
+    /// NemoNotch toast 投递开关的键(键名即持久化契约,勿改)。
+    static let toastDeliveryStorageKey = "alertNemoNotchToastEnabled"
 
     /// 当前配置(缺省 = 预设阈值 + 全关)。授权状态不在这里记:以系统三态为准
     /// (AlertCenter 现查),本地"请求过"标记曾与系统现状脱节、误判拒绝
     /// (2026-10-19),已撤。
     private(set) var configs: [AlertKind: AlertRuleConfig]
+    /// NemoNotch toast 投递开关(默认开:规则本身默认全关,开规则才是主闸门;
+    /// NemoNotch 未运行时发送器静默跳过,开着无副作用)。
+    private(set) var toastDeliveryEnabled: Bool
 
     private let persist: ([AlertKind: AlertRuleConfig]) -> Void
+    private let persistToastDelivery: (Bool) -> Void
 
     /// 任一规则开着(授权时序:有规则开着而系统还没问过时才请求授权)。
     var isAnyEnabled: Bool {
@@ -29,10 +35,14 @@ final class AlertSettingsStore {
     /// 注入读写闭包的构造(测试 / 预览)。
     init(
         load: () -> [AlertKind: AlertRuleConfig],
-        persist: @escaping ([AlertKind: AlertRuleConfig]) -> Void
+        persist: @escaping ([AlertKind: AlertRuleConfig]) -> Void,
+        loadToastDelivery: () -> Bool = { true },
+        persistToastDelivery: @escaping (Bool) -> Void = { _ in }
     ) {
         configs = Self.mergingPresets(load())
+        toastDeliveryEnabled = loadToastDelivery()
         self.persist = persist
+        self.persistToastDelivery = persistToastDelivery
     }
 
     /// 生产构造:UserDefaults(标准库);测试注入独立 suite。
@@ -43,6 +53,12 @@ final class AlertSettingsStore {
             load: { Self.decode(defaults.data(forKey: Self.storageKey)) },
             persist: { configs in
                 defaults.set(Self.encode(configs), forKey: Self.storageKey)
+            },
+            loadToastDelivery: {
+                defaults.object(forKey: Self.toastDeliveryStorageKey) as? Bool ?? true
+            },
+            persistToastDelivery: { enabled in
+                defaults.set(enabled, forKey: Self.toastDeliveryStorageKey)
             }
         )
     }
@@ -69,6 +85,12 @@ final class AlertSettingsStore {
         config.threshold = threshold
         configs[kind] = config
         persist(configs)
+    }
+
+    /// 开关 NemoNotch toast 投递(设置页 Toggle;改动即落盘)。
+    func setToastDeliveryEnabled(_ enabled: Bool) {
+        toastDeliveryEnabled = enabled
+        persistToastDelivery(enabled)
     }
 
     /// 引擎每轮喂食取的策略快照(用户配置 × 种类预设)。

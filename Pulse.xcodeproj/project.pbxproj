@@ -10,6 +10,7 @@
 		005D31D5A553D3A1105FF607 /* MetricCardModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53973290E8EB9138A67B958C /* MetricCardModel.swift */; };
 		00782FC590CECF347756D123 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7139D7B174756F0CAD5B532C /* HistoryView.swift */; };
 		00830AABA431FA2E43DA8F07 /* NativeList.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9E66EF3F4924169F8F7E693 /* NativeList.swift */; };
+		02E97C4C404FDFB2C8B24988 /* AlertCenterToastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12FBE262C111877A74B7F58 /* AlertCenterToastTests.swift */; };
 		040A86C6285D90BF16F5B5AA /* PulseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 679FABC27E634B3FA90955FE /* PulseCore */; };
 		04BFB76AC65777ABAFFF1897 /* LiveDiskSourceSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F27F7F4AB085BB21BC93D75 /* LiveDiskSourceSmokeTests.swift */; };
 		05709BE15A090DCA772345D5 /* GroupingEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D0353305807063B3A9F254 /* GroupingEngineTests.swift */; };
@@ -50,6 +51,7 @@
 		3CF021A14DA00F8F1381EBF7 /* DiskSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCF3D2ECCF35087812BF92C5 /* DiskSensor.swift */; };
 		3DEFB73B1AB0CBBE257F342F /* DevServerFinderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF3E209527FBD12B7B4014D9 /* DevServerFinderTests.swift */; };
 		417BC00094F41184FE546F35 /* SoundFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEE86D46318C3A81F3B27F06 /* SoundFeature.swift */; };
+		42CC1DC1CC1DFFC5186B8248 /* NemoNotchToastSender.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF6813960D12A83141B88F0F /* NemoNotchToastSender.swift */; };
 		468E4F4F50FB387354742865 /* EnergyModelSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2C47A273B11DED944F68280 /* EnergyModelSensor.swift */; };
 		46DBB21B089E14C2B6E39036 /* BirthScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B861A747FF3BF8E186AD5FFB /* BirthScannerTests.swift */; };
 		46FA3C977CB5BA520598C04C /* SystemMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7B5ADC98A14B764E51366DB /* SystemMonitor.swift */; };
@@ -289,6 +291,7 @@
 		9F27F7F4AB085BB21BC93D75 /* LiveDiskSourceSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDiskSourceSmokeTests.swift; sourceTree = "<group>"; };
 		9FB3411DD59194CA8264149E /* AgentEnergy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentEnergy.swift; sourceTree = "<group>"; };
 		9FFEDF60F89066B8BB05A0EF /* SmcCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmcCardViews.swift; sourceTree = "<group>"; };
+		A12FBE262C111877A74B7F58 /* AlertCenterToastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertCenterToastTests.swift; sourceTree = "<group>"; };
 		A311BFB8099AF93518F47C9B /* ProcArgsParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcArgsParser.swift; sourceTree = "<group>"; };
 		A8434AD3F303A7E024D2887D /* ProcessDrilldownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessDrilldownView.swift; sourceTree = "<group>"; };
 		A93981AEA461948386E597BB /* SoundSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundSensor.swift; sourceTree = "<group>"; };
@@ -313,6 +316,7 @@
 		CA9B6FCA72A37F307AF87A30 /* DashboardModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardModel.swift; sourceTree = "<group>"; };
 		CB2143C633E5F922EDA23B55 /* EnergyImpactFeatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyImpactFeatureTests.swift; sourceTree = "<group>"; };
 		CEF074B1893DFC234824F594 /* CleanerViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanerViews.swift; sourceTree = "<group>"; };
+		CF6813960D12A83141B88F0F /* NemoNotchToastSender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NemoNotchToastSender.swift; sourceTree = "<group>"; };
 		D1C9148F4EC10E000CE96ABA /* SmcSensorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmcSensorTests.swift; sourceTree = "<group>"; };
 		D24F280DF9DF1C4BD1AE2729 /* MenuBarBadgeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarBadgeSettingsView.swift; sourceTree = "<group>"; };
 		D2A5BBAE60025E3EB318E411 /* LogServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogServiceTests.swift; sourceTree = "<group>"; };
@@ -502,6 +506,7 @@
 				6B06E911B136D09E8F6E569D /* LiveCoreTickSource.swift */,
 				06A4CAD37F3D2BE0A494F9DA /* LiveProcessSource.swift */,
 				D6CB838FAB56E49D3DB8D34D /* MemoryStats.swift */,
+				CF6813960D12A83141B88F0F /* NemoNotchToastSender.swift */,
 				35DEE559EA3973593D52217F /* NettopSource.swift */,
 				23CEC39FCC8CC2FDE38BBAF7 /* NetworkSensor.swift */,
 				A311BFB8099AF93518F47C9B /* ProcArgsParser.swift */,
@@ -567,6 +572,7 @@
 				8C71FCD146BC0C56EF25AEE9 /* AcceptanceAnchorEndToEndTests.swift */,
 				3E2C1C579AAC70056E11EABF /* AgentEnergyTableTests.swift */,
 				71178307830FDF67F93A9523 /* AlertCenterTests.swift */,
+				A12FBE262C111877A74B7F58 /* AlertCenterToastTests.swift */,
 				02DA72B605936ABAB68101E8 /* AlertNotificationSmokeTests.swift */,
 				F24703C16273CB98970E4297 /* AlertSettingsStoreTests.swift */,
 				78EC09371E86E7408FA32ADC /* AppIconCacheTests.swift */,
@@ -726,6 +732,7 @@
 				E4A99F8C1ACA71DF7876AF70 /* AcceptanceAnchorEndToEndTests.swift in Sources */,
 				5EFCC13BB4804E62AFD916B3 /* AgentEnergyTableTests.swift in Sources */,
 				25710F4D00266A1760713D57 /* AlertCenterTests.swift in Sources */,
+				02E97C4C404FDFB2C8B24988 /* AlertCenterToastTests.swift in Sources */,
 				CF06B9E60C578C995DAF72DC /* AlertNotificationSmokeTests.swift in Sources */,
 				20550F03DAEF45E3DEBE36E7 /* AlertSettingsStoreTests.swift in Sources */,
 				31A4795EB7C03BA0FE9573D2 /* AppIconCacheTests.swift in Sources */,
@@ -856,6 +863,7 @@
 				B590F624901FBA4BF2DB438F /* ModuleRankingCard.swift in Sources */,
 				A6DF542F79BD60BFE631FD62 /* MonitorAssembly.swift in Sources */,
 				00830AABA431FA2E43DA8F07 /* NativeList.swift in Sources */,
+				42CC1DC1CC1DFFC5186B8248 /* NemoNotchToastSender.swift in Sources */,
 				B482306A9746A2741DC459B4 /* NettopSource.swift in Sources */,
 				BC3F96643A2148359F32904E /* NetworkCardViews.swift in Sources */,
 				4C316564981903520DD003A2 /* NetworkFeature.swift in Sources */,

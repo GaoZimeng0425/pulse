@@ -31,16 +31,23 @@ final class AlertCenter {
     private var loggedStatus: NotificationAuthorization?
 
     private let sender: any AlertNotificationSending
+    private let toastSender: any NemoNotchToastSending
     private let clock: @Sendable () -> Date
     private var engine = AlertEngine()
+    /// 触发当轮的组上下文(归因原料):onRound 暂存、fired 事件消费——归因口径
+    /// 是「现在谁在吃」,不是告警起始时刻。
+    private var latestGroups: [ProcessGroup] = []
+    private var latestCPUPercentByPID: [pid_t: Double] = [:]
 
     init(
         store: AlertSettingsStore = AlertSettingsStore(),
         sender: any AlertNotificationSending = LiveAlertNotificationSender(),
+        toastSender: any NemoNotchToastSending = LiveNemoNotchToastSender(),
         clock: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.store = store
         self.sender = sender
+        self.toastSender = toastSender
         self.clock = clock
     }
 
@@ -178,6 +185,7 @@ final class AlertCenter {
                     category: "Alert"
                 )
                 payloads.append(AlertNotificationContent.make(for: occurrence))
+                sendToast(for: occurrence)
             case let .resolved(kind, subjectKey):
                 activeAlerts.removeAll {
                     $0.kind == kind && $0.subjectKey == subjectKey
@@ -199,6 +207,24 @@ final class AlertCenter {
             }
         }
     }
+
+    /// ④NemoNotch toast 出口(附加,不取代前三路):点名「哪个项目/应用下的
+    /// 哪个进程在消耗」。开关默认开(规则本身默认全关,开规则才是主闸门);
+    /// devServerIdle 不进(与「谁在消耗资源」无关)。发送 fire-and-forget——
+    /// NemoNotch 未运行是常态,失败只在发送器内记日志,主流程零影响。
+    private func sendToast(for occurrence: AlertOccurrence) {
+        guard store.toastDeliveryEnabled, let payload = NemoNotchToastContent.make(
+            for: occurrence,
+            offender: AlertOffenderAttribution.summarize(
+                occurrence: occurrence,
+                groups: latestGroups,
+                cpuPercentByPID: latestCPUPercentByPID
+            ),
+            jumpBundleId: Bundle.main.bundleIdentifier
+        ) else { return }
+        let toastSender = toastSender
+        Task { await toastSender.send(payload) }
+    }
 }
 
 // MARK: - 功能模块(ADR-0003 MonitorFeature)
@@ -208,6 +234,10 @@ final class AlertCenter {
 /// 与 dev server 盘点经其他模块的广播喂进来。引擎只读聚合口径,不持快照。
 extension AlertCenter: MonitorFeature {
     func onRound(_ context: RoundContext) {
+        // 归因原料先暂存(与喂食同一轮):fired 事件里按 subjectKey 回查组内
+        // 进程明细,「现在谁在吃」以触发当轮为准。
+        latestGroups = context.groups
+        latestCPUPercentByPID = context.update.diff.processCPU.cpuPercentByPID
         ingestSampling(
             systemCPULoad: context.update.systemCPULoad,
             groups: context.groups.map { group in
