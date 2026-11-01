@@ -167,6 +167,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.row-meter}` | 64pt | 行内电量条宽(全尺寸档,蓝牙设备行) |
 | `{layout.row-host-icon}` | 14pt | 下钻进程行宿主 App 徽标图标边长(project-visibility/02;徽标文字随行 `{typography.caption}` secondary,图标-文字间距 `{spacing.inline}`) |
 | `{layout.overview-card-min-width}` | 340pt | 总览卡自适应网格的单卡最小宽(主窗口列数 1–4 由它派生:列数 = 内容宽容纳的最多列,340 + 列距 16,上限 4) |
+| `{layout.popover-ranking-limit}` | 20 行 | 弹窗各排行只列前 20 名,超出补「查看全部(另 N 项)」末行进主窗口(2026-11-01 popover-top20 用户拍板;主窗口不截断) |
 | `{layout.sheet-width}` | 460pt | 确认清单 sheet 定宽(清理页「清理…」,p4-cleaner/04;原型 B 变体同值) |
 | `{layout.sheet-list-max-height}` | 220pt | 确认清单 sheet 内逐行列表的最大高(超出滚动,总量与按钮恒在视口内) |
 
@@ -243,6 +244,8 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   存在」——0.6s 缓动让面板开期 CPU 36.5% vs 无动画 8.4%,popover-layout-loop/01)。
   **行容器与主窗口滚动区一律 `LazyVStack`**(2026-10-30 popover-appkit/10 实测:排行常上百行,
   普通 VStack 全建 → 弹窗开期鼠标移动 ~33% / 滚动 ~41%,惰性后 ~7% / ~25%;不得退回 VStack)。
+  **弹窗排行截断**:只列前 `{layout.popover-ranking-limit}` 20 名,末行 `RankingShowAllRow`(`{typography.caption}`
+  11 medium secondary + chevron,居中,悬停底同排行行)点开主窗口并落当前 tab。
   **弹窗滚动区是通用原生列表 `NativeList`**(2026-10-31 native-list,用户拍板):AppKit NSTableView
   承载 SwiftUI 行——行视图按 kind 复用、行高缓存(排行行同 kind 量一次,卡片 / 展开行按 key 量)、
   结构不变只换可见行内容、行宿主不参与键盘焦点链;卡片序列出自 `MetricTabStack.blocks`,排行拆卡头 /

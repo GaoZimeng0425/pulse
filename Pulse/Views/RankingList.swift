@@ -266,6 +266,36 @@ enum RankingListSlices {
     }
 }
 
+/// 弹窗排行截断后的末行(popover-top20):「查看全部(另 N 项)」,点了进主窗口。
+/// 字号 `{typography.caption}` 11 medium、secondary 墨色;悬停底色同排行行
+/// (primary 5% + 圆角 8)。
+struct RankingShowAllRow: View {
+    let hiddenCount: Int
+    let isCompact: Bool
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Text("查看全部(另 \(hiddenCount) 项)")
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .semibold))
+            }
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, isCompact ? 7 : 9)
+            .background(isHovering ? Color.primary.opacity(0.05) : Color.clear, in: .rect(cornerRadius: 8))
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .help("在主窗口查看完整排行")
+    }
+}
+
 extension View {
     /// 排行中段一行:卡内水平内距 + 行距 2 + 直角卡底色。
     func rankingRowSlice(compact: Bool) -> some View {
