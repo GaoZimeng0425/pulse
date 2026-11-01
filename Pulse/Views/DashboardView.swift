@@ -16,6 +16,9 @@ struct DashboardView: View {
     /// 理想高度恒为 0,弹窗会被压扁成只剩头部(工单 09 实机走查发现)——
     /// 必须给定值而非 maxHeight。
     private static let contentHeight: CGFloat = 520
+    /// 弹窗排行只列前 20 名(2026-11-01 用户拍板 B;DESIGN.md `layout.popover-ranking-limit`):
+    /// 弹窗是"扫一眼谁最忙",上百行的快速滚动是剩下的大头开销;其余由「查看全部」进主窗口。
+    private static let rankingLimit = 20
 
     /// 两窗共用呈现模型(评审 F4):卡模型 / 会话状态 / 处置请求同出处。
     @State private var model: DashboardModel
@@ -152,7 +155,7 @@ struct DashboardView: View {
         var rows = [NativeListRow(kind: "\(id)-header", height: .measured(key: "\(id)-header-\(header.isEmpty)")) {
             AnyView(RankingListSlices.Header(content: header, isCompact: true))
         }]
-        for group in content.ranking {
+        for group in content.ranking.prefix(Self.rankingLimit) {
             let isExpanded = model.expandedGroupIDs.contains(group.id)
             let cell = RankingGroupCell(
                 group: group,
@@ -175,6 +178,7 @@ struct DashboardView: View {
                     AnyView(cell.rankingRowSlice(compact: true))
                 })
         }
+        rows += showAllRows(id: id, total: content.ranking.count)
         rows.append(NativeListRow(kind: "\(id)-footer", height: .measured(key: "\(id)-footer")) {
             AnyView(RankingListSlices.Footer(footnote: nil, isCompact: true))
         })
@@ -190,16 +194,43 @@ struct DashboardView: View {
         var rows = [NativeListRow(kind: "\(id)-header", height: .measured(key: "\(id)-header-\(header.isEmpty)")) {
             AnyView(RankingListSlices.Header(content: header, isCompact: true))
         }]
-        rows += spec.rows.map { row in
+        rows += spec.rows.prefix(Self.rankingLimit).map { row in
             NativeListRow(kind: "\(id)-row", height: .uniform) {
                 AnyView(ModuleRankingRowView(row: row, accent: spec.accent, isCompact: true)
                     .rankingRowSlice(compact: true))
             }
         }
+        rows += showAllRows(id: id, total: spec.rows.count)
         rows.append(NativeListRow(kind: "\(id)-footer", height: .measured(key: "\(id)-footer")) {
             AnyView(RankingListSlices.Footer(footnote: spec.cadenceNote, isCompact: true))
         })
         return rows
+    }
+
+    /// 超出前 20 名时补一行「查看全部」:点了开主窗口并落到当前 tab。
+    private func showAllRows(id: String, total: Int) -> [NativeListRow] {
+        let hidden = total - Self.rankingLimit
+        guard hidden > 0 else { return [] }
+        let tab = tabSelection.current
+        return [NativeListRow(kind: "\(id)-show-all", height: .uniform) {
+            AnyView(RankingShowAllRow(hiddenCount: hidden, isCompact: true) {
+                Self.openMainWindow(tab: tab)
+            }
+            .rankingRowSlice(compact: true))
+        }]
+    }
+
+    /// 开主窗口:LSUIElement 应用激活策略为 .accessory,开窗只建窗不抢前台,窗口会开在
+    /// 其他应用后面(实机反馈"点了没反应")——先激活再开窗。开窗走广播由菜单栏控制器统一
+    /// 路由(收面板 + 经桥开主窗):NSPanel 宿主里环境 openWindow 是哑动作。带 tab 时
+    /// 主窗口已开则切到该 tab(冷开窗落默认页)。
+    private static func openMainWindow(tab: MetricTab? = nil) {
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        NotificationCenter.default.post(
+            name: AlertNotificationRouter.openMainWindowNotification,
+            object: nil,
+            userInfo: tab.map { [AlertNotificationRouter.tabUserInfoKey: $0.rawValue] }
+        )
     }
 
     /// 当前 tab 的展示内容(纯逻辑折叠):榜单序、组行口径、内存分段。
@@ -239,7 +270,7 @@ struct DashboardView: View {
     /// "当前最忙"排行卡:全部组,榜单序随 tab;点行展开组内进程(只读最近一轮采样);
     private var rankingCard: some View {
         RankingCardView(
-            groups: content.ranking,
+            groups: Array(content.ranking.prefix(Self.rankingLimit)),
             metric: content.metric,
             cpuLeader: content.cpuLeader,
             memoryLeaderBytes: content.memoryLeaderBytes,
@@ -270,15 +301,7 @@ struct DashboardView: View {
     private var footer: some View {
         HStack(spacing: 6) {
             Button {
-                // LSUIElement 应用激活策略为 .accessory:开窗只建窗不抢前台,
-                // 窗口会开在其他应用后面(实机反馈"点了没反应")——先激活再开窗。
-                // 开窗走广播由菜单栏控制器统一路由(收面板 + 经桥开主窗):
-                // NSPanel 宿主里环境 openWindow 是哑动作。
-                NSApplication.shared.activate(ignoringOtherApps: true)
-                NotificationCenter.default.post(
-                    name: AlertNotificationRouter.openMainWindowNotification,
-                    object: nil
-                )
+                Self.openMainWindow()
             } label: {
                 Image(systemName: "macwindow")
             }
