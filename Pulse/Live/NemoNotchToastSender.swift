@@ -84,12 +84,13 @@ struct LiveNemoNotchToastSender: NemoNotchToastSending {
         request.httpBody = data
 
         do {
-            let (_, response) = try await session.data(for: request)
+            let (data, response) = try await session.data(for: request)
             if let http = response as? HTTPURLResponse, !(200 ..< 300).contains(http.statusCode) {
-                // 400 = 载荷不合约(本地 bug 信号,记载荷标题排查);401 = 令牌失配
-                // (不记令牌本身)。两者都不重试。
+                // 400 = 载荷不合约(本地 bug 信号,reason 随日志排查——2026-11-01
+                // 实战:少记 reason 多绕半小时);401 = 令牌失配(不记令牌本身)。不重试。
+                let reason = String(data: data, encoding: .utf8) ?? ""
                 LogService.info(
-                    "NemoNotch toast 被拒(HTTP \(http.statusCode),title=\(payload.title))",
+                    "NemoNotch toast 被拒(HTTP \(http.statusCode) \(reason),title=\(payload.title))",
                     category: "Alert"
                 )
             }
