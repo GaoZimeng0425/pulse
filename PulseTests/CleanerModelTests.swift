@@ -448,6 +448,39 @@ final class CleanerModelTests: XCTestCase {
         XCTAssertEqual(map.children.first { $0.isSealed }?.bytes, 80)
     }
 
+    // MARK: 方案 A 路径域修正(2026-11-02 实机回归:Data 根扫描后清单为空)
+
+    func testCanonicalDataScanFindsJunkCandidatesForCanonicalHome() async {
+        // 生产扫描 = Data 物理根 + 规范根 "/"。夹具按物理路径铺,规则/家目录按规范路径找:
+        // 树路径与用户可见路径同域,白名单定位不再因前缀失配而空手而归。
+        let fake = FakeCleanDirectoryEnumerator(listings: [
+            "/System/Volumes/Data": .entries([
+                CleanFixture.directory("Users", fileID: 700),
+            ]),
+            "/System/Volumes/Data/Users": .entries([
+                CleanFixture.directory("me", fileID: 705),
+            ]),
+            "/System/Volumes/Data/Users/me": .entries([
+                CleanFixture.directory("Library", fileID: 701),
+            ]),
+            "/System/Volumes/Data/Users/me/Library": .entries([
+                CleanFixture.directory("Caches", fileID: 702),
+            ]),
+            "/System/Volumes/Data/Users/me/Library/Caches": .entries([
+                CleanFixture.directory("Homebrew", fileID: 703),
+            ]),
+            "/System/Volumes/Data/Users/me/Library/Caches/Homebrew": .entries([
+                CleanFixture.file("b.bin", allocated: 512, reclaimable: 512),
+            ]),
+        ])
+        let model = CleanerModel(homeDirectory: "/Users/me")
+        model.startScan(using: fake)
+        await waitUntil { !model.isScanning }
+
+        XCTAssertEqual(model.candidates.map(\.ruleID), ["homebrew.cache"], "规范域树 + 规范家目录:清单不再为空")
+        XCTAssertEqual(model.candidates.first?.path, "/Users/me/Library/Caches/Homebrew")
+    }
+
     private func waitUntil(_ condition: @MainActor () -> Bool) async {
         for _ in 0 ..< 500 {
             if condition() {

@@ -175,11 +175,16 @@ public enum SpaceMapTree {
                 children.append(mapped)
             }
         }
+        // ③ 卷级注入(方案 A 规范根扫描走这条:树里没有 System,只读系统卷全靠摘要;
+        //    树里有 System 的旧形态 sealedVolumes 为空,不会双计)。
+        if let sealed = sealedVolumeNode(sealedVolumes) {
+            children.append(sealed)
+        }
 
         return SpaceMapNode(
             name: root.name == "/" ? "整卷" : root.name,
             path: PathNormalization.normalize(root.path),
-            bytes: root.accountedBytes,
+            bytes: root.accountedBytes + sealedVolumes.reduce(Int64(0)) { $0 + $1.usedBytes },
             isPartial: root.isPartial,
             children: sorted(children)
         )
