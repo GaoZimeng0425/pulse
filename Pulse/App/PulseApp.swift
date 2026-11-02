@@ -78,7 +78,8 @@ struct PulseApp: App {
         _menuBar = State(initialValue: MenuBarController(
             monitor: monitor,
             badgeDisplay: badgeDisplay,
-            rootsStore: store
+            rootsStore: store,
+            alertRouter: router
         ))
         // 主窗口可见即守卫一次(2026-10-16 验收走查:外接屏断电时窗口被系统恢复到
         // 幻影屏坐标,AppKit 层观察比 SwiftUI 视图钩子更早更稳);启动后延迟一拍

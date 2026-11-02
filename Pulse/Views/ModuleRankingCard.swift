@@ -32,8 +32,12 @@ struct ModuleRankingCardView: View {
     let spec: ModuleRankingSpec
     /// 弹窗紧凑档。
     var isCompact = false
+    /// 截断(ranking-limit/01):只列前 `RankingOverflow.limit` 名,末行按宿主行为处理溢出;
+    /// nil = 不截(预览)。
+    var overflow: RankingOverflow.Action?
 
     var body: some View {
+        let shown = overflow.map { RankingOverflow.split(spec.rows, isExpanded: $0.isExpanded).shown } ?? spec.rows[...]
         RankingListCard(
             title: spec.title,
             accent: spec.accent,
@@ -41,10 +45,11 @@ struct ModuleRankingCardView: View {
             isCompact: isCompact,
             isEmpty: spec.rows.isEmpty,
             emptyMessage: spec.resolvedEmptyMessage,
-            footnote: spec.cadenceNote
+            footnote: spec.cadenceNote,
+            overflow: overflow.flatMap { RankingOverflow.rowModel(total: spec.rows.count, action: $0) }
         ) {
             // 按名次认行(list-position-id,同 RankingCardView):重排只刷新行内容。
-            ForEach(Array(spec.rows.enumerated()), id: \.offset) { _, row in
+            ForEach(Array(shown.enumerated()), id: \.offset) { _, row in
                 ModuleRankingRowView(row: row, accent: spec.accent, isCompact: isCompact)
             }
         }

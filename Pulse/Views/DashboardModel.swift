@@ -15,6 +15,9 @@ final class DashboardModel {
 
     /// 展开中的组(按类型化组身份):跨采样轮次保持,组消失时残留身份无害。
     var expandedGroupIDs: Set<GroupIdentity> = []
+    /// 展开为全量的排行卡(按卡 id = tab 前缀 + 卡名,ranking-limit/01):主窗口「显示全部」
+    /// 原地展开;弹窗「查看全部」落地时预置。切 tab 换 id 即回到前 N,不跨 tab 记忆。
+    var expandedRankingIDs: Set<String> = []
     /// 展开详情的进程(跨组唯一):下钻期间进程退出时详情安静收起。
     var selectedProcessID: pid_t?
     /// 处置结果汇总(工单 08):**有失败才弹**;全成功保持安静。
@@ -98,6 +101,18 @@ final class DashboardModel {
         if !expandedGroupIDs.insert(groupID).inserted {
             expandedGroupIDs.remove(groupID)
         }
+    }
+
+    /// 排行卡「显示全部 / 收起」(主窗口末行)。
+    func toggleRankingExpansion(_ rankingID: String) {
+        if !expandedRankingIDs.insert(rankingID).inserted {
+            expandedRankingIDs.remove(rankingID)
+        }
+    }
+
+    /// 排行卡预置展开(弹窗「查看全部」落地到主窗口);重复无害。
+    func expandRanking(_ rankingID: String) {
+        expandedRankingIDs.insert(rankingID)
     }
 
     /// 进程详情"结束进程":确认(点名 name+pid)→ SIGTERM;有失败才弹汇总。

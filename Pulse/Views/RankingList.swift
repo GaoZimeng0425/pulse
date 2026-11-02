@@ -121,7 +121,7 @@ struct RankingEmptyMessage {
     var detail: String?
 }
 
-/// 排行卡外壳:标题 / 表头 / 行 / 注脚 / 空态。行内容由调用方给(RankingListRow)。
+/// 排行卡外壳:标题 / 表头 / 行 / 截断末行 / 注脚 / 空态。行内容由调用方给(RankingListRow)。
 struct RankingListCard<Rows: View>: View {
     let title: String
     /// 标题色 = 所在页的指标色。
@@ -133,6 +133,8 @@ struct RankingListCard<Rows: View>: View {
     let emptyMessage: RankingEmptyMessage
     /// 卡底注脚(数据节拍等);nil 不画。
     var footnote: String?
+    /// 截断末行(ranking-limit/01):行已由调用方按 `RankingOverflow` 截过,这里只画末行;nil 不画。
+    var overflow: RankingOverflowRowModel?
     @ViewBuilder let rows: () -> Rows
     @Environment(\.rankingRowsInList) private var rowsInList
 
@@ -147,6 +149,9 @@ struct RankingListCard<Rows: View>: View {
                 header
                 if !isEmpty {
                     rows()
+                    if let overflow {
+                        RankingOverflowRow(model: overflow, isCompact: isCompact)
+                    }
                 }
                 RankingListFootnote(text: footnote)
             }
@@ -165,6 +170,11 @@ struct RankingListCard<Rows: View>: View {
             rows()
                 .rankingRowSlice(compact: isCompact)
                 .listRowInsets(EdgeInsets())
+            if let overflow {
+                RankingOverflowRow(model: overflow, isCompact: isCompact)
+                    .rankingRowSlice(compact: isCompact)
+                    .listRowInsets(EdgeInsets())
+            }
         }
         RankingListSlices.Footer(footnote: footnote, isCompact: isCompact)
             .listRowInsets(EdgeInsets())
@@ -263,36 +273,6 @@ enum RankingListSlices {
                 .cardSlice(.bottom, compact: isCompact)
                 .padding(.bottom, 4)
         }
-    }
-}
-
-/// 弹窗排行截断后的末行(popover-top20):「查看全部(另 N 项)」,点了进主窗口。
-/// 字号 `{typography.caption}` 11 medium、secondary 墨色;悬停底色同排行行
-/// (primary 5% + 圆角 8)。
-struct RankingShowAllRow: View {
-    let hiddenCount: Int
-    let isCompact: Bool
-    let action: () -> Void
-
-    @State private var isHovering = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                Text("查看全部(另 \(hiddenCount) 项)")
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .semibold))
-            }
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, isCompact ? 7 : 9)
-            .background(isHovering ? Color.primary.opacity(0.05) : Color.clear, in: .rect(cornerRadius: 8))
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
-        .help("在主窗口查看完整排行")
     }
 }
 

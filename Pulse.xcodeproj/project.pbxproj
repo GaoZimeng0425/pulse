@@ -48,11 +48,13 @@
 		3912CC7AE8C5DF0325342786 /* RoundSpineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA32BC4006AFA168EE6CF9B5 /* RoundSpineTests.swift */; };
 		39462B81458878FA28174509 /* ContainerFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF2CA7CD9C3FB8777581E6E /* ContainerFeature.swift */; };
 		3A4696425FA64D6D47C5ED02 /* DiagnosticReportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 276EA0F7DAC2C0AC558E9614 /* DiagnosticReportTests.swift */; };
+		3BFAA3592B43CEAB2E4733D8 /* RankingOverflowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D62C614668136B62C900ECA /* RankingOverflowTests.swift */; };
 		3C482A1F03A55F04BACE1E8F /* RankingList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45A0A70732B983FE5B5426B0 /* RankingList.swift */; };
 		3CF021A14DA00F8F1381EBF7 /* DiskSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCF3D2ECCF35087812BF92C5 /* DiskSensor.swift */; };
 		3DEFB73B1AB0CBBE257F342F /* DevServerFinderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF3E209527FBD12B7B4014D9 /* DevServerFinderTests.swift */; };
 		417BC00094F41184FE546F35 /* SoundFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEE86D46318C3A81F3B27F06 /* SoundFeature.swift */; };
 		42CC1DC1CC1DFFC5186B8248 /* NemoNotchToastSender.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF6813960D12A83141B88F0F /* NemoNotchToastSender.swift */; };
+		44FF4D90C0131F982D4887A1 /* RankingOverflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FD44EAE086DEE8538A21818 /* RankingOverflow.swift */; };
 		468E4F4F50FB387354742865 /* EnergyModelSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2C47A273B11DED944F68280 /* EnergyModelSensor.swift */; };
 		46DBB21B089E14C2B6E39036 /* BirthScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B861A747FF3BF8E186AD5FFB /* BirthScannerTests.swift */; };
 		46FA3C977CB5BA520598C04C /* SystemMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7B5ADC98A14B764E51366DB /* SystemMonitor.swift */; };
@@ -223,6 +225,7 @@
 		1C3691DE09224C04DEA8AB40 /* LaunchdManifestFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchdManifestFeature.swift; sourceTree = "<group>"; };
 		1C592AC26CEC4C7129D0463B /* BatterySensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySensor.swift; sourceTree = "<group>"; };
 		1CDD19BA97EC142A19A465AE /* EnergyHelperClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyHelperClient.swift; sourceTree = "<group>"; };
+		1D62C614668136B62C900ECA /* RankingOverflowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingOverflowTests.swift; sourceTree = "<group>"; };
 		1FF2CA7CD9C3FB8777581E6E /* ContainerFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerFeature.swift; sourceTree = "<group>"; };
 		200DFF5D21AE90C78A55C055 /* ContainerSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerSensor.swift; sourceTree = "<group>"; };
 		215416C474EC313A5A138037 /* SystemStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemStatsTests.swift; sourceTree = "<group>"; };
@@ -233,6 +236,7 @@
 		29E406A1D678E2CAF14F3E30 /* RankingListMetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingListMetricsTests.swift; sourceTree = "<group>"; };
 		2D83B99D1565E444748A7987 /* ModuleRankingCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleRankingCard.swift; sourceTree = "<group>"; };
 		2D9E9859704834567FBC963A /* KillRequestFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KillRequestFlow.swift; sourceTree = "<group>"; };
+		2FD44EAE086DEE8538A21818 /* RankingOverflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingOverflow.swift; sourceTree = "<group>"; };
 		318F273F87B0FBA5A9534EAC /* DevServerFinder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevServerFinder.swift; sourceTree = "<group>"; };
 		32DF241AAD5F8798ADDE0FC2 /* GroupingPipelineSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupingPipelineSmokeTests.swift; sourceTree = "<group>"; };
 		35723EF8EBF87105BAF71FAF /* MonitorAssemblyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorAssemblyTests.swift; sourceTree = "<group>"; };
@@ -567,6 +571,7 @@
 				DAD5923604EC0076DBCA7F94 /* ProjectRootsSettingsView.swift */,
 				FA9D963B1DE0ED63855A6AAF /* RankingCard.swift */,
 				45A0A70732B983FE5B5426B0 /* RankingList.swift */,
+				2FD44EAE086DEE8538A21818 /* RankingOverflow.swift */,
 				B4E07450A436F2AE681A8772 /* RingCardView.swift */,
 				992920D9BD4AE699DFE1A1B5 /* SettingsView.swift */,
 				D3DD97B8B77F12CD4DF6B3CB /* SettingsWindowChrome.swift */,
@@ -630,6 +635,7 @@
 				992A92032D0B982D3C0006EB /* ProcessRankingSensorTests.swift */,
 				DF43629A17EF4D982135C6DC /* ProjectRootsStoreTests.swift */,
 				29E406A1D678E2CAF14F3E30 /* RankingListMetricsTests.swift */,
+				1D62C614668136B62C900ECA /* RankingOverflowTests.swift */,
 				EA32BC4006AFA168EE6CF9B5 /* RoundSpineTests.swift */,
 				D1C9148F4EC10E000CE96ABA /* SmcSensorTests.swift */,
 				126800DC1FC5FCB799DDA633 /* SoundSensorTests.swift */,
@@ -795,6 +801,7 @@
 				A1307D0D5CDA410E84C9AA0D /* ProcessRankingSensorTests.swift in Sources */,
 				0E7CC3EE21A1321E89D78BFC /* ProjectRootsStoreTests.swift in Sources */,
 				1F7A55CC3A6CF75D16DEF819 /* RankingListMetricsTests.swift in Sources */,
+				3BFAA3592B43CEAB2E4733D8 /* RankingOverflowTests.swift in Sources */,
 				3912CC7AE8C5DF0325342786 /* RoundSpineTests.swift in Sources */,
 				E9F71EE03BA7B4C44DD8DCC6 /* SmcSensorTests.swift in Sources */,
 				EF095DB50F12562588921E86 /* SoundSensorTests.swift in Sources */,
@@ -895,6 +902,7 @@
 				3486367464537B6192F7C2AF /* PulseApp.swift in Sources */,
 				C550809223BC4A1E6D6225BD /* RankingCard.swift in Sources */,
 				3C482A1F03A55F04BACE1E8F /* RankingList.swift in Sources */,
+				44FF4D90C0131F982D4887A1 /* RankingOverflow.swift in Sources */,
 				C294F0991EC58C8379AB59CC /* RankingsFeature.swift in Sources */,
 				A14EBD3EFB9899B060881BC3 /* RingCardView.swift in Sources */,
 				E0391947A668FC976A3C1FEC /* SettingsView.swift in Sources */,
