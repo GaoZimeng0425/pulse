@@ -183,14 +183,36 @@ final class AlertNotificationRouter: NSObject, UNUserNotificationCenterDelegate 
     /// 开窗广播名:常驻视图监听它调用 openWindow(id: main)。
     static let openMainWindowNotification = Notification.Name("pulse.alert.openMainWindow")
     static let tabUserInfoKey = "tab"
+    /// 落地即展开的排行卡 id(弹窗「查看全部」,ranking-limit/01)。
+    static let rankingUserInfoKey = "ranking"
 
     /// 落点 tab(主窗口出现/存活时消费并清空;消费方同模块)。
     private(set) var pendingTab: MetricTab?
+    /// 落点排行卡(主窗口出现时消费并清空;弹窗「查看全部」冷开窗专用)。
+    private(set) var pendingRankingID: String?
 
     /// 主窗口消费落点后清空(避免下次开窗重复跳转)。
     func consumePendingTab() -> MetricTab? {
         defer { pendingTab = nil }
         return pendingTab
+    }
+
+    func consumePendingRankingID() -> String? {
+        defer { pendingRankingID = nil }
+        return pendingRankingID
+    }
+
+    /// 记落点但不广播:弹窗侧的跳转(「查看全部」/ 底排开窗)自己广播,菜单栏控制器收到
+    /// 广播后经此记落点——窗口未建时(冷开窗)onReceive 收不到,主窗口出现再消费才落对页。
+    func stash(tab: MetricTab, rankingID: String?) {
+        pendingTab = tab
+        pendingRankingID = rankingID
+    }
+
+    /// 主窗口存活时已按广播直接落地,清掉落点——否则下次冷开窗会把这次的落点重放一遍。
+    func clearPending() {
+        pendingTab = nil
+        pendingRankingID = nil
     }
 
     /// 前台收到通知也横幅提示(菜单栏 app 常驻后台,横幅不打断)。

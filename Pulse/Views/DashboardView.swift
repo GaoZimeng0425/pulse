@@ -18,9 +18,8 @@ struct DashboardView: View {
     static let panelSize = CGSize(width: 360, height: 648)
     /// 弹窗宽度(OG 紧凑弹窗形态)。
     private static let width: CGFloat = panelSize.width
-    /// 弹窗排行只列前 20 名(2026-11-01 用户拍板 B;DESIGN.md `layout.popover-ranking-limit`):
-    /// 弹窗是"扫一眼谁最忙",上百行的快速滚动是剩下的大头开销;其余由「查看全部」进主窗口。
-    private static let rankingLimit = 20
+    // 排行截断:上限与末行行为在 RankingOverflow(ranking-limit/01,与主窗口同规则,
+    // DESIGN.md `{layout.ranking-limit}`);弹窗末行「查看全部」跳主窗口并落地即展开。
 
     /// 两窗共用呈现模型(评审 F4):卡模型 / 会话状态 / 处置请求同出处。
     @State private var model: DashboardModel
@@ -102,7 +101,8 @@ struct DashboardView: View {
                     monitor: monitor,
                     model: model,
                     content: content,
-                    onSelectTab: { tabSelection.current = $0 }
+                    onSelectTab: { tabSelection.current = $0 },
+                    overflowPolicy: overflowPolicy
                 ) {
                     rankingCard
                 }
@@ -131,7 +131,8 @@ struct DashboardView: View {
             monitor: monitor,
             model: model,
             content: content,
-            onSelectTab: { tabSelection.current = $0 }
+            onSelectTab: { tabSelection.current = $0 },
+            overflowPolicy: overflowPolicy
         ) { EmptyView() }
         return stack.blocks.flatMap { block -> [NativeListRow] in
             switch block.kind {
@@ -162,7 +163,7 @@ struct DashboardView: View {
         var rows = [NativeListRow(kind: "\(id)-header", height: .measured(key: "\(id)-header-\(header.isEmpty)")) {
             AnyView(RankingListSlices.Header(content: header, isCompact: true))
         }]
-        for group in content.ranking.prefix(Self.rankingLimit) {
+        for group in content.ranking.prefix(RankingOverflow.limit) {
             let isExpanded = model.expandedGroupIDs.contains(group.id)
             let cell = RankingGroupCell(
                 group: group,
@@ -201,7 +202,7 @@ struct DashboardView: View {
         var rows = [NativeListRow(kind: "\(id)-header", height: .measured(key: "\(id)-header-\(header.isEmpty)")) {
             AnyView(RankingListSlices.Header(content: header, isCompact: true))
         }]
-        rows += spec.rows.prefix(Self.rankingLimit).map { row in
+        rows += spec.rows.prefix(RankingOverflow.limit).map { row in
             NativeListRow(kind: "\(id)-row", height: .uniform) {
                 AnyView(ModuleRankingRowView(row: row, accent: spec.accent, isCompact: true)
                     .rankingRowSlice(compact: true))
@@ -214,29 +215,42 @@ struct DashboardView: View {
         return rows
     }
 
-    /// 超出前 20 名时补一行「查看全部」:点了开主窗口并落到当前 tab。
-    private func showAllRows(id: String, total: Int) -> [NativeListRow] {
-        let hidden = total - Self.rankingLimit
-        guard hidden > 0 else { return [] }
+    /// 弹窗的排行溢出策略:「查看全部」跳主窗口并带上卡 id,主窗口落地即展开该卡
+    /// (卡 id 规则与主窗口同出 MetricTabBlockBuilder,两边才对得上)。
+    private var overflowPolicy: RankingOverflowPolicy {
         let tab = tabSelection.current
+        return .jumpToMainWindow { rankingID in Self.openMainWindow(tab: tab, rankingID: rankingID) }
+    }
+
+    /// 超出前 20 名时补一行「查看全部」(原生列表逐行拼装;整卡形态由 RankingListCard 自画)。
+    private func showAllRows(id: String, total: Int) -> [NativeListRow] {
+        guard let rowModel = RankingOverflow.rowModel(
+            total: total,
+            action: overflowPolicy.action(for: id, model: model)
+        )
+        else { return [] }
         return [NativeListRow(kind: "\(id)-show-all", height: .uniform) {
-            AnyView(RankingShowAllRow(hiddenCount: hidden, isCompact: true) {
-                Self.openMainWindow(tab: tab)
-            }
-            .rankingRowSlice(compact: true))
+            AnyView(RankingOverflowRow(model: rowModel, isCompact: true).rankingRowSlice(compact: true))
         }]
     }
 
     /// 开主窗口:LSUIElement 应用激活策略为 .accessory,开窗只建窗不抢前台,窗口会开在
     /// 其他应用后面(实机反馈"点了没反应")——先激活再开窗。开窗走广播由菜单栏控制器统一
-    /// 路由(收面板 + 经桥开主窗):NSPanel 宿主里环境 openWindow 是哑动作。带 tab 时
-    /// 主窗口已开则切到该 tab(冷开窗落默认页)。
-    private static func openMainWindow(tab: MetricTab? = nil) {
+    /// 路由(收面板 + 经桥开主窗):NSPanel 宿主里环境 openWindow 是哑动作。带 tab / 排行卡
+    /// 时主窗口已开则直接落地;冷开窗由控制器先记进路由、主窗口出现再消费(ranking-limit/01)。
+    private static func openMainWindow(tab: MetricTab? = nil, rankingID: String? = nil) {
         NSApplication.shared.activate(ignoringOtherApps: true)
+        var userInfo: [String: Any] = [:]
+        if let tab {
+            userInfo[AlertNotificationRouter.tabUserInfoKey] = tab.rawValue
+        }
+        if let rankingID {
+            userInfo[AlertNotificationRouter.rankingUserInfoKey] = rankingID
+        }
         NotificationCenter.default.post(
             name: AlertNotificationRouter.openMainWindowNotification,
             object: nil,
-            userInfo: tab.map { [AlertNotificationRouter.tabUserInfoKey: $0.rawValue] }
+            userInfo: userInfo.isEmpty ? nil : userInfo
         )
     }
 
@@ -266,12 +280,15 @@ struct DashboardView: View {
     /// "当前最忙"排行卡:全部组,榜单序随 tab;点行展开组内进程(只读最近一轮采样);
     private var rankingCard: some View {
         RankingCardView(
-            groups: Array(content.ranking.prefix(Self.rankingLimit)),
+            groups: content.ranking,
             metric: content.metric,
             cpuLeader: content.cpuLeader,
             memoryLeaderBytes: content.memoryLeaderBytes,
             expandedGroupIDs: model.expandedGroupIDs,
             density: .compact,
+            overflow: overflowPolicy.action(
+                for: MetricTabBlockBuilder.groupRankingID(for: tabSelection.current), model: model
+            ),
             onToggle: model.toggleExpansion(of:),
             onEndGroup: model.requestEndGroup
         ) { group in

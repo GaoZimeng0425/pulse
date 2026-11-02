@@ -25,24 +25,29 @@ struct RankingCardView<Expanded: View>: View {
     var density: Density = .regular
     /// 组列表为空时的卡内空态(首轮前 / 搜索无命中,由调用方给文案)。
     var emptyMessage = RankingEmptyMessage(title: "暂无活动组", detail: "首轮采样尚未完成,或系统极端空闲")
+    /// 截断(ranking-limit/01):只列前 `RankingOverflow.limit` 名,末行按宿主行为处理溢出;
+    /// nil = 不截(主窗口搜索命中、预览)。
+    var overflow: RankingOverflow.Action?
     let onToggle: (GroupIdentity) -> Void
     let onEndGroup: (ProcessGroup) -> Void
     @ViewBuilder let expandedContent: (ProcessGroup) -> Expanded
 
     var body: some View {
+        let shown = overflow.map { RankingOverflow.split(groups, isExpanded: $0.isExpanded).shown } ?? groups[...]
         RankingListCard(
             title: title,
             accent: GroupRankingStyle.accent(metric),
             valueLabel: GroupRankingStyle.valueLabel(metric),
             isCompact: density == .compact,
             isEmpty: groups.isEmpty,
-            emptyMessage: emptyMessage
+            emptyMessage: emptyMessage,
+            overflow: overflow.flatMap { RankingOverflow.rowModel(total: groups.count, action: $0) }
         ) {
             // 按名次认行(list-position-id):排行每秒重排,按组认行时 List 底层表格把名次
             // 变化当成删行 + 插行,逐行重建 / 测高 / 重算焦点链(真机总览页开着 10%、滚动
             // 44%;探针 120 行每秒重排 4.9–8.9% → 2.4%)。按名次认行只刷新行内容;展开
             // 态按组 id 存在模型里,不受影响。
-            ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
+            ForEach(Array(shown.enumerated()), id: \.offset) { _, group in
                 RankingGroupCell(
                     group: group,
                     metric: metric,

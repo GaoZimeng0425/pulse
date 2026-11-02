@@ -25,6 +25,8 @@ final class MenuBarController: NSObject {
     private let monitor: SystemMonitor
     private let badgeDisplay: MenuBarBadgeDisplayModel
     private let rootsStore: ProjectRootsStore
+    /// 开主窗口的落点簿(与主窗口共用一份):冷开窗时把广播里的 tab / 排行卡先记进去。
+    private let alertRouter: AlertNotificationRouter
     private let statusItem: NSStatusItem
     /// 面板懒创建:首开才建。常驻菜单栏 app 启动即零可见窗,提前把
     /// NSVisualEffectView + NSHostingView 塞进一个隐藏面板,等于让窗口服务
@@ -50,10 +52,16 @@ final class MenuBarController: NSObject {
     /// 与设置页同键共享(p1-history/09 槽位配置契约)。
     private static let badgeConfigKey = "settings.menuBarBadge"
 
-    init(monitor: SystemMonitor, badgeDisplay: MenuBarBadgeDisplayModel, rootsStore: ProjectRootsStore) {
+    init(
+        monitor: SystemMonitor,
+        badgeDisplay: MenuBarBadgeDisplayModel,
+        rootsStore: ProjectRootsStore,
+        alertRouter: AlertNotificationRouter
+    ) {
         self.monitor = monitor
         self.badgeDisplay = badgeDisplay
         self.rootsStore = rootsStore
+        self.alertRouter = alertRouter
         badgeConfigRaw = UserDefaults.standard.string(forKey: Self.badgeConfigKey)
             ?? MenuBarBadgeConfiguration.default.rawValue
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -203,14 +211,24 @@ final class MenuBarController: NSObject {
 
     private func armNotificationObservers() {
         let center = NotificationCenter.default
-        // 告警通知点开 → 开主窗口(激活已由路由完成,这里只开窗)。
+        // 告警通知点开 / 弹窗「查看全部」「打开主窗口」→ 开主窗口(激活已由发起方完成,
+        // 这里只开窗)。冷开窗时主窗口视图还不存在、收不到这条广播,带 tab / 排行卡的落点
+        // 先记进路由(ranking-limit/01),主窗口出现再消费;窗口存活时它自己按广播落地,
+        // 这里不记——记了没人清,下次冷开窗会重放。
         center.addObserver(
             forName: AlertNotificationRouter.openMainWindowNotification,
             object: nil,
             queue: .main
-        ) { [weak self] _ in
+        ) { [weak self] note in
+            let tab = (note.userInfo?[AlertNotificationRouter.tabUserInfoKey] as? String)
+                .flatMap(MetricTab.init(rawValue:))
+            let rankingID = note.userInfo?[AlertNotificationRouter.rankingUserInfoKey] as? String
             Task { @MainActor in
-                self?.closePanel()
+                guard let self else { return }
+                if let tab, !self.monitor.mainWindowVisible {
+                    self.alertRouter.stash(tab: tab, rankingID: rankingID)
+                }
+                self.closePanel()
                 MainWindowBridge.open()
             }
         }

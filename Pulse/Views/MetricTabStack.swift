@@ -23,6 +23,9 @@ struct MetricTabStack<Ranking: View>: View {
     let content: MetricTabContent
     /// 总览卡点击跳转。
     let onSelectTab: (MetricTab) -> Void
+    /// 排行截断的溢出策略(ranking-limit/01):主窗口原地展开 / 弹窗跳主窗口;模块排行卡
+    /// 在本栈内按卡 id 派生动作,组排行卡由宿主在 `ranking` 里自配(同一策略、同一 id 规则)。
+    let overflowPolicy: RankingOverflowPolicy
     @ViewBuilder let ranking: () -> Ranking
 
     var body: some View {
@@ -30,7 +33,12 @@ struct MetricTabStack<Ranking: View>: View {
             switch block.kind {
             case let .card(view): view
             case .groupRanking: ranking()
-            case let .moduleRanking(spec): ModuleRankingCardView(spec: spec, isCompact: isCompact)
+            case let .moduleRanking(spec):
+                ModuleRankingCardView(
+                    spec: spec,
+                    isCompact: isCompact,
+                    overflow: overflowPolicy.action(for: block.id, model: model)
+                )
             }
         }
     }
@@ -248,7 +256,13 @@ struct MetricTabBlockBuilder {
     }
 
     mutating func groupRanking() {
-        blocks.append(MetricTabBlock(id: "\(tab)-group-ranking", kind: .groupRanking))
+        blocks.append(MetricTabBlock(id: Self.groupRankingID(for: tab), kind: .groupRanking))
+    }
+
+    /// 组排行卡的 id(tab 前缀 + 卡名):宿主给组排行卡配截断动作时与本栈同一 id 规则,
+    /// 弹窗「查看全部」带去主窗口的落点才对得上(ranking-limit/01)。
+    static func groupRankingID(for tab: MetricTab) -> String {
+        "\(tab)-group-ranking"
     }
 
     mutating func moduleRanking(_ name: String, _ spec: ModuleRankingSpec) {

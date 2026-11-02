@@ -83,8 +83,9 @@ struct MainWindowView: View {
         .onChange(of: tabSelection.current) { _, newTab in
             monitor.setMainWindowTab(newTab)
         }
-        // 点开告警通知 → 直达对应 tab(工单 P1-07):窗口存活时响应广播;
-        // 窗口刚被 openWindow 拉起时 onAppear 消费落下的 pendingTab。
+        // 点开告警通知 / 弹窗「查看全部」→ 直达对应 tab(工单 P1-07;排行卡落地即展开,
+        // ranking-limit/01):窗口存活时响应广播并清掉路由落点(发起方可能已记,留着会在
+        // 下次冷开窗重放);窗口刚被 openWindow 拉起时 onAppear 消费落点。
         .onReceive(NotificationCenter.default.publisher(
             for: AlertNotificationRouter.openMainWindowNotification
         )) { notification in
@@ -92,10 +93,17 @@ struct MainWindowView: View {
                let tab = MetricTab(rawValue: raw) {
                 tabSelection.current = tab
             }
+            if let rankingID = notification.userInfo?[AlertNotificationRouter.rankingUserInfoKey] as? String {
+                model.expandRanking(rankingID)
+            }
+            alertRouter?.clearPending()
         }
         .onAppear {
             if let tab = alertRouter?.consumePendingTab() {
                 tabSelection.current = tab
+            }
+            if let rankingID = alertRouter?.consumePendingRankingID() {
+                model.expandRanking(rankingID)
             }
             // 进场即报当前 tab:覆盖深链落点(onChange 只管后续切换;引导值由
             // MainWindowGate.onAppear 先写,此处同值 no-op)。
@@ -229,7 +237,8 @@ struct MainWindowView: View {
                 monitor: monitor,
                 model: model,
                 content: content,
-                onSelectTab: { tabSelection.current = $0 }
+                onSelectTab: { tabSelection.current = $0 },
+                overflowPolicy: .expandInPlace
             ) {
                 rankingCard
             }
@@ -239,8 +248,11 @@ struct MainWindowView: View {
     /// 排行卡:全部组;搜索生效时换成过滤后的组(无命中 → 卡内专用空态,与首轮
     /// 空载区分开);点行展开主窗口版进程表(表头可排序)。
     /// meter 归一榜首仍取全榜单(content 口径),过滤不改变条的相对读数。
+    /// 截断(ranking-limit/01,与弹窗同规则):只列前 20,末行「显示全部」原地展开;
+    /// 搜索命中不截——过滤本身已经收窄。
     private var rankingCard: some View {
         let filter = searchFilter
+        let rankingID = MetricTabBlockBuilder.groupRankingID(for: tabSelection.current)
         return RankingCardView(
             groups: filter.isActive ? displayGroups : content.ranking,
             metric: content.metric,
@@ -253,6 +265,7 @@ struct MainWindowView: View {
                     detail: "试试应用名的片段,或输入纯数字按 PID 前缀搜"
                 )
                 : RankingEmptyMessage(title: "暂无活动组", detail: "首轮采样尚未完成,或系统极端空闲"),
+            overflow: filter.isActive ? nil : RankingOverflowPolicy.expandInPlace.action(for: rankingID, model: model),
             onToggle: model.toggleExpansion(of:),
             onEndGroup: model.requestEndGroup
         ) { group in
