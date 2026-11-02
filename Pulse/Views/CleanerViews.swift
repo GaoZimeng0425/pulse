@@ -23,6 +23,50 @@ enum CleanerSubTab: String, CaseIterable, Hashable {
     }
 }
 
+/// 清理页页头(popover-header/01):统一组件 `PageHeader` 全尺寸档——标题「清理」+ 扫描状态
+/// 副标题 + 右侧扫描 / 取消按钮。由主窗口在页头槽位画(`MainWindowView.pageHeader`),
+/// `CleanerTabView` 本体不再自画标题——此前主窗口页头与本页各画一次「清理」26pt,同页两个
+/// 大标题(用户 2026-11-02 实见)。
+struct CleanerPageHeader: View {
+    let model: CleanerModel
+
+    var body: some View {
+        PageHeader(title: MetricTab.cleaner.title, subtitle: subtitle, style: .full) {
+            Group {
+                if model.isScanning {
+                    Button("取消扫描") { model.cancelScan() }
+                } else {
+                    Button(model.result == nil ? "扫描整台 Mac" : "重新扫描") { model.startScan() }
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Metric.disk.accentColor)
+        }
+    }
+
+    private var subtitle: String {
+        switch model.phase {
+        case .idle:
+            return "按需扫描,不常驻 · 结果缓存到下次扫描"
+        case let .scanning(stats):
+            return "正在扫描 · \(stats.entriesSeen) 项 · \(PulseFormat.memory(UInt64(max(0, stats.accountedBytes))))"
+        case let .finished(result):
+            // 清理后树不重扫(树只是快照),摘要数字会偏大——如实提示,不悄悄改数。
+            let cleaned = model.recycledPaths.isEmpty ? "" : " · 本次已清理 \(model.recycledPaths.count) 项,重新扫描刷新数字"
+            return "上次扫描 \(result.cancelled ? "已取消(部分)" : "完成") · \(model.scanDurationText) · 实际占用口径" + cleaned
+        }
+    }
+}
+
+extension CleanerModel {
+    /// 上次扫描耗时人话(页头副标题与「扫描完成」卡共用)。
+    var scanDurationText: String {
+        guard let started = scanStartedAt, let finished = scanFinishedAt else { return "—" }
+        let seconds = finished.timeIntervalSince(started)
+        return seconds < 60 ? String(format: "%.0f 秒", seconds) : String(format: "%.1f 分钟", seconds / 60)
+    }
+}
+
 struct CleanerTabView: View {
     let model: CleanerModel
     @State private var subTab: CleanerSubTab = .junk
@@ -36,7 +80,6 @@ struct CleanerTabView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            header
             if let hint = model.permissionHint {
                 fdaBanner(hint)
             }
@@ -47,47 +90,6 @@ struct CleanerTabView: View {
             case .history: CleanHistorySection(model: model)
             }
         }
-    }
-
-    // MARK: 页头
-
-    private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("清理")
-                    .font(.system(size: 26, weight: .bold))
-                Text(headerSubtitle)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            if model.isScanning {
-                Button("取消扫描") { model.cancelScan() }
-            } else {
-                Button(model.result == nil ? "扫描整台 Mac" : "重新扫描") { model.startScan() }
-            }
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(accent)
-    }
-
-    private var headerSubtitle: String {
-        switch model.phase {
-        case .idle:
-            return "按需扫描,不常驻 · 结果缓存到下次扫描"
-        case let .scanning(stats):
-            return "正在扫描 · \(stats.entriesSeen) 项 · \(PulseFormat.memory(UInt64(max(0, stats.accountedBytes))))"
-        case let .finished(result):
-            // 清理后树不重扫(树只是快照),摘要数字会偏大——如实提示,不悄悄改数。
-            let cleaned = model.recycledPaths.isEmpty ? "" : " · 本次已清理 \(model.recycledPaths.count) 项,重新扫描刷新数字"
-            return "上次扫描 \(result.cancelled ? "已取消(部分)" : "完成") · \(scanDurationText) · 实际占用口径" + cleaned
-        }
-    }
-
-    private var scanDurationText: String {
-        guard let started = model.scanStartedAt, let finished = model.scanFinishedAt else { return "—" }
-        let seconds = finished.timeIntervalSince(started)
-        return seconds < 60 ? String(format: "%.0f 秒", seconds) : String(format: "%.1f 分钟", seconds / 60)
     }
 
     // MARK: FDA 引导(spec:未授时受限如实标注 + 直达系统设置)
@@ -183,7 +185,7 @@ struct CleanerTabView: View {
     private func summaryCard(_ result: SpaceScanResult) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             CardHeader(symbolName: "sparkles", title: result.cancelled ? "扫描已取消(部分结果)" : "扫描完成", tint: accent) {
-                Text(scanDurationText)
+                Text(model.scanDurationText)
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
                     .monospacedDigit()

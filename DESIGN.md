@@ -62,6 +62,7 @@ components:
   metric-main-card: "指标 tab 主卡,见 §Components"
   pill-tab: "药丸 tab,见 §Components"
   menubar-badge: "菜单栏徽标,见 §Components"
+  page-header: "页头(主窗口 / 弹窗 / 清理页统一组件),见 §Components"
 ---
 
 # Pulse DESIGN.md
@@ -171,9 +172,10 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.sheet-width}` | 460pt | 确认清单 sheet 定宽(清理页「清理…」,p4-cleaner/04;原型 B 变体同值) |
 | `{layout.sheet-list-max-height}` | 220pt | 确认清单 sheet 内逐行列表的最大高(超出滚动,总量与按钮恒在视口内) |
 | `{layout.sunburst-diameter}` | 340pt | 空间地图两环旭日图定宽(卡内水平居中;几何/两环半径比在 PulseCore `SunburstLayout`,p4-cleaner/07) |
+| `{layout.popover-size}` | 360×648pt | 菜单栏弹窗面板**定尺寸**(`DashboardView.panelSize`;popover-header/01 用户拍板 A,2026-11-02):AppKit 面板直接按此开窗、不读内容 fittingSize;中间滚动区 `maxHeight: .infinity` 吃掉头尾之外的全部高度——tab 栏 / 页头钉顶、底排钉底,告警横幅出没只挤中间,切 tab 面板不动 |
 
-窗口:主窗口最小 **720×560**(spec 钉死),默认 880×620;弹窗定宽 **360pt**
-(`DashboardView.width`)。工具栏内容必须按 720 最小窗宽预算(见 §Do's and Don'ts)。
+窗口:主窗口最小 **720×560**(spec 钉死),默认 880×620;弹窗面板 **360×648 定尺寸**
+(`{layout.popover-size}`,内容撑满、不随内容伸缩)。工具栏内容必须按 720 最小窗宽预算(见 §Do's and Don'ts)。
 主窗口总览网格是**响应式**的(用户拍板 2026-10-24):列数随窗宽自适应 1–4
 (720 最小宽下 1 列、744 起两列、约 1104 三列、约 1456 四列;`AdaptiveCardGrid`)。
 
@@ -339,11 +341,20 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   (rpm−min)/(max−min) 钳 0…1,上下限不可用(max ≤ min)给空条;上下限标注
   「下限 N · 上限 M rpm」(`{typography.micro}` 10.5 tertiary):全部风扇相同时卡头注记写一次,
   不同时逐扇行下各写,两处不同时出现。派生卡最快风扇行多扇时数值前带扇名(「名 · 3200 rpm」)。
-- **弹窗 DashboardView**:定宽 360pt;底部操作"开窗靠左、设置+退出靠右"
+- **页头 PageHeader**(popover-header/01,用户拍板 2026-11-02「每个 tab 只有一个标题,且是
+  统一组件」,`Pulse/Views/PageHeader.swift`):主窗口页头 / 弹窗页头 / 清理页页头三处同一
+  出处,不再各自手写。结构 = 标题一行 + 可选副标题一行 + 右侧配件槽。两档:`.full` 主窗口 =
+  `{typography.page-title}` 26 bold + `{typography.body}` 12 secondary;`.compact` 弹窗 = 两行皆
+  `{typography.caption}` 11 secondary;行距 `{spacing.micro}` 2。**副标题「本机一行」(芯片 ·
+  核数 · 内存,`hostSummary`)只有总览带**,其余 tab 只有标题——判据在 `PageHeader.init(tab:)`
+  单点,两窗不许各写一份;清理页副标题 = 扫描状态、配件 = 扫描 / 取消按钮(`CleanerPageHeader`,
+  由主窗口页头槽位画,`CleanerTabView` 本体不画标题)。**每个 tab 恰一个标题**:tab 内容
+  (卡片 / 子页)不得再画与页名同级的大标题。
+- **弹窗 DashboardView**:面板 `{layout.popover-size}` 360×648 定尺寸;底部操作"开窗靠左、设置+退出靠右"
   (退出 = 纯图标,用户拍板)。顶部图标 tab 槽位**单行满宽均分**(P2 扩到
   11 枚后 32pt 定宽槽超出 332pt 内容区、右端裁切;均分只收窄不溢出,与主窗口
-  工具栏 720 预算同一哲学)。页头 = 页名 + 本机一行「芯片 · 核数 · 内存」
-  (`hostSummary`,与主窗口内容头同源;Vitals 页头同款)+ 右侧运行时长,全 tab 一致。
+  工具栏 720 预算同一哲学)。页头 = `PageHeader` 紧凑档(页名;本机一行只在总览)+ 右侧
+  运行时长。
 - **状态 chip**:胶囊、tint 14~16% 底 + 同色文字,两态语言(✓正常 / 高负载),
   阈值在 `StatusBadgeRules`(组 >100%、系统 <30% / >70%)。现役用法 = 指标卡大数字旁
   (系统负载);排行行不挂"高负载"文字 chip,组高负载 = 数值红字 + 最忙进程名 chip
