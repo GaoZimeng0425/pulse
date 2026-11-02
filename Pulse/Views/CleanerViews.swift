@@ -130,7 +130,7 @@ struct CleanerTabView: View {
         case .idle:
             CardEmptyState(
                 title: "还没扫描过",
-                detail: "点右上「扫描整台 Mac」——约半分钟,随时可取消",
+                detail: "点右上「扫描整台 Mac」——约 1 分钟,随时可取消",
                 actionTitle: "开始扫描",
                 action: { model.startScan() }
             )
@@ -172,8 +172,9 @@ struct CleanerTabView: View {
     /// 进度没有已知总量(全卷文件数因机器而异),条只做"有进展"的视觉信号:
     /// 用一个缓慢逼近 1 的伪进度(不伪造百分比数字——假数不上屏,防御性数据纪律)。
     private func scanProgressFraction(_ stats: ScanStats) -> Double {
-        // 探针 15 全量复测:本机全卷 ≈340 万项(03 票写的 65 万是采样外推错误,早顶 95% 帽)。
-        let guess = 3_400_000.0
+        // 真机 Data 卷(方案 A 扫描根)≈500 万项(2026-11-02 真引擎实测
+        // 433 万文件 + 60 万目录;旧 340 万全卷口径是探针 15 的 Data 外推错误)。
+        let guess = 5_000_000.0
         return min(0.95, Double(stats.entriesSeen) / guess)
     }
 

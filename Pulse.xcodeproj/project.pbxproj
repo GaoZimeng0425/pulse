@@ -114,6 +114,7 @@
 		A14EBD3EFB9899B060881BC3 /* RingCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4E07450A436F2AE681A8772 /* RingCardView.swift */; };
 		A5132CFE821C63B253C7D50B /* SmcSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4AD28E35F37C300CAEC8717 /* SmcSensor.swift */; };
 		A6DF542F79BD60BFE631FD62 /* MonitorAssembly.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16E122CDE8CB7A49B14C617E /* MonitorAssembly.swift */; };
+		A7EC8929C2925EBEC907E4DC /* LiveCleanVolumeSummaries.swift in Sources */ = {isa = PBXBuildFile; fileRef = 521CFD7E4C18FECCE0749E5E /* LiveCleanVolumeSummaries.swift */; };
 		A94FE8284BA99E78188EAEA4 /* SyntheticProcessSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F037E709135740FF3012BA47 /* SyntheticProcessSourceTests.swift */; };
 		AA528E9EE2DB20755AA5481C /* LaunchdManifestFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B76926FB48518EBB58CAA6F /* LaunchdManifestFeatureTests.swift */; };
 		AA6920C6B25E30AC0A50495C /* BatteryFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AF42F49FFB85D97F2B8C74D /* BatteryFixture.swift */; };
@@ -257,6 +258,7 @@
 		4A3A11CA7FAC45ECB8511C5B /* BluetoothSensorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothSensorTests.swift; sourceTree = "<group>"; };
 		4C9E00667C343ED4FBBFF8AE /* GeneralSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsView.swift; sourceTree = "<group>"; };
 		4FBA30D234A433E58E16508B /* PulseTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PulseTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		521CFD7E4C18FECCE0749E5E /* LiveCleanVolumeSummaries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCleanVolumeSummaries.swift; sourceTree = "<group>"; };
 		53973290E8EB9138A67B958C /* MetricCardModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricCardModel.swift; sourceTree = "<group>"; };
 		556E90C2DDB739846AA22485 /* AlertCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertCenter.swift; sourceTree = "<group>"; };
 		578B06925AAA893C922D03BC /* ContainerCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerCardViews.swift; sourceTree = "<group>"; };
@@ -517,6 +519,7 @@
 				CD87D6AF9EFA784A9E84C641 /* LiveCleanActivitySource.swift */,
 				7FFE17F679EFFD8CCA29B0DC /* LiveCleanDirectoryEnumerator.swift */,
 				402CDC78D088CCD268E214D9 /* LiveCleanTrashExecutor.swift */,
+				521CFD7E4C18FECCE0749E5E /* LiveCleanVolumeSummaries.swift */,
 				6B06E911B136D09E8F6E569D /* LiveCoreTickSource.swift */,
 				06A4CAD37F3D2BE0A494F9DA /* LiveProcessSource.swift */,
 				D6CB838FAB56E49D3DB8D34D /* MemoryStats.swift */,
@@ -865,6 +868,7 @@
 				2F016FF68304A538C3FEF849 /* LiveCleanActivitySource.swift in Sources */,
 				57D679777701897AD304570E /* LiveCleanDirectoryEnumerator.swift in Sources */,
 				7EECD9B072C93FEBF647E76A /* LiveCleanTrashExecutor.swift in Sources */,
+				A7EC8929C2925EBEC907E4DC /* LiveCleanVolumeSummaries.swift in Sources */,
 				F63D91DA540721BCDDDDA930 /* LiveCoreTickSource.swift in Sources */,
 				2CCCA9B897A9A569F82F95BB /* LiveProcessSource.swift in Sources */,
 				4A70488CB7607A767B604693 /* LogService.swift in Sources */,

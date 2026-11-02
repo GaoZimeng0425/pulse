@@ -61,6 +61,9 @@ final class CleanerModel {
     private let history: CleanHistoryStore?
     private let trash: any CleanTrashExecutor
     private let activity: (any CleanActivitySource)?
+    /// 只读系统卷的卷级字节(方案 A:SSV/Preboot/VM 等不逐文件走,statfs 一笔;
+    /// 生产 Live,测试注固定值;nil = 不注入,地图无密封块——不伪造)。
+    private let volumeSummaries: (@Sendable () -> [SpaceMapVolumeSummary])?
     private let homeDirectory: String
 
     /// 项目产物的排序(05,用户拍板:默认大小、可切新旧)。新旧 = 项目年龄升序
@@ -79,6 +82,7 @@ final class CleanerModel {
     ///   - trash: 废纸篓执行器(生产 Live;测试 spy——核心测试纪律:绝不真删)。
     ///   - activity: 进程活动源(在用保护输入;生产 = monitor 的采样快照投影,
     ///     测试 FakeCleanActivitySource;nil = 无活动源,在用保护按无活动处理)。
+    ///   - volumeSummaries: 只读系统卷卷级摘要源(生产 statfs;测试固定值)。
     ///   - homeDirectory: 规则表相对它展开;测试注入假家目录。
     init(
         exclusions: CleanExclusionsStore = CleanExclusionsStore(load: { [] }, persist: { _ in }),
@@ -86,6 +90,7 @@ final class CleanerModel {
         history: CleanHistoryStore? = nil,
         trash: any CleanTrashExecutor = LiveCleanTrashExecutor(),
         activity: (any CleanActivitySource)? = nil,
+        volumeSummaries: (@Sendable () -> [SpaceMapVolumeSummary])? = nil,
         homeDirectory: String = NSHomeDirectory()
     ) {
         self.exclusions = exclusions
@@ -93,11 +98,18 @@ final class CleanerModel {
         self.history = history
         self.trash = trash
         self.activity = activity
+        self.volumeSummaries = volumeSummaries
         self.homeDirectory = PathNormalization.normalize(homeDirectory)
     }
 
     /// 生产扫描并发:6 个 worker(元数据密集型遍历,留核给 UI;引擎侧再按活动核数封顶)。
     static let productionScanConcurrency = 6
+
+    /// 生产扫描根(方案 A,票 10):只对 Data 卷做文件级扫描(用户数据/缓存/项目
+    /// 全在这,路径天然规范);SSV/Preboot/VM 等只读卷以卷级字节进地图密封块,
+    /// 不再逐文件走——真机 Data 并行扫描 56s(vs 全卷 86s / 旧串行 234s)。
+    /// 测试仍可经 startScan(roots:) 注入任意根。
+    static let productionScanRoot = SpaceMapTree.dataVolumePath
 
     var isScanning: Bool {
         if case .scanning = phase {
@@ -132,8 +144,10 @@ final class CleanerModel {
     ///   (协议注入,p4-cleaner/02 的接缝约定)。
     func startScan(
         using enumerator: (any CleanDirectoryEnumerator)? = nil,
-        roots: [String] = ["/"]
+        roots: [String]? = nil
     ) {
+        // 生产默认 = Data 卷(方案 A);测试注入假枚举器时常配合显式 roots。
+        let scanRoots = roots ?? [Self.productionScanRoot]
         guard scanTask == nil else { return }
         scanStartedAt = Date()
         scanFinishedAt = nil
@@ -147,7 +161,7 @@ final class CleanerModel {
         let liveEnumerator = LiveCleanDirectoryEnumerator()
         let source = enumerator ?? liveEnumerator
         let options = SpaceScanOptions(
-            roots: roots,
+            roots: scanRoots,
             excludedPathPrefixes: exclusions.paths,
             retainFileNodes: false,
             // petal 式并行(性能票):真机全卷 1010 万项,单线程实测 6–10 分钟,
@@ -156,7 +170,7 @@ final class CleanerModel {
             maxConcurrency: Self.productionScanConcurrency
         )
 
-        scanTask = Task.detached(priority: .utility) { [engine, weak self] in
+        scanTask = Task.detached(priority: .utility) { [engine, volumeSummaries, weak self] in
             let result = await engine.scan(
                 options,
                 using: source,
@@ -170,9 +184,12 @@ final class CleanerModel {
                 },
                 isCancelled: { Task.isCancelled }
             )
-            // 显示树变换(firmlink 提升 + 密封折叠)整树一次,放在扫描任务里,
-            // 不占主线程;地图子页直接消费(03 缓存的第二读者)。
-            let mapTrees = SpaceMapTree.buildTrees(from: result.trees)
+            // 显示树变换(Data 根规范路径 + 卷级密封块注入)整树一次,放在扫描
+            // 任务里,不占主线程;地图子页直接消费(03 缓存的第二读者)。
+            let sealedVolumes = volumeSummaries?() ?? []
+            let mapTrees = result.trees.map {
+                SpaceMapTree.build(from: $0, sealedVolumes: sealedVolumes)
+            }
             await MainActor.run { self?.finish(result, mapTrees: mapTrees) }
         }
     }

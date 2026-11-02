@@ -102,9 +102,22 @@ public extension SpaceMapNode {
     }
 }
 
+/// 一个非数据系统卷的卷级口径摘要(方案 A:只读卷不再逐文件走,statfs 一个数)。
+public struct SpaceMapVolumeSummary: Sendable, Equatable {
+    public var label: String
+    /// (f_blocks − f_bfree) × f_bsize,卷级口径(与文件级 PRIVATESIZE 不同源,拼图如实并列)。
+    public var usedBytes: Int64
+
+    public init(label: String, usedBytes: Int64) {
+        self.label = label
+        self.usedBytes = usedBytes
+    }
+}
+
 /// 扫描树 → 显示树:Data firmlink 提升 + 密封折叠 + 零字节裁剪 + 大到小排序。
 public enum SpaceMapTree {
-    /// Data 卷挂载点(firmlink 目标;提升基准路径)。
+    /// Data 卷挂载点(firmlink 目标;提升基准路径;也是生产扫描根——方案 A 后
+    /// 扫描只走 Data 卷,系统/其他只读卷以 `SpaceMapVolumeSummary` 卷级注入)。
     public static let dataVolumePath = "/System/Volumes/Data"
     /// 密封系统卷上的顶层目录(只读;折叠为单块)。/System 走「提升 + 余量折叠」特例。
     public static let sealedPaths = ["/System", "/bin", "/sbin"]
@@ -116,9 +129,21 @@ public enum SpaceMapTree {
     public static func build(
         from root: SpaceNode,
         dataVolumePath: String = SpaceMapTree.dataVolumePath,
-        sealedPaths: [String] = SpaceMapTree.sealedPaths
+        sealedPaths: [String] = SpaceMapTree.sealedPaths,
+        sealedVolumes: [SpaceMapVolumeSummary] = []
     ) -> SpaceMapNode {
         let dataPrefix = normalizedPrefix(dataVolumePath)
+        // 方案 A 主路:树根本身就是 Data 卷(roots=[dataVolumePath] 的扫描产物)——
+        // 子目录剥前缀即规范路径,不做提升;系统/其他只读卷按卷级字节注入为单块。
+        if PathNormalization.normalize(root.path) == dataPrefix {
+            return buildFromDataRoot(
+                root,
+                dataPrefix: dataPrefix,
+                sealedPaths: sealedPaths,
+                sealedVolumes: sealedVolumes
+            )
+        }
+
         let data = root.descendant(atPath: dataPrefix)
         var children: [SpaceMapNode] = []
 
@@ -158,6 +183,39 @@ public enum SpaceMapTree {
             isPartial: root.isPartial,
             children: sorted(children)
         )
+    }
+
+    /// 方案 A 主路:Data 根树 → 显示树。子目录剥 Data 前缀成规范路径;
+    /// 卷级密封摘要合并为单块;根 = 整卷(文件级 + 卷级两截口径之和)。
+    private static func buildFromDataRoot(
+        _ root: SpaceNode,
+        dataPrefix: String,
+        sealedPaths: [String],
+        sealedVolumes: [SpaceMapVolumeSummary]
+    ) -> SpaceMapNode {
+        var children: [SpaceMapNode] = []
+        for child in root.children where child.kind == .directory {
+            if let mapped = mapChild(child, dataPrefix: dataPrefix, sealedPaths: sealedPaths) {
+                children.append(mapped)
+            }
+        }
+        if let sealed = sealedVolumeNode(sealedVolumes) {
+            children.append(sealed)
+        }
+        return SpaceMapNode(
+            name: "整卷",
+            path: "/",
+            bytes: root.accountedBytes + sealedVolumes.reduce(Int64(0)) { $0 + $1.usedBytes },
+            isPartial: root.isPartial,
+            children: sorted(children)
+        )
+    }
+
+    /// 卷级密封块:所有非数据系统卷(SSV / Preboot / VM / Update / Recovery…)一笔。
+    private static func sealedVolumeNode(_ volumes: [SpaceMapVolumeSummary]) -> SpaceMapNode? {
+        let sum = volumes.reduce(Int64(0)) { $0 + $1.usedBytes }
+        guard sum > 0 else { return nil }
+        return SpaceMapNode(name: "系统(密封)", path: "/System", bytes: sum, isSealed: true)
     }
 
     /// 单节点变换:零字节非部分裁剪、密封折叠、递归、逐层排序。

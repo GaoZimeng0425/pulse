@@ -51,7 +51,8 @@ struct MainWindowView: View {
             exclusions: cleanExclusions,
             scanRoots: cleanScanRoots,
             history: monitor.history.cleanHistory,
-            activity: LiveCleanActivitySource(board: monitor.activityBoard)
+            activity: LiveCleanActivitySource(board: monitor.activityBoard),
+            volumeSummaries: { LiveCleanVolumeSummaries().internalSystemVolumes() }
         ))
         // 展示轴随电池可用性(工单 02):无内建电池的机器不含电池页。
         // 窗口新建/重建时先取路由落点(点通知时窗口可能还没开)。
