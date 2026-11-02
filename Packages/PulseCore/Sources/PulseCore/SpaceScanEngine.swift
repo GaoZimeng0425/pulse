@@ -23,17 +23,24 @@ public struct SpaceScanOptions: Sendable, Equatable {
     /// 开发者垃圾(规则只认目录)与空间地图(目录粒度)都不需要文件节点;默认 true
     /// 保持 02 票的树形状不变,按需关。
     public var retainFileNodes: Bool
+    /// 并行 worker 数(p4-cleaner 性能票):1 = 串行,**与历史行为逐位一致**
+    /// (双访先到先得、进度节奏、树形状都不因默认值漂移——引擎单测的确定性锚);
+    /// >1 = petal 式子目录并行(长驻 worker 池吃共享目录栈,不为每目录起 Task)。
+    /// 生产由调用方按核数开(CleanerModel 传 6);上限取活动核数,防过订阅。
+    public var maxConcurrency: Int
 
     public init(
         roots: [String],
         excludedPathPrefixes: [String] = [],
         maxDepth: Int = 256,
-        retainFileNodes: Bool = true
+        retainFileNodes: Bool = true,
+        maxConcurrency: Int = 1
     ) {
         self.roots = roots
         self.excludedPathPrefixes = excludedPathPrefixes
         self.maxDepth = maxDepth
         self.retainFileNodes = retainFileNodes
+        self.maxConcurrency = maxConcurrency
     }
 }
 
@@ -169,7 +176,7 @@ public struct SpaceScanEngine: Sendable {
     public init() {}
 
     /// - Parameters:
-    ///   - progress: 每 2048 项(及收尾)回调一次累计统计;03 票接进度条。
+    ///   - progress: 每 ~2048 项(按目录粒度跨越;及收尾)回调一次累计统计;03 票接进度条。
     ///   - isCancelled: 每进入一个目录检查一次;true 即停,产出标记 cancelled。
     public func scan(
         _ options: SpaceScanOptions,
@@ -177,37 +184,36 @@ public struct SpaceScanEngine: Sendable {
         progress: (@Sendable (ScanStats) -> Void)? = nil,
         isCancelled: (@Sendable () -> Bool)? = nil
     ) async -> SpaceScanResult {
-        let walker = Walker(options: options, enumerator: enumerator, progress: progress, isCancelled: isCancelled)
-        var trees: [SpaceNode] = []
-        var cancelled = false
+        let core = ScanCore(options: options, enumerator: enumerator, progress: progress, isCancelled: isCancelled)
+
         // 根重叠(一根是另一根的子孙):先到的赢,后到的整棵跳过——同一子树绝不重复入树。
+        // 排除根:静默跳过——排除是用户意图,不进错误台账(GLOSSARY「排除目录」)。
         var claimedRoots: [String] = []
+        var seeded: [(path: String, name: String)] = []
         for root in options.roots {
             let normalized = Self.norm(root)
             if claimedRoots.contains(where: { normalized.hasPrefix($0) }) {
-                walker.noteSkippedRoot()
+                core.noteSkippedRoot()
                 continue
             }
             claimedRoots.append(normalized)
-            // 排除根:静默跳过——排除是用户意图,不进错误台账(GLOSSARY「排除目录」)。
-            if walker.isExcluded(normalized) {
+            if core.isExcluded(normalized) {
                 continue
             }
-            let node = await walker.scanDirectory(path: normalized, name: Self.lastName(of: normalized), depth: 0)
-            // 取消也保留已产出(部分)树——取消点之后不再枚举,已扫部分照常可用。
-            trees.append(node)
-            if walker.cancelled {
-                cancelled = true
-                break
+            seeded.append((path: normalized, name: Self.lastName(of: normalized)))
+        }
+        core.enqueueRoots(seeded.map { ScanCore.PendingDir(path: $0.path, depth: 0) })
+
+        // worker 池:maxConcurrency=1 走与历史递归 DFS 逐位一致的路径(LIFO 栈 +
+        // 子目录逆序入栈 = 入口序处理);>1 时多 worker 共享目录栈并行。
+        let workerCount = max(1, min(options.maxConcurrency, ProcessInfo.processInfo.activeProcessorCount))
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0 ..< workerCount {
+                group.addTask { await core.run() }
             }
         }
-        walker.finish()
-        return SpaceScanResult(
-            trees: trees,
-            ledger: walker.ledger,
-            stats: walker.stats,
-            cancelled: cancelled || walker.cancelled
-        )
+        core.finish()
+        return core.result(rootMetas: seeded)
     }
 
     static func norm(_ p: String) -> String {
@@ -223,26 +229,65 @@ public struct SpaceScanEngine: Sendable {
     }
 }
 
-// MARK: - 单趟遍历内核(单 Task 内串行使用,非 Sendable 不跨并发域)
+// MARK: - 遍历内核(p4-cleaner 性能票:worker 池 + 共享目录栈)
+
+//
+// maxConcurrency = 1 时与旧递归 DFS 逐位等价:LIFO 栈、子目录按入口序逆序入栈
+// (弹出序 = 入口序)、先到先得的 (dev, fileID) 占坑、进度每 ~2048 项一发——
+// 引擎既有单测的确定性锚全在默认路径上,零改动。
+// > 1 时(petal 式并行):N 个长驻 worker 吃共享栈,不为 135 万个目录各起 Task;
+// 每目录**先占坑再枚举**(firmlink/双挂载去重语义不变,谁先占由调度定);
+// 文件硬链接去重集合按 fileID 哈希分 32 片(全卷千万级插入,单锁必排队);
+// 统计/台账按目录批合并;树不在线拼——每目录记账(直属文件聚合 + 子目录序),
+// 收工后自底向上拼装,并行/串行产出同形树。取消时缺口的祖先标 partial
+// (与旧实现「取消点之后的子树消失、链上标 partial」同义)。
+//
+// 等待语义:栈空但还有 in-flight 目录时 worker 让出并小睡(200µs),不用
+// 条件变量长阻塞——阻塞 Swift 协作线程池有饿死风险(枚举本身也在池上跑)。
 
 private struct IdentityKey: Hashable {
     var device: UInt32
     var fileID: UInt64
 }
 
-private final class Walker {
+/// 并行遍历内核:全部共享状态由锁保护,@unchecked Sendable 的前提即「只经锁碰」。
+private final class ScanCore: @unchecked Sendable {
+    struct PendingDir {
+        let path: String
+        let depth: Int
+    }
+
+    /// 一份记录,等价于旧实现完成一个目录后的现场。
+    private struct Record {
+        var node: SpaceNode // 直属文件已聚合;children 空,拼装时补
+        var childDirPaths: [String] // 子目录路径,按入口序(拼装顺序 = 旧 absorb 顺序)
+    }
+
     let options: SpaceScanOptions
     let enumerator: any CleanDirectoryEnumerator
     let progress: (@Sendable (ScanStats) -> Void)?
     let isCancelled: (@Sendable () -> Bool)?
 
-    var stats = ScanStats()
-    var ledger: [CleanEnumerateError] = []
-    var cancelled = false
+    private let stateLock = NSLock()
+    private var stack: [PendingDir] = []
+    private var inFlight = 0
+    private var records: [String: Record] = [:]
+    private var stats = ScanStats()
+    private var ledger: [CleanEnumerateError] = []
+    private var cancelled = false
+    private var lastProgressAt = 0
 
+    private let dirLock = NSLock()
     private var visitedDirs = Set<IdentityKey>()
-    private var seenFiles = Set<IdentityKey>()
-    private var progressCounter = 0
+
+    /// 文件去重分片:32 把锁按 fileID 哈希落片,互不相干。
+    private final class FileShard {
+        let lock = NSLock()
+        var seen = Set<IdentityKey>()
+    }
+
+    private static let fileShardCount = 32
+    private let fileShards: [FileShard]
 
     init(
         options: SpaceScanOptions,
@@ -254,10 +299,15 @@ private final class Walker {
         self.enumerator = enumerator
         self.progress = progress
         self.isCancelled = isCancelled
+        fileShards = (0 ..< Self.fileShardCount).map { _ in FileShard() }
     }
 
+    // MARK: 种子与辅助
+
     func noteSkippedRoot() {
+        stateLock.lock()
         stats.doubleVisitSkips += 1
+        stateLock.unlock()
     }
 
     func isExcluded(_ path: String) -> Bool {
@@ -265,83 +315,123 @@ private final class Walker {
         CleanExclusions.isExcluded(path, by: options.excludedPathPrefixes)
     }
 
-    func finish() {
-        progress?(stats)
+    func enqueueRoots(_ roots: [PendingDir]) {
+        stateLock.lock()
+        stack.append(contentsOf: roots)
+        stateLock.unlock()
     }
 
-    func scanDirectory(path: String, name: String, depth: Int) async -> SpaceNode {
-        var node = SpaceNode(name: name, path: path, kind: .directory)
+    // MARK: worker 主循环
 
-        if isCancelled?() == true {
-            cancelled = true
-            node.isPartial = true
-            return node
+    func run() async {
+        while true {
+            if let job = pop() {
+                await process(job)
+            } else if isSettled() {
+                return
+            } else {
+                // 栈空但仍有 in-flight(别的 worker 枚举完会补目录):让出 + 小睡。
+                await Task.yield()
+                try? await Task.sleep(nanoseconds: 200_000)
+            }
         }
-        if depth >= options.maxDepth {
-            ledger.append(CleanEnumerateError(path: path, reason: .tooDeep))
-            node.isPartial = true
-            return node
+    }
+
+    private func pop() -> PendingDir? {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard let job = stack.popLast() else { return nil }
+        inFlight += 1
+        return job
+    }
+
+    /// 全部工作了结 = 无在途、栈空。(取消时 worker 会清空在途并快速归零。)
+    private func isSettled() -> Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return inFlight == 0 && stack.isEmpty
+    }
+
+    private func settleOne() {
+        stateLock.lock()
+        inFlight -= 1
+        stateLock.unlock()
+    }
+
+    // MARK: 单目录处理(语义与旧 scanDirectory 对齐)
+
+    private func process(_ job: PendingDir) async {
+        // 取消:不再产出该目录——拼装时其祖先会因缺口标 partial。
+        if isCancelled?() == true {
+            markCancelledAndDrain()
+            settleOne()
+            return
+        }
+        // 深度护栏:入台账 + 记一个空 partial 占位(与旧实现返回的空节点等价)。
+        if job.depth >= options.maxDepth {
+            recordPlaceholder(path: job.path, reason: .tooDeep)
+            settleOne()
+            return
         }
 
         let entries: [FsEntrySnapshot]
         do {
-            entries = try await enumerator.entries(ofDirectory: path)
+            entries = try await enumerator.entries(ofDirectory: job.path)
         } catch let error as CleanEnumerateError {
-            ledger.append(error)
-            node.isPartial = true
-            return node
+            recordPlaceholder(error: error)
+            settleOne()
+            return
         } catch {
             // 边界实现只该抛 CleanEnumerateError;兜底入册不吞(CODING_STANDARDS:不伪造数据)。
-            ledger.append(CleanEnumerateError(path: path, reason: .other(errno: 0)))
-            node.isPartial = true
-            return node
+            recordPlaceholder(path: job.path, reason: .other(errno: 0))
+            settleOne()
+            return
         }
 
+        var node = SpaceNode(
+            name: SpaceScanEngine.lastName(of: job.path),
+            path: job.path,
+            kind: .directory
+        )
+        var childDirs: [String] = []
+        var childJobs: [PendingDir] = []
+        var dirStats = ScanStats()
+
         for entry in entries {
-            stats.entriesSeen += 1
-            if progressCounter >= 2048 {
-                progressCounter = 0
-                progress?(stats)
-            } else {
-                progressCounter += 1
-            }
-            let childPath = path == "/" ? "/" + entry.name : path + "/" + entry.name
+            dirStats.entriesSeen += 1
+            let childPath = job.path == "/" ? "/" + entry.name : job.path + "/" + entry.name
 
             switch entry.kind {
             case .directory:
+                // 探针 11 ⑤:firmlink 双路径同 (dev, fileID)——先到先得,同一子树只走一次。
+                // (fileID 0 = 边界没给身份,不占坑不判重,与旧实现一致)
                 let key = IdentityKey(device: entry.deviceID, fileID: entry.fileID)
-                // 探针 11 ⑤:firmlink 双路径同 (dev, fileID)——访问集防双计,先到先得。
-                guard entry.fileID != 0, !visitedDirs.contains(key) else {
-                    stats.doubleVisitSkips += 1
+                let alreadyVisited = entry.fileID != 0 && claimDirectory(key)
+                guard !alreadyVisited else {
+                    dirStats.doubleVisitSkips += 1
                     continue
                 }
-                visitedDirs.insert(key)
 
                 if isExcluded(childPath) {
-                    // 排除目录(GLOSSARY):不下潜、不计数——扫描与删除两处都收窄(04 票复用同判定)。
+                    // 排除目录(GLOSSARY):不下潜、不计数——扫描与删除两处都收窄。
                     continue
                 }
-                stats.directories += 1
-                let child = await scanDirectory(path: childPath, name: entry.name, depth: depth + 1)
-                if cancelled {
-                    node.isPartial = true
-                    return node
-                }
-                absorb(child, into: &node)
+                dirStats.directories += 1
+                childDirs.append(childPath)
+                childJobs.append(PendingDir(path: childPath, depth: job.depth + 1))
 
             case .file:
-                let key = IdentityKey(device: entry.deviceID, fileID: entry.fileID)
-                // 硬链接同 (dev, fileID) 只计首个(dust §2.3 的内联等价;先到先得,枚举序决定)。
+                // 硬链接同 (dev, fileID) 只计首个(dust §2.3;先到先得,并行下由分片锁定序)。
                 if entry.fileID != 0 {
-                    guard !seenFiles.contains(key) else {
-                        stats.hardlinkSkips += 1
+                    let key = IdentityKey(device: entry.deviceID, fileID: entry.fileID)
+                    guard !claimFile(key) else {
+                        dirStats.hardlinkSkips += 1
                         continue
                     }
-                    seenFiles.insert(key)
                 }
-                stats.files += 1
+                dirStats.files += 1
                 if entry.isDataless {
-                    stats.datalessFiles += 1
+                    dirStats.datalessFiles += 1
                 }
                 node.fileCount += 1
                 if entry.isDataless {
@@ -349,7 +439,7 @@ private final class Walker {
                 }
                 let bytes = entry.reclaimableSize ?? entry.allocatedSize
                 node.accountedBytes += bytes
-                stats.accountedBytes += bytes
+                dirStats.accountedBytes += bytes
                 if let reclaimable = entry.reclaimableSize {
                     node.reclaimableBytes += reclaimable
                 } else {
@@ -360,8 +450,7 @@ private final class Walker {
                 if let modified = entry.modifiedEpoch {
                     node.newestChangeEpoch = max(node.newestChangeEpoch ?? modified, modified)
                 }
-                // 文件节点可选不进树(内存量级,见 SpaceScanOptions.retainFileNodes);
-                // 上面的计数与字节已聚合进父目录,树的数字不因此改变。
+                // 文件节点可选不进树(内存量级,见 SpaceScanOptions.retainFileNodes)。
                 if options.retainFileNodes {
                     node.children.append(SpaceNode(
                         name: entry.name,
@@ -379,26 +468,173 @@ private final class Walker {
 
             case .symlink:
                 // 不跟随(spec:dust 默认同款);链接本体字节可忽略,单独计数上屏。
-                stats.symlinks += 1
+                dirStats.symlinks += 1
                 node.symlinkCount += 1
 
             case .other:
                 break
             }
         }
-        return node
+
+        commit(path: job.path, node: node, childDirs: childDirs, childJobs: childJobs, dirStats: dirStats)
     }
 
-    private func absorb(_ child: SpaceNode, into node: inout SpaceNode) {
-        node.children.append(child)
-        node.accountedBytes += child.accountedBytes
-        node.reclaimableBytes += child.reclaimableBytes
-        node.fallbackBytes += child.fallbackBytes
-        node.fileCount += child.fileCount
-        node.directoryCount += child.directoryCount + 1
-        node.symlinkCount += child.symlinkCount
-        node.datalessCount += child.datalessCount
-        node.isPartial = node.isPartial || child.isPartial
-        node.allReclaimableAccounting = node.allReclaimableAccounting && child.allReclaimableAccounting
+    // MARK: 同步锁帮手(async 上下文禁直接 NSLock.lock,Swift 6;锁内无 await)
+
+    /// 目录占坑:已在册返回 true(双访跳过),否则登记。
+    private func claimDirectory(_ key: IdentityKey) -> Bool {
+        dirLock.lock()
+        defer { dirLock.unlock() }
+        if visitedDirs.contains(key) {
+            return true
+        }
+        visitedDirs.insert(key)
+        return false
+    }
+
+    /// 文件占坑:同 (dev, fileID) 已见过返回 true(硬链接跳过),否则登记。
+    private func claimFile(_ key: IdentityKey) -> Bool {
+        let shard = fileShards[Int(key.fileID % UInt64(Self.fileShardCount))]
+        shard.lock.lock()
+        defer { shard.lock.unlock() }
+        if shard.seen.contains(key) {
+            return true
+        }
+        shard.seen.insert(key)
+        return false
+    }
+
+    private func markCancelledAndDrain() {
+        stateLock.lock()
+        cancelled = true
+        stack.removeAll()
+        stateLock.unlock()
+    }
+
+    /// 空节点占位(超深 / 枚举失败):入台账 + 记一个与旧实现等价的空 partial 记录。
+    private func recordPlaceholder(path: String, reason: CleanEnumerateFailure) {
+        stateLock.lock()
+        ledger.append(CleanEnumerateError(path: path, reason: reason))
+        records[path] = Record(
+            node: SpaceNode(
+                name: SpaceScanEngine.lastName(of: path),
+                path: path,
+                kind: .directory,
+                isPartial: true
+            ),
+            childDirPaths: []
+        )
+        stateLock.unlock()
+    }
+
+    private func recordPlaceholder(error: CleanEnumerateError) {
+        stateLock.lock()
+        ledger.append(error)
+        records[error.path] = Record(
+            node: SpaceNode(
+                name: SpaceScanEngine.lastName(of: error.path),
+                path: error.path,
+                kind: .directory,
+                isPartial: true
+            ),
+            childDirPaths: []
+        )
+        stateLock.unlock()
+    }
+
+    /// 单目录收工:记账 + 统计合并(含进度) + 子目录入栈 + 在途减一,一把锁内完成。
+    private func commit(
+        path: String,
+        node: SpaceNode,
+        childDirs: [String],
+        childJobs: [PendingDir],
+        dirStats: ScanStats
+    ) {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        records[path] = Record(node: node, childDirPaths: childDirs)
+        mergeStats(dirStats)
+        // 子目录逆序入栈:单 worker 时弹出序 = 入口序(与旧递归 DFS 逐位一致)。
+        stack.append(contentsOf: childJobs.reversed())
+        inFlight -= 1
+    }
+
+    /// 必须持 stateLock 调用:统计合并 + 进度按目录粒度跨越 ~2048 项一发。
+    private func mergeStats(_ delta: ScanStats) {
+        stats.entriesSeen += delta.entriesSeen
+        stats.files += delta.files
+        stats.directories += delta.directories
+        stats.symlinks += delta.symlinks
+        stats.datalessFiles += delta.datalessFiles
+        stats.hardlinkSkips += delta.hardlinkSkips
+        stats.doubleVisitSkips += delta.doubleVisitSkips
+        stats.accountedBytes += delta.accountedBytes
+        if let cb = progress, stats.entriesSeen - lastProgressAt >= 2048 {
+            lastProgressAt = stats.entriesSeen
+            let snapshot = stats
+            stateLock.unlock()
+            cb(snapshot)
+            stateLock.lock()
+        }
+    }
+
+    // MARK: 收工:拼树 + 汇总
+
+    func finish() {
+        stateLock.lock()
+        let snapshot = stats
+        stateLock.unlock()
+        progress?(snapshot)
+    }
+
+    func result(rootMetas: [(path: String, name: String)]) -> SpaceScanResult {
+        stateLock.lock()
+        let records = records
+        let ledger = ledger
+        let stats = stats
+        let cancelled = cancelled
+        stateLock.unlock()
+
+        func absorb(_ child: SpaceNode, into node: inout SpaceNode) {
+            node.children.append(child)
+            node.accountedBytes += child.accountedBytes
+            node.reclaimableBytes += child.reclaimableBytes
+            node.fallbackBytes += child.fallbackBytes
+            node.fileCount += child.fileCount
+            node.directoryCount += child.directoryCount + 1
+            node.symlinkCount += child.symlinkCount
+            node.datalessCount += child.datalessCount
+            node.isPartial = node.isPartial || child.isPartial
+            node.allReclaimableAccounting = node.allReclaimableAccounting && child.allReclaimableAccounting
+        }
+
+        // 自底向上拼装;记录缺口(取消点之后的目录)→ 祖先标 partial。
+        func build(_ path: String) -> SpaceNode? {
+            guard let record = records[path] else { return nil }
+            var node = record.node
+            var missingChild = false
+            for childPath in record.childDirPaths {
+                if let child = build(childPath) {
+                    absorb(child, into: &node)
+                } else {
+                    missingChild = true
+                }
+            }
+            if missingChild {
+                node.isPartial = true
+            }
+            return node
+        }
+
+        var trees: [SpaceNode] = []
+        for root in rootMetas {
+            if let tree = build(root.path) {
+                trees.append(tree)
+            } else if cancelled {
+                // 与旧实现一致:取消也保留(空 partial)根节点,已扫部分照常可用。
+                trees.append(SpaceNode(name: root.name, path: root.path, kind: .directory, isPartial: true))
+            }
+        }
+        return SpaceScanResult(trees: trees, ledger: ledger, stats: stats, cancelled: cancelled)
     }
 }

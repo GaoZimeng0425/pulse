@@ -96,6 +96,9 @@ final class CleanerModel {
         self.homeDirectory = PathNormalization.normalize(homeDirectory)
     }
 
+    /// 生产扫描并发:6 个 worker(元数据密集型遍历,留核给 UI;引擎侧再按活动核数封顶)。
+    static let productionScanConcurrency = 6
+
     var isScanning: Bool {
         if case .scanning = phase {
             return true
@@ -146,7 +149,11 @@ final class CleanerModel {
         let options = SpaceScanOptions(
             roots: roots,
             excludedPathPrefixes: exclusions.paths,
-            retainFileNodes: false
+            retainFileNodes: false,
+            // petal 式并行(性能票):真机全卷 1010 万项,单线程实测 6–10 分钟,
+            // 6 个长驻 worker 吃共享目录栈。测试注入假枚举器时保持默认串行——
+            // 假实现的请求序断言依赖确定性。
+            maxConcurrency: Self.productionScanConcurrency
         )
 
         scanTask = Task.detached(priority: .utility) { [engine, weak self] in

@@ -316,6 +316,105 @@ final class SpaceScanEngineTests: XCTestCase {
         XCTAssertNil(result2.trees[0].newestChangeEpoch)
     }
 
+    // MARK: 并行内核(性能票:串行↔并行等价、去重语义、取消)
+
+    /// 扁平化树成「路径 → 账目」便于与串行产物逐位对比(子节点顺序由入口序决定,
+    /// 并行下同样按入口序拼装,理论全等;对比聚合更稳)。
+    private struct FlatAccount: Equatable {
+        var bytes: Int64
+        var files: Int
+        var dirs: Int
+        var partial: Bool
+    }
+
+    private func flatten(_ node: SpaceNode, into map: inout [String: FlatAccount]) {
+        map[node.path] = FlatAccount(
+            bytes: node.accountedBytes,
+            files: node.fileCount,
+            dirs: node.directoryCount,
+            partial: node.isPartial
+        )
+        for child in node.children {
+            flatten(child, into: &map)
+        }
+    }
+
+    private func parallelFixture() -> FakeCleanDirectoryEnumerator {
+        // 三层、多分枝、含跨目录硬链接(同 dev+fileID)与 firmlink 双路径(同身份目录)。
+        FakeCleanDirectoryEnumerator(listings: [
+            "/r": .entries([
+                CleanFixture.file("root.bin", allocated: 512, reclaimable: 512),
+                CleanFixture.directory("a", fileID: 501),
+                CleanFixture.directory("b", fileID: 502),
+                CleanFixture.directory("dup", fileID: 501), // 与 a 同身份:双访跳过
+            ]),
+            "/r/a": .entries([
+                CleanFixture.file("shared.bin", allocated: 1024, reclaimable: 1024, device: 16_777_229, fileID: 9001),
+                CleanFixture.directory("deep", fileID: 511),
+            ]),
+            "/r/a/deep": .entries([
+                CleanFixture.file("d.bin", allocated: 256, reclaimable: 256),
+            ]),
+            "/r/b": .entries([
+                // 硬链接到 /r/a/shared.bin:同 (dev, fileID) 只计一次
+                CleanFixture.file("shared.bin", allocated: 1024, reclaimable: 1024, device: 16_777_229, fileID: 9001),
+                CleanFixture.file("b1.bin", allocated: 128, reclaimable: 128),
+            ]),
+        ])
+    }
+
+    func testParallelScanProducesIdenticalTreeAndStatsAsSerial() async {
+        let serial = await engine.scan(
+            SpaceScanOptions(roots: ["/r"], retainFileNodes: false),
+            using: parallelFixture()
+        )
+        let parallel = await engine.scan(
+            SpaceScanOptions(roots: ["/r"], retainFileNodes: false, maxConcurrency: 4),
+            using: parallelFixture()
+        )
+
+        var serialFlat: [String: FlatAccount] = [:]
+        var parallelFlat: [String: FlatAccount] = [:]
+        for tree in serial.trees {
+            flatten(tree, into: &serialFlat)
+        }
+        for tree in parallel.trees {
+            flatten(tree, into: &parallelFlat)
+        }
+        XCTAssertEqual(serialFlat.keys, parallelFlat.keys)
+        for (path, serialEntry) in serialFlat {
+            XCTAssertEqual(parallelFlat[path], serialEntry, "路径 \(path) 的账目并行/串行不一致")
+        }
+
+        // 汇总口径逐字段相等(去重计数也是确定性总量,与先后无关)。
+        XCTAssertEqual(parallel.stats.entriesSeen, serial.stats.entriesSeen)
+        XCTAssertEqual(parallel.stats.files, serial.stats.files)
+        XCTAssertEqual(parallel.stats.directories, serial.stats.directories)
+        XCTAssertEqual(parallel.stats.hardlinkSkips, serial.stats.hardlinkSkips)
+        XCTAssertEqual(parallel.stats.doubleVisitSkips, serial.stats.doubleVisitSkips)
+        XCTAssertEqual(parallel.stats.accountedBytes, serial.stats.accountedBytes)
+        XCTAssertFalse(parallel.cancelled)
+
+        // 语义锚:硬链接 1 次、双访 1 次、文件 4 个(root/shared/deep/b1)。
+        XCTAssertEqual(parallel.stats.files, 4)
+        XCTAssertEqual(parallel.stats.hardlinkSkips, 1)
+        XCTAssertEqual(parallel.stats.doubleVisitSkips, 1)
+        XCTAssertFalse(parallelFlat.keys.contains("/r/dup"), "同身份目录不重复入树")
+    }
+
+    func testParallelScanCancelKeepsPartialTree() async {
+        // 取消在首目录即触发:产出标记 cancelled、根保留为空 partial(与旧实现同义)。
+        let cancelledResult = await engine.scan(
+            SpaceScanOptions(roots: ["/r"], retainFileNodes: false, maxConcurrency: 4),
+            using: parallelFixture(),
+            isCancelled: { true }
+        )
+        XCTAssertTrue(cancelledResult.cancelled)
+        XCTAssertEqual(cancelledResult.trees.count, 1, "取消也保留(空 partial)根节点")
+        XCTAssertTrue(cancelledResult.trees[0].isPartial)
+        XCTAssertTrue(cancelledResult.trees[0].children.isEmpty, "取消点之后不再枚举")
+    }
+
     func testDescendantLocatesDirectoryByPath() async {
         let fs = FakeCleanDirectoryEnumerator(listings: [
             "/Users": .entries([CleanFixture.directory("t", fileID: 11)]),
