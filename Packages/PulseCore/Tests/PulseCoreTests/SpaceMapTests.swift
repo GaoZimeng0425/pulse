@@ -126,6 +126,37 @@ final class SpaceMapTests: XCTestCase {
         XCTAssertEqual(map.children.map(\.path), ["/Users", "/opt"])
     }
 
+    // MARK: 方案 A:Data 根树 + 卷级密封注入
+
+    func testBuildFromDataRootRemapsPathsAndInjectsSealedVolumes() {
+        // 扫描根本身 = Data 卷:子目录剥前缀即规范路径;只读系统卷以卷级字节进密封块。
+        let users = dir("Users", under: "/System/Volumes/Data", bytes: 200)
+        let dataRoot = dir("Data", under: "/System/Volumes", children: [users])
+        let map = SpaceMapTree.build(
+            from: dataRoot,
+            sealedVolumes: [
+                SpaceMapVolumeSummary(label: "SSV", usedBytes: 80),
+                SpaceMapVolumeSummary(label: "Preboot", usedBytes: 20),
+            ]
+        )
+        XCTAssertEqual(map.name, "整卷")
+        XCTAssertEqual(map.path, "/")
+        XCTAssertEqual(map.bytes, 300, "根账 = 文件级 200 + 卷级密封 100")
+        let sealed = map.children.first { $0.isSealed }
+        XCTAssertEqual(sealed?.name, "系统(密封)")
+        XCTAssertEqual(sealed?.bytes, 100, "卷级摘要合并为单块")
+        XCTAssertEqual(map.children.first { $0.name == "Users" }?.path, "/Users", "规范路径,无需提升")
+    }
+
+    func testBuildFromDataRootWithoutSummariesOmitsSealedBlock() {
+        let dataRoot = dir("Data", under: "/System/Volumes", children: [
+            dir("Users", under: "/System/Volumes/Data", bytes: 50),
+        ])
+        let map = SpaceMapTree.build(from: dataRoot, sealedVolumes: [])
+        XCTAssertFalse(map.children.contains { $0.isSealed }, "没有卷级数据就不出密封块,不伪造")
+        XCTAssertEqual(map.bytes, 50)
+    }
+
     // MARK: 导航
 
     func testDescendantAndBreadcrumbWalkCanonicalPaths() {

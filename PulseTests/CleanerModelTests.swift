@@ -418,6 +418,36 @@ final class CleanerModelTests: XCTestCase {
         XCTAssertEqual(calls.map { Set($0) }, [Set([newPath])], "在用项绝不到执行器")
     }
 
+    // MARK: 方案 A(票 10):默认根 = Data 卷 + 卷级密封注入
+
+    func testDefaultScanRootIsDataVolumeWithSealedVolumeInjection() async {
+        let fake = FakeCleanDirectoryEnumerator(listings: [
+            "/System/Volumes/Data": .entries([
+                CleanFixture.directory("Users", fileID: 210),
+            ]),
+            "/System/Volumes/Data/Users": .entries([
+                CleanFixture.file("me.bin", allocated: 200, reclaimable: 200),
+            ]),
+        ])
+        let model = CleanerModel(
+            volumeSummaries: {
+                [SpaceMapVolumeSummary(label: "SSV", usedBytes: 80)]
+            },
+            homeDirectory: "/Users/me"
+        )
+        model.startScan(using: fake) // 不传 roots:生产默认 = Data 卷
+        await waitUntil { !model.isScanning }
+
+        guard let map = model.mapTrees.first else {
+            XCTFail("应有显示树")
+            return
+        }
+        XCTAssertEqual(map.path, "/")
+        XCTAssertEqual(map.bytes, 280, "文件级 200 + 卷级密封 80")
+        XCTAssertEqual(map.children.first { $0.name == "Users" }?.path, "/Users")
+        XCTAssertEqual(map.children.first { $0.isSealed }?.bytes, 80)
+    }
+
     private func waitUntil(_ condition: @MainActor () -> Bool) async {
         for _ in 0 ..< 500 {
             if condition() {
