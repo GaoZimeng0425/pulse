@@ -10,12 +10,14 @@ import SwiftUI
 struct DashboardView: View {
     let monitor: SystemMonitor
 
+    /// 弹窗面板尺寸(DESIGN.md `{layout.popover-size}` 360×648;popover-header/01 用户拍板 A
+    /// 「面板定高」):AppKit 面板直接按此开窗,不再读内容的 fittingSize——面板高度与内容
+    /// 理想高度两边各算一次就会错位(面板高 → 内容被宿主居中悬空、底色铺不到边;面板矮 →
+    /// 刚性内容居中溢出、上下对称被裁)。中间滚动区弹性吃掉剩余高度(见 body),
+    /// tab 栏 / 页头钉顶、底排钉底,告警横幅出没只挤中间,切 tab 面板不动。
+    static let panelSize = CGSize(width: 360, height: 648)
     /// 弹窗宽度(OG 紧凑弹窗形态)。
-    private static let width: CGFloat = 360
-    /// 内容滚动区固定高度:MenuBarExtra 按内容理想尺寸定窗,ScrollView 的
-    /// 理想高度恒为 0,弹窗会被压扁成只剩头部(工单 09 实机走查发现)——
-    /// 必须给定值而非 maxHeight。
-    private static let contentHeight: CGFloat = 520
+    private static let width: CGFloat = panelSize.width
     /// 弹窗排行只列前 20 名(2026-11-01 用户拍板 B;DESIGN.md `layout.popover-ranking-limit`):
     /// 弹窗是"扫一眼谁最忙",上百行的快速滚动是剩下的大头开销;其余由「查看全部」进主窗口。
     private static let rankingLimit = 20
@@ -55,8 +57,11 @@ struct DashboardView: View {
         return VStack(spacing: 10) {
             MetricIconTabBar(selection: $tabSelection)
             pageHeader
+            // 滚动区弹性:面板定高(panelSize)后,中间吃掉头尾之外的全部高度——
+            // 原 520 定值是 MenuBarExtra 按内容理想尺寸定窗时代的权宜(ScrollView 理想高
+            // 恒 0 会压扁弹窗),换 NSPanel 自定尺寸后前提已不在(popover-header/01)。
             scrollContent
-                .frame(height: Self.contentHeight)
+                .frame(maxHeight: .infinity)
             // 触发中的告警(工单 P1-07):授权被拒的降级出口 + 常态状态展示;
             // 无告警时不渲染。点开系统通知走主窗口深链,弹窗只做提示面。
             if !monitor.alerts.activeAlerts.isEmpty {
@@ -66,6 +71,8 @@ struct DashboardView: View {
         }
         .padding(14)
         .frame(width: Self.width)
+        // 撑满宿主:宿主比内容高时 NSHostingView 会把内容居中悬空(上下留白、底色不到边)。
+        .frame(maxHeight: .infinity, alignment: .top)
         .background(Surface.window)
         // 首次电池读数落地 → 电池页入轴(工单 02);被隐藏的当前 tab 回落总览。
         .onChange(of: monitor.battery.hasBattery) { _, hasBattery in
@@ -238,32 +245,21 @@ struct DashboardView: View {
         model.content(tab: tabSelection.current)
     }
 
-    /// 页头(OG:"Overview" + 右侧 "⏱ Up 6d 4h";页名下的本机一行补齐参考文档
-    /// 点名的缺口「Vitals 报 Apple M1 Max · 10 cores · 64 GB」——用户 2026-10-24
-    /// 反馈弹窗总览缺本机信息):「芯片 · 核数 · 内存」与主窗口内容头同一出处
-    /// (hostSummary);全部 tab 一致,切 tab 页头不跳高。运行时长每分钟刷新。
+    /// 页头(OG:"Overview" + 右侧 "⏱ Up 6d 4h"):统一组件 `PageHeader` 紧凑档
+    /// (popover-header/01)——标题 = tab 名;本机一行「芯片 · 核数 · 内存」**只有总览带**
+    /// (用户拍板 2026-11-02,判据在 PageHeader 单点);右侧运行时长每分钟刷新。
     private var pageHeader: some View {
-        let host = HostInfo.current
-        return HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(tabSelection.current.title)
-                Text(PulseFormat.hostSummary(
-                    chipName: host.chipName,
-                    coreCount: host.coreCount,
-                    physicalMemoryBytes: host.physicalMemoryBytes
-                ))
-            }
-            Spacer()
+        PageHeader(tab: tabSelection.current, style: .compact) {
             TimelineView(.periodic(from: .now, by: 60)) { _ in
                 Label(
                     PulseFormat.systemUptime(seconds: ProcessInfo.processInfo.systemUptime),
                     systemImage: "clock"
                 )
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
                 .monospacedDigit()
             }
         }
-        .font(.system(size: 11))
-        .foregroundStyle(.secondary)
         .padding(.horizontal, 4)
     }
 

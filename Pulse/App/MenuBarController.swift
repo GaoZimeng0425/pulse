@@ -118,7 +118,7 @@ final class MenuBarController: NSObject {
         monitor.setPopoverTab(lastTab)
         statusItem.button?.isHighlighted = true
 
-        let size = panel.fittingSize
+        let size = PopupPanel.size
         // 锚 = 实际点击位置,不锚 button.window 的 frame:多屏各自带菜单栏时,
         // 状态项在两块屏都有镜像,而 button.window 恒报其中一块屏的坐标
         // (实测报外接屏 -583,1168)——用户点主屏镜像时,按 window frame 定位
@@ -291,14 +291,12 @@ final class PopupPanel: NSPanel {
 
     private let hosting: NSHostingView<AnyView>
 
-    /// 面板理想尺寸:内容(fittingSize)优先,与门控占位帧口径一致的兜底。
-    var fittingSize: CGSize {
-        let fitting = hosting.fittingSize
-        return CGSize(
-            width: max(320, fitting.width),
-            height: max(480, min(fitting.height, 720))
-        )
-    }
+    /// 面板尺寸 = 设计令牌(`DashboardView.panelSize`,DESIGN.md `{layout.popover-size}`),
+    /// AppKit 侧直接给,**不读内容的 fittingSize**(popover-header/01 用户拍板 A):原先
+    /// 开面板时读一次 hosting.fittingSize——此刻 SwiftUI 还没把透明占位换成真内容,量到的
+    /// 是上次关闭时的占位尺寸;之后内容理想高度一变(告警横幅出没)面板又不跟,两边错位
+    /// = 内容悬空 / 上下被裁。定高后内容侧弹性撑满(DashboardView),面板永不需要量内容。
+    static let size = DashboardView.panelSize
 
     init(content: MenuBarPopoverGate?) {
         let root: AnyView = content.map { AnyView($0) } ?? AnyView(
@@ -312,9 +310,12 @@ final class PopupPanel: NSPanel {
             }.padding(14).frame(width: 330, alignment: .leading)
         )
         hosting = NSHostingView(rootView: root)
-        let initial = CGSize(width: 360, height: 648)
+        let initial = Self.size
         hosting.frame = NSRect(origin: .zero, size: initial)
         hosting.autoresizingMask = [.width, .height]
+        // 固定帧宿主:不向 AppKit 报固有尺寸 / 最小最大约束(NativeListCell 同纪律),
+        // 内容按面板给的 bounds 布局,面板尺寸只由 `size` 决定。
+        hosting.sizingOptions = []
         // 面板借 .titled + .fullSizeContentView 取圆角阴影,隐形标题栏仍算安全区:
         // SwiftUI 会在内容顶部让出 ~28pt(tab 栏上方凭空一截空白,用户实见)。
         hosting.safeAreaRegions = []

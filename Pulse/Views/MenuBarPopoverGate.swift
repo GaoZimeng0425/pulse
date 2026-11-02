@@ -12,8 +12,8 @@ import SwiftUI
 
 /// 弹窗内容根:可见性门控 + 会话状态持有。tab 选择与 DashboardModel(展开组、
 /// 处置请求等)提升到本层——条件渲染会随关闭销毁 DashboardView 的 @State,不提升
-/// 则每次重开都回总览、丢展开(泄漏时代反而有这份"记忆",不得倒退)。面板尺寸用
-/// 上次实测值撑占位帧,首开未知前用默认值(打开动画内一帧,不可感知)。
+/// 则每次重开都回总览、丢展开(泄漏时代反而有这份"记忆",不得倒退)。占位帧与面板
+/// 同尺寸(`DashboardView.panelSize` 令牌;面板定高后不再实测内容,popover-header/01)。
 struct MenuBarPopoverGate: View {
     let monitor: SystemMonitor
 
@@ -21,17 +21,11 @@ struct MenuBarPopoverGate: View {
     @State private var model: DashboardModel
     /// 上次所在 tab,重开还原。
     @State private var lastTab: MetricTab = .overview
-    /// 上次弹窗内容尺寸:占位帧与真实面板同尺寸,开合不做尺寸跳动。
-    @State private var contentSize: CGSize?
 
     init(monitor: SystemMonitor) {
         self.monitor = monitor
         _model = State(initialValue: DashboardModel(monitor: monitor))
     }
-
-    /// 首开占位尺寸:与 DashboardView 布局(定宽 360 + 内容区 520 + 头尾)接近即可,
-    /// 之后逐帧被实测值取代。
-    private static let defaultSize = CGSize(width: 360, height: 648)
 
     var body: some View {
         Group {
@@ -45,11 +39,10 @@ struct MenuBarPopoverGate: View {
                         monitor.setPopoverTab($0)
                     }
                 )
-                .onGeometryChange(for: CGSize.self, of: { $0.size }) { contentSize = $0 }
             } else {
                 Color.clear.frame(
-                    width: contentSize?.width ?? Self.defaultSize.width,
-                    height: contentSize?.height ?? Self.defaultSize.height
+                    width: DashboardView.panelSize.width,
+                    height: DashboardView.panelSize.height
                 )
             }
         }

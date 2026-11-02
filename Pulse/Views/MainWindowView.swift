@@ -200,19 +200,17 @@ struct MainWindowView: View {
         }
     }
 
-    /// 内容头(SHOT1:`Overview` 大标题 + `Apple M1 Max · 10 cores · 64 GB`)。
+    /// 内容头(SHOT1:`Overview` 大标题 + `Apple M1 Max · 10 cores · 64 GB`):统一组件
+    /// `PageHeader` 全尺寸档(popover-header/01)——本机一行**只有总览带**(用户拍板
+    /// 2026-11-02,判据在 PageHeader 单点);清理页的页头(标题 + 扫描状态 + 扫描按钮)
+    /// 由 `CleanerPageHeader` 在同一槽位画,`CleanerTabView` 不再自画标题——每个 tab
+    /// 恰一个标题。
+    @ViewBuilder
     private var pageHeader: some View {
-        let host = HostInfo.current
-        return VStack(alignment: .leading, spacing: 2) {
-            Text(tabSelection.current.title)
-                .font(.system(size: 26, weight: .bold))
-            Text(PulseFormat.hostSummary(
-                chipName: host.chipName,
-                coreCount: host.coreCount,
-                physicalMemoryBytes: host.physicalMemoryBytes
-            ))
-            .font(.system(size: 12))
-            .foregroundStyle(.secondary)
+        if tabSelection.current == .cleaner {
+            CleanerPageHeader(model: cleanerModel)
+        } else {
+            PageHeader(tab: tabSelection.current, style: .full)
         }
     }
 
