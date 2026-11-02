@@ -323,15 +323,16 @@ struct DashboardView: View {
             Spacer()
             Button {
                 NSApplication.shared.activate(ignoringOtherApps: true)
-                // 场景环境的 openSettings 在 NSPanel 宿主里不可用(见头部注释):
-                // 走系统标准动作,任一命中即可(macOS 14+ showSettingsWindow:)。
-                if !NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) {
-                    _ = NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
-                }
+                // 场景环境的 openSettings 在 NSPanel 宿主里不可用(见头部注释);
+                // AppKit 私有选择子(showSettingsWindow:/showPreferencesWindow:)
+                // 在本系统上也不再响应(2026-11-02 用户实测点不动)。改走确定性桥:
+                // 发通知 → 常驻主窗场景的接收器(MainWindowGate,开窗桥同款常驻)
+                // 在 Scene 环境里调 openSettings()——与主窗口齿轮同一条已验证通路。
+                NotificationCenter.default.post(name: .pulseOpenSettings, object: nil)
             } label: {
                 Image(systemName: "gearshape")
             }
-            .help("设置项目根目录")
+            .help("设置")
             .accessibilityLabel("设置")
             Button {
                 NSApplication.shared.terminate(nil)
