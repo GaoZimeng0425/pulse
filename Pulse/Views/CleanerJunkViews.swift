@@ -19,12 +19,21 @@ struct JunkListSection: View {
     var body: some View {
         switch model.phase {
         case .idle:
-            CardEmptyState(
-                title: "先扫描才能识别垃圾",
-                detail: "点右上「扫描整台 Mac」——白名单识别,未识别的目录不会出现",
-                actionTitle: "开始扫描",
-                action: { model.startScan() }
-            )
+            // 扫描前就给出扫描根指引(2026-11-02 用户实测找不到入口:配置只在
+            // 设置窗「清理」页,主窗口这边扫之前看不到任何提示)。
+            VStack(alignment: .leading, spacing: 4) {
+                CardEmptyState(
+                    title: "先扫描才能识别垃圾",
+                    detail: "点右上「扫描整台 Mac」——白名单识别,未识别的目录不会出现",
+                    actionTitle: "开始扫描",
+                    action: { model.startScan() }
+                )
+                if !model.hasScanRoots {
+                    Text("想清项目产物(node_modules 等)?先到 设置 → 清理 配置项目目录:工具栏齿轮打开设置,勾选建议目录或自添(如 ~/Documents/Learn/macos)。")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.tertiary)
+                }
+            }
             .cardShell(compact: false)
         case .scanning:
             CardEmptyState(
