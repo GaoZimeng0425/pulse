@@ -415,6 +415,36 @@ final class SpaceScanEngineTests: XCTestCase {
         XCTAssertTrue(cancelledResult.trees[0].children.isEmpty, "取消点之后不再枚举")
     }
 
+    /// 双路径域(方案 A 路径域修正):物理根喂枚举器,树路径落规范前缀;
+    /// 台账错误路径保留物理(诊断)。
+    func testCanonicalRootsPutTreePathsInUserDomain() async {
+        let fs = FakeCleanDirectoryEnumerator(listings: [
+            "/System/Volumes/Data": .entries([
+                CleanFixture.directory("Users", fileID: 601),
+            ]),
+            "/System/Volumes/Data/Users": .entries([
+                CleanFixture.directory("me", fileID: 602),
+                CleanFixture.directory("locked", fileID: 603),
+            ]),
+            "/System/Volumes/Data/Users/me": .entries([
+                CleanFixture.file("a.bin", allocated: 512, reclaimable: 512),
+            ]),
+            "/System/Volumes/Data/Users/locked": .failure(.permissionDenied),
+        ])
+        let result = await engine.scan(
+            SpaceScanOptions(roots: ["/System/Volumes/Data"], canonicalRoots: ["/"]),
+            using: fs
+        )
+        // 枚举走物理路径
+        let meCount = await fs.requestedPathCount("/System/Volumes/Data/Users/me")
+        XCTAssertGreaterThan(meCount, 0, "枚举器收到物理路径")
+        // 树路径是规范域:定位 /Users/me 直接命中(匹配器/排除的同域前提)
+        XCTAssertNotNil(SpaceNode.locate(path: "/Users/me", in: result.trees))
+        XCTAssertEqual(result.trees[0].path, "/")
+        // 台账错误用物理路径(诊断要看真路径)
+        XCTAssertTrue(result.ledger.contains { $0.path == "/System/Volumes/Data/Users/locked" })
+    }
+
     func testDescendantLocatesDirectoryByPath() async {
         let fs = FakeCleanDirectoryEnumerator(listings: [
             "/Users": .entries([CleanFixture.directory("t", fileID: 11)]),

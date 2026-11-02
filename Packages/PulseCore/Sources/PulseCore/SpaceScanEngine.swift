@@ -23,6 +23,11 @@ public struct SpaceScanOptions: Sendable, Equatable {
     /// 开发者垃圾(规则只认目录)与空间地图(目录粒度)都不需要文件节点;默认 true
     /// 保持 02 票的树形状不变,按需关。
     public var retainFileNodes: Bool
+    /// 规范根(方案 A 路径域修正):与 roots 一一对应;第 i 个非 nil 时,该根的
+    /// **树路径**以它为前缀(如 "/" ),而**枚举仍走 roots[i] 物理路径**(如
+    /// /System/Volumes/Data)。树上的路径因此与用户可见路径(/Users/…)同域,
+    /// 白名单匹配 / 排除判定 / 候选展示零转换;台账错误路径保留物理路径(诊断用)。
+    public var canonicalRoots: [String?]
     /// 并行 worker 数(p4-cleaner 性能票):1 = 串行,**与历史行为逐位一致**
     /// (双访先到先得、进度节奏、树形状都不因默认值漂移——引擎单测的确定性锚);
     /// >1 = petal 式子目录并行(长驻 worker 池吃共享目录栈,不为每目录起 Task)。
@@ -34,13 +39,15 @@ public struct SpaceScanOptions: Sendable, Equatable {
         excludedPathPrefixes: [String] = [],
         maxDepth: Int = 256,
         retainFileNodes: Bool = true,
-        maxConcurrency: Int = 1
+        maxConcurrency: Int = 1,
+        canonicalRoots: [String?]? = nil
     ) {
         self.roots = roots
         self.excludedPathPrefixes = excludedPathPrefixes
         self.maxDepth = maxDepth
         self.retainFileNodes = retainFileNodes
         self.maxConcurrency = maxConcurrency
+        self.canonicalRoots = canonicalRoots ?? [String?](repeating: nil, count: roots.count)
     }
 }
 
@@ -189,20 +196,26 @@ public struct SpaceScanEngine: Sendable {
         // 根重叠(一根是另一根的子孙):先到的赢,后到的整棵跳过——同一子树绝不重复入树。
         // 排除根:静默跳过——排除是用户意图,不进错误台账(GLOSSARY「排除目录」)。
         var claimedRoots: [String] = []
-        var seeded: [(path: String, name: String)] = []
-        for root in options.roots {
+        var seeded: [(path: String, name: String, display: String)] = []
+        for (index, root) in options.roots.enumerated() {
             let normalized = Self.norm(root)
             if claimedRoots.contains(where: { normalized.hasPrefix($0) }) {
                 core.noteSkippedRoot()
                 continue
             }
             claimedRoots.append(normalized)
-            if core.isExcluded(normalized) {
+            // 树路径域(方案 A 路径域修正):canonicalRoots 非 nil 的根,树以规范前缀
+            // 落路径;物理路径只喂枚举器与台账。
+            var display = normalized
+            if index < options.canonicalRoots.count, let canonical = options.canonicalRoots[index] {
+                display = Self.norm(canonical)
+            }
+            if core.isExcluded(display) {
                 continue
             }
-            seeded.append((path: normalized, name: Self.lastName(of: normalized)))
+            seeded.append((path: normalized, name: Self.lastName(of: normalized), display: display))
         }
-        core.enqueueRoots(seeded.map { ScanCore.PendingDir(path: $0.path, depth: 0) })
+        core.enqueueRoots(seeded.map { ScanCore.PendingDir(path: $0.path, displayPath: $0.display, depth: 0) })
 
         // worker 池:maxConcurrency=1 走与历史递归 DFS 逐位一致的路径(LIFO 栈 +
         // 子目录逆序入栈 = 入口序处理);>1 时多 worker 共享目录栈并行。
@@ -213,7 +226,7 @@ public struct SpaceScanEngine: Sendable {
             }
         }
         core.finish()
-        return core.result(rootMetas: seeded)
+        return core.result(rootMetas: seeded.map { (path: $0.display, name: $0.name) })
     }
 
     static func norm(_ p: String) -> String {
@@ -253,7 +266,10 @@ private struct IdentityKey: Hashable {
 /// 并行遍历内核:全部共享状态由锁保护,@unchecked Sendable 的前提即「只经锁碰」。
 private final class ScanCore: @unchecked Sendable {
     struct PendingDir {
+        /// 物理路径(喂枚举器;台账错误也用它——诊断要看真路径)。
         let path: String
+        /// 规范路径(树上的路径域;无别名时与物理相同)。
+        let displayPath: String
         let depth: Int
     }
 
@@ -369,7 +385,7 @@ private final class ScanCore: @unchecked Sendable {
         }
         // 深度护栏:入台账 + 记一个空 partial 占位(与旧实现返回的空节点等价)。
         if job.depth >= options.maxDepth {
-            recordPlaceholder(path: job.path, reason: .tooDeep)
+            recordPlaceholder(job: job, reason: .tooDeep)
             settleOne()
             return
         }
@@ -378,19 +394,19 @@ private final class ScanCore: @unchecked Sendable {
         do {
             entries = try await enumerator.entries(ofDirectory: job.path)
         } catch let error as CleanEnumerateError {
-            recordPlaceholder(error: error)
+            recordPlaceholder(error: error, display: job.displayPath)
             settleOne()
             return
         } catch {
             // 边界实现只该抛 CleanEnumerateError;兜底入册不吞(CODING_STANDARDS:不伪造数据)。
-            recordPlaceholder(path: job.path, reason: .other(errno: 0))
+            recordPlaceholder(job: job, reason: .other(errno: 0))
             settleOne()
             return
         }
 
         var node = SpaceNode(
-            name: SpaceScanEngine.lastName(of: job.path),
-            path: job.path,
+            name: SpaceScanEngine.lastName(of: job.displayPath),
+            path: job.displayPath,
             kind: .directory
         )
         var childDirs: [String] = []
@@ -399,7 +415,9 @@ private final class ScanCore: @unchecked Sendable {
 
         for entry in entries {
             dirStats.entriesSeen += 1
+            // 双路径域:物理路径继续喂枚举;规范路径进树/排除判定(与用户可见路径同域)。
             let childPath = job.path == "/" ? "/" + entry.name : job.path + "/" + entry.name
+            let childDisplay = job.displayPath == "/" ? "/" + entry.name : job.displayPath + "/" + entry.name
 
             switch entry.kind {
             case .directory:
@@ -412,13 +430,13 @@ private final class ScanCore: @unchecked Sendable {
                     continue
                 }
 
-                if isExcluded(childPath) {
+                if isExcluded(childDisplay) {
                     // 排除目录(GLOSSARY):不下潜、不计数——扫描与删除两处都收窄。
                     continue
                 }
                 dirStats.directories += 1
-                childDirs.append(childPath)
-                childJobs.append(PendingDir(path: childPath, depth: job.depth + 1))
+                childDirs.append(childDisplay)
+                childJobs.append(PendingDir(path: childPath, displayPath: childDisplay, depth: job.depth + 1))
 
             case .file:
                 // 硬链接同 (dev, fileID) 只计首个(dust §2.3;先到先得,并行下由分片锁定序)。
@@ -454,7 +472,7 @@ private final class ScanCore: @unchecked Sendable {
                 if options.retainFileNodes {
                     node.children.append(SpaceNode(
                         name: entry.name,
-                        path: childPath,
+                        path: childDisplay,
                         kind: .file,
                         accountedBytes: bytes,
                         reclaimableBytes: entry.reclaimableSize ?? 0,
@@ -476,7 +494,7 @@ private final class ScanCore: @unchecked Sendable {
             }
         }
 
-        commit(path: job.path, node: node, childDirs: childDirs, childJobs: childJobs, dirStats: dirStats)
+        commit(displayPath: job.displayPath, node: node, childDirs: childDirs, childJobs: childJobs, dirStats: dirStats)
     }
 
     // MARK: 同步锁帮手(async 上下文禁直接 NSLock.lock,Swift 6;锁内无 await)
@@ -511,29 +529,26 @@ private final class ScanCore: @unchecked Sendable {
         stateLock.unlock()
     }
 
-    /// 空节点占位(超深 / 枚举失败):入台账 + 记一个与旧实现等价的空 partial 记录。
-    private func recordPlaceholder(path: String, reason: CleanEnumerateFailure) {
-        stateLock.lock()
-        ledger.append(CleanEnumerateError(path: path, reason: reason))
-        records[path] = Record(
-            node: SpaceNode(
-                name: SpaceScanEngine.lastName(of: path),
-                path: path,
-                kind: .directory,
-                isPartial: true
-            ),
-            childDirPaths: []
+    /// 空节点占位(超深 / 枚举失败):台账记物理路径(诊断),树记录挂规范路径。
+    private func recordPlaceholder(job: PendingDir, reason: CleanEnumerateFailure) {
+        recordPlaceholder(
+            physical: job.path,
+            display: job.displayPath,
+            error: CleanEnumerateError(path: job.path, reason: reason)
         )
-        stateLock.unlock()
     }
 
-    private func recordPlaceholder(error: CleanEnumerateError) {
+    private func recordPlaceholder(error: CleanEnumerateError, display: String) {
+        recordPlaceholder(physical: error.path, display: display, error: error)
+    }
+
+    private func recordPlaceholder(physical: String, display: String, error: CleanEnumerateError) {
         stateLock.lock()
         ledger.append(error)
-        records[error.path] = Record(
+        records[display] = Record(
             node: SpaceNode(
-                name: SpaceScanEngine.lastName(of: error.path),
-                path: error.path,
+                name: SpaceScanEngine.lastName(of: display),
+                path: display,
                 kind: .directory,
                 isPartial: true
             ),
@@ -544,7 +559,7 @@ private final class ScanCore: @unchecked Sendable {
 
     /// 单目录收工:记账 + 统计合并(含进度) + 子目录入栈 + 在途减一,一把锁内完成。
     private func commit(
-        path: String,
+        displayPath: String,
         node: SpaceNode,
         childDirs: [String],
         childJobs: [PendingDir],
@@ -552,7 +567,7 @@ private final class ScanCore: @unchecked Sendable {
     ) {
         stateLock.lock()
         defer { stateLock.unlock() }
-        records[path] = Record(node: node, childDirPaths: childDirs)
+        records[displayPath] = Record(node: node, childDirPaths: childDirs)
         mergeStats(dirStats)
         // 子目录逆序入栈:单 worker 时弹出序 = 入口序(与旧递归 DFS 逐位一致)。
         stack.append(contentsOf: childJobs.reversed())

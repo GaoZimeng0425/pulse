@@ -160,17 +160,21 @@ final class CleanerModel {
         }
         let liveEnumerator = LiveCleanDirectoryEnumerator()
         let source = enumerator ?? liveEnumerator
+        // 方案 A 路径域修正:物理根喂枚举器,树路径以规范根("/")落——匹配/排除/展示同域。
+        // 测试注入自定义 roots 时保持原样(夹具路径即规范路径)。
+        let canonical = scanRoots == [Self.productionScanRoot] ? ["/"] : nil
         let options = SpaceScanOptions(
             roots: scanRoots,
             excludedPathPrefixes: exclusions.paths,
             retainFileNodes: false,
-            // petal 式并行(性能票):真机全卷 1010 万项,单线程实测 6–10 分钟,
-            // 6 个长驻 worker 吃共享目录栈。测试注入假枚举器时保持默认串行——
-            // 假实现的请求序断言依赖确定性。
-            maxConcurrency: Self.productionScanConcurrency
+            // petal 式并行(性能票):真机 Data 卷 ≈500 万项,6 个长驻 worker
+            // 吃共享目录栈;测试注入假枚举器时保持默认串行(请求序断言依赖确定性)。
+            maxConcurrency: Self.productionScanConcurrency,
+            canonicalRoots: canonical
         )
 
         scanTask = Task.detached(priority: .utility) { [engine, volumeSummaries, weak self] in
+            let scanBegin = Date()
             let result = await engine.scan(
                 options,
                 using: source,
@@ -187,9 +191,17 @@ final class CleanerModel {
             // 显示树变换(Data 根规范路径 + 卷级密封块注入)整树一次,放在扫描
             // 任务里,不占主线程;地图子页直接消费(03 缓存的第二读者)。
             let sealedVolumes = volumeSummaries?() ?? []
+            let mapBegin = Date()
             let mapTrees = result.trees.map {
                 SpaceMapTree.build(from: $0, sealedVolumes: sealedVolumes)
             }
+            // 分段计时(诊断用,票 10):真机基准 Data+6worker ≈56s;偏离时看三段各占多少。
+            LogService.info(
+                "扫描计时:walk \(Int(Date().timeIntervalSince(scanBegin)))s"
+                    + " · map \(Int(Date().timeIntervalSince(mapBegin) * 1000))ms"
+                    + " · 项 \(result.stats.entriesSeen) · 错误 \(result.ledger.count)",
+                category: "Cleaner"
+            )
             await MainActor.run { self?.finish(result, mapTrees: mapTrees) }
         }
     }
