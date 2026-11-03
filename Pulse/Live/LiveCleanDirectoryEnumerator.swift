@@ -84,6 +84,12 @@ struct LiveCleanDirectoryEnumerator: CleanDirectoryEnumerator {
         return snapshots
     }
 
+    /// 用户域(可能收到 TCC 拒绝、全盘访问可解的):家目录之下——扫描喂进来的是
+    /// 物理路径(/System/Volumes/Data/Users/…),兼容两域判断。
+    static func isUserDomain(_ path: String) -> Bool {
+        path.hasPrefix("/Users/") || path.hasPrefix(SpaceMapTree.dataVolumePath + "/Users/")
+    }
+
     private func mapErrno(_ path: String) -> CleanEnumerateError {
         switch errno {
         // 用户域(/Users 下)的 EPERM = TCC 拒绝(授权可解);系统域 EPERM 与 EACCES
@@ -91,7 +97,7 @@ struct LiveCleanDirectoryEnumerator: CleanDirectoryEnumerator {
         // 残留 54 个「去授权」全是 /private/var、com.apple.* 守护缓存这类系统目录。
         case EPERM: CleanEnumerateError(
                 path: path,
-                reason: path.hasPrefix("/Users/") ? .tccDenied : .permissionDenied
+                reason: Self.isUserDomain(path) ? .tccDenied : .permissionDenied
             )
         case EACCES: CleanEnumerateError(path: path, reason: .permissionDenied)
         case ENOENT: CleanEnumerateError(path: path, reason: .vanished)
