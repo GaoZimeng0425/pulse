@@ -66,6 +66,10 @@ public struct FsEntrySnapshot: Sendable, Equatable {
 // MARK: 枚举失败分类(错误台账的条目形状)
 
 public enum CleanEnumerateFailure: Sendable, Equatable {
+    /// TCC 拒绝(EPERM):全盘访问可解——界面横幅的「去授权」只对这一类喊。
+    case tccDenied
+    /// UNIX 权限拒绝(EACCES,root/他属主目录):FDA 也无解,不引导授权,
+    /// 如实计入台账并标「部分扫描」(ADR-0009:清理永不碰 root)。
     case permissionDenied
     /// 枚举中途消失(扫描期间被删/改名)——不算错误环境,如实入册即可。
     case vanished

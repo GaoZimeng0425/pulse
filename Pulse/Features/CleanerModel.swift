@@ -125,17 +125,17 @@ final class CleanerModel {
         return nil
     }
 
-    /// 权限拒了的目录数——FDA 引导横幅的判据(spec:未授时能扫的照扫、受限如实
-    /// 标注,不报错;判据来自台账而非预探测,零额外 IO)。
+    /// TCC 拒绝的目录数——FDA 引导横幅的判据(EPERM,授权可解;2026-11-03 拆分:
+    /// root/他属主的 EACCES 不再引导授权——FDA 帮不了它们,引导是误导)。
     var permissionDeniedCount: Int {
         guard let result else { return 0 }
-        return result.ledger.count { $0.reason == .permissionDenied }
+        return result.ledger.count { $0.reason == .tccDenied }
     }
 
     var permissionHint: String? {
         let count = permissionDeniedCount
         guard count > 0 else { return nil }
-        return "\(count) 个目录因权限未能扫到(含受 TCC 保护的文件夹)"
+        return "\(count) 个目录因 macOS 隐私保护未能扫到,授权全盘访问后重扫可收进来"
     }
 
     // MARK: 扫描

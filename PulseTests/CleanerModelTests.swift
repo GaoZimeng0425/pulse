@@ -14,7 +14,7 @@ final class CleanerModelTests: XCTestCase {
                 CleanFixture.directory("locked", fileID: 10),
             ]),
             "/r/sub": .entries([CleanFixture.file("b.bin", allocated: 256, reclaimable: 256)]),
-            "/r/locked": .failure(.permissionDenied),
+            "/r/locked": .failure(.tccDenied),
         ])
         let model = CleanerModel()
         model.startScan(using: fake, roots: ["/r"])
@@ -51,6 +51,24 @@ final class CleanerModelTests: XCTestCase {
         await waitUntil { !model.isScanning }
 
         XCTAssertEqual(model.result?.stats.files, 2, "重扫替换旧结果")
+    }
+
+    /// root/他属主目录(EACCES)不该出「去授权」横幅——FDA 帮不了它们,
+    /// 引导是误导(2026-11-03 拆分后横幅只认 TCC 的 EPERM)。
+    func testUnixPermissionDeniedDoesNotShowAuthorizationBanner() async {
+        let fake = FakeCleanDirectoryEnumerator(listings: [
+            "/r": .entries([
+                CleanFixture.file("a.bin", allocated: 512, reclaimable: 512),
+                CleanFixture.directory("root-owned", fileID: 900),
+            ]),
+            "/r/root-owned": .failure(.permissionDenied),
+        ])
+        let model = CleanerModel()
+        model.startScan(using: fake, roots: ["/r"])
+        await waitUntil { !model.isScanning }
+        XCTAssertEqual(model.permissionDeniedCount, 0, "EACCES 不进 TCC 计数")
+        XCTAssertNil(model.permissionHint)
+        XCTAssertTrue(model.result?.ledger.contains { $0.reason == .permissionDenied } == true, "台账里如实保留")
     }
 
     /// 零权限失败 → 无 FDA 横幅(不骚扰)。

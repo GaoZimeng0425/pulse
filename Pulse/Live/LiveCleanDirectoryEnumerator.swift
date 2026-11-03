@@ -86,7 +86,9 @@ struct LiveCleanDirectoryEnumerator: CleanDirectoryEnumerator {
 
     private func mapErrno(_ path: String) -> CleanEnumerateError {
         switch errno {
-        case EACCES, EPERM: CleanEnumerateError(path: path, reason: .permissionDenied)
+        // TCC 拒绝走 EPERM(可解:授权);root/他属主的 UNIX 拒绝走 EACCES(无解:不引导)。
+        case EPERM: CleanEnumerateError(path: path, reason: .tccDenied)
+        case EACCES: CleanEnumerateError(path: path, reason: .permissionDenied)
         case ENOENT: CleanEnumerateError(path: path, reason: .vanished)
         default: CleanEnumerateError(path: path, reason: .other(errno: errno))
         }
