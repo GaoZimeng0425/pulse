@@ -57,6 +57,8 @@ final class CleanerModel {
     private(set) var lastSavedMeta: SpaceScanMeta?
     /// 本会话亲手清理的项数(页头「本次已清理」只认它,不含缓存带来的历史清理)。
     private(set) var sessionCleanedCount = 0
+    /// 缓存恢复进行中(空态卡的「正在恢复…」文案判据;常态亚秒,满载数秒)。
+    private(set) var isRestoringCache = false
 
     /// 清理活动变化广播(quit 门卫订阅):userInfo["running"] = Bool。
     /// nonisolated:Notification.Name 是不可值,门卫(nonisolated 类)直接引用。
@@ -177,10 +179,14 @@ final class CleanerModel {
             LogService.warn("缓存装载:无 store(装配缺失?)", category: "Cleaner")
             return
         }
+        isRestoringCache = true
         LogService.info("缓存装载:开始读盘+解码", category: "Cleaner")
-        Task.detached(priority: .utility) { [weak self, scanCache, volumeSummaries] in
+        // userInitiated:用户点开清理页正在等这个结果(真机实锤 2026-11-03:满载下
+        // utility 解码被饿 21s,空态期被当成了「没缓存」;同文件常态 0.6s)。
+        Task.detached(priority: .userInitiated) { [weak self, scanCache, volumeSummaries] in
             guard let payload = scanCache.load() else {
                 LogService.warn("缓存装载:文件缺失或解码失败", category: "Cleaner")
+                await MainActor.run { self?.isRestoringCache = false }
                 return
             }
             let sealedVolumes = volumeSummaries?() ?? []
@@ -192,6 +198,7 @@ final class CleanerModel {
     }
 
     private func applyCached(_ payload: SpaceScanCachePayload, mapTrees: [SpaceMapNode]) {
+        isRestoringCache = false
         guard case .idle = phase, scanTask == nil else {
             LogService.warn("缓存装载:解码完成但状态已变,放弃套用", category: "Cleaner")
             return
