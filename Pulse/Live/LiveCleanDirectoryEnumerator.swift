@@ -86,8 +86,13 @@ struct LiveCleanDirectoryEnumerator: CleanDirectoryEnumerator {
 
     private func mapErrno(_ path: String) -> CleanEnumerateError {
         switch errno {
-        // TCC 拒绝走 EPERM(可解:授权);root/他属主的 UNIX 拒绝走 EACCES(无解:不引导)。
-        case EPERM: CleanEnumerateError(path: path, reason: .tccDenied)
+        // 用户域(/Users 下)的 EPERM = TCC 拒绝(授权可解);系统域 EPERM 与 EACCES
+        // 一样是 root/系统保护(全盘访问也无解,不引导授权)——2026-11-03 用户实拍:
+        // 残留 54 个「去授权」全是 /private/var、com.apple.* 守护缓存这类系统目录。
+        case EPERM: CleanEnumerateError(
+                path: path,
+                reason: path.hasPrefix("/Users/") ? .tccDenied : .permissionDenied
+            )
         case EACCES: CleanEnumerateError(path: path, reason: .permissionDenied)
         case ENOENT: CleanEnumerateError(path: path, reason: .vanished)
         default: CleanEnumerateError(path: path, reason: .other(errno: errno))
