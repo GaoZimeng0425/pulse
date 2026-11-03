@@ -69,6 +69,32 @@ final class AlertSettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.config(for: .systemLoad).threshold, AlertKind.systemLoad.preset.threshold)
     }
 
+    // MARK: - 投递出口配置(2026-11-03:单入口适配,出口分流)
+
+    func testSystemDeliveryDefaultsToInverseOfToast() {
+        let defaults = makeDefaults()
+        // toast 开(默认)且系统键未设 → 系统出口关(开卡不发横幅)。
+        var store = AlertSettingsStore(defaults: defaults)
+        XCTAssertTrue(store.toastDeliveryEnabled)
+        XCTAssertFalse(store.systemDeliveryEnabled)
+        // toast 关且系统键未设 → 系统出口开(回到 toast 上线前的老行为)。
+        store.setToastDeliveryEnabled(false)
+        store = AlertSettingsStore(defaults: defaults)
+        XCTAssertFalse(store.toastDeliveryEnabled)
+        XCTAssertTrue(store.systemDeliveryEnabled)
+    }
+
+    func testSystemDeliveryExplicitKeyWinsAndPersists() {
+        let defaults = makeDefaults()
+        defaults.set(false, forKey: AlertSettingsStore.systemDeliveryStorageKey)
+        var store = AlertSettingsStore(defaults: defaults)
+        XCTAssertFalse(store.systemDeliveryEnabled, "显式键优先于派生默认")
+        store.setSystemDeliveryEnabled(true)
+        XCTAssertTrue(defaults.bool(forKey: AlertSettingsStore.systemDeliveryStorageKey), "显式开关即落盘")
+        store = AlertSettingsStore(defaults: defaults)
+        XCTAssertTrue(store.systemDeliveryEnabled, "重开 app 后仍读显式值")
+    }
+
     func testUnknownKindsInPayloadAreIgnored() {
         let defaults = makeDefaults()
         // 手写一份带未知 kind 的合法载荷:未知键忽略,已知键保留。

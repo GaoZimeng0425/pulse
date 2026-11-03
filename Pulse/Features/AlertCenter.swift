@@ -2,13 +2,17 @@ import Foundation
 import Observation
 import PulseCore
 
-/// 告警编排(工单 P1-07,MainActor 粘合层):喂食 → 引擎评估 → 三路出口——
-/// ①系统通知(已授权才发);②应用内提示(activeAlerts,授权被拒时的降级出口,
-/// 主窗口与弹窗常显);③日志(告警触发/恢复,spec"过渡非轮询"惯例)。
+/// 告警编排(工单 P1-07,MainActor 粘合层):喂食 → 引擎评估 → 单入口投递
+/// (deliver,出口按投递配置分流)——①系统通知(已授权且出口开着才发);
+/// ④NemoNotch 卡(toast 出口开着才发,2026-11-03 起两出口互斥为默认、可显式
+/// 双开,见 AlertSettingsStore.systemDeliveryEnabled);②应用内提示(activeAlerts,
+/// 授权被拒/出口全关时的兜底,主窗口与弹窗常显);③日志(告警触发/恢复,spec
+/// "过渡非轮询"惯例)。
 ///
 /// 授权时序(spec):有规则开着才请求授权(开规则时;启动时若系统还没问过也补
-/// 一次);以系统三态为准,不信本地标记。拒绝后规则照常判定,只是不发系统通知
-/// (activeAlerts 照常更新 = 应用内提示);发送前现查授权,系统设置里改即生效。
+/// 一次;系统通知出口关着不请求——权限只为该出口服务);以系统三态为准,不信
+/// 本地标记。拒绝后规则照常判定,只是不发系统通知(activeAlerts 照常更新 =
+/// 应用内提示);发送前现查授权,系统设置里改即生效。
 /// UI 不单测,此处粘合逻辑经注入 sender/时钟的 AlertCenterTests 覆盖。
 @Observable
 @MainActor
@@ -52,10 +56,11 @@ final class AlertCenter {
     }
 
     /// 启动时现查授权:系统还没问过且已有规则开着 → 补一次真请求(只认系统
-    /// 三态,不信本地标记——2026-10-19 真机:本地标记与系统现状脱节)。全关时不弹窗。
+    /// 三态,不信本地标记——2026-10-19 真机:本地标记与系统现状脱节)。全关时
+    /// 不弹窗;系统通知出口关着也不请求——横幅权限只为该出口服务。
     func refreshAuthorization() async {
         let status = await recordStatus(resendingExcept: [])
-        if status == .notDetermined, store.isAnyEnabled {
+        if status == .notDetermined, store.isAnyEnabled, store.systemDeliveryEnabled {
             await requestAuthorization()
         }
     }
@@ -105,11 +110,12 @@ final class AlertCenter {
         }
     }
 
-    /// 开关规则:写存储(即时生效并持久);开规则而授权未落定时请求授权
-    /// (系统侧幂等:已落定不弹窗,只回现状)。
+    /// 开关规则:写存储(即时生效并持久);开规则、系统通知出口开着且授权未
+    /// 落定时请求授权(系统侧幂等:已落定不弹窗,只回现状)。出口关着不请求
+    /// ——弹权限窗讨一个用不上的授权只会吓人。
     func setEnabled(_ enabled: Bool, for kind: AlertKind) {
         store.setEnabled(enabled, for: kind)
-        guard enabled, !notificationsAuthorized, !authorizationDenied else { return }
+        guard enabled, store.systemDeliveryEnabled, !notificationsAuthorized, !authorizationDenied else { return }
         Task { [weak self] in
             await self?.requestAuthorization()
         }
@@ -140,7 +146,7 @@ final class AlertCenter {
         if status != .notDetermined {
             authorizationRequestFailed = false
         }
-        if let skipped, notificationsAuthorized, !wasAuthorized {
+        if store.systemDeliveryEnabled, let skipped, notificationsAuthorized, !wasAuthorized {
             let backlog = activeAlerts
                 .map(AlertNotificationContent.make(for:))
                 .filter { !skipped.contains($0.identifier) }
@@ -167,7 +173,7 @@ final class AlertCenter {
         store.setThreshold(threshold, for: kind)
     }
 
-    // MARK: - 事件出口
+    // MARK: - 事件出口(单入口,出口按投递配置分流)
 
     private func handle(_ events: [AlertEvent]) {
         var payloads: [AlertNotificationPayload] = []
@@ -184,8 +190,7 @@ final class AlertCenter {
                         + " 读数=\(occurrence.value)",
                     category: "Alert"
                 )
-                payloads.append(AlertNotificationContent.make(for: occurrence))
-                sendToast(for: occurrence)
+                deliver(occurrence, into: &payloads)
             case let .resolved(kind, subjectKey):
                 activeAlerts.removeAll {
                     $0.kind == kind && $0.subjectKey == subjectKey
@@ -208,11 +213,16 @@ final class AlertCenter {
         }
     }
 
-    /// ④NemoNotch toast 出口(附加,不取代前三路):点名「哪个项目/应用下的
-    /// 哪个进程在消耗」。开关默认开(规则本身默认全关,开规则才是主闸门);
-    /// devServerIdle 不进(与「谁在消耗资源」无关)。发送 fire-and-forget——
-    /// NemoNotch 未运行是常态,失败只在发送器内记日志,主流程零影响。
-    private func sendToast(for occurrence: AlertOccurrence) {
+    /// 投递适配入口(2026-11-03 用户拍板):一条告警只进这一个口,出口由配置
+    /// 分流——①系统通知(store.systemDeliveryEnabled;未显式设置时默认取
+    /// toast 开关的反:开 NemoNotch 卡就不发横幅,叠加双弹是噪音);②NemoNotch
+    /// 卡(store.toastDeliveryEnabled;devServerIdle 不进)。两开关独立,可双开
+    /// 可全关(全关只剩应用内提示)。NemoNotch 发送 fire-and-forget——未运行
+    /// 是常态,失败只在发送器内记日志,主流程零影响。
+    private func deliver(_ occurrence: AlertOccurrence, into payloads: inout [AlertNotificationPayload]) {
+        if store.systemDeliveryEnabled {
+            payloads.append(AlertNotificationContent.make(for: occurrence))
+        }
         guard store.toastDeliveryEnabled, let payload = NemoNotchToastContent.make(
             for: occurrence,
             offender: AlertOffenderAttribution.summarize(

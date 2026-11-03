@@ -143,6 +143,9 @@ final class AlertCenterTests: XCTestCase {
         addTeardownBlock {
             UserDefaults().removePersistentDomain(forName: suiteName)
         }
+        // 本文件测的是系统通知授权/发送链:显式种上系统通知出口(未种时默认取
+        // toast 开关的反,而 toast 默认开 → 系统出口会被派生成关)。
+        defaults.set(true, forKey: AlertSettingsStore.systemDeliveryStorageKey)
         return defaults
     }
 

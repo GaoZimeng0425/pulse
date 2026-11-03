@@ -15,6 +15,8 @@ final class AlertSettingsStore {
     static let storageKey = "alertRuleConfigs"
     /// NemoNotch toast 投递开关的键(键名即持久化契约,勿改)。
     static let toastDeliveryStorageKey = "alertNemoNotchToastEnabled"
+    /// 系统通知投递开关的键(键名即持久化契约,勿改)。
+    static let systemDeliveryStorageKey = "alertSystemNotificationEnabled"
 
     /// 当前配置(缺省 = 预设阈值 + 全关)。授权状态不在这里记:以系统三态为准
     /// (AlertCenter 现查),本地"请求过"标记曾与系统现状脱节、误判拒绝
@@ -23,9 +25,14 @@ final class AlertSettingsStore {
     /// NemoNotch toast 投递开关(默认开:规则本身默认全关,开规则才是主闸门;
     /// NemoNotch 未运行时发送器静默跳过,开着无副作用)。
     private(set) var toastDeliveryEnabled: Bool
+    /// 系统通知(UNUserNotification 横幅)投递开关。**未显式设置时取 toast 开关
+    /// 的反**(2026-11-03 用户拍板:开 NemoNotch 卡就不发系统通知——一条告警弹
+    /// 横幅+卡两路是噪音,根源是 toast 上线时做成了叠加出口);显式设置后独立。
+    private(set) var systemDeliveryEnabled: Bool
 
     private let persist: ([AlertKind: AlertRuleConfig]) -> Void
     private let persistToastDelivery: (Bool) -> Void
+    private let persistSystemDelivery: (Bool) -> Void
 
     /// 任一规则开着(授权时序:有规则开着而系统还没问过时才请求授权)。
     var isAnyEnabled: Bool {
@@ -37,12 +44,20 @@ final class AlertSettingsStore {
         load: () -> [AlertKind: AlertRuleConfig],
         persist: @escaping ([AlertKind: AlertRuleConfig]) -> Void,
         loadToastDelivery: () -> Bool = { true },
-        persistToastDelivery: @escaping (Bool) -> Void = { _ in }
+        persistToastDelivery: @escaping (Bool) -> Void = { _ in },
+        loadSystemDelivery: () -> Bool? = { nil },
+        persistSystemDelivery: @escaping (Bool) -> Void = { _ in }
     ) {
         configs = Self.mergingPresets(load())
-        toastDeliveryEnabled = loadToastDelivery()
+        let toastEnabled = loadToastDelivery()
+        toastDeliveryEnabled = toastEnabled
+        // nil = 未显式设置:默认与 toast 互斥(开卡不横幅;不开卡保持老的横幅出口)。
+        // 局部值参与派生:@Observable 访问器在完全初始化前读兄弟属性会报
+        // used-before-initialized。
+        systemDeliveryEnabled = loadSystemDelivery() ?? !toastEnabled
         self.persist = persist
         self.persistToastDelivery = persistToastDelivery
+        self.persistSystemDelivery = persistSystemDelivery
     }
 
     /// 生产构造:UserDefaults(标准库);测试注入独立 suite。
@@ -59,6 +74,12 @@ final class AlertSettingsStore {
             },
             persistToastDelivery: { enabled in
                 defaults.set(enabled, forKey: Self.toastDeliveryStorageKey)
+            },
+            loadSystemDelivery: {
+                defaults.object(forKey: Self.systemDeliveryStorageKey) as? Bool
+            },
+            persistSystemDelivery: { enabled in
+                defaults.set(enabled, forKey: Self.systemDeliveryStorageKey)
             }
         )
     }
@@ -91,6 +112,12 @@ final class AlertSettingsStore {
     func setToastDeliveryEnabled(_ enabled: Bool) {
         toastDeliveryEnabled = enabled
         persistToastDelivery(enabled)
+    }
+
+    /// 开关系统通知投递(设置页 Toggle;显式写入即落盘,独立于 toast 开关)。
+    func setSystemDeliveryEnabled(_ enabled: Bool) {
+        systemDeliveryEnabled = enabled
+        persistSystemDelivery(enabled)
     }
 
     /// 引擎每轮喂食取的策略快照(用户配置 × 种类预设)。

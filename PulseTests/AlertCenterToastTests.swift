@@ -135,6 +135,99 @@ final class AlertCenterToastTests: XCTestCase {
         XCTAssertTrue(toast.sent.isEmpty)
     }
 
+    /// 记录型系统通知替身(授权恒为已授;锁纪律同 FakeToastSender)。
+    private final class RecordingSystemSender: AlertNotificationSending, @unchecked Sendable {
+        private let lock = NSLock()
+        private var delivered: [AlertNotificationPayload] = []
+
+        var sent: [AlertNotificationPayload] {
+            lock.lock()
+            defer { lock.unlock() }
+            return delivered
+        }
+
+        func requestAuthorization() async -> Bool {
+            true
+        }
+
+        func authorizationStatus() async -> NotificationAuthorization {
+            .authorized
+        }
+
+        func authorizationDiagnostics() async -> String {
+            "recording"
+        }
+
+        func send(_ payload: AlertNotificationPayload) async {
+            record(payload)
+        }
+
+        private func record(_ payload: AlertNotificationPayload) {
+            lock.lock()
+            defer { lock.unlock() }
+            delivered.append(payload)
+        }
+    }
+
+    // MARK: - 投递出口路由(2026-11-03:单入口,出口按配置分流)
+
+    /// 默认派生(toast 开、系统键未设 → 系统关):只发 toast,横幅一路静默。
+    func testDefaultRoutingSendsToastOnly() async {
+        let toast = FakeToastSender()
+        let system = RecordingSystemSender()
+        let clock = MutableClock(t0)
+        let center = AlertCenter(
+            store: AlertSettingsStore(defaults: makeDefaults()),
+            sender: system,
+            toastSender: toast,
+            clock: { clock.now }
+        )
+        center.setEnabled(true, for: .systemLoad)
+        await fireSystemLoad(center, clock: clock, processes: [])
+        XCTAssertEqual(toast.sent.count, 1, "NemoNotch 出口照发")
+        XCTAssertTrue(system.sent.isEmpty, "系统通知出口被派生默认关掉,一条告警只弹一处")
+    }
+
+    /// 双开:两路都发(用户显式要横幅 + 卡)。
+    func testBothOutletsDeliver() async {
+        let toast = FakeToastSender()
+        let system = RecordingSystemSender()
+        let clock = MutableClock(t0)
+        let defaults = makeDefaults()
+        defaults.set(true, forKey: AlertSettingsStore.systemDeliveryStorageKey)
+        let center = AlertCenter(
+            store: AlertSettingsStore(defaults: defaults),
+            sender: system,
+            toastSender: toast,
+            clock: { clock.now }
+        )
+        center.setEnabled(true, for: .systemLoad)
+        await fireSystemLoad(center, clock: clock, processes: [])
+        XCTAssertEqual(toast.sent.count, 1)
+        XCTAssertEqual(system.sent.count, 1)
+    }
+
+    /// 全关:两路都不发,但应用内提示照常(activeAlerts 仍记录)。
+    func testNoOutletStillRecordsActiveAlerts() async {
+        let toast = FakeToastSender()
+        let system = RecordingSystemSender()
+        let clock = MutableClock(t0)
+        let defaults = makeDefaults()
+        defaults.set(false, forKey: AlertSettingsStore.toastDeliveryStorageKey)
+        defaults.set(false, forKey: AlertSettingsStore.systemDeliveryStorageKey)
+        let center = AlertCenter(
+            store: AlertSettingsStore(defaults: defaults),
+            sender: system,
+            toastSender: toast,
+            clock: { clock.now }
+        )
+        center.setEnabled(true, for: .systemLoad)
+        await fireSystemLoad(center, clock: clock, processes: [])
+        XCTAssertTrue(toast.sent.isEmpty)
+        XCTAssertTrue(system.sent.isEmpty)
+        XCTAssertEqual(center.activeAlerts.count, 1, "应用内提示(第三出口)不受投递配置影响")
+    }
+
     /// dev server 闲置触发 → 不进 toast(与「谁在消耗资源」无关)。
     func testDevServerIdleFiresNoToast() async {
         let toast = FakeToastSender()
