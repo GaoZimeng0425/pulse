@@ -1,24 +1,28 @@
 import PulseCore
 import SwiftUI
 
-// MARK: - 清理页(p4-cleaner/03 扫描闭环 + 04 删除管线):三子药丸壳
+// MARK: - 清理页(p4-cleaner/03 扫描闭环 + 04 删除管线 + p4-uninstaller/01 四子药丸壳)
 
 //
 // 子页内容:开发者垃圾 = JunkListSection(04,CleanerJunkViews.swift)、空间地图 =
 // 03 的扫描状态卡 + 结果摘要卡(旭日图 07 票接入 `mapSection`)、清理历史 =
-// CleanHistorySection(04 列表 + 明细;「清空废纸篓」按钮 08 票)。空态一律走
-// CardEmptyState(DESIGN.md 卡片家族,不手写空态)。
+// CleanHistorySection(04 列表 + 明细;「清空废纸篓」按钮 08 票)、应用 =
+// AppListSection(p4-uninstaller/01,清单只读;残留 / 卸载动作 02/03 票)。空态
+// 一律走 CardEmptyState(DESIGN.md 卡片家族,不手写空态)。
 
 enum CleanerSubTab: String, CaseIterable, Hashable {
     case junk
     case map
     case history
+    /// 应用卸载器(p4-uninstaller):spec 定案为第 4 个子药丸。
+    case apps
 
     var title: String {
         switch self {
         case .junk: "开发者垃圾"
         case .map: "空间地图"
         case .history: "清理历史"
+        case .apps: "应用"
         }
     }
 }
@@ -87,6 +91,9 @@ extension CleanerModel {
 
 struct CleanerTabView: View {
     let model: CleanerModel
+    /// 应用卸载器模型(p4-uninstaller/01):无常驻采集,由 AppListSection 的
+    /// task/onDisappear 驱动装载与取消;壳层只负责传递。
+    let uninstallModel: UninstallModel
     @State private var subTab: CleanerSubTab = .junk
     /// 空间地图的导航态放在壳层(07):切子药丸再回来不丢下钻位置。
     @State private var mapDrillPath: String?
@@ -109,6 +116,7 @@ struct CleanerTabView: View {
             case .junk: JunkListSection(model: model)
             case .map: mapSection
             case .history: CleanHistorySection(model: model)
+            case .apps: AppListSection(model: uninstallModel)
             }
         }
         // 进清理页即试装载落盘缓存(p4-cleaner/11):空态且无在跑扫描才读盘

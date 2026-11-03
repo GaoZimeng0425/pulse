@@ -37,6 +37,10 @@ struct MainWindowView: View {
     /// 快照投影板(每轮 apply 更新,零新采集)。
     @State private var cleanerModel: CleanerModel
 
+    /// 应用卸载器(p4-uninstaller/01):活动板同源(运行中判定输入,零新采集),
+    /// 无常驻采集,进子页才收集。
+    @State private var uninstallModel: UninstallModel
+
     init(
         monitor: SystemMonitor,
         initialTab: MetricTab = .overview,
@@ -57,6 +61,9 @@ struct MainWindowView: View {
             // (注入 store)而正式版从未落盘,关窗即回空态。registry-漏登病再犯,
             // 见 p2-audit 教训;目录建不了时 init 返回 nil,功能优雅降级。
             scanCache: CleanScanResultStore()
+        ))
+        _uninstallModel = State(initialValue: UninstallModel(
+            activityBoard: monitor.activityBoard
         ))
         // 展示轴随电池可用性(工单 02):无内建电池的机器不含电池页。
         // 窗口新建/重建时先取路由落点(点通知时窗口可能还没开)。
@@ -234,7 +241,7 @@ struct MainWindowView: View {
         // 清理页(p4-cleaner/03):整页自持(按需扫描,无 MonitorFeatures 卡片栈),
         // 不进 MetricTabStack;弹窗侧不会走到(popoverAxis 已排除)。
         if tabSelection.current == .cleaner {
-            CleanerTabView(model: cleanerModel)
+            CleanerTabView(model: cleanerModel, uninstallModel: uninstallModel)
         } else {
             MetricTabStack(
                 tab: tabSelection.current,
