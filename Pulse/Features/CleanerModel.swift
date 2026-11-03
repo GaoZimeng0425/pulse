@@ -203,11 +203,21 @@ final class CleanerModel {
             LogService.warn("缓存装载:解码完成但状态已变,放弃套用", category: "Cleaner")
             return
         }
+        // 旧账纠正:EPERM=TCC 的分类已收窄为「仅用户域」;缓存里扫描时记下的系统域
+        // tccDenied(/private/var、com.apple.* 守护缓存)在此归位,重开即消横幅,
+        // 不必重扫。
+        var result = payload.result
+        result.ledger = result.ledger.map { entry in
+            guard case .tccDenied = entry.reason,
+                  !LiveCleanDirectoryEnumerator.isUserDomain(entry.path)
+            else { return entry }
+            return CleanEnumerateError(path: entry.path, reason: .permissionDenied)
+        }
         LogService.info(
             "缓存装载:已套用 · 项 \(payload.result.stats.entriesSeen) · 扫描于 \(payload.meta.finishedAt)",
             category: "Cleaner"
         )
-        phase = .finished(payload.result)
+        phase = .finished(result)
         self.mapTrees = mapTrees
         scanStartedAt = payload.meta.startedAt
         scanFinishedAt = payload.meta.finishedAt
