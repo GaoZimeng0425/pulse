@@ -217,7 +217,7 @@ private struct JunkListCard: View {
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
-                Text("正在移入废纸篓…")
+                Text("正在移入废纸篓…(完成后才可退出 app)")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }

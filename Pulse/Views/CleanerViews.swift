@@ -52,7 +52,9 @@ struct CleanerPageHeader: View {
             return "正在扫描 · \(stats.entriesSeen) 项 · \(PulseFormat.memory(UInt64(max(0, stats.accountedBytes))))"
         case let .finished(result):
             // 清理后树不重扫(树只是快照),摘要数字会偏大——如实提示,不悄悄改数。
-            let cleaned = model.recycledPaths.isEmpty ? "" : " · 本次已清理 \(model.recycledPaths.count) 项,重新扫描刷新数字"
+            let cleaned = model.sessionCleanedCount == 0
+                ? ""
+                : " · 本次已清理 \(model.sessionCleanedCount) 项,重新扫描刷新数字"
             // 缓存装载(票 11):标相对时间,让「这是旧结果」一眼可见。
             let age = model.loadedFromCache
                 ? " · \(Self.relativeAgeText(from: model.scanFinishedAt))前(缓存)"

@@ -63,7 +63,8 @@ final class SpaceScanCacheTests: XCTestCase {
                 startedAt: Date(timeIntervalSince1970: 1_700_000_000),
                 finishedAt: Date(timeIntervalSince1970: 1_700_006_060.5),
                 roots: ["/System/Volumes/Data"],
-                excludedPathPrefixes: ["/Users/me/Library/Caches/Homebrew"]
+                excludedPathPrefixes: ["/Users/me/Library/Caches/Homebrew"],
+                cleanedPaths: ["/Users/me/Library/Caches/Homebrew", "/x"]
             ),
             result: SpaceScanResult(
                 trees: [dataRoot, canonicalRoot],
@@ -94,6 +95,7 @@ final class SpaceScanCacheTests: XCTestCase {
         let decoded = try XCTUnwrap(SpaceScanCache.decode(data), "应能解码")
 
         XCTAssertEqual(decoded.meta, payload.meta)
+        XCTAssertEqual(decoded.meta.cleanedPaths, ["/Users/me/Library/Caches/Homebrew", "/x"], "v2 新字段:清理后重开的过滤依据")
         let result = decoded.result
         XCTAssertEqual(result.cancelled, true)
         XCTAssertEqual(result.stats.entriesSeen, 11)
