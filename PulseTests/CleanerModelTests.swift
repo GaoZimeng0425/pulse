@@ -499,6 +499,128 @@ final class CleanerModelTests: XCTestCase {
         XCTAssertEqual(model.candidates.first?.path, "/Users/me/Library/Caches/Homebrew")
     }
 
+    // MARK: 扫描结果落盘缓存(p4-cleaner/11)
+
+    private func makeCacheFixture() -> FakeCleanDirectoryEnumerator {
+        // 物理域铺 Data 根(canonical 模式),规范域断言清单
+        FakeCleanDirectoryEnumerator(listings: [
+            "/System/Volumes/Data": .entries([
+                CleanFixture.directory("Users", fileID: 800),
+            ]),
+            "/System/Volumes/Data/Users": .entries([
+                CleanFixture.directory("me", fileID: 801),
+            ]),
+            "/System/Volumes/Data/Users/me": .entries([
+                CleanFixture.directory("Library", fileID: 802),
+            ]),
+            "/System/Volumes/Data/Users/me/Library": .entries([
+                CleanFixture.directory("Caches", fileID: 803),
+            ]),
+            "/System/Volumes/Data/Users/me/Library/Caches": .entries([
+                CleanFixture.directory("Homebrew", fileID: 804),
+            ]),
+            "/System/Volumes/Data/Users/me/Library/Caches/Homebrew": .entries([
+                CleanFixture.file("b.bin", allocated: 512, reclaimable: 512),
+            ]),
+        ])
+    }
+
+    func testScanResultSurvivesRelaunchViaCache() async {
+        // 内存"文件":锁保护的盒子模拟落盘/重启(Sendable 闭包捕获得体)
+        final class Box: @unchecked Sendable {
+            private let lock = NSLock()
+            private var payload: SpaceScanCachePayload?
+            var value: SpaceScanCachePayload? {
+                get { lock.lock()
+                    defer { lock.unlock() }
+                    return payload
+                }
+                set { lock.lock()
+                    defer { lock.unlock() }
+                    payload = newValue
+                }
+            }
+        }
+        let box = Box()
+        let cache = CleanScanResultStore(load: { box.value }, save: { box.value = $0 })
+
+        // 第一次会话:扫描 → 落盘
+        let first = CleanerModel(
+            exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
+            scanCache: cache,
+            homeDirectory: "/Users/me"
+        )
+        first.startScan(using: makeCacheFixture())
+        await waitUntil { !first.isScanning }
+        XCTAssertEqual(first.candidates.map(\.ruleID), ["homebrew.cache"])
+        XCTAssertNotNil(box.value, "扫完即落盘")
+
+        // 第二次会话(新模型 = 关窗/重启语义):空态装载缓存 → 结果复活
+        let second = CleanerModel(
+            exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
+            scanCache: cache,
+            homeDirectory: "/Users/me"
+        )
+        second.loadCachedScan()
+        await waitUntil { second.result != nil }
+        XCTAssertTrue(second.loadedFromCache)
+        XCTAssertEqual(second.candidates.map(\.ruleID), ["homebrew.cache"], "清单从缓存复活(路径域一致)")
+        XCTAssertEqual(second.candidates.first?.path, "/Users/me/Library/Caches/Homebrew")
+        XCTAssertNil(second.cacheStalenessHint, "配置未变,无过期提示")
+        XCTAssertNotNil(second.mapTrees.first, "地图同样复活")
+
+        // 重扫:缓存态复位,结果照常刷新
+        second.startScan(using: makeCacheFixture())
+        await waitUntil { !second.isScanning && !second.loadedFromCache }
+        XCTAssertFalse(second.loadedFromCache)
+    }
+
+    func testCacheStalenessHintWhenExclusionsChangedAfterScan() async {
+        final class Box: @unchecked Sendable {
+            private let lock = NSLock()
+            private var payload: SpaceScanCachePayload?
+            var value: SpaceScanCachePayload? {
+                get { lock.lock()
+                    defer { lock.unlock() }
+                    return payload
+                }
+                set { lock.lock()
+                    defer { lock.unlock() }
+                    payload = newValue
+                }
+            }
+        }
+        let box = Box()
+        let cache = CleanScanResultStore(load: { box.value }, save: { box.value = $0 })
+        let first = CleanerModel(
+            exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
+            scanCache: cache,
+            homeDirectory: "/Users/me"
+        )
+        first.startScan(using: makeCacheFixture())
+        await waitUntil { !first.isScanning }
+        XCTAssertNotNil(box.value)
+
+        // 新会话:排除清单与扫描时不同 → 过期提示(数字只可能偏大方向)
+        let second = CleanerModel(
+            exclusions: CleanExclusionsStore(
+                load: { ["/Users/me/Library/Caches/Homebrew"] },
+                persist: { _ in }
+            ),
+            scanCache: cache,
+            homeDirectory: "/Users/me"
+        )
+        second.loadCachedScan()
+        await waitUntil { second.result != nil }
+        XCTAssertNotNil(second.cacheStalenessHint, "排除配置变了要提示建议重扫")
+
+        // 没有缓存的模型不落盘也不装载(旧测试路径零影响)
+        let bare = CleanerModel(homeDirectory: "/Users/me")
+        bare.loadCachedScan()
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertNil(bare.result, "无缓存 store:装载零动作")
+    }
+
     private func waitUntil(_ condition: @MainActor () -> Bool) async {
         for _ in 0 ..< 500 {
             if condition() {

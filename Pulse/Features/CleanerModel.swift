@@ -49,6 +49,11 @@ final class CleanerModel {
     /// 本会话已移入废纸篓的路径:树里还挂着(不重扫),清单里不再列。
     private(set) var recycledPaths: Set<String> = []
 
+    /// 当前结果是否来自落盘缓存(重启后装载)。真实扫描(含重扫)置回 false。
+    private(set) var loadedFromCache = false
+    /// 装载时的元信息(时间戳给页头「上次扫描 X 前」;排除快照给过期判定)。
+    private(set) var loadedCacheMeta: SpaceScanMeta?
+
     /// 清理历史列表(nil = 尚未加载或不可用;见 `historyAvailable`)。
     private(set) var historyRuns: [CleanRunRecord]?
     private(set) var historyItems: [Int64: [CleanItemRecord]] = [:]
@@ -64,6 +69,10 @@ final class CleanerModel {
     /// 只读系统卷的卷级字节(方案 A:SSV/Preboot/VM 等不逐文件走,statfs 一笔;
     /// 生产 Live,测试注固定值;nil = 不注入,地图无密封块——不伪造)。
     private let volumeSummaries: (@Sendable () -> [SpaceMapVolumeSummary])?
+    /// 扫描结果落盘缓存(p4-cleaner/11):扫完写、开清理页时若无内存结果则读。
+    /// nil = 不落盘(预览 / 旧测试)。读 = 打开清理页一次(后台),写 = 扫完一次;
+    /// 常驻稳态零——不挂调度,关窗照旧释放内存树。
+    private let scanCache: CleanScanResultStore?
     private let homeDirectory: String
 
     /// 项目产物的排序(05,用户拍板:默认大小、可切新旧)。新旧 = 项目年龄升序
@@ -91,6 +100,7 @@ final class CleanerModel {
         trash: any CleanTrashExecutor = LiveCleanTrashExecutor(),
         activity: (any CleanActivitySource)? = nil,
         volumeSummaries: (@Sendable () -> [SpaceMapVolumeSummary])? = nil,
+        scanCache: CleanScanResultStore? = nil,
         homeDirectory: String = NSHomeDirectory()
     ) {
         self.exclusions = exclusions
@@ -99,6 +109,7 @@ final class CleanerModel {
         self.trash = trash
         self.activity = activity
         self.volumeSummaries = volumeSummaries
+        self.scanCache = scanCache
         self.homeDirectory = PathNormalization.normalize(homeDirectory)
     }
 
@@ -138,6 +149,39 @@ final class CleanerModel {
         return "\(count) 个目录因 macOS 隐私保护未能扫到,授权全盘访问后重扫可收进来"
     }
 
+    /// 缓存结果的过期提示:扫描后排除配置变了 → 数字可能偏大(被排除的目录还在
+    /// 旧树里),建议重扫;配置一致则 nil。真实扫描永远无此提示。
+    var cacheStalenessHint: String? {
+        guard loadedFromCache, let meta = loadedCacheMeta,
+              meta.excludedPathPrefixes != exclusions.paths else { return nil }
+        return "上次扫描后排除配置已变——清单可能多列了新排除的目录,建议重新扫描"
+    }
+
+    // MARK: 缓存装载(p4-cleaner/11:开清理页时若无内存结果则读盘一次)
+
+    /// 空态才装(有扫描在跑 / 已有结果都不动);后台解码,落主线程后照常出清单/地图。
+    func loadCachedScan() {
+        guard case .idle = phase, scanTask == nil, let scanCache else { return }
+        Task.detached(priority: .utility) { [weak self, scanCache, volumeSummaries] in
+            guard let payload = scanCache.load() else { return }
+            let sealedVolumes = volumeSummaries?() ?? []
+            let mapTrees = payload.result.trees.map {
+                SpaceMapTree.build(from: $0, sealedVolumes: sealedVolumes)
+            }
+            await MainActor.run { self?.applyCached(payload, mapTrees: mapTrees) }
+        }
+    }
+
+    private func applyCached(_ payload: SpaceScanCachePayload, mapTrees: [SpaceMapNode]) {
+        guard case .idle = phase, scanTask == nil else { return }
+        phase = .finished(payload.result)
+        self.mapTrees = mapTrees
+        scanStartedAt = payload.meta.startedAt
+        scanFinishedAt = payload.meta.finishedAt
+        loadedFromCache = true
+        loadedCacheMeta = payload.meta
+    }
+
     // MARK: 扫描
 
     /// - Parameter enumerator: 生产不传 = Live 扫描器;测试传 TestSupport 假实现
@@ -153,8 +197,11 @@ final class CleanerModel {
         scanFinishedAt = nil
         phase = .scanning(ScanStats())
         mapTrees = []
-        // 重扫 = 新一轮真相:已回收集合清空(树会重新反映磁盘),勾选随清单收敛。
+        // 重扫 = 新一轮真相:已回收集合清空(树会重新反映磁盘),勾选随清单收敛;
+        // 缓存态一并复位(真实扫描覆盖装载态)。
         recycledPaths = []
+        loadedFromCache = false
+        loadedCacheMeta = nil
         if case .finished = cleanPhase {
             cleanPhase = .idle
         }
@@ -173,7 +220,7 @@ final class CleanerModel {
             canonicalRoots: canonical
         )
 
-        scanTask = Task.detached(priority: .utility) { [engine, volumeSummaries, weak self] in
+        scanTask = Task.detached(priority: .utility) { [engine, volumeSummaries, scanCache, weak self] in
             let scanBegin = Date()
             let result = await engine.scan(
                 options,
@@ -202,6 +249,27 @@ final class CleanerModel {
                     + " · 项 \(result.stats.entriesSeen) · 错误 \(result.ledger.count)",
                 category: "Cleaner"
             )
+            // 落盘缓存(票 11):写一次,失败只记日志不影响扫描结果;体积/耗时实测
+            // 见票面(真机 60 万节点 Release 基准)。
+            if let scanCache {
+                let started = await MainActor.run { self?.scanStartedAt ?? Date() }
+                let excluded = await MainActor.run { self?.exclusions.paths ?? [] }
+                let payload = SpaceScanCachePayload(
+                    meta: SpaceScanMeta(
+                        startedAt: started,
+                        finishedAt: Date(),
+                        roots: scanRoots,
+                        excludedPathPrefixes: excluded
+                    ),
+                    result: result
+                )
+                let encodeBegin = Date()
+                scanCache.save(payload)
+                LogService.info(
+                    "扫描缓存:写入 \(Int(Date().timeIntervalSince(encodeBegin) * 1000))ms",
+                    category: "Cleaner"
+                )
+            }
             await MainActor.run { self?.finish(result, mapTrees: mapTrees) }
         }
     }
