@@ -1,6 +1,11 @@
 import Foundation
 import PulseCore
 
+// attr 常量(sys/attr.h;SDK enum 不进 Swift 模块,DiskSensor 同款硬编码)
+private let attrBitmapCount = UInt16(5)
+private let attrVolInfo: attrgroup_t = 0x8000_0000
+private let attrVolSpaceUsed: attrgroup_t = 0x0080_0000
+
 // MARK: - Live 卷级摘要(方案 A:只读系统卷不逐文件走)
 
 /// 非数据系统卷的卷级字节(statfs):SSV(/)、Preboot、VM、Update、Recovery 等同
@@ -35,21 +40,40 @@ struct LiveCleanVolumeSummaries {
                   mountPoint != "/",
                   !excludedMounts.contains(mountPoint)
             else { continue }
-            // "/"(SSV 密封系统卷)也算:上面 statfs 的 root 就是它;其余同盘 apfs 卷一并。
-            let used = (Int64(fs.f_blocks) - Int64(fs.f_bfree)) * Int64(fs.f_bsize)
-            guard used > 0 else { continue }
+            // 每卷精确已用:getattrlist ATTR_VOL_SPACEUSED(DiskSensor/petal volume_used
+            // 同源)。**不能用 statfs 的 f_blocks−f_bfree**:APFS 各卷共享容器,这两个数
+            // 是容器级的——每卷都算出「整个容器已用」,六卷叠出 2.2TB 假账(2026-11-03
+            // 用户实拍 2461GB 实锤)。读失败跳过该卷(不伪造)。
+            guard let used = Self.volumeUsedBytes(atPath: mountPoint), used > 0 else { continue }
             out.append(SpaceMapVolumeSummary(
                 label: (mountPoint as NSString).lastPathComponent,
-                usedBytes: used
+                usedBytes: Int64(used)
             ))
         }
 
-        // SSV 本体("/" 挂载的密封系统卷)单独补上:系统文件所在地,必须进密封块。
-        let ssvUsed = (Int64(root.f_blocks) - Int64(root.f_bfree)) * Int64(root.f_bsize)
-        if ssvUsed > 0 {
-            out.append(SpaceMapVolumeSummary(label: "SSV", usedBytes: ssvUsed))
+        // SSV 本体("/" 挂载的密封系统卷):系统文件所在地,必须进密封块。
+        if let ssvUsed = Self.volumeUsedBytes(atPath: "/"), ssvUsed > 0 {
+            out.append(SpaceMapVolumeSummary(label: "SSV", usedBytes: Int64(ssvUsed)))
         }
         return out
+    }
+
+    /// 每卷精确已用(getattrlist;回包 = [u32 总长][off_t 已用 @ 偏移 4],DiskSensor 同款)。
+    private static func volumeUsedBytes(atPath path: String) -> UInt64? {
+        var attrs = attrlist(
+            bitmapcount: attrBitmapCount, reserved: 0,
+            commonattr: 0, volattr: attrVolInfo | attrVolSpaceUsed,
+            dirattr: 0, fileattr: 0, forkattr: 0
+        )
+        var buffer = [UInt8](repeating: 0, count: 16)
+        let ok = path.withCString { cPath in
+            getattrlist(cPath, &attrs, &buffer, buffer.count, 0) == 0
+        }
+        guard ok else { return nil }
+        return buffer.withUnsafeBytes { raw -> UInt64? in
+            let used = raw.loadUnaligned(fromByteOffset: 4, as: off_t.self)
+            return used >= 0 ? UInt64(used) : nil
+        }
     }
 
     /// "/dev/disk3s1s1" → "/dev/disk3";对不上模式(如 map 设备)返回 nil。
