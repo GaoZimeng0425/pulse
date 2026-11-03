@@ -53,7 +53,23 @@ struct CleanerPageHeader: View {
         case let .finished(result):
             // 清理后树不重扫(树只是快照),摘要数字会偏大——如实提示,不悄悄改数。
             let cleaned = model.recycledPaths.isEmpty ? "" : " · 本次已清理 \(model.recycledPaths.count) 项,重新扫描刷新数字"
-            return "上次扫描 \(result.cancelled ? "已取消(部分)" : "完成") · \(model.scanDurationText) · 实际占用口径" + cleaned
+            // 缓存装载(票 11):标相对时间,让「这是旧结果」一眼可见。
+            let age = model.loadedFromCache
+                ? " · \(Self.relativeAgeText(from: model.scanFinishedAt))前(缓存)"
+                : ""
+            return "上次扫描 \(result.cancelled ? "已取消(部分)" : "完成") · \(model.scanDurationText) · 实际占用口径" + age + cleaned
+        }
+    }
+
+    /// 相对时间人话(缓存装载的页头标注用)。
+    private static func relativeAgeText(from date: Date?) -> String {
+        guard let date else { return "—" }
+        let seconds = max(0, Date().timeIntervalSince(date))
+        switch seconds {
+        case ..<90: return "刚刚"
+        case ..<3600: return "\(Int(seconds / 60)) 分钟"
+        case ..<86400: return "\(Int(seconds / 3600)) 小时"
+        default: return "\(Int(seconds / 86400)) 天"
         }
     }
 }
@@ -83,6 +99,9 @@ struct CleanerTabView: View {
             if let hint = model.permissionHint {
                 fdaBanner(hint)
             }
+            if let stale = model.cacheStalenessHint {
+                stalenessBanner(stale)
+            }
             subPillBar
             switch subTab {
             case .junk: JunkListSection(model: model)
@@ -90,6 +109,23 @@ struct CleanerTabView: View {
             case .history: CleanHistorySection(model: model)
             }
         }
+        // 进清理页即试装载落盘缓存(p4-cleaner/11):空态且无在跑扫描才读盘
+        // (后台解码),已有结果 / 扫描中 / 无缓存都零动作;常驻稳态零成本。
+        .task { model.loadCachedScan() }
+    }
+
+    /// 缓存过期提示(扫描后排除配置变了,数字只可能偏大):信息语气,不是警告琥珀。
+    private func stalenessBanner(_ text: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "clock.badge.exclamationmark")
+                .foregroundStyle(.secondary)
+            Text(text)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .padding(12)
+        .background(Surface.cardHigh.opacity(0.6), in: .rect(cornerRadius: 12))
     }
 
     // MARK: FDA 引导(spec:未授时受限如实标注 + 直达系统设置)
