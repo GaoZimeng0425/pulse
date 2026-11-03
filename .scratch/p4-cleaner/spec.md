@@ -70,9 +70,21 @@ Status: ready-for-agent
 - Live 薄壳(FDA 检测、真扫描器装拆)进 PulseTests;真机全卷扫描的观感与性能(首扫时长、扫描中可取消、与 Finder 数字互证)交收口票人工目验(用户有眼睛,不循环截图)。
 - 先例:GroupingEngine 合成快照测试、BadgeDisplayHysteresis 状态机测试、HistoryDatabase 内存库迁移测试。
 
+## 二期:应用卸载器(2026-11-01 grill 定案,开工时立票)
+
+词汇以 GLOSSARY「清理」节为准(应用卸载 / 残留 / cask 收据 / 彻底删除);永久路径口径见 ADR-0010;白名单与用户态纪律(ADR-0008 / ADR-0009)原样适用。
+
+- **入口与清单**:清理页第 4 个子药丸「应用」。清单 = /Applications(含 Utilities)+ ~/Applications 的 .app,按名排序,v1 无搜索;Apple 签名的系统应用永不进清单;无权限删除的灰行标「无权限」;正在运行的灰行标「先退出」,不提供退出 / 终止按钮。在用保护与清理器同款:删除前重查、判定不缓存。
+- **行与交互**:图标 + 名字 + .app 实际占用 + brew 徽标;点行展开残留清单(每行 = 路径 + 实际占用,默认不勾);v1 单 app 逐个卸载,不做跨 app 多选;不做「最近使用时间」。
+- **brew 侧**:徽标判定 = 离线读 Caskroom 收据(INSTALL_RECEIPT.json 的 uninstall_artifacts 对 app 名),对不上宁可漏标不误标。执行卸载时才调 `brew uninstall --cask`;brew 缺失 / 失败 = 行内红字原因 + 本次整体中止,绝不回退文件删除。非 brew 徽标的应用点卸载时,本机有 brew 则动作时刻跑一次交叉核对,发现归 brew 管即提示改道(可继续可取消)。brew 应用的残留候选优先取收据 zap 段声明的路径,未覆盖处落回通用位置清单。
+- **删除执行**:默认 .app + 所选残留一律移废纸篓,复用清理器同款确认清单弹窗;「彻底删除」勾选(brew / 非 brew 统一,默认不勾、不记忆跨次):勾 = 永久删除(brew 走 `--zap`),确认清单逐行标「永久删除」+ 明示不可恢复(ADR-0010)。
+- **残留候选位置**(键 = bundle id 与应用名,目录名全等才命中):Application Support / Caches / Preferences(`<bid>.plist`)/ Containers / Group Containers(后缀匹配,前缀为团队 id)/ Saved Application State / HTTPStorages / WebKit / Logs / Application Scripts;LaunchAgents 恒「先检查」档;PrivilegedHelperTools 不碰(root 域)。
+- **清理历史**:沿用同表,去向新增「已卸载(brew,永久)」与「永久删除」。
+- **不做**:iSurge 式 Homebrew 管理页(装了什么 / 谁在用 / 什么可删);清理页(开发者垃圾)不加「彻底删除」勾选——那里的永久路径仍是「废纸篓 → 清空废纸篓」两段式。
+
 ## Out of Scope
 
-二期批次(各批开工前单独 grill):应用缓存页、大文件 + 重复文件、应用卸载器、浏览器缓存、登录项 / 启动代理管理、Docker 悬空资源、维护任务、Intel 瘦身、TM 本地快照删除、iOS 模拟器清理、空间地图内删除(白名单识别块标出可删的 C 形态)。
+二期批次(各批开工前单独 grill;应用卸载器已定案,见上节):应用缓存页、大文件 + 重复文件、应用卸载器、浏览器缓存、登录项 / 启动代理管理、Docker 悬空资源、维护任务、Intel 瘦身、TM 本地快照删除、iOS 模拟器清理、空间地图内删除(白名单识别块标出可删的 C 形态)。
 
 明确不做:邮件附件、照片库垃圾、恶意软件扫描、浏览器隐私擦除、语言文件修剪(破坏签名)。
 
