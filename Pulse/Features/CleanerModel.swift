@@ -53,6 +53,14 @@ final class CleanerModel {
     private(set) var loadedFromCache = false
     /// 装载时的元信息(时间戳给页头「上次扫描 X 前」;排除快照给过期判定)。
     private(set) var loadedCacheMeta: SpaceScanMeta?
+    /// 最近一次落盘的元信息(清理后增量更新 cleanedPaths 用;扫描/装载时刷新)。
+    private(set) var lastSavedMeta: SpaceScanMeta?
+    /// 本会话亲手清理的项数(页头「本次已清理」只认它,不含缓存带来的历史清理)。
+    private(set) var sessionCleanedCount = 0
+
+    /// 清理活动变化广播(quit 门卫订阅):userInfo["running"] = Bool。
+    /// nonisolated:Notification.Name 是不可值,门卫(nonisolated 类)直接引用。
+    nonisolated static let cleanActivityNotification = Notification.Name("cleanerCleanActivityChanged")
 
     /// 清理历史列表(nil = 尚未加载或不可用;见 `historyAvailable`)。
     private(set) var historyRuns: [CleanRunRecord]?
@@ -180,6 +188,9 @@ final class CleanerModel {
         scanFinishedAt = payload.meta.finishedAt
         loadedFromCache = true
         loadedCacheMeta = payload.meta
+        lastSavedMeta = payload.meta
+        // 落盘后的清理记录照旧过滤(树是快照,这些路径已进废纸篓)。
+        recycledPaths.formUnion(payload.meta.cleanedPaths)
     }
 
     // MARK: 扫描
@@ -200,6 +211,7 @@ final class CleanerModel {
         // 重扫 = 新一轮真相:已回收集合清空(树会重新反映磁盘),勾选随清单收敛;
         // 缓存态一并复位(真实扫描覆盖装载态)。
         recycledPaths = []
+        sessionCleanedCount = 0
         loadedFromCache = false
         loadedCacheMeta = nil
         if case .finished = cleanPhase {
@@ -254,15 +266,14 @@ final class CleanerModel {
             if let scanCache {
                 let started = await MainActor.run { self?.scanStartedAt ?? Date() }
                 let excluded = await MainActor.run { self?.exclusions.paths ?? [] }
-                let payload = SpaceScanCachePayload(
-                    meta: SpaceScanMeta(
-                        startedAt: started,
-                        finishedAt: Date(),
-                        roots: scanRoots,
-                        excludedPathPrefixes: excluded
-                    ),
-                    result: result
+                let meta = SpaceScanMeta(
+                    startedAt: started,
+                    finishedAt: Date(),
+                    roots: scanRoots,
+                    excludedPathPrefixes: excluded
                 )
+                let payload = SpaceScanCachePayload(meta: meta, result: result)
+                await MainActor.run { self?.lastSavedMeta = meta }
                 let encodeBegin = Date()
                 scanCache.save(payload)
                 LogService.info(
@@ -425,7 +436,8 @@ final class CleanerModel {
             return
         }
         cleanPhase = .running
-        Task { [trash, history] in
+        Self.postCleanActivity(true)
+        Task { [trash, history, weak self] in
             let report = await CleanRunner.run(plan, using: trash)
             var recorded = false
             if let history {
@@ -435,17 +447,45 @@ final class CleanerModel {
                     LogService.error("清理历史落库失败:\(error)", category: "Cleaner")
                 }
             }
-            self.applyCleanReport(report, historyRecorded: recorded)
+            self?.applyCleanReport(report, historyRecorded: recorded)
         }
+    }
+
+    private static func postCleanActivity(_ running: Bool) {
+        NotificationCenter.default.post(
+            name: cleanActivityNotification,
+            object: nil,
+            userInfo: ["running": running]
+        )
     }
 
     private func applyCleanReport(_ report: CleanRunReport, historyRecorded: Bool) {
         recycledPaths.formUnion(report.recycledPaths)
+        sessionCleanedCount += report.recycledPaths.count
         selection.retain(in: candidates)
         cleanPhase = .finished(report, historyRecorded: historyRecorded)
+        updateCacheAfterClean(recycled: Array(report.recycledPaths))
+        Self.postCleanActivity(false)
         if historyRecorded, historyRuns != nil {
             Task { await loadHistory() }
         }
+    }
+
+    /// 清理后把 cleanedPaths 增量写回缓存(重开不再回列表;关窗不影响——后台任务
+    /// 持 self,报告落地即写,185ms 级,不挡任何东西)。
+    private func updateCacheAfterClean(recycled: [String]) {
+        guard let scanCache, let result, let saved = lastSavedMeta else { return }
+        let merged = Array(Set(saved.cleanedPaths).union(recycled)).sorted()
+        let meta = SpaceScanMeta(
+            startedAt: saved.startedAt,
+            finishedAt: saved.finishedAt,
+            roots: saved.roots,
+            excludedPathPrefixes: exclusions.paths,
+            cleanedPaths: merged
+        )
+        lastSavedMeta = meta
+        let payload = SpaceScanCachePayload(meta: meta, result: result)
+        Task.detached(priority: .utility) { scanCache.save(payload) }
     }
 
     func dismissCleanReport() {

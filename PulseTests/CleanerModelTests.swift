@@ -621,6 +621,101 @@ final class CleanerModelTests: XCTestCase {
         XCTAssertNil(bare.result, "无缓存 store:装载零动作")
     }
 
+    // MARK: 清理生命周期(p4-cleaner/11 补丁,2026-11-03 用户实案)
+
+    func testCleanedItemsFilteredAfterRelaunchFromCache() async {
+        final class Box: @unchecked Sendable {
+            private let lock = NSLock()
+            private var payload: SpaceScanCachePayload?
+            var value: SpaceScanCachePayload? {
+                get { lock.lock()
+                    defer { lock.unlock() }
+                    return payload
+                }
+                set { lock.lock()
+                    defer { lock.unlock() }
+                    payload = newValue
+                }
+            }
+        }
+        let box = Box()
+        let cache = CleanScanResultStore(load: { box.value }, save: { box.value = $0 })
+
+        // 会话 1:扫描 → 勾选 → 清理(spy 全部成功)
+        let homebrew = "/Users/me/Library/Caches/Homebrew"
+        let spy = FakeCleanTrashExecutor(nextRecycleOutcome: TrashRecycleOutcome(
+            recycled: [homebrew: "/Users/me/.Trash/Homebrew"]
+        ))
+        let first = CleanerModel(
+            exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
+            trash: spy,
+            scanCache: cache,
+            homeDirectory: "/Users/me"
+        )
+        first.startScan(using: makeCacheFixture())
+        await waitUntil { !first.isScanning }
+        first.toggle(first.candidates[0])
+        first.requestClean()
+        first.confirmClean()
+        await waitForCleanFinished(first)
+        XCTAssertEqual(first.candidates.isEmpty, true, "清完的项不再列(会话内)")
+
+        // 清后缓存被增量更新:cleanedPaths 含该路径
+        await waitUntil { box.value?.meta.cleanedPaths.contains(homebrew) == true }
+
+        // 会话 2(重启语义):装载 → 已清项过滤,不回列表
+        let second = CleanerModel(
+            exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
+            scanCache: cache,
+            homeDirectory: "/Users/me"
+        )
+        second.loadCachedScan()
+        await waitUntil { second.result != nil }
+        XCTAssertEqual(second.candidates.isEmpty, true, "缓存带来的已清项照旧过滤(修复:不再回列)")
+        XCTAssertEqual(second.sessionCleanedCount, 0, "历史清理不计入「本次已清理」")
+    }
+
+    func testCleanActivityBroadcastFlipsRunning() async {
+        final class Box: @unchecked Sendable {
+            private let lock = NSLock()
+            var running = false
+            func set(_ v: Bool) {
+                lock.lock()
+                defer { lock.unlock() }
+                running = v
+            }
+        }
+        let box = Box()
+        let token = NotificationCenter.default.addObserver(
+            forName: CleanerModel.cleanActivityNotification,
+            object: nil,
+            queue: .main
+        ) { note in
+            box.set((note.userInfo?["running"] as? Bool) == true)
+        }
+        defer { NotificationCenter.default.removeObserver(token) }
+
+        let homebrew = "/Users/me/Library/Caches/Homebrew"
+        let spy = FakeCleanTrashExecutor(nextRecycleOutcome: TrashRecycleOutcome(
+            recycled: [homebrew: "/Users/me/.Trash/Homebrew"]
+        ))
+        let model = CleanerModel(
+            exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
+            trash: spy,
+            homeDirectory: "/Users/me"
+        )
+        model.startScan(using: makeCacheFixture())
+        await waitUntil { !model.isScanning }
+        XCTAssertFalse(box.running, "未在清理时不得广播 running")
+
+        model.toggle(model.candidates[0])
+        model.requestClean()
+        model.confirmClean()
+        await waitUntil { box.running } // 开始即广播 true(quit 门卫依赖)
+        await waitForCleanFinished(model)
+        await waitUntil { !box.running } // 结束回落 false
+    }
+
     private func waitUntil(_ condition: @MainActor () -> Bool) async {
         for _ in 0 ..< 500 {
             if condition() {

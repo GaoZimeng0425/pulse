@@ -382,8 +382,37 @@ final class PopupPanel: NSPanel {
 /// 定时器(_scheduleCheckForTerminateAfterLastWindowClosed,2026-10-29 法医栈
 /// 实证)会把常驻菜单栏 app 杀掉——明确拒绝。SwiftUI 经 Adaptor 合并转发。
 final class KeepAliveAppDelegate: NSObject, NSApplicationDelegate {
+    /// 清理门卫(2026-11-03 用户实案:清理中退出 app,任务随进程被杀、文件半途而废、
+    /// 历史零记录)。清理运行中拦下退出(⌘Q/菜单/Dock 退出),把主窗弹到前面让进度
+    /// 可见——**不弹阻塞对话框**:runModal 会卡主线程,NSWorkspace 回调落不了地,
+    /// 清理就真死锁了。紧急逃生仍有强制退出(⌘⇧⌥Q / 活动监视器)。
+    private var cleanRunning = false
+    private var observer: NSObjectProtocol?
+
+    override init() {
+        super.init()
+        observer = NotificationCenter.default.addObserver(
+            forName: CleanerModel.cleanActivityNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            self?.cleanRunning = (note.userInfo?["running"] as? Bool) == true
+        }
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard cleanRunning else { return .terminateNow }
+        // 弹回主窗(清理页):让「正在移入废纸篓…」可见,清完广播落地后退出即恢复。
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        NotificationCenter.default.post(
+            name: AlertNotificationRouter.openMainWindowNotification,
+            object: nil
+        )
+        return .terminateCancel
     }
 
     /// 点 Dock 图标:已有可见窗交给系统置前;主窗已关(常规 app 现在有常驻 Dock 图标,

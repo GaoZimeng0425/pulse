@@ -22,17 +22,21 @@ public struct SpaceScanMeta: Sendable, Equatable {
     public var roots: [String]
     /// 扫描时的排除清单快照。
     public var excludedPathPrefixes: [String]
+    /// 落盘后又清理掉的路径(扫描快照里还挂着,装载后照旧过滤,直到下次重扫)。
+    public var cleanedPaths: [String]
 
     public init(
         startedAt: Date,
         finishedAt: Date,
         roots: [String],
-        excludedPathPrefixes: [String]
+        excludedPathPrefixes: [String],
+        cleanedPaths: [String] = []
     ) {
         self.startedAt = startedAt
         self.finishedAt = finishedAt
         self.roots = roots
         self.excludedPathPrefixes = excludedPathPrefixes
+        self.cleanedPaths = cleanedPaths
     }
 }
 
@@ -50,7 +54,9 @@ public struct SpaceScanCachePayload: Sendable {
 public enum SpaceScanCache {
     static let magic: [UInt8] = Array("PSC1".utf8)
     /// 格式版本(魔数后 u32 小端)。不兼容变更:改魔数,不覆写旧文件语义。
-    static let formatVersion: UInt32 = 1
+    /// v2(2026-11-03):meta 增 cleanedPaths(清理后重开不再回列表);v1 文件弃用,
+    /// 代价是升版后第一次要重扫一次。
+    static let formatVersion: UInt32 = 2
 
     // MARK: 编码
 
@@ -64,6 +70,7 @@ public enum SpaceScanCache {
         w.f64(meta.finishedAt.timeIntervalSince1970)
         w.strings(meta.roots)
         w.strings(meta.excludedPathPrefixes)
+        w.strings(meta.cleanedPaths)
 
         let result = payload.result
         w.bool(result.cancelled)
@@ -144,6 +151,7 @@ public enum SpaceScanCache {
               let finished = r.f64(),
               let roots = r.strings(),
               let exclusions = r.strings(),
+              let cleanedPaths = r.strings(),
               let cancelled = r.bool(),
               let entries = r.varint(),
               let files = r.varint(),
@@ -198,7 +206,8 @@ public enum SpaceScanCache {
                 startedAt: Date(timeIntervalSince1970: started),
                 finishedAt: Date(timeIntervalSince1970: finished),
                 roots: roots,
-                excludedPathPrefixes: exclusions
+                excludedPathPrefixes: exclusions,
+                cleanedPaths: cleanedPaths
             ),
             result: SpaceScanResult(trees: trees, ledger: ledger, stats: stats, cancelled: cancelled)
         )
