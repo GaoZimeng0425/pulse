@@ -234,8 +234,8 @@ struct DashboardView: View {
         }]
     }
 
-    /// 开主窗口:LSUIElement 应用激活策略为 .accessory,开窗只建窗不抢前台,窗口会开在
-    /// 其他应用后面(实机反馈"点了没反应")——先激活再开窗。开窗走广播由菜单栏控制器统一
+    /// 开主窗口:先激活再开窗(历史:LSUIElement 时代开窗不抢前台会开在别的 app 后面;
+    /// 现为常规 app,激活依然保证从前台路径进来)。开窗走广播由菜单栏控制器统一
     /// 路由(收面板 + 经桥开主窗):NSPanel 宿主里环境 openWindow 是哑动作。带 tab / 排行卡
     /// 时主窗口已开则直接落地;冷开窗由控制器先记进路由、主窗口出现再消费(ranking-limit/01)。
     private static func openMainWindow(tab: MetricTab? = nil, rankingID: String? = nil) {
