@@ -194,19 +194,7 @@ private struct SunburstChart: View {
             ForEach(coloredArcs) { item in
                 ArcShape(arc: item.arc, radius: radius)
                     .fill(item.color)
-                    // SwiftUI 默认按矩形框架命中测试——ZStack 里所有弧都占 340×340,
-                    // 只剩最顶(ForEach 最后一个)吃到全部事件(用户实拍:悬浮/下钻只
-                    // 认 700M 那块)。contentShape 用弧自身路径做命中区域。
-                    .contentShape(ArcShape(arc: item.arc, radius: radius))
                     .opacity(item.arc.id == hoveredID ? 0.72 : item.arc.node.isSealed ? 1.0 : 0.92)
-                    .onTapGesture { onTap(item.arc.node) }
-                    .onHover { hovering in
-                        if hovering {
-                            hoveredID = item.arc.id
-                        } else if hoveredID == item.arc.id {
-                            hoveredID = nil
-                        }
-                    }
             }
             center(radius: radius)
             labels(radius: radius)
@@ -215,6 +203,63 @@ private struct SunburstChart: View {
             }
         }
         .frame(width: Self.diameter, height: Self.diameter)
+        .contentShape(Rectangle())
+        .onTapGesture { location in
+            if let node = hitArc(at: location, radius: radius)?.node {
+                onTap(node)
+            }
+        }
+        .onContinuousHover { phase in
+            switch phase {
+            case let .active(location):
+                hoveredID = hitArc(at: location, radius: radius)?.id
+            case .ended:
+                hoveredID = nil
+            }
+        }
+    }
+
+    // MARK: 坐标命中(不再依赖 SwiftUI 逐形状 hit test——ZStack 里形状框架全重叠,
+
+    // 只有最顶层吃到事件;反算角度+半径直接匹配,百分百可靠)
+
+    /// 给定图表局部坐标,返回命中的弧(nil = 命中空白或中心)。
+    private func hitArc(at point: CGPoint, radius: CGFloat) -> SunburstArc? {
+        let center = CGPoint(x: radius, y: radius)
+        let dx = point.x - center.x
+        let dy = point.y - center.y
+        let distance = sqrt(dx * dx + dy * dy)
+        // 中心圆区域 → 无弧(中心有自己的交互)
+        guard distance > radius * 0.34, distance <= radius * 0.995 else { return nil }
+        // 逆时针还是顺时针取决于 dy 符号;布局约定:start = -π/2(正上),顺时针增大
+        var angle = atan2(dy, dx)
+        if angle < 0 {
+            angle += 2 * .pi
+        }
+        // atan2 的 0 = 正右(3 点钟),布局的 0 = 正上(-π/2 = atan2 意义的 -π/2)
+        // 统一到布局坐标:布局角 = atan2 角 + π/2,再归到 [0, 2π)
+        var layoutAngle = angle + .pi / 2
+        if layoutAngle >= 2 * .pi {
+            layoutAngle -= 2 * .pi
+        }
+        if layoutAngle < 0 {
+            layoutAngle += 2 * .pi
+        }
+
+        let ring: Int = distance <= radius * 0.68 ? 1 : 2
+        for arc in arcs where arc.ring == ring {
+            let start = arc.start
+            let end = arc.end
+            // 跨 0 弧(如 start=5.8,end=6.5 → 包裹过 0)
+            if start <= end {
+                if layoutAngle >= start, layoutAngle < end {
+                    return arc
+                }
+            } else if layoutAngle >= start || layoutAngle < end {
+                return arc
+            }
+        }
+        return nil
     }
 
     // MARK: 配色(内环循环既有令牌,外环随父色;布局按父-子顺序产出,顺序即着色依据)
