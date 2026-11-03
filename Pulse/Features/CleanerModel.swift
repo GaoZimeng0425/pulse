@@ -169,9 +169,20 @@ final class CleanerModel {
 
     /// 空态才装(有扫描在跑 / 已有结果都不动);后台解码,落主线程后照常出清单/地图。
     func loadCachedScan() {
-        guard case .idle = phase, scanTask == nil, let scanCache else { return }
+        guard case .idle = phase, scanTask == nil else {
+            LogService.info("缓存装载:跳过(phase 非空态或扫描在跑)", category: "Cleaner")
+            return
+        }
+        guard let scanCache else {
+            LogService.warn("缓存装载:无 store(装配缺失?)", category: "Cleaner")
+            return
+        }
+        LogService.info("缓存装载:开始读盘+解码", category: "Cleaner")
         Task.detached(priority: .utility) { [weak self, scanCache, volumeSummaries] in
-            guard let payload = scanCache.load() else { return }
+            guard let payload = scanCache.load() else {
+                LogService.warn("缓存装载:文件缺失或解码失败", category: "Cleaner")
+                return
+            }
             let sealedVolumes = volumeSummaries?() ?? []
             let mapTrees = payload.result.trees.map {
                 SpaceMapTree.build(from: $0, sealedVolumes: sealedVolumes)
@@ -181,7 +192,14 @@ final class CleanerModel {
     }
 
     private func applyCached(_ payload: SpaceScanCachePayload, mapTrees: [SpaceMapNode]) {
-        guard case .idle = phase, scanTask == nil else { return }
+        guard case .idle = phase, scanTask == nil else {
+            LogService.warn("缓存装载:解码完成但状态已变,放弃套用", category: "Cleaner")
+            return
+        }
+        LogService.info(
+            "缓存装载:已套用 · 项 \(payload.result.stats.entriesSeen) · 扫描于 \(payload.meta.finishedAt)",
+            category: "Cleaner"
+        )
         phase = .finished(payload.result)
         self.mapTrees = mapTrees
         scanStartedAt = payload.meta.startedAt
