@@ -23,10 +23,12 @@ struct JunkListSection: View {
             // 设置窗「清理」页,主窗口这边扫之前看不到任何提示)。
             VStack(alignment: .leading, spacing: 4) {
                 CardEmptyState(
-                    title: "先扫描才能识别垃圾",
-                    detail: "点右上「扫描整台 Mac」——白名单识别,未识别的目录不会出现",
-                    actionTitle: "开始扫描",
-                    action: { model.startScan() }
+                    title: model.isRestoringCache ? "正在恢复上次扫描结果…" : "先扫描才能识别垃圾",
+                    detail: model.isRestoringCache
+                        ? "从缓存读回上次结果(约一秒;机器满载时稍等)"
+                        : "点右上「扫描整台 Mac」——白名单识别,未识别的目录不会出现",
+                    actionTitle: model.isRestoringCache ? nil : "开始扫描",
+                    action: model.isRestoringCache ? nil : { model.startScan() }
                 )
                 if !model.hasScanRoots {
                     Text("想清项目产物(node_modules 等)?先到 设置 → 清理 配置项目目录:工具栏齿轮打开设置,勾选建议目录或自添(如 ~/Documents/Learn/macos)。")
