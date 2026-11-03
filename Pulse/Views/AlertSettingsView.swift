@@ -39,7 +39,15 @@ struct AlertSettingsView: View {
                 Toggle(isOn: toastDeliveryBinding) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("NemoNotch 卡片")
-                        Text("资源类告警同时经本机 NemoNotch 在刘海下弹卡片,点名最耗资源的进程;NemoNotch 未运行时静默跳过。")
+                        Text("资源类告警经本机 NemoNotch 在刘海下弹卡片,点名最耗资源的进程;NemoNotch 未运行时静默跳过。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Toggle(isOn: systemDeliveryBinding) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("系统通知")
+                        Text("macOS 通知横幅。未手动改过时与 NemoNotch 卡片互斥:开了卡片就不发横幅,一条告警只弹一处;两个都想要就都打开。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -86,6 +94,14 @@ struct AlertSettingsView: View {
         Binding(
             get: { center.store.toastDeliveryEnabled },
             set: { center.store.setToastDeliveryEnabled($0) }
+        )
+    }
+
+    /// 系统通知投递开关绑定(显式写死独立键;授权状态展示照旧,开关本身不触发请求)。
+    private var systemDeliveryBinding: Binding<Bool> {
+        Binding(
+            get: { center.store.systemDeliveryEnabled },
+            set: { center.store.setSystemDeliveryEnabled($0) }
         )
     }
 
