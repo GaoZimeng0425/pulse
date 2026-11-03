@@ -52,7 +52,11 @@ struct MainWindowView: View {
             scanRoots: cleanScanRoots,
             history: monitor.history.cleanHistory,
             activity: LiveCleanActivitySource(board: monitor.activityBoard),
-            volumeSummaries: { LiveCleanVolumeSummaries().internalSystemVolumes() }
+            volumeSummaries: { LiveCleanVolumeSummaries().internalSystemVolumes() },
+            // 落盘缓存(票 11):2026-11-03 实机排障发现此装配点漏传——测试全绿
+            // (注入 store)而正式版从未落盘,关窗即回空态。registry-漏登病再犯,
+            // 见 p2-audit 教训;目录建不了时 init 返回 nil,功能优雅降级。
+            scanCache: CleanScanResultStore()
         ))
         // 展示轴随电池可用性(工单 02):无内建电池的机器不含电池页。
         // 窗口新建/重建时先取路由落点(点通知时窗口可能还没开)。
