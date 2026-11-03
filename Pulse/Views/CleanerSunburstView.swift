@@ -194,6 +194,10 @@ private struct SunburstChart: View {
             ForEach(coloredArcs) { item in
                 ArcShape(arc: item.arc, radius: radius)
                     .fill(item.color)
+                    // SwiftUI 默认按矩形框架命中测试——ZStack 里所有弧都占 340×340,
+                    // 只剩最顶(ForEach 最后一个)吃到全部事件(用户实拍:悬浮/下钻只
+                    // 认 700M 那块)。contentShape 用弧自身路径做命中区域。
+                    .contentShape(ArcShape(arc: item.arc, radius: radius))
                     .opacity(item.arc.id == hoveredID ? 0.72 : item.arc.node.isSealed ? 1.0 : 0.92)
                     .onTapGesture { onTap(item.arc.node) }
                     .onHover { hovering in
