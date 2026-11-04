@@ -250,7 +250,13 @@ public enum AppLeftovers {
         var seen = Set(result.compactMap(\.fixedPath))
         for raw in brewZapPaths {
             let path = CaskReceipt.expandTilde(raw)
-            guard path.hasPrefix(homePrefix), zapAll.insert(path).inserted else { continue }
+            // 家域过滤 + PrivilegedHelperTools 显式排除:它在 ~/Library 下(家域
+            // 前缀拦不住)但语义是 root 域(特权助手安装处,root 属主),ADR-0009
+            // 恒不碰——收据声明了也不进清单(testPrivilegedHelperToolsNeverProbed)。
+            guard path.hasPrefix(homePrefix),
+                  !path.contains("/PrivilegedHelperTools/"),
+                  zapAll.insert(path).inserted
+            else { continue }
             if seen.insert(path).inserted {
                 zapExtra.append(path)
             }
