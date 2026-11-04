@@ -293,6 +293,12 @@ public enum HistoryDatabase {
             """)
             try db.execute(sql: "CREATE INDEX clean_item_run ON clean_item(run_id)")
         }
+        // p4-uninstaller/03:卸载域永久删除路由(direct=彻底删除 / brew=brew 卸载带走)。
+        // 旧行 NULL = 非 permanent;与 destination/failure 三列正交,读取侧解码成
+        // CleanItemOutcome.permanentlyDeleted。
+        migrator.registerMigration("p4-uninstaller-03-uninstall-history") { db in
+            try db.execute(sql: "ALTER TABLE clean_item ADD COLUMN permanent_route TEXT")
+        }
 
         return migrator
     }

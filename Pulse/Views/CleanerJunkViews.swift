@@ -735,6 +735,15 @@ private struct CleanHistoryItemRow: View {
             var text = AttributedString("→ " + (destination as NSString).lastPathComponent)
             text.foregroundColor = Color.secondary
             return text
+        case .permanentlyDeleted(route: .direct):
+            // p4-uninstaller/03:彻底删除直删——无去向路径,标明不可恢复。
+            var text = AttributedString("永久删除")
+            text.foregroundColor = Surface.negative
+            return text
+        case .permanentlyDeleted(route: .brew):
+            var text = AttributedString("已卸载(brew,永久)")
+            text.foregroundColor = Surface.negative
+            return text
         case let .failed(reason):
             var text = AttributedString("失败:" + reason)
             text.foregroundColor = Surface.negative

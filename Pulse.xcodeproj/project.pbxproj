@@ -119,6 +119,7 @@
 		A5132CFE821C63B253C7D50B /* SmcSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4AD28E35F37C300CAEC8717 /* SmcSensor.swift */; };
 		A6DF542F79BD60BFE631FD62 /* MonitorAssembly.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16E122CDE8CB7A49B14C617E /* MonitorAssembly.swift */; };
 		A7EC8929C2925EBEC907E4DC /* LiveCleanVolumeSummaries.swift in Sources */ = {isa = PBXBuildFile; fileRef = 521CFD7E4C18FECCE0749E5E /* LiveCleanVolumeSummaries.swift */; };
+		A83B3273400AF603C993572D /* LiveBrewUninstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A04E30F215BC0E462F41F6 /* LiveBrewUninstaller.swift */; };
 		A94FE8284BA99E78188EAEA4 /* SyntheticProcessSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F037E709135740FF3012BA47 /* SyntheticProcessSourceTests.swift */; };
 		AA528E9EE2DB20755AA5481C /* LaunchdManifestFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B76926FB48518EBB58CAA6F /* LaunchdManifestFeatureTests.swift */; };
 		AA6920C6B25E30AC0A50495C /* BatteryFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AF42F49FFB85D97F2B8C74D /* BatteryFixture.swift */; };
@@ -235,6 +236,7 @@
 		1D62C614668136B62C900ECA /* RankingOverflowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingOverflowTests.swift; sourceTree = "<group>"; };
 		1FF2CA7CD9C3FB8777581E6E /* ContainerFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerFeature.swift; sourceTree = "<group>"; };
 		200DFF5D21AE90C78A55C055 /* ContainerSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerSensor.swift; sourceTree = "<group>"; };
+		20A04E30F215BC0E462F41F6 /* LiveBrewUninstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveBrewUninstaller.swift; sourceTree = "<group>"; };
 		215416C474EC313A5A138037 /* SystemStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemStatsTests.swift; sourceTree = "<group>"; };
 		2395D7D9D7A918F62EDFADD8 /* InertSources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InertSources.swift; sourceTree = "<group>"; };
 		23CC14BC245E753EAACD6E13 /* LiveCoreTickSourceSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCoreTickSourceSmokeTests.swift; sourceTree = "<group>"; };
@@ -531,6 +533,7 @@
 				AD227C96857D63ACF7B5E480 /* KillService.swift */,
 				986C77EF7853628E6A424165 /* LaunchdManifestSensor.swift */,
 				DB7CF3F08B4853A7F4B4401E /* LiveAppCatalogSource.swift */,
+				20A04E30F215BC0E462F41F6 /* LiveBrewUninstaller.swift */,
 				CD87D6AF9EFA784A9E84C641 /* LiveCleanActivitySource.swift */,
 				7FFE17F679EFFD8CCA29B0DC /* LiveCleanDirectoryEnumerator.swift */,
 				402CDC78D088CCD268E214D9 /* LiveCleanTrashExecutor.swift */,
@@ -888,6 +891,7 @@
 				71FDAE1452AD249D0F8D0867 /* LaunchdManifestFeature.swift in Sources */,
 				0B23F408C8204B0867448614 /* LaunchdManifestSensor.swift in Sources */,
 				B8A7E170826E5E447B7C0211 /* LiveAppCatalogSource.swift in Sources */,
+				A83B3273400AF603C993572D /* LiveBrewUninstaller.swift in Sources */,
 				2F016FF68304A538C3FEF849 /* LiveCleanActivitySource.swift in Sources */,
 				57D679777701897AD304570E /* LiveCleanDirectoryEnumerator.swift in Sources */,
 				7EECD9B072C93FEBF647E76A /* LiveCleanTrashExecutor.swift in Sources */,

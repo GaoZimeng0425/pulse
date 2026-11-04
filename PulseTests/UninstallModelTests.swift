@@ -147,6 +147,121 @@ final class UninstallModelTests: XCTestCase {
         XCTAssertTrue(model.isLeftoverSelected(launchAgent))
     }
 
+    // MARK: 卸载执行状态机(03;全假边界注入)
+
+    private func makeExecModel(
+        recycle: @escaping @Sendable ([String]) async -> TrashRecycleOutcome = { paths in
+            TrashRecycleOutcome(recycled: Dictionary(uniqueKeysWithValues: paths.map { ($0, "/Trash/\($0)") }))
+        },
+        brew: @escaping @Sendable (String, Bool) async -> BrewUninstallResult = { _, _ in .success },
+        crossCheck: @escaping @Sendable () async -> [String: String] = { [:] }
+    ) -> UninstallModel {
+        UninstallModel(
+            collectFacts: {
+                LiveAppCatalogFacts(
+                    candidates: [
+                        AppCatalogCandidate(
+                            path: "/Applications/Demo.app", directoryName: "Demo.app",
+                            bundleID: "com.demo", displayName: "Demo"
+                        ),
+                    ],
+                    brewAppNames: [:], brewZapPaths: [:]
+                )
+            },
+            scanSizes: { paths, _, _ in
+                ["/Applications/Demo.app": (bytes: 1000, partial: false)].filter { paths.contains($0.key) }
+            },
+            activityBoard: nil,
+            prober: { _ in [] },
+            recycle: recycle,
+            deletePermanently: { paths in
+                PermanentDeletionOutcome(deleted: Set(paths))
+            },
+            brewUninstall: brew,
+            crossCheckCasks: crossCheck
+        )
+    }
+
+    private func waitIdle(_ model: UninstallModel) async {
+        for _ in 0 ..< 200 where model.uninstallPhase == .running {
+            await Task.yield()
+        }
+    }
+
+    func testConfirmFlowCompletesRemovesRowAndClearsSelection() async {
+        let model = makeExecModel()
+        model.loadIfNeeded()
+        await waitForFinished(model)
+        let entry = model.displayedEntries[0]
+        model.onExpand(entry)
+        model.togglePermanentDelete(entry) // 彻底删除 → 直删路径
+        model.requestUninstall(entry)
+        guard case .confirming = model.uninstallPhase else {
+            return XCTFail("应进确认态")
+        }
+        model.confirmUninstall()
+        await waitIdle(model)
+        guard case .finished = model.uninstallPhase else {
+            return XCTFail("应完成,得到 \(model.uninstallPhase)")
+        }
+        XCTAssertTrue(model.removedAppPaths.contains(entry.path), "Q14:即移行")
+        XCTAssertTrue(model.displayedEntries.isEmpty, "清单即时不再列出")
+        XCTAssertFalse(model.isPermanentDeleteSelected(entry), "勾选随执行清空")
+    }
+
+    func testBrewMissingAbortsAndKeepsRow() async {
+        let model = UninstallModel(
+            collectFacts: {
+                LiveAppCatalogFacts(
+                    candidates: [
+                        AppCatalogCandidate(
+                            path: "/Applications/Demo.app", directoryName: "Demo.app",
+                            bundleID: "com.demo", displayName: "Demo"
+                        ),
+                    ],
+                    brewAppNames: ["Demo.app": "demo"], brewZapPaths: ["demo": []]
+                )
+            },
+            scanSizes: { _, _, _ in ["/Applications/Demo.app": (bytes: 1000, partial: false)] },
+            activityBoard: nil,
+            prober: { _ in [] },
+            recycle: { _ in TrashRecycleOutcome() },
+            deletePermanently: { _ in PermanentDeletionOutcome() },
+            brewUninstall: { _, _ in .brewMissing },
+            crossCheckCasks: { [:] }
+        )
+        model.loadIfNeeded()
+        await waitForFinished(model)
+        let entry = model.displayedEntries[0]
+        XCTAssertEqual(entry.brewCaskName, "demo", "brew 应用")
+        model.requestUninstall(entry)
+        model.confirmUninstall()
+        await waitIdle(model)
+        guard case .aborted = model.uninstallPhase else {
+            return XCTFail("缺 brew 应中止,得到 \(model.uninstallPhase)")
+        }
+        XCTAssertFalse(model.removedAppPaths.contains(entry.path), "零文件动作,行保留")
+    }
+
+    func testReroutePromptAndProceed() async {
+        let model = makeExecModel(crossCheck: { ["Demo.app": "demo"] })
+        model.loadIfNeeded()
+        await waitForFinished(model)
+        let entry = model.displayedEntries[0]
+        model.requestUninstall(entry)
+        model.confirmUninstall()
+        await waitIdle(model)
+        guard case let .reroute(_, cask) = model.uninstallPhase else {
+            return XCTFail("应触发改道,得到 \(model.uninstallPhase)")
+        }
+        XCTAssertEqual(cask, "demo")
+        model.proceedAfterReroute()
+        await waitIdle(model)
+        guard case .finished = model.uninstallPhase else {
+            return XCTFail("确认后应完成,得到 \(model.uninstallPhase)")
+        }
+    }
+
     func testPermanentDeleteResetsOnEachExpand() async throws {
         let model = makeModel()
         model.loadIfNeeded()

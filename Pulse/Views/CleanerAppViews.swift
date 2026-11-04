@@ -83,6 +83,10 @@ struct AppListSection: View {
                 emptyView
             } else {
                 VStack(alignment: .leading, spacing: 8) {
+                    uninstallBanner
+                    if model.uninstallPhase == .running {
+                        runningBanner
+                    }
                     controlsBar
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 2) {
@@ -108,6 +112,133 @@ struct AppListSection: View {
                 .background(Surface.card, in: .rect(cornerRadius: 18))
             }
         }
+        .sheet(isPresented: uninstallSheetPresented) {
+            if case let .confirming(plan) = model.uninstallPhase {
+                AppUninstallConfirmSheet(plan: plan) {
+                    model.confirmUninstall()
+                } onCancel: {
+                    model.cancelUninstall()
+                }
+            }
+        }
+        .alert("这个应用由 Homebrew 安装", isPresented: rerouteAlertPresented) {
+            Button("取消", role: .cancel) { model.cancelUninstall() }
+            Button("仍要直接删文件(绕过 Homebrew)", role: .destructive) { model.proceedAfterReroute() }
+        } message: {
+            if case let .reroute(_, cask) = model.uninstallPhase {
+                Text("建议让 Homebrew 卸载(\(cask))以保持安装记录一致——取消后此应用会带 brew 徽标,用 brew 卸载即可。")
+            }
+        }
+    }
+
+    private var uninstallSheetPresented: Binding<Bool> {
+        Binding(
+            get: {
+                if case .confirming = model.uninstallPhase {
+                    true
+                } else {
+                    false
+                }
+            },
+            set: { presented in
+                if !presented {
+                    model.cancelUninstall()
+                }
+            }
+        )
+    }
+
+    private var rerouteAlertPresented: Binding<Bool> {
+        Binding(
+            get: {
+                if case .reroute = model.uninstallPhase {
+                    true
+                } else {
+                    false
+                }
+            },
+            set: { presented in
+                if !presented {
+                    model.cancelUninstall()
+                }
+            }
+        )
+    }
+
+    /// 完成横幅(Q10:页内,不发系统通知)/ 中止红字;关闭回空态。
+    @ViewBuilder
+    private var uninstallBanner: some View {
+        switch model.uninstallPhase {
+        case let .finished(report):
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(Surface.positive)
+                Text(finishedText(report))
+                    .font(.system(size: 11.5, weight: .medium))
+                Spacer()
+                Button {
+                    model.dismissUninstallBanner()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+                .help("关闭")
+            }
+            .padding(10)
+            .background(Surface.positive.opacity(0.1), in: .rect(cornerRadius: 10))
+        case let .aborted(reason):
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(Surface.negative)
+                Text(reason)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .lineLimit(3)
+                Spacer()
+                Button {
+                    model.dismissUninstallBanner()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+                .help("关闭")
+            }
+            .padding(10)
+            .background(Surface.negative.opacity(0.1), in: .rect(cornerRadius: 10))
+        default:
+            EmptyView()
+        }
+    }
+
+    private func finishedText(_ report: CleanRunReport) -> String {
+        var text = "已处理 \(report.items.filter(\.isReleased).count) 项"
+        if report.recycled.count > 0 {
+            text += "(移入废纸篓 \(report.recycled.count)"
+        }
+        if report.permanentItems.count > 0 {
+            text += report.recycled.count > 0 ? " · 永久删除 \(report.permanentItems.count)" : "(永久删除 \(report.permanentItems.count)"
+        }
+        if report.recycled.count > 0 || report.permanentItems.count > 0 {
+            text += " · 释放 \(PulseFormat.memory(UInt64(max(0, report.freedBytes))))"
+        }
+        if report.failed.count > 0 {
+            text += ",失败 \(report.failed.count) 项"
+        }
+        return text + ")"
+    }
+
+    private var runningBanner: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            Text("正在卸载…")
+                .font(.system(size: 11.5))
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .padding(10)
+        .background(Surface.cardHigh, in: .rect(cornerRadius: 10))
     }
 
     /// 搜索 + 排序 + 操作提示(Q5:默认占用降序,可切按名;子页内过滤)。
@@ -309,6 +440,18 @@ private struct LeftoverDisclosure: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            leftoverContent
+            actionRow
+        }
+        .padding(.top, 2)
+        .padding(.bottom, 4)
+        .background(Surface.cardHigh.opacity(0.6), in: .rect(cornerRadius: 10))
+        .padding(.horizontal, 8)
+        .padding(.bottom, 4)
+    }
+
+    private var leftoverContent: some View {
+        VStack(alignment: .leading, spacing: 8) {
             if entry.bundleID == nil {
                 // Q4:只剩应用名一把键,~/Library 里按名字撞目录误中风险高于收益。
                 Text("未识别,不敢猜——这个应用读不到 bundle id,残留无法精确匹配,不列。")
@@ -344,11 +487,32 @@ private struct LeftoverDisclosure: View {
                     .padding(.bottom, 6)
             }
         }
-        .padding(.top, 2)
-        .padding(.bottom, 4)
-        .background(Surface.cardHigh.opacity(0.6), in: .rect(cornerRadius: 10))
-        .padding(.horizontal, 8)
-        .padding(.bottom, 4)
+    }
+
+    /// 动作排(03):彻底删除勾选(Q6,红字行内、每次展开重置)+ 卸载主按钮。
+    private var actionRow: some View {
+        HStack(spacing: 8) {
+            Toggle(isOn: Binding(
+                get: { model.isPermanentDeleteSelected(entry) },
+                set: { _ in model.togglePermanentDelete(entry) }
+            )) {
+                Text("彻底删除:不进废纸篓,不可恢复")
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(Surface.negative)
+            }
+            .toggleStyle(.checkbox)
+            .help("默认移入废纸篓,可从 Finder 恢复;勾选后直接永久删除(brew 应用走 --zap)")
+            Spacer()
+            Button(action: { model.requestUninstall(entry) }) {
+                Text(model.isPermanentDeleteSelected(entry) ? "永久卸载 \(entry.name)…" : "卸载 \(entry.name)…")
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(model.isPermanentDeleteSelected(entry) ? Surface.negative : Metric.disk.accentColor)
+            .disabled(model.uninstallPhase == .running)
+        }
+        .padding(.horizontal, RankingListMetrics.rowInset + 28)
+        .padding(.vertical, 4)
     }
 
     private func header(_ rows: [AppLeftoverRow]) -> some View {
@@ -458,5 +622,151 @@ private struct BrewChip: View {
             .padding(.vertical, 2)
             .background(Surface.inkTertiary.opacity(0.15), in: .capsule)
             .help("由 Homebrew 安装(卸载时将由它执行,票 03)")
+    }
+}
+
+// MARK: - 卸载确认弹窗(03;一期 CleanConfirmSheet 同配方,卸载域文案)
+
+/// 确认清单(ADR-0008 闸门在卸载域的投影):逐行 = 路径 + 大小 + 去向标;
+/// 彻底删除时逐行红标「永久删除」+ 页脚明示不可恢复(Q6);brew 应用注明
+/// 本体由 Homebrew 卸载(永久),勾选残留按模式走。
+private struct AppUninstallConfirmSheet: View {
+    let plan: AppUninstallPlan
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    private var accent: Color {
+        Metric.disk.accentColor
+    }
+
+    private struct Row: Identifiable {
+        let id = UUID()
+        let path: String
+        let title: String
+        let bytes: Int64?
+        let permanent: Bool
+        let viaBrew: Bool
+    }
+
+    private var rows: [Row] {
+        var list = [
+            Row(
+                path: plan.appPath, title: plan.appName, bytes: plan.appBytes,
+                permanent: plan.permanent || plan.isBrew, viaBrew: plan.isBrew
+            ),
+        ]
+        let zapSet = Set(plan.receiptZapPaths)
+        for leftover in plan.leftoverItems {
+            // brew + 彻底删除:zap 声明域由 brew --zap 带走(与 app 本体同路由)。
+            let viaBrew = plan.permanent && plan.isBrew && zapSet.contains(leftover.path)
+            list.append(
+                Row(
+                    path: leftover.path, title: leftover.site.plainTitle, bytes: leftover.sizeBytes,
+                    permanent: plan.permanent || viaBrew, viaBrew: viaBrew
+                )
+            )
+        }
+        return list
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("卸载 \(plan.appName)")
+                .font(.system(size: 17, weight: .bold))
+            Text(subtitle)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(rows) { row in
+                        confirmRow(row)
+                    }
+                }
+                .padding(6)
+            }
+            .frame(maxHeight: 220)
+            .background(Surface.card, in: .rect(cornerRadius: 12))
+            Text(footerText)
+                .font(.system(size: 12.5, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(plan.permanent ? Surface.negative : .primary)
+            HStack(spacing: 8) {
+                Text(footnote)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("取消", action: onCancel)
+                Button(confirmButtonTitle, action: onConfirm)
+                    .buttonStyle(.borderedProminent)
+                    .tint(plan.permanent ? Surface.negative : accent)
+            }
+        }
+        .padding(20)
+        .frame(width: 480)
+    }
+
+    private var subtitle: String {
+        if plan.isBrew {
+            return plan.permanent
+                ? "应用本体与收据声明的残留由 Homebrew --zap 永久删除;其余勾选项一并永久删除"
+                : "应用本体由 Homebrew 卸载(永久);勾选的残留移入废纸篓,可随时恢复"
+        }
+        return plan.permanent
+            ? "全部不经废纸篓直接永久删除,不可恢复"
+            : "全部移入废纸篓——清空废纸篓前可随时在 Finder 恢复"
+    }
+
+    private var confirmButtonTitle: String {
+        plan.permanent ? "永久删除 \(rows.count) 项" : "移入废纸篓(\(rows.count) 项)"
+    }
+
+    private var footerText: String {
+        let total = rows.compactMap(\.bytes).reduce(Int64(0), +)
+        let prefix = "共 \(rows.count) 项 · 约 \(PulseFormat.memory(UInt64(max(0, total))))"
+        return plan.permanent ? "\(prefix)——永久删除,不可恢复" : "共释放约 \(prefix)"
+    }
+
+    private var footnote: String {
+        if plan.isBrew {
+            return "Homebrew 卸载失败时本次零删除,不会绕过它直接删文件。"
+        }
+        return "大小按实际占用计;失败项会如实报告并跳过。"
+    }
+
+    private func confirmRow(_ row: Row) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: row.viaBrew ? "brew" : "arrow.triangle.2.circlepath")
+                .font(.system(size: 11))
+                .foregroundStyle(row.viaBrew ? Surface.inkTertiary : accent)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(row.title)
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+                Text(row.path)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
+            }
+            Spacer(minLength: 8)
+            if row.permanent {
+                Text(row.viaBrew ? "已卸载(brew,永久)" : "永久删除")
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(Surface.negative)
+            } else {
+                Text("废纸篓")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.secondary)
+            }
+            Text(row.bytes.map { PulseFormat.memory(UInt64(max(0, $0))) } ?? "—")
+                .font(.system(size: 12, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(width: 72, alignment: .trailing)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
     }
 }
