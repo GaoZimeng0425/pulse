@@ -128,8 +128,20 @@ public struct CleanPlan: Sendable, Equatable {
 public enum CleanItemOutcome: Sendable, Equatable {
     /// 已移入废纸篓,`destination` = 废纸篓内路径(探针 12:recycle 回赠)。
     case recycled(destination: String)
+    /// 未经废纸篓的永久删除(p4-uninstaller/03)。路由两态,历史文案映射:
+    /// .direct = 「永久删除」(非 brew 彻底删除);.brew = 「已卸载(brew,永久)」
+    /// (brew uninstall / --zap 带走——app 本体恒此路由,zap 覆盖的残留同)。
+    case permanentlyDeleted(route: PermanentDeleteRoute)
     /// 未能移入;`reason` 为人话(进确认结果的失败清单与清理历史)。
     case failed(reason: String)
+}
+
+/// 永久删除的路由(历史与横幅的文案分叉;ADR-0010:废纸篓是默认技术路径而非原则)。
+public enum PermanentDeleteRoute: String, Sendable, Equatable {
+    /// 非 brew 应用的「彻底删除」直删。
+    case direct
+    /// Homebrew 卸载(uninstall / --zap)带走——文件由 brew 删除,不经我们手。
+    case brew
 }
 
 /// 报告里的一行(= 计划里的一项 + 去向)。
@@ -163,6 +175,14 @@ public struct CleanRunItem: Sendable, Equatable {
         }
         return false
     }
+
+    /// 已离开本机(废纸篓或永久删除)——释放量与成功计数的口径(p4-uninstaller/03)。
+    public var isReleased: Bool {
+        switch outcome {
+        case .recycled, .permanentlyDeleted: true
+        case .failed: false
+        }
+    }
 }
 
 /// 一次清理的战报(= 清理历史的一个 run)。
@@ -181,13 +201,24 @@ public struct CleanRunReport: Sendable, Equatable {
         items.filter(\.isRecycled)
     }
 
-    public var failed: [CleanRunItem] {
-        items.filter { !$0.isRecycled }
+    /// 永久删除项(p4-uninstaller/03;一期恒空)。
+    public var permanentItems: [CleanRunItem] {
+        items.filter {
+            if case .permanentlyDeleted = $0.outcome {
+                return true
+            }
+            return false
+        }
     }
 
-    /// 已释放字节(只算真进了废纸篓的项;失败项不计)。
+    public var failed: [CleanRunItem] {
+        items.filter { !$0.isReleased }
+    }
+
+    /// 已释放字节(废纸篓 + 永久删除;失败项不计)。一期没有永久删除项,
+    /// 语义扩展对既有行为零影响(2026-11-04 Q14 完成横幅与历史共用此口径)。
     public var freedBytes: Int64 {
-        recycled.reduce(0) { $0 + $1.bytes }
+        items.filter(\.isReleased).reduce(0) { $0 + $1.bytes }
     }
 
     public var recycledPaths: Set<String> {

@@ -93,18 +93,25 @@ public actor CleanHistoryStore {
             for item in report.items {
                 let destination: String?
                 let failure: String?
+                var permanentRoute: String? // p4-uninstaller/03:永久删除路由(新列,旧行恒 NULL)
                 switch item.outcome {
                 case let .recycled(path):
                     destination = path
                     failure = nil
+                    permanentRoute = nil
+                case let .permanentlyDeleted(route):
+                    destination = nil
+                    failure = nil
+                    permanentRoute = route.rawValue
                 case let .failed(reason):
                     destination = nil
                     failure = reason
+                    permanentRoute = nil
                 }
                 try db.execute(
                     sql: """
-                    INSERT INTO clean_item (run_id, path, title, bytes, tier, rule_id, destination, failure)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO clean_item (run_id, path, title, bytes, tier, rule_id, destination, failure, permanent_route)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     arguments: [
                         runID,
@@ -115,6 +122,7 @@ public actor CleanHistoryStore {
                         item.ruleID,
                         destination,
                         failure,
+                        permanentRoute,
                     ]
                 )
             }
@@ -151,17 +159,20 @@ public actor CleanHistoryStore {
             try Row.fetchAll(
                 db,
                 sql: """
-                SELECT run_id, path, title, bytes, tier, rule_id, destination, failure
+                SELECT run_id, path, title, bytes, tier, rule_id, destination, failure, permanent_route
                 FROM clean_item WHERE run_id = ? ORDER BY rowid
                 """,
                 arguments: [runID]
             ).map { row in
                 let destination: String? = row["destination"]
                 let failure: String? = row["failure"]
+                let permanentRoute: String? = row["permanent_route"]
                 let outcome: CleanItemOutcome = if let destination {
                     .recycled(destination: destination)
+                } else if let route = permanentRoute.flatMap(PermanentDeleteRoute.init(rawValue:)) {
+                    .permanentlyDeleted(route: route)
                 } else {
-                    // 库里 destination 与 failure 都空只可能是外部改库;如实报"原因未知",不装成功。
+                    // 库里三列全空只可能是外部改库;如实报"原因未知",不装成功。
                     .failed(reason: failure ?? "原因未记录")
                 }
                 return CleanItemRecord(

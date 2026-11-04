@@ -29,6 +29,20 @@ final class UninstallModel {
     var sortOrder: AppSortOrder = .sizeDescending
     /// 子页内搜索过滤(应用名 / 路径子串,大小写不敏感;Core 的 filtered 实现)。
     var searchQuery = ""
+    /// 卸载执行状态机(03)。
+    enum UninstallPhase: Equatable {
+        case idle
+        case confirming(plan: AppUninstallPlan)
+        case reroute(plan: AppUninstallPlan, cask: String)
+        case running
+        case finished(CleanRunReport)
+        case aborted(reason: String)
+    }
+
+    private(set) var uninstallPhase: UninstallPhase = .idle
+    /// 已卸载的 app 路径(displayedEntries 即时过滤,Q14)。
+    private(set) var removedAppPaths: Set<String> = []
+
     /// 点行选中的 app 本体(checkbox 语义;灰行不可选——rowState != normal 拒绝)。
     private(set) var appSelection: Set<String> = []
     /// 「彻底删除」勾选(Q6:默认不勾、**每次展开重置**;03 票执行消费)。
@@ -56,6 +70,12 @@ final class UninstallModel {
     @ObservationIgnored private let prober: @Sendable ([LeftoverProbe]) async -> [AppLeftoverRow]
     /// cask 名 → zap 路径(清单落地时从 facts 存下,展开残留时按徽标取)。
     @ObservationIgnored private var brewZapPaths: [String: [String]] = [:]
+    @ObservationIgnored private let recycle: @Sendable ([String]) async -> TrashRecycleOutcome
+    @ObservationIgnored private let deletePermanently: @Sendable ([String]) async -> PermanentDeletionOutcome
+    @ObservationIgnored private let brewUninstall: @Sendable (String, Bool) async -> BrewUninstallResult
+    /// 动作时刻收据交叉核对(Q11:重新读一次收据索引,不吃清单快照)。
+    @ObservationIgnored private let crossCheckCasks: @Sendable () async -> [String: String]
+    @ObservationIgnored private let recordHistory: @Sendable (CleanRunReport) async -> Void
 
     init(
         collectFacts: @escaping @Sendable () async -> LiveAppCatalogFacts = {
@@ -73,12 +93,33 @@ final class UninstallModel {
         activityBoard: CleanActivityBoard? = nil,
         prober: @escaping @Sendable ([LeftoverProbe]) async -> [AppLeftoverRow] = { probes in
             await LiveAppCatalogSource().probeLeftovers(probes)
+        },
+        // 03 票执行边界(全闭包注入,测试喂 spy;Live 默认):
+        recycle: @escaping @Sendable ([String]) async -> TrashRecycleOutcome = { paths in
+            await LiveCleanTrashExecutor().recycleToTrash(paths)
+        },
+        deletePermanently: @escaping @Sendable ([String]) async -> PermanentDeletionOutcome = { paths in
+            await LiveCleanPermanentDeleter().deletePermanently(paths)
+        },
+        brewUninstall: @escaping @Sendable (String, Bool) async -> BrewUninstallResult = { cask, zap in
+            await LiveBrewUninstaller().uninstall(cask: cask, zap: zap)
+        },
+        crossCheckCasks: @escaping @Sendable () async -> [String: String] = {
+            await LiveAppCatalogSource().collectFacts().brewAppNames
+        },
+        recordHistory: @escaping @Sendable (CleanRunReport) async -> Void = { _ in
+            // 正式装配在 MainWindowView 注入历史库;默认 no-op 供预览与单测。
         }
     ) {
         self.collectFacts = collectFacts
         self.scanSizes = scanSizes
         self.activityBoard = activityBoard
         self.prober = prober
+        self.recycle = recycle
+        self.deletePermanently = deletePermanently
+        self.brewUninstall = brewUninstall
+        self.crossCheckCasks = crossCheckCasks
+        self.recordHistory = recordHistory
     }
 
     var isBusy: Bool {
@@ -99,11 +140,12 @@ final class UninstallModel {
         return nil
     }
 
-    /// 展示序清单:搜索过滤 + 当前排序(Core 纯值,可测)。
+    /// 展示序清单:搜索过滤 + 当前排序(Core 纯值,可测);
+    /// 已卸载的 app 即时移除(Q14:不触发重扫,删了什么我们自己知道)。
     var displayedEntries: [UninstallAppEntry] {
         guard let output else { return [] }
         return AppCatalog.sorted(
-            AppCatalog.filtered(output.entries, query: searchQuery),
+            AppCatalog.filtered(output.entries.filter { !removedAppPaths.contains($0.path) }, query: searchQuery),
             by: sortOrder
         )
     }
@@ -207,6 +249,127 @@ final class UninstallModel {
         }
     }
 
+    // MARK: 卸载执行(03)
+
+    /// 当前选择 → 计划(确认弹窗与执行的单一事实源)。
+    func makePlan(for entry: UninstallAppEntry) -> AppUninstallPlan {
+        let selectedRows = (leftoverCache[entry.path] ?? []).filter { leftoverSelection.contains($0.path) }
+        return AppUninstallPlan(
+            appPath: entry.path,
+            appName: entry.name,
+            appBytes: entry.sizeBytes,
+            caskName: entry.brewCaskName,
+            permanent: isPermanentDeleteSelected(entry),
+            leftoverItems: selectedRows,
+            receiptZapPaths: entry.brewCaskName.flatMap { brewZapPaths[$0] } ?? []
+        )
+    }
+
+    /// 点「卸载…」:灰行拒绝;有 brew 或运行态变化在确认后由编排器把关。
+    func requestUninstall(_ entry: UninstallAppEntry) {
+        guard entry.rowState == .normal, uninstallPhase == .idle || isBannerState else { return }
+        uninstallPhase = .confirming(plan: makePlan(for: entry))
+    }
+
+    /// 确认弹窗 → 执行。
+    func confirmUninstall() {
+        guard case let .confirming(plan) = uninstallPhase else { return }
+        runUninstall(plan, rerouteAcknowledged: false)
+    }
+
+    /// 改道提示(Q11):取消 = 回空态(零动作)。
+    func cancelUninstall() {
+        guard case .confirming = uninstallPhase else { return }
+        uninstallPhase = .idle
+    }
+
+    /// 改道提示「仍要直接删文件(绕过 Homebrew)」→ 带确认重跑(不再核对)。
+    func proceedAfterReroute() {
+        guard case let .reroute(plan, _) = uninstallPhase else { return }
+        runUninstall(plan, rerouteAcknowledged: true)
+    }
+
+    /// 完成横幅 / 中止红字的关闭。
+    func dismissUninstallBanner() {
+        if case .finished = uninstallPhase {
+            uninstallPhase = .idle
+            return
+        }
+        if case .aborted = uninstallPhase {
+            uninstallPhase = .idle
+        }
+    }
+
+    private var isBannerState: Bool {
+        switch uninstallPhase {
+        case .finished, .aborted: true
+        default: false
+        }
+    }
+
+    private func runUninstall(_ plan: AppUninstallPlan, rerouteAcknowledged: Bool) {
+        uninstallPhase = .running
+        // 运行重查(判定不缓存):此刻取活动板快照现判。
+        let board = activityBoard
+        Task.detached(priority: .userInitiated) { [
+            weak self,
+            recycle,
+            deletePermanently,
+            brewUninstall,
+            crossCheckCasks,
+            recordHistory
+        ] in
+            let termination = await AppUninstallRunner.run(
+                plan,
+                recycle: recycle,
+                deletePermanently: deletePermanently,
+                brewUninstall: brewUninstall,
+                isAppRunning: { appPath in
+                    let running = board?.current().compactMap(\.executablePath) ?? []
+                    return AppCatalog.isRunning(appPath: appPath, executablePaths: running)
+                },
+                crossCheckCask: { directoryName in
+                    // 动作时刻重读收据(rerouteAcknowledged 时 Core 不会调用)。
+                    await crossCheckCasks()[directoryName]
+                },
+                rerouteAcknowledged: rerouteAcknowledged
+            )
+            await MainActor.run { self?.apply(termination, plan: plan, recordHistory: recordHistory) }
+        }
+    }
+
+    private func apply(
+        _ termination: AppUninstallTermination,
+        plan: AppUninstallPlan,
+        recordHistory: @escaping @Sendable (CleanRunReport) async -> Void
+    ) {
+        switch termination {
+        case let .completed(report):
+            // 历史落库后台走(actor 串行),横幅不待它;失败由 store 侧如实抛。
+            Task.detached(priority: .utility) { await recordHistory(report) }
+            // Q14:即移行 + 清勾选(该 app 的全部选择状态),不触发重扫。
+            removedAppPaths.insert(plan.appPath)
+            appSelection.remove(plan.appPath)
+            permanentDelete.remove(plan.appPath)
+            for row in leftoverCache[plan.appPath] ?? [] {
+                leftoverSelection.remove(row.path)
+            }
+            leftoverCache[plan.appPath] = nil
+            uninstallPhase = .finished(report)
+            LogService.info(
+                "应用卸载:\(plan.appName) · 成功 \(report.items.filter(\.isReleased).count) / 失败 \(report.failed.count)",
+                category: "Cleaner"
+            )
+        case let .aborted(reason):
+            uninstallPhase = .aborted(reason: reason)
+            LogService.warn("应用卸载中止:\(reason)", category: "Cleaner")
+        case let .needsReroute(cask):
+            uninstallPhase = .reroute(plan: plan, cask: cask)
+        case .rejectedRunning:
+            uninstallPhase = .aborted(reason: "\(plan.appName)正在运行——请先退出应用再卸载")
+        }
+    }
+
     private func startLoad() {
         loadTask?.cancel()
         cancelFlag.reset()
@@ -252,6 +415,8 @@ final class UninstallModel {
                 // 旧清单的选择 / 残留缓存 / 勾选全部作废(签名、收据、盘上事实都可能变了);
                 // 搜索词与排序保留。
                 self.brewZapPaths = facts.brewZapPaths
+                self.removedAppPaths = []
+                self.uninstallPhase = .idle
                 self.appSelection = []
                 self.permanentDelete = []
                 self.leftoverCache = [:]
