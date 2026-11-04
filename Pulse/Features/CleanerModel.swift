@@ -57,6 +57,20 @@ final class CleanerModel {
     private(set) var lastSavedMeta: SpaceScanMeta?
     /// 本会话亲手清理的项数(页头「本次已清理」只认它,不含缓存带来的历史清理)。
     private(set) var sessionCleanedCount = 0
+
+    // MARK: 清空废纸篓(p4-uninstaller/04,自 08 摘出;Q3 腾空间闭环)
+
+    enum TrashPhase: Equatable {
+        case idle
+        case inventorying
+        case confirming(TrashInventory)
+        case running
+        case finished(TrashEmptySummary)
+    }
+
+    private(set) var trashPhase: TrashPhase = .idle
+    /// 短提示(空废纸篓等;横幅可关)。
+    private(set) var trashNotice: String?
     /// 缓存恢复进行中(空态卡的「正在恢复…」文案判据;常态亚秒,满载数秒)。
     private(set) var isRestoringCache = false
 
@@ -111,7 +125,10 @@ final class CleanerModel {
         activity: (any CleanActivitySource)? = nil,
         volumeSummaries: (@Sendable () -> [SpaceMapVolumeSummary])? = nil,
         scanCache: CleanScanResultStore? = nil,
-        homeDirectory: String = NSHomeDirectory()
+        homeDirectory: String = NSHomeDirectory(),
+        trashInventory: @escaping @Sendable () async -> TrashInventory = {
+            await LiveCleanTrashExecutor().inventory()
+        }
     ) {
         self.exclusions = exclusions
         self.scanRoots = scanRoots
@@ -121,6 +138,57 @@ final class CleanerModel {
         self.volumeSummaries = volumeSummaries
         self.scanCache = scanCache
         self.homeDirectory = PathNormalization.normalize(homeDirectory)
+        trashInventorySource = trashInventory
+    }
+
+    @ObservationIgnored private let trashInventorySource: @Sendable () async -> TrashInventory
+
+    /// 点「清空废纸篓」:先清点(数字进确认弹窗);空废纸篓给短提示不弹窗。
+    func beginEmptyTrash() {
+        guard trashPhase == .idle else { return }
+        trashPhase = .inventorying
+        Task.detached(priority: .userInitiated) { [weak self, trashInventorySource] in
+            let inventory = await trashInventorySource()
+            await MainActor.run {
+                guard let self else { return }
+                if inventory.isEmpty {
+                    self.trashPhase = .idle
+                    self.trashNotice = "废纸篓是空的"
+                } else {
+                    self.trashPhase = .confirming(inventory)
+                }
+            }
+        }
+    }
+
+    func cancelEmptyTrash() {
+        guard case .confirming = trashPhase else { return }
+        trashPhase = .idle
+    }
+
+    func confirmEmptyTrash() {
+        guard case .confirming = trashPhase else { return }
+        trashPhase = .running
+        Task.detached(priority: .userInitiated) { [weak self, trash] in
+            let summary = await trash.emptyTrash()
+            await MainActor.run {
+                guard let self else { return }
+                self.trashPhase = .finished(summary)
+                LogService.info(
+                    "清空废纸篓:释放 \(PulseFormat.memory(UInt64(max(0, summary.totalFreedBytes)))) · 清空 \(summary.totalItems) 项 · 跳过 \(summary.totalSkipped) 项",
+                    category: "Cleaner"
+                )
+            }
+        }
+    }
+
+    /// 结果横幅 / 短提示的关闭。
+    func dismissTrashFeedback() {
+        if case .finished = trashPhase {
+            trashPhase = .idle
+            return
+        }
+        trashNotice = nil
     }
 
     /// 生产扫描并发:6 个 worker(元数据密集型遍历,留核给 UI;引擎侧再按活动核数封顶)。

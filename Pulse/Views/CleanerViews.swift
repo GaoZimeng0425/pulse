@@ -36,15 +36,28 @@ struct CleanerPageHeader: View {
 
     var body: some View {
         PageHeader(title: MetricTab.cleaner.title, subtitle: subtitle, style: .full) {
-            Group {
+            HStack(spacing: 8) {
+                Button {
+                    model.beginEmptyTrash()
+                } label: {
+                    if model.trashPhase == .running || model.trashPhase == .inventorying {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text("清空废纸篓")
+                    }
+                }
+                .disabled(model.trashPhase != .idle)
+                .help("清空所有卷的废纸篓(永久删除,不可恢复)——腾出它占着的空间")
                 if model.isScanning {
                     Button("取消扫描") { model.cancelScan() }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Metric.disk.accentColor)
                 } else {
                     Button(model.result == nil ? "扫描整台 Mac" : "重新扫描") { model.startScan() }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Metric.disk.accentColor)
                 }
             }
-            .buttonStyle(.borderedProminent)
-            .tint(Metric.disk.accentColor)
         }
     }
 
@@ -105,6 +118,7 @@ struct CleanerTabView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            trashFeedbackBanner
             if let hint = model.permissionHint {
                 fdaBanner(hint)
             }
@@ -122,6 +136,127 @@ struct CleanerTabView: View {
         // 进清理页即试装载落盘缓存(p4-cleaner/11):空态且无在跑扫描才读盘
         // (后台解码),已有结果 / 扫描中 / 无缓存都零动作;常驻稳态零成本。
         .task { model.loadCachedScan() }
+        .sheet(isPresented: trashSheetPresented) {
+            if case let .confirming(inventory) = model.trashPhase {
+                TrashEmptyConfirmSheet(inventory: inventory) {
+                    model.confirmEmptyTrash()
+                } onCancel: {
+                    model.cancelEmptyTrash()
+                }
+            }
+        }
+    }
+
+    private var trashSheetPresented: Binding<Bool> {
+        Binding(
+            get: {
+                if case .confirming = model.trashPhase {
+                    true
+                } else {
+                    false
+                }
+            },
+            set: { presented in
+                if !presented {
+                    model.cancelEmptyTrash()
+                }
+            }
+        )
+    }
+
+    /// 清空结果 / 空废纸篓短提示(Q10 同款:页内横幅,不发系统通知)。
+    @ViewBuilder
+    private var trashFeedbackBanner: some View {
+        switch model.trashPhase {
+        case let .finished(summary):
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(Surface.positive)
+                Text(trashFinishedText(summary))
+                    .font(.system(size: 11.5, weight: .medium))
+                Spacer()
+                dismissTrashButton
+            }
+            .padding(10)
+            .background(Surface.positive.opacity(0.1), in: .rect(cornerRadius: 10))
+        default:
+            if let notice = model.trashNotice {
+                HStack(spacing: 8) {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(.secondary)
+                    Text(notice)
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    dismissTrashButton
+                }
+                .padding(10)
+                .background(Surface.cardHigh.opacity(0.6), in: .rect(cornerRadius: 10))
+            }
+        }
+    }
+
+    private var dismissTrashButton: some View {
+        Button {
+            model.dismissTrashFeedback()
+        } label: {
+            Image(systemName: "xmark.circle.fill")
+                .foregroundStyle(.tertiary)
+        }
+        .buttonStyle(.plain)
+        .help("关闭")
+    }
+
+    private func trashFinishedText(_ summary: TrashEmptySummary) -> String {
+        var text = "已清空 \(summary.totalItems) 项 · 释放 \(PulseFormat.memory(UInt64(max(0, summary.totalFreedBytes))))"
+        if summary.totalSkipped > 0 {
+            text += " · \(summary.totalSkipped) 项无权限跳过"
+        }
+        return text
+    }
+
+    /// 普通二次确认(票面:所有卷汇总 + 永久不可恢复 + 含其他 App 扔进的内容)。
+    private struct TrashEmptyConfirmSheet: View {
+        let inventory: TrashInventory
+        let onConfirm: () -> Void
+        let onCancel: () -> Void
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("清空废纸篓")
+                    .font(.system(size: 17, weight: .bold))
+                Text(TrashEmptying.confirmationText(for: inventory))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if inventory.volumes.count > 1 {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(inventory.volumes.filter { $0.items > 0 }) { volume in
+                            HStack {
+                                Text(volume.name)
+                                    .font(.system(size: 12))
+                                Spacer()
+                                Text("\(volume.items) 项 · 约 \(PulseFormat.diskCapacity(UInt64(max(0, volume.bytes))))")
+                                    .font(.system(size: 12))
+                                    .monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .padding(10)
+                    .background(Surface.card, in: .rect(cornerRadius: 10))
+                }
+                HStack {
+                    Spacer()
+                    Button("取消", action: onCancel)
+                    Button("永久清空", action: onConfirm)
+                        .buttonStyle(.borderedProminent)
+                        .tint(Surface.negative)
+                }
+            }
+            .padding(20)
+            .frame(width: 440)
+        }
     }
 
     /// 缓存过期提示(扫描后排除配置变了,数字只可能偏大):信息语气,不是警告琥珀。

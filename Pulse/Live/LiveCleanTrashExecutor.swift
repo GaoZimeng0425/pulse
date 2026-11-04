@@ -61,6 +61,13 @@ struct LiveCleanTrashExecutor: CleanTrashExecutor {
             for name in entries where name != ".DS_Store" {
                 let itemPath = (directory as NSString).appendingPathComponent(name)
                 let size = Self.allocatedSize(atPath: itemPath)
+                // 防御闸(p4-uninstaller/04,ADR-0008):删除动作只许落在废纸篓
+                // 目录之内。路径来自 contentsOfDirectory 本不该越界,这道 guard
+                // 是纵深防御——越界按跳过计,绝不出废纸篓一步(单测钉住边界)。
+                guard TrashEmptying.isInsideTrash(itemPath, trashDirectories: [directory]) else {
+                    skipped += 1
+                    continue
+                }
                 do {
                     try manager.removeItem(atPath: itemPath)
                     emptied += 1
@@ -111,5 +118,26 @@ struct LiveCleanTrashExecutor: CleanTrashExecutor {
             }
         }
         return total
+    }
+}
+
+// MARK: - 清点(p4-uninstaller/04:确认弹窗的数字来源)
+
+extension LiveCleanTrashExecutor {
+    /// 点「清空废纸篓」时现点:各卷顶层条目数 + 分配大小求和(约数)。不删任何
+    /// 东西;失败卷如实少报不了——枚举失败按 0 项计(空卷语义),删除时自会报数。
+    func inventory() async -> TrashInventory {
+        var volumes: [TrashInventory.Volume] = []
+        for (volume, directory) in Self.userTrashDirectories() {
+            guard let entries = try? FileManager.default.contentsOfDirectory(atPath: directory) else {
+                continue
+            }
+            let names = entries.filter { $0 != ".DS_Store" }
+            let bytes = names.reduce(Int64(0)) { partial, name in
+                partial + Self.allocatedSize(atPath: (directory as NSString).appendingPathComponent(name))
+            }
+            volumes.append(TrashInventory.Volume(name: volume, items: names.count, bytes: bytes))
+        }
+        return TrashInventory(volumes: volumes)
     }
 }
