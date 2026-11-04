@@ -1,0 +1,229 @@
+<div id="pulse-uninstaller-proto">
+<style>
+  #pulse-uninstaller-proto{
+    --win:light-dark(#ffffff,#1a1a1d);
+    --card:light-dark(#f5f5f7,#1f1f22);
+    --card-hi:light-dark(#e8e8ed,#27272b);
+    --ink:light-dark(rgba(0,0,0,.88),rgba(255,255,255,.92));
+    --ink2:light-dark(rgba(0,0,0,.55),rgba(255,255,255,.55));
+    --ink3:light-dark(#a1a1a6,#6e6e73);
+    --sep:light-dark(rgba(0,0,0,.09),rgba(255,255,255,.1));
+    --disk:light-dark(#c98500,#eda100);
+    --pos:light-dark(#2fa83a,#2fa83a);
+    --neg:light-dark(#e0352b,#ff453a);
+    --glass:light-dark(rgba(255,255,255,.72),rgba(30,30,32,.72));
+    font-family:-apple-system,"SF Pro Text","PingFang SC",sans-serif;
+    color:var(--ink);font-size:12px;
+    max-width:980px;margin:0 auto;
+  }
+  #pulse-uninstaller-proto .num{font-variant-numeric:tabular-nums}
+  #pulse-uninstaller-proto .fig{font-family:ui-rounded,"SF Pro Rounded",-apple-system,sans-serif;font-variant-numeric:tabular-nums}
+  #pulse-uninstaller-proto .pwin{border-radius:12px;overflow:hidden;background:var(--win);
+    box-shadow:0 24px 70px rgba(0,0,0,.35);outline:1px solid rgba(0,0,0,.2)}
+  #pulse-uninstaller-proto .tbar{height:34px;background:var(--glass);display:flex;align-items:center;padding:0 12px;gap:8px}
+  #pulse-uninstaller-proto .tl{width:11px;height:11px;border-radius:50%}
+  #pulse-uninstaller-proto .tbar .tt{flex:1;text-align:center;color:var(--ink2);font-size:12px;font-weight:600}
+  #pulse-uninstaller-proto .ubar{height:42px;background:var(--glass);display:flex;align-items:center;padding:0 10px;gap:3px;overflow:hidden}
+  #pulse-uninstaller-proto .up{display:flex;align-items:center;gap:5px;height:26px;padding:0 10px;border-radius:9999px;
+    color:var(--ink2);font-size:12px;font-weight:500;white-space:nowrap}
+  #pulse-uninstaller-proto .up.sel{background:color-mix(in srgb,var(--disk) 16%,transparent);color:var(--disk)}
+  #pulse-uninstaller-proto .up i{width:14px;height:14px}
+  #pulse-uninstaller-proto .ucontent{background:var(--win);padding:16px 20px 20px;display:flex;flex-direction:column;gap:12px}
+  #pulse-uninstaller-proto .ph{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+  #pulse-uninstaller-proto .ph h1{font-size:24px;font-weight:700;letter-spacing:-.3px;margin:0}
+  #pulse-uninstaller-proto .ph .sub{color:var(--ink2);font-size:11px;margin-top:2px}
+  #pulse-uninstaller-proto .subpills{display:flex;gap:2px;background:var(--card);border-radius:9999px;padding:2px;width:max-content}
+  #pulse-uninstaller-proto .sp{height:24px;padding:0 11px;border-radius:9999px;font-size:11.5px;font-weight:500;color:var(--ink2);
+    display:flex;align-items:center;border:none;background:transparent;cursor:default}
+  #pulse-uninstaller-proto .sp.on{background:var(--win);color:var(--disk);box-shadow:0 1px 4px rgba(0,0,0,.18)}
+  #pulse-uninstaller-proto .btn{height:26px;padding:0 11px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:600;
+    background:var(--card-hi);color:var(--ink);display:inline-flex;align-items:center;gap:5px;font-family:inherit}
+  #pulse-uninstaller-proto .btn.acc{background:var(--disk);color:#fff}
+  #pulse-uninstaller-proto .btn.ghost{background:transparent;color:var(--ink2)}
+  #pulse-uninstaller-proto .btn i{width:13px;height:13px}
+  #pulse-uninstaller-proto .srch{flex:1;max-width:220px;height:26px;border-radius:8px;background:var(--card);border:none;outline:none;
+    padding:0 10px 0 28px;font-size:12px;color:var(--ink);font-family:inherit}
+  #pulse-uninstaller-proto .seg{display:flex;background:var(--card);border-radius:8px;padding:2px;gap:2px}
+  #pulse-uninstaller-proto .seg button{height:22px;padding:0 9px;border-radius:6px;border:none;background:transparent;
+    font-size:11px;font-weight:600;color:var(--ink2);cursor:pointer;font-family:inherit}
+  #pulse-uninstaller-proto .seg button.on{background:var(--win);color:var(--ink)}
+  #pulse-uninstaller-proto .card{background:var(--card);border-radius:14px;padding:6px 4px}
+  #pulse-uninstaller-proto .chip{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:9999px;
+    font-size:10.5px;font-weight:600;white-space:nowrap}
+  #pulse-uninstaller-proto .chip.brew{background:color-mix(in srgb,var(--ink3) 16%,transparent);color:var(--ink3)}
+  #pulse-uninstaller-proto .chip.gray{background:color-mix(in srgb,var(--ink3) 16%,transparent);color:var(--ink3)}
+  #pulse-uninstaller-proto .chip.warn{background:color-mix(in srgb,var(--disk) 18%,transparent);color:var(--disk)}
+  #pulse-uninstaller-proto .appicon{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+    color:#fff;font-weight:700;font-size:11px;flex:none}
+  #pulse-uninstaller-proto .meter{height:4px;border-radius:2px;background:var(--sep);overflow:hidden;flex:1;min-width:40px;max-width:90px}
+  #pulse-uninstaller-proto .meter b{display:block;height:100%;background:var(--ink3);border-radius:2px}
+  #pulse-uninstaller-proto .ck{width:14px;height:14px;border-radius:4px;border:1.5px solid var(--ink3);
+    background:transparent;cursor:pointer;flex:none;appearance:none;position:relative}
+  #pulse-uninstaller-proto .ck:checked{background:var(--disk);border-color:var(--disk)}
+  #pulse-uninstaller-proto .ck:checked::after{content:"";position:absolute;inset:2px 3px 4px;border:solid #fff;border-width:0 0 2px 2px;transform:rotate(-45deg) scale(.9)}
+  #pulse-uninstaller-proto .note{font-size:10.5px;color:var(--ink3)}
+  #pulse-uninstaller-proto .lblrow{font-size:10.5px;font-weight:700;color:var(--disk);letter-spacing:.3px}
+  #pulse-uninstaller-proto .fakepath{color:var(--ink3);font-size:10px;font-family:ui-monospace,Menlo,monospace;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #pulse-uninstaller-proto .arrow{color:var(--ink3);transition:transform .15s;display:flex;align-items:center;
+    width:24px;height:24px;border-radius:6px;justify-content:center;flex:none}
+  #pulse-uninstaller-proto .arrow:hover{background:var(--card-hi)}
+  #pulse-uninstaller-proto .arrow.open{transform:rotate(90deg)}
+  #pulse-uninstaller-proto .lrow{display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:10px;cursor:pointer}
+  #pulse-uninstaller-proto .lrow:hover{background:var(--card-hi)}
+  #pulse-uninstaller-proto .lrow.sel{background:color-mix(in srgb,var(--disk) 10%,transparent)}
+  #pulse-uninstaller-proto .lrow .p2{color:var(--ink2);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
+  #pulse-uninstaller-proto .dim{opacity:.55}
+  #pulse-uninstaller-proto .flexrow{display:flex;align-items:center;gap:8px}
+  #pulse-uninstaller-proto .grow{flex:1;min-width:0}
+  @media (max-width:720px){#pulse-uninstaller-proto .ubar .up:not(.sel):not(.keep){display:none}}
+</style>
+
+<div class="pwin">
+  <div class="tbar"><span class="tl" style="background:#ff5f57"></span><span class="tl" style="background:#febc2e"></span><span class="tl" style="background:#28c840"></span><span class="tt">Pulse</span><span style="width:52px"></span></div>
+  <div class="ubar">
+    <span class="up keep"><i data-lucide="activity"></i></span>
+    <span class="up"><i data-lucide="cpu"></i>CPU</span>
+    <span class="up"><i data-lucide="memory-stick"></i>内存</span>
+    <span class="up sel keep"><i data-lucide="sparkles"></i>清理</span>
+    <span class="up"><i data-lucide="history"></i>历史</span>
+    <span style="flex:1"></span>
+    <i data-lucide="search" style="width:14px;height:14px;color:var(--ink3)"></i>
+    <i data-lucide="settings" style="width:15px;height:15px;color:var(--ink3)"></i>
+  </div>
+  <div class="ucontent">
+    <div class="ph">
+      <div><h1>清理</h1><div class="sub num">上次扫描 2 小时前 · 结果已缓存</div></div>
+      <div class="flexrow"><span class="btn ghost"><i data-lucide="trash"></i>清空废纸篓</span><span class="btn">重新扫描</span></div>
+    </div>
+    <div class="subpills">
+      <button class="sp">开发者垃圾</button><button class="sp">空间地图</button><button class="sp on">应用</button><button class="sp">清理历史</button>
+    </div>
+
+    <div class="flexrow" style="justify-content:space-between">
+      <div class="flexrow" style="flex:1">
+        <div style="position:relative;flex:1;max-width:220px">
+          <i data-lucide="search" style="position:absolute;left:8px;top:7px;width:13px;height:13px;color:var(--ink3)"></i>
+          <input class="srch" placeholder="搜索应用" aria-label="搜索应用">
+        </div>
+        <div class="seg" role="group" aria-label="排序">
+          <button class="on">占用 ↓</button><button>按名</button>
+        </div>
+      </div>
+      <div class="flexrow">
+        <span class="note num" style="margin-right:6px">共 182 个 · 已隐藏 34 个 Apple 系统应用</span>
+        <button class="btn ghost" aria-label="刷新"><i data-lucide="rotate-cw"></i></button>
+      </div>
+    </div>
+
+    <div class="card" id="a-list">
+      <div class="lrow sel" id="a-row1">
+        <input type="checkbox" class="ck" checked aria-label="选中 Bitwarden">
+        <span class="appicon" style="background:#175ddc">B</span>
+        <div class="grow"><div class="flexrow"><b>Bitwarden</b><span class="chip brew">brew</span></div>
+          <div class="p2">/Applications/Bitwarden.app</div></div>
+        <span class="meter"><b style="width:9%"></b></span>
+        <span class="num" style="font-weight:600;width:64px;text-align:right">182.4 MB</span>
+        <button class="arrow open" id="a-arw" aria-label="展开 Bitwarden 的残留清单"><i data-lucide="chevron-right" style="width:13px;height:13px"></i></button>
+      </div>
+
+      <div id="a-exp" style="background:var(--card-hi);border-radius:10px;margin:2px 8px 8px;padding:10px 12px">
+        <div class="flexrow" style="justify-content:space-between;margin-bottom:8px">
+          <span class="lblrow">残留 · 4 项 · 共 108.7 MB · 默认不勾,点行只选中 app 本体</span>
+          <button class="btn" style="height:22px;font-size:11px" id="a-selall">全选残留</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px" id="a-lo">
+          <label class="flexrow" style="gap:9px;cursor:pointer">
+            <input type="checkbox" class="ck">
+            <div class="grow"><b style="font-size:12px">应用数据</b> <span class="note">· 删了下一次启动要重新登录</span>
+              <div class="fakepath">~/Library/Application Support/Bitwarden</div></div>
+            <span class="num note" style="width:64px;text-align:right">96.2 MB</span>
+          </label>
+          <label class="flexrow" style="gap:9px;cursor:pointer">
+            <input type="checkbox" class="ck">
+            <div class="grow"><b style="font-size:12px">缓存</b> <span class="note">· 删了下次启动自动重建</span>
+              <div class="fakepath">~/Library/Caches/com.bitwarden.desktop</div></div>
+            <span class="num note" style="width:64px;text-align:right">12.4 MB</span>
+          </label>
+          <label class="flexrow" style="gap:9px;cursor:pointer">
+            <input type="checkbox" class="ck">
+            <div class="grow"><b style="font-size:12px">设置</b> <span class="note">· 删了回到出厂设置</span>
+              <div class="fakepath">~/Library/Preferences/com.bitwarden.desktop.plist</div></div>
+            <span class="num note" style="width:64px;text-align:right">4 KB</span>
+          </label>
+          <label class="flexrow" style="gap:9px;cursor:pointer">
+            <input type="checkbox" class="ck" id="a-ck4">
+            <div class="grow"><b style="font-size:12px">后台代理</b> <span class="chip warn">先检查</span>
+              <div class="fakepath">~/Library/LaunchAgents/com.bitwarden.desktop.plist</div></div>
+            <span class="num note" style="width:64px;text-align:right">1 KB</span>
+          </label>
+        </div>
+        <hr style="border:none;border-top:1px solid var(--sep);margin:10px 0 8px">
+        <div class="flexrow" style="justify-content:space-between">
+          <label class="flexrow" style="gap:7px;cursor:pointer">
+            <input type="checkbox" class="ck" id="a-perm" style="border-color:var(--neg)">
+            <span class="note" style="color:var(--neg);font-weight:600">彻底删除:不进废纸篓,不可恢复</span>
+          </label>
+          <button class="btn acc" id="a-go">卸载 Bitwarden…</button>
+        </div>
+        <div class="note" style="margin-top:7px">默认移入废纸篓,可从 Finder 废纸篓恢复;brew 应用将由 Homebrew 执行卸载。</div>
+      </div>
+
+      <div class="lrow" id="a-row2">
+        <input type="checkbox" class="ck" aria-label="选中 Xcode">
+        <span class="appicon" style="background:#7c4dff">X</span>
+        <div class="grow"><div class="flexrow"><b>Xcode</b><span class="chip gray">先退出</span></div>
+          <div class="p2">/Applications/Xcode.app</div></div>
+        <span class="meter"><b style="width:100%"></b></span>
+        <span class="num dim" style="font-weight:600;width:64px;text-align:right">12.4 GB</span>
+        <button class="arrow" aria-label="展开 Xcode 的残留清单"><i data-lucide="chevron-right" style="width:13px;height:13px"></i></button>
+      </div>
+      <div class="lrow" id="a-row3">
+        <input type="checkbox" class="ck" aria-label="选中 Ghostty">
+        <span class="appicon" style="background:#3fbf7f">G</span>
+        <div class="grow"><div class="flexrow"><b>Ghostty</b><span class="chip brew">brew</span></div>
+          <div class="p2">/Applications/Ghostty.app</div></div>
+        <span class="meter"><b style="width:13%"></b></span>
+        <span class="num" style="font-weight:600;width:64px;text-align:right">246.8 MB</span>
+        <button class="arrow" aria-label="展开 Ghostty 的残留清单"><i data-lucide="chevron-right" style="width:13px;height:13px"></i></button>
+      </div>
+      <div class="lrow" id="a-row4">
+        <input type="checkbox" class="ck" aria-label="选中 CleanMyMac 5">
+        <span class="appicon" style="background:#e04a5f">C</span>
+        <div class="grow"><div class="flexrow"><b>CleanMyMac 5</b></div>
+          <div class="p2">/Applications/CleanMyMac_5.app</div></div>
+        <span class="meter"><b style="width:66%"></b></span>
+        <span class="num" style="font-weight:600;width:64px;text-align:right">1.2 GB</span>
+        <button class="arrow" aria-label="展开 CleanMyMac 5 的残留清单"><i data-lucide="chevron-right" style="width:13px;height:13px"></i></button>
+      </div>
+    </div>
+    <div class="note num">点行 = 选中 app 本体(再点取消)· 点行尾箭头 = 展开残留 · 排序按 .app 实际占用(与空间地图同口径)</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var root=document.getElementById('pulse-uninstaller-proto');
+  var exp=root.querySelector('#a-exp'),arw=root.querySelector('#a-arw'),row1=root.querySelector('#a-row1');
+  function setExp(open){exp.style.display=open?'block':'none';arw.classList.toggle('open',open);}
+  // 点行 = 选中(checkbox 语义);灰行(先退出)点了不动。点箭头 = 展开残留。
+  root.querySelectorAll('.lrow').forEach(function(row){
+    row.addEventListener('click',function(e){
+      if(e.target.closest('.arrow'))return;
+      if(row.id==='a-row2')return; // 灰行:先退出,不选中
+      var ck=row.querySelector('input.ck');
+      ck.checked=!ck.checked;
+      row.classList.toggle('sel',ck.checked);
+    });
+  });
+  arw.addEventListener('click',function(e){e.stopPropagation();setExp(exp.style.display==='none');});
+  setExp(true);
+  // 「全选残留」:只收通用位置,LaunchAgents(先检查)恒不进全选,但可手动勾。
+  root.querySelector('#a-selall').addEventListener('click',function(){
+    root.querySelectorAll('#a-lo input.ck').forEach(function(ck){
+      if(ck.id!=='a-ck4')ck.checked=true;});});
+  root.querySelector('#a-perm').addEventListener('change',function(){
+    root.querySelector('#a-go').textContent=this.checked?'永久卸载 Bitwarden…':'卸载 Bitwarden…';});
+})();
+</script>
+</div>
