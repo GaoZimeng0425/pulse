@@ -1,16 +1,20 @@
-# 02: 残留候选引擎 + 展开行
+# 02: 清单产品口径 + 残留信任三件套
 
-**What to build:** 给清单里的每个 app 算残留候选清单。键 = bundle id 与应用名两把,**目录名全等才命中**(Group Containers 例外:后缀匹配,前缀为团队 id)。通用位置清单:Application Support / Caches / Preferences(`<bid>.plist`)/ Containers / Group Containers / Saved Application State / HTTPStorages / WebKit / Logs / Application Scripts;LaunchAgents 恒「先检查」档;PrivilegedHelperTools 永不出现(root 域)。brew 应用残留候选优先取收据 zap 段声明的路径,未覆盖处落回通用位置清单。每行残留 = 路径 + 实际占用,默认不勾。UI:点 app 行展开残留清单。
+**What to build:** 在票 01 只读清单 + 半成品残留引擎(worktree `feat/uninstaller-02` 续改,不推倒)之上,落 2026-11-04 产品拍板:
 
-**接缝:** 实际占用骑 `CleanBoundary` 元数据枚举(同口径去重);收据 zap 段读取沿用票 01 的收据读取器;候选位置判定纯值化(PulseCore,喂假 fs 夹具);Info.plist 读不到 bundle id 的 app → 残留清单如实为空并标注「无 bundle id」,不拿应用名硬猜 Group Containers。
+1. **排序与搜索(Q5,推翻 11-01 两处)**:应用页默认按 .app 实际占用降序,标题旁可切「按名」;顶部过滤搜索框(子页内过滤,不与主窗口全局搜索耦合)。
+2. **四门顺序(Q13)**:子药丸调整为 开发者垃圾 | 空间地图 | 应用 | 清理历史(动手门在前、档案门殿后;防漂移测试同步改)。
+3. **残留信任三件套(Q4)**:点行展开残留清单(票 01 半成品的引擎+探测器接上 UI);每行人话副标+「删了会怎样」(位置类型 → 人话映射表:Containers=容器沙盒数据·删了下次启动重建 / Caches=缓存·删了重建 / Preferences=设置·删了回到出厂设置 / …);「全选残留」按钮(只收通用位置,LaunchAgents 恒先检查不进全选);默认全不勾;无 bundle id 的 app 标注「未识别,不敢猜」不展开探测。
 
-**Blocked by:** 01(清单形状与收据读取器)
+**接缝:** 引擎 `AppLeftovers.probes`(两把键/GC 谓词/zap 并集)与 Live 探测器、UninstallModel 残留缓存/选择集已具雏形(worktree 半成品);人话映射表放 PulseCore(可测)。
 
-**Status:** ready-for-agent
+**Blocked by:** 无(01 done)
 
-- [ ] 夹具测试:bundle id / 应用名两把键全等命中与不命中;目录名前缀相似不误中
-- [ ] 夹具测试:Group Containers 后缀匹配(团队 id 前缀);Preferences 只认 `<bid>.plist`
-- [ ] 夹具测试:LaunchAgents 候选恒「先检查」;PrivilegedHelperTools 永不出现(测试断言)
-- [ ] 夹具测试:收据 zap 段路径优先并入、通用位置补未覆盖处(合成收据)
-- [ ] 残留行默认不勾;实际占用与口径标注一致;展开行 UI
-- [ ] 无 bundle id 的 app:残留为空 + 标注,不误猜
+**Status:** ready-for-agent(产品口径 2026-11-04 拍板)
+
+- [ ] 夹具测试:默认占用降序(大小未知排最后)、切换按名;搜索为子串过滤、大小写不敏感
+- [ ] 夹具测试:全选只收通用位置残留,LaunchAgents 不进;默认全不勾
+- [ ] 夹具测试:人话映射表每个位置类型都有文案且不含实现术语(路径段不出现在副标里)
+- [ ] 无 bundle id:不探测、行内标注(与「没有残留」视觉可区分)
+- [ ] 四门顺序调整 + 防漂移登记测试改口径
+- [ ] 展开行 UI:路径可复制,副标先于人话呈现,LaunchAgents 保留「先检查」chip

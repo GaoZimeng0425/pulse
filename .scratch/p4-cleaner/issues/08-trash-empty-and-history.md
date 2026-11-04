@@ -4,7 +4,7 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] 多卷夹具测试:各卷废纸篓汇总项数 / 总量正确;无权限项被跳过并计数上报
 - [ ] 确认文案含所有卷汇总与「永久删除不可恢复」字样
@@ -15,3 +15,7 @@
 ## Comments
 
 - 2026-11-03 用户拍板:06/08 放一放(09 因 Blocked by 连带挂起),先做二期应用卸载器(.scratch/p4-uninstaller/,spec 已立、票 01–04)。挂起不结项,用户说继续时按票面原样开工。
+
+## Comments
+
+- 2026-11-04:「清空废纸篓」主体已摘至 `.scratch/p4-uninstaller/issues/04-trash-empty.md`(2026-11-04 拍板 Q3,腾空间闭环必需件提前);清理历史页部分早在一期 04 票落地。本票剩余项(目验点)并入 p4-uninstaller/07,**本票结项(迁移完成)**。
