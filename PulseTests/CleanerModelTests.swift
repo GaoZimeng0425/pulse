@@ -725,4 +725,89 @@ final class CleanerModelTests: XCTestCase {
         }
         XCTFail("等待条件超时(10s)")
     }
+
+    // MARK: 清空废纸篓状态机(p4-uninstaller/04;fake 注入,绝不真删)
+
+    private func waitTrashPhase(
+        _ model: CleanerModel,
+        where predicate: (CleanerModel.TrashPhase) -> Bool,
+        _ label: String
+    ) async {
+        for _ in 0 ..< 200 where !predicate(model.trashPhase) {
+            await Task.yield()
+        }
+        XCTAssertTrue(predicate(model.trashPhase), label)
+    }
+
+    func testEmptyTrashInventoryEmptyGivesNoticeWithoutSheetOrDeletion() async {
+        let spy = FakeCleanTrashExecutor()
+        let model = CleanerModel(trash: spy, trashInventory: {
+            TrashInventory(volumes: [.init(name: "启动卷", items: 0, bytes: 0)])
+        })
+        model.beginEmptyTrash()
+        await waitTrashPhase(model, where: { $0 == .idle }, "空废纸篓回 idle")
+        XCTAssertEqual(model.trashNotice, "废纸篓是空的")
+        let emptyCalls = await spy.emptyCalls
+        XCTAssertEqual(emptyCalls, 0, "空废纸篓零删除")
+        model.dismissTrashFeedback()
+        XCTAssertNil(model.trashNotice)
+    }
+
+    func testEmptyTrashConfirmFlowRunsExecutorOnce() async {
+        let spy = FakeCleanTrashExecutor(
+            nextEmptySummary: TrashEmptySummary(volumes: [
+                TrashVolumeEmptySummary(volume: "启动卷", emptiedItems: 3, freedBytes: 1000),
+            ])
+        )
+        let model = CleanerModel(trash: spy, trashInventory: {
+            TrashInventory(volumes: [.init(name: "启动卷", items: 3, bytes: 1000)])
+        })
+        model.beginEmptyTrash()
+        await waitTrashPhase(model, where: {
+            if case .confirming = $0 {
+                true
+            } else {
+                false
+            }
+        }, "进确认态")
+        guard case let .confirming(inventory) = model.trashPhase else { return }
+        XCTAssertEqual(inventory.totalItems, 3, "确认弹窗吃清点数字")
+        model.confirmEmptyTrash()
+        await waitTrashPhase(model, where: {
+            if case .finished = $0 {
+                true
+            } else {
+                false
+            }
+        }, "执行完成")
+        guard case let .finished(summary) = model.trashPhase else { return }
+        XCTAssertEqual(summary.totalItems, 3, "战报透传")
+        let emptyCalls = await spy.emptyCalls
+        XCTAssertEqual(emptyCalls, 1, "恰好执行一次")
+        model.dismissTrashFeedback()
+        if case .idle = model.trashPhase {} else {
+            XCTFail("关闭横幅应回 idle")
+        }
+    }
+
+    func testEmptyTrashCancelKeepsEverything() async {
+        let spy = FakeCleanTrashExecutor()
+        let model = CleanerModel(trash: spy, trashInventory: {
+            TrashInventory(volumes: [.init(name: "启动卷", items: 2, bytes: 5)])
+        })
+        model.beginEmptyTrash()
+        await waitTrashPhase(model, where: {
+            if case .confirming = $0 {
+                true
+            } else {
+                false
+            }
+        }, "进确认态")
+        model.cancelEmptyTrash()
+        if case .idle = model.trashPhase {} else {
+            XCTFail("取消回 idle")
+        }
+        let emptyCalls = await spy.emptyCalls
+        XCTAssertEqual(emptyCalls, 0, "取消零删除")
+    }
 }

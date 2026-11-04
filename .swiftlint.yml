@@ -28,3 +28,20 @@ excluded:
   - .claude
   - .worktrees                             # 仓库内 agent worktree 副本(AGENTS.md 分支节)
   - Packages/*/.build                    # SwiftPM 构建产物与依赖源码(GRDB/swift-sdk 等),不是自有代码;漏排轻则违规噪音、重则 swiftlint SIGILL 崩溃(2026-10-26 两票连续实踩:02 PulseMCP/03 PulseHelper,故通配根治)
+
+# ── 自定义规则(机械门禁;CODING_STANDARDS:机械项归 lint,不进评审)──
+custom_rules:
+  # p4-uninstaller/04 拍板:全系统不可逆出口 = 清空废纸篓 + 卸载域「彻底删除」
+  # 勾选,再无第三处。removeItem(atPath:) 只许出现在两个删除执行器文件里;
+  # 新增出口先过 ADR-0008 闸门设计(白名单/确认清单/废纸篓默认)再回白名单+写理由。
+  # 测试的临时夹具清理(defer)合法,排除测试域。
+  no_remove_item_outside_deletion_gates:
+    name: "Deletion Gate"
+    regex: '\.removeItem\(atPath:'
+    excluded:
+      - '.*/Pulse/Live/LiveCleanTrashExecutor\.swift'
+      - '.*/Pulse/Live/LiveBrewUninstaller\.swift' # LiveCleanPermanentDeleter 所在文件
+      - '.*/Tests/.*'
+      - '.*/PulseTests/.*'
+    message: "永久删除出口仅两处(废纸篓执行器/卸载域永久删除);新出口先过 ADR-0008 闸门再进白名单。"
+    severity: error
