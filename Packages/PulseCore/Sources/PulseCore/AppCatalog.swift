@@ -189,3 +189,45 @@ public enum AppCatalog {
         }
     }
 }
+
+// MARK: - 展示层纯值(2026-11-04 拍板 Q5:默认占用降序 + 搜索;排序/过滤可测)
+
+/// 应用清单展示序。
+public enum AppSortOrder: Sendable, Equatable {
+    /// 默认(腾空间第一动机):占用降序,大小未知排最后(不伪造 0),再按名稳定。
+    case sizeDescending
+    /// 按名(精确卸载动机):localizedCaseInsensitive。
+    case name
+}
+
+public extension AppCatalog {
+    static func sorted(_ entries: [UninstallAppEntry], by order: AppSortOrder) -> [UninstallAppEntry] {
+        switch order {
+        case .sizeDescending:
+            entries.sorted { lhs, rhs in
+                switch (lhs.sizeBytes, rhs.sizeBytes) {
+                case let (l?, r?):
+                    l != r
+                        ? l > r
+                        : lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+                case (_?, nil): true
+                case (nil, _?): false
+                case (nil, nil):
+                    lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+                }
+            }
+        case .name:
+            entries.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        }
+    }
+
+    /// 搜索过滤(Q5):应用名 / 路径子串,大小写不敏感;空查询原样返回。
+    static func filtered(_ entries: [UninstallAppEntry], query: String) -> [UninstallAppEntry] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return entries }
+        return entries.filter {
+            $0.name.localizedCaseInsensitiveContains(trimmed)
+                || $0.path.localizedCaseInsensitiveContains(trimmed)
+        }
+    }
+}

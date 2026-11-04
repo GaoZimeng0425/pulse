@@ -140,6 +140,43 @@ final class AppCatalogTests: XCTestCase {
         )
         XCTAssertNil(output.entries.single?.bundleID, "02 票残留引擎按「无 bundle id」处理")
     }
+
+    // MARK: 展示层纯值(2026-11-04 Q5:默认占用降序 + 搜索)
+
+    func testSortSizeDescendingPutsUnknownLast() {
+        let entries = [
+            UninstallAppEntry(name: "Small", path: "/A", sizeBytes: 100),
+            UninstallAppEntry(name: "Unknown", path: "/B"), // 大小未知不伪造 0
+            UninstallAppEntry(name: "Big", path: "/C", sizeBytes: 900),
+        ]
+        XCTAssertEqual(
+            AppCatalog.sorted(entries, by: .sizeDescending).map(\.name),
+            ["Big", "Small", "Unknown"]
+        )
+    }
+
+    func testSortByNameCaseInsensitive() {
+        let entries = [
+            UninstallAppEntry(name: "beta", path: "/1"),
+            UninstallAppEntry(name: "Zeta", path: "/2"),
+            UninstallAppEntry(name: "alpha", path: "/3"),
+        ]
+        XCTAssertEqual(
+            AppCatalog.sorted(entries, by: .name).map(\.name),
+            ["alpha", "beta", "Zeta"]
+        )
+    }
+
+    func testFilterMatchesNameOrPathCaseInsensitive() {
+        let entries = [
+            UninstallAppEntry(name: "Bitwarden", path: "/Applications/Bitwarden.app"),
+            UninstallAppEntry(name: "Ghostty", path: "/Applications/Ghostty.app"),
+        ]
+        XCTAssertEqual(AppCatalog.filtered(entries, query: "bitwarden").map(\.name), ["Bitwarden"], "名字命中")
+        XCTAssertEqual(AppCatalog.filtered(entries, query: "ghostty.app").map(\.name), ["Ghostty"], "路径命中")
+        XCTAssertEqual(AppCatalog.filtered(entries, query: "  ").count, 2, "空白查询原样返回")
+        XCTAssertEqual(AppCatalog.filtered(entries, query: "不存在").count, 0)
+    }
 }
 
 private extension Array {
