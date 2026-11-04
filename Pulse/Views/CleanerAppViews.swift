@@ -142,7 +142,8 @@ struct AppListSection: View {
                 Text("按名").tag(AppSortOrder.name)
             }
             .pickerStyle(.segmented)
-            .frame(width: 130)
+            .labelsHidden()
+            .fixedSize()
             .help("默认按 .app 实际占用降序(与空间地图同口径)")
 
             Spacer(minLength: 8)
