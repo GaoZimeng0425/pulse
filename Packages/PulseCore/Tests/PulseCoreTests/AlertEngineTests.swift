@@ -346,7 +346,8 @@ final class AlertEngineTests: XCTestCase {
         // 新组内存落内存页(同构延伸,工单未点名)。
         XCTAssertEqual(AlertKind.systemLoad.route.tab, .overview)
         XCTAssertEqual(AlertKind.groupCPU.route.tab, .cpu)
-        XCTAssertEqual(AlertKind.diskAvailable.route.tab, .disk)
+        // p4-uninstaller/06 拍板 Q8:容量类点开跳清理页(动手清 > 看数字)。
+        XCTAssertEqual(AlertKind.diskAvailable.route.tab, .cleaner)
         XCTAssertEqual(AlertKind.newGroupMemory.route.tab, .memory)
     }
 

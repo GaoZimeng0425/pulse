@@ -26,7 +26,7 @@ struct JunkListSection: View {
             // 设置窗「清理」页,主窗口这边扫之前看不到任何提示)。
             VStack(alignment: .leading, spacing: 4) {
                 CardEmptyState(
-                    title: model.isRestoringCache ? "正在恢复上次扫描结果…" : "先扫描才能识别垃圾",
+                    title: model.isRestoringCache ? "正在恢复上次扫描结果…" : "先扫一遍,看看能回收多少",
                     detail: model.isRestoringCache
                         ? "从缓存读回上次结果(约一秒;机器满载时稍等)"
                         : "点右上「扫描整台 Mac」——白名单识别,未识别的目录不会出现",
@@ -685,6 +685,11 @@ private struct CleanRunDisclosureRow: View {
                     Image(systemName: expanded ? "chevron.down" : "chevron.right")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.tertiary)
+                    // 类型标记(Q15):卸载带应用图标、清理带垃圾桶,扫一眼可分;不做筛选分页。
+                    Image(systemName: run.isUninstall ? "app.dashed" : "trash")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                        .help(run.isUninstall ? "应用卸载" : "清理")
                     Text(run.startedAt.formatted(date: .abbreviated, time: .shortened))
                         .font(.system(size: 12, weight: .medium))
                         .monospacedDigit()
@@ -752,6 +757,18 @@ private struct CleanHistoryItemRow: View {
                 .monospacedDigit()
                 .lineLimit(1)
                 .truncationMode(.middle)
+            // 找回(Q12):只在废纸篓去向存在时亮;永久删除无去向,不画。
+            if case let .recycled(destination) = record.outcome {
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: destination)])
+                } label: {
+                    Image(systemName: "magnifyingglass.circle")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+                .help("在 Finder 废纸篓中显示(选中它,可拖回原位恢复)")
+            }
         }
     }
 
