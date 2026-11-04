@@ -111,6 +111,9 @@ struct CleanerTabView: View {
     /// 空间地图的导航态放在壳层(07):切子药丸再回来不丢下钻位置。
     @State private var mapDrillPath: String?
     @State private var mapTreeIndex = 0
+    /// 轻桥(p4-uninstaller/05):地图「这块能清」→ 切垃圾子页并定位的组;
+    /// JunkListSection 消费后自清。切走再回来地图下钻位置不丢(壳层既有态)。
+    @State private var pendingJunkGroup: JunkGroup?
 
     private var accent: Color {
         Metric.disk.accentColor
@@ -127,7 +130,7 @@ struct CleanerTabView: View {
             }
             subPillBar
             switch subTab {
-            case .junk: JunkListSection(model: model)
+            case .junk: JunkListSection(model: model, pendingGroup: $pendingJunkGroup)
             case .map: mapSection
             case .history: CleanHistorySection(model: model)
             case .apps: AppListSection(model: uninstallModel)
@@ -323,7 +326,12 @@ struct CleanerTabView: View {
                 SpaceMapSection(
                     model: model,
                     drillPath: $mapDrillPath,
-                    treeIndex: $mapTreeIndex
+                    treeIndex: $mapTreeIndex,
+                    home: model.junkHome,
+                    onGoToJunk: { group in
+                        subTab = .junk
+                        pendingJunkGroup = group
+                    }
                 )
                 summaryCard(result)
             }

@@ -20,6 +20,10 @@ struct SpaceMapSection: View {
     let model: CleanerModel
     @Binding var drillPath: String?
     @Binding var treeIndex: Int
+    /// 轻桥(p4-uninstaller/05):白名单判定相对它展开(与开发者垃圾清单同源)。
+    let home: String
+    /// 命中白名单的块「去清理清单」动作(壳层切子药丸 + 定位组)。
+    let onGoToJunk: (JunkGroup) -> Void
 
     @State private var notice: String?
     @State private var hoveredRectIndex: Int?
@@ -53,6 +57,12 @@ struct SpaceMapSection: View {
     private func mapCard(_ tree: SpaceMapNode) -> some View {
         let root = resolveDrill(in: tree)
         let rects = TreemapLayout.layout(root: root)
+        // 角标判定预计算一次(与 rects 同源);Canvas 里只查表,hover 重绘零重算。
+        // 只命中非密封非合并块——密封区不可删、「其他」是合成块,都零暗示(ADR-0008)。
+        let cleanable: [JunkGroup?] = rects.map { rect in
+            guard !rect.node.isSealed, !rect.node.isAggregate else { return nil }
+            return JunkRuleTable.cleanableGroup(for: rect.node.path, home: home)
+        }
         return VStack(alignment: .leading, spacing: 12) {
             CardHeader(symbolName: "square.grid.3x3.square", title: "空间地图", tint: accent) {
                 Button("在 Finder 中显示") { reveal(root) }
@@ -73,7 +83,8 @@ struct SpaceMapSection: View {
                     .foregroundStyle(.tertiary)
                     .padding(.horizontal, 12)
             } else {
-                treemapBody(rects: rects, tree: tree)
+                hoverInfoRow(rects: rects, cleanable: cleanable)
+                treemapBody(rects: rects, tree: tree, cleanable: cleanable)
             }
         }
         .cardShell(compact: false)
@@ -81,7 +92,7 @@ struct SpaceMapSection: View {
 
     // MARK: Canvas treemap(单次 draw call)
 
-    private func treemapBody(rects: [TreemapRect], tree: SpaceMapNode) -> some View {
+    private func treemapBody(rects: [TreemapRect], tree: SpaceMapNode, cleanable: [JunkGroup?]) -> some View {
         GeometryReader { geo in
             Canvas { context, size in
                 for (index, tr) in rects.enumerated() {
@@ -119,6 +130,31 @@ struct SpaceMapSection: View {
                                     .foregroundColor(textColor.opacity(0.8)),
                                 at: CGPoint(x: rect.minX + 6, y: rect.maxY - 4),
                                 anchor: .bottomLeading
+                            )
+                        }
+                    }
+
+                    // 轻桥角标(p4-uninstaller/05):白名单命中块右上角「可清理」;
+                    // 块太小画不下文字时退化为一个点——存在感保留,不给版面压力。
+                    if cleanable.indices.contains(index), let group = cleanable[index] {
+                        _ = group
+                        if rect.width > 72, rect.height > 30 {
+                            let badge = CGRect(x: rect.maxX - 40, y: rect.minY + 3, width: 36, height: 13)
+                            context.fill(
+                                Path(roundedRect: badge, cornerRadius: 6.5),
+                                with: .color(Metric.disk.accentColor.opacity(0.95))
+                            )
+                            context.draw(
+                                Text("可清理").font(.system(size: 8.5, weight: .semibold))
+                                    .foregroundColor(.white),
+                                at: CGPoint(x: badge.midX, y: badge.midY),
+                                anchor: .center
+                            )
+                        } else {
+                            let dot = CGRect(x: rect.maxX - 9, y: rect.minY + 3, width: 5, height: 5)
+                            context.fill(
+                                Path(ellipseIn: dot),
+                                with: .color(Metric.disk.accentColor.opacity(0.95))
                             )
                         }
                     }
@@ -184,6 +220,39 @@ struct SpaceMapSection: View {
             return Surface.cardHigh
         }
         return treemapColors[index % treemapColors.count]
+    }
+
+    /// hover 信息行(轻桥):路径 + 大小;白名单命中块给「去清理清单」跳转。
+    /// 文案明示判定来源(清理白名单)与地图只读立场(checklist)。
+    @ViewBuilder
+    private func hoverInfoRow(rects: [TreemapRect], cleanable: [JunkGroup?]) -> some View {
+        if let index = hoveredRectIndex, rects.indices.contains(index) {
+            let node = rects[index].node
+            HStack(spacing: 8) {
+                Text(node.path)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(node.path)
+                Spacer(minLength: 8)
+                Text("\(PulseFormat.memory(UInt64(max(0, node.bytes)))) · \(node.name)")
+                    .font(.system(size: 10.5))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                if cleanable.indices.contains(index), let group = cleanable[index] {
+                    Button {
+                        onGoToJunk(group)
+                    } label: {
+                        Label("这块能清", systemImage: "arrow.right.circle.fill")
+                            .font(.system(size: 10.5, weight: .semibold))
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(Metric.disk.accentColor)
+                    .help("能删的判定来自清理白名单(与开发者垃圾清单同源);地图本身只读——点击去开发者垃圾定位对应组")
+                }
+            }
+        }
     }
 
     private func breadcrumbRow(_ tree: SpaceMapNode) -> some View {

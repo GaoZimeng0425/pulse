@@ -15,6 +15,9 @@ import SwiftUI
 /// 清单子页(换掉 03 票的占位卡):未扫描给 CTA,扫描中给提示,完成给清单卡。
 struct JunkListSection: View {
     let model: CleanerModel
+    /// 轻桥落点(p4-uninstaller/05):地图「这块能清」切过来时待定位的组;
+    /// 透传给清单卡(JunkListCard):滚动到组头并短暂高亮,消费后自清。
+    var pendingGroup: Binding<JunkGroup?> = .constant(nil)
 
     var body: some View {
         switch model.phase {
@@ -44,7 +47,7 @@ struct JunkListSection: View {
             )
             .cardShell(compact: false)
         case .finished:
-            JunkListCard(model: model)
+            JunkListCard(model: model, pendingGroup: pendingGroup)
         }
     }
 }
@@ -53,6 +56,10 @@ struct JunkListSection: View {
 
 private struct JunkListCard: View {
     let model: CleanerModel
+    /// 轻桥落点(p4-uninstaller/05):待定位组;滚动+高亮后自清(同组再跳也能再闪)。
+    var pendingGroup: Binding<JunkGroup?> = .constant(nil)
+    @State private var flashGroup: JunkGroup?
+
     private var accent: Color {
         Metric.disk.accentColor
     }
@@ -120,29 +127,48 @@ private struct JunkListCard: View {
         let byGroup = Dictionary(grouping: candidates, by: \.group)
         // 活动条目每次渲染现查一次(判定永不缓存),行级原因复用同一份。
         let activity = model.currentActivityEntries()
-        return LazyVStack(alignment: .leading, spacing: 2) {
-            ForEach(JunkGroup.allCases.filter { byGroup[$0] != nil }, id: \.self) { group in
-                let items = byGroup[group] ?? []
-                // 整组勾选只吃组内「可安全清理」且**非在用**的项(拍板 B + 在用保护):
-                // 先检查项、在用项都不参与组勾选,组里没有可勾项就不画 checkbox。
-                let safeItems = items
-                    .filter { $0.tier == .safe && model.inUseReasons(for: $0, entries: activity) == nil }
-                groupHeader(group, items: items, safeItems: safeItems)
-                ForEach(items) { candidate in
-                    JunkRow(
-                        candidate: candidate,
-                        leader: candidates.map(\.bytes).max() ?? 0,
-                        accent: accent,
-                        isSelected: model.isSelected(candidate),
-                        inUseReasons: model.inUseReasons(for: candidate, entries: activity),
-                        disabled: isBusy,
-                        onToggle: { model.toggle(candidate) },
-                        onExclude: { model.exclude(candidate.path) }
-                    )
+        return ScrollViewReader { proxy in
+            LazyVStack(alignment: .leading, spacing: 2) {
+                ForEach(JunkGroup.allCases.filter { byGroup[$0] != nil }, id: \.self) { group in
+                    let items = byGroup[group] ?? []
+                    // 整组勾选只吃组内「可安全清理」且**非在用**的项(拍板 B + 在用保护):
+                    // 先检查项、在用项都不参与组勾选,组里没有可勾项就不画 checkbox。
+                    let safeItems = items
+                        .filter { $0.tier == .safe && model.inUseReasons(for: $0, entries: activity) == nil }
+                    groupHeader(group, items: items, safeItems: safeItems)
+                        .id(group)
+                        .background(
+                            // 轻桥定位高亮(p4-uninstaller/05):跳转落地闪一下,1.5s 自灭。
+                            flashGroup == group ? Metric.disk.accentColor.opacity(0.12) : Color.clear
+                        )
+                    ForEach(items) { candidate in
+                        JunkRow(
+                            candidate: candidate,
+                            leader: candidates.map(\.bytes).max() ?? 0,
+                            accent: accent,
+                            isSelected: model.isSelected(candidate),
+                            inUseReasons: model.inUseReasons(for: candidate, entries: activity),
+                            disabled: isBusy,
+                            onToggle: { model.toggle(candidate) },
+                            onExclude: { model.exclude(candidate.path) }
+                        )
+                    }
+                }
+                if byGroup[.projectArtifacts] == nil {
+                    scanRootsHint
                 }
             }
-            if byGroup[.projectArtifacts] == nil {
-                scanRootsHint
+            .onChange(of: pendingGroup.wrappedValue) { _, group in
+                guard let group else { return }
+                proxy.scrollTo(group, anchor: .top)
+                flashGroup = group
+                pendingGroup.wrappedValue = nil
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    if flashGroup == group {
+                        flashGroup = nil
+                    }
+                }
             }
         }
     }
