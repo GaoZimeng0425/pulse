@@ -104,14 +104,10 @@ final class CleanerModel {
         homeDirectory
     }
 
-    /// 项目产物的排序(05,用户拍板:默认大小、可切新旧)。新旧 = 项目年龄升序
-    /// (最久未动在前),年龄未知排最后。
-    enum ProjectArtifactSort: Hashable {
-        case size
-        case age
-    }
-
-    var artifactSort: ProjectArtifactSort = .size
+    /// 两组展示排序(08:统一 Core 的 JunkSortOrder;项目产物沿用 05 拍板
+    /// 默认大小、可切新旧;工具缓存排序为 08 新增,两组互不影响)。
+    var artifactSort: JunkSortOrder = .size
+    var toolCacheSort: JunkSortOrder = .size
 
     /// - Parameters:
     ///   - exclusions: 排除目录(设置页同一实例;默认不落盘的空表给预览 / 测试)。
@@ -423,17 +419,7 @@ final class CleanerModel {
             roots: scanRoots.paths,
             excludedPathPrefixes: excluded
         )
-        if artifactSort == .age {
-            // 新旧 = 最久未动在前;年龄未知(nil)排最后。
-            artifacts.sort { lhs, rhs in
-                switch (lhs.newestChangeEpoch, rhs.newestChangeEpoch) {
-                case let (l?, r?): l < r
-                case (_?, nil): true
-                case (nil, _?): false
-                default: lhs.path < rhs.path
-                }
-            }
-        }
+
         return (global + artifacts)
             .filter { !recycledPaths.contains($0.path) }
     }

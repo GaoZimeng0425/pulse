@@ -38,6 +38,10 @@ enum Surface {
     /// 警示色(`{colors.state-warning}`,琥珀):内存压力"偏高"、优化充电介入、触发中
     /// 告警横幅等"值得留意但未到危险"的唯一出处——取 Disk 指标色的别名,不抄第二份 hex。
     static let warning = Metric.disk.accentColor
+
+    /// 「先检查」档位专用(DESIGN.md state-caution;p4-uninstaller/08):
+    /// warning 是磁盘金别名,在清理页与 accent 全页撞色,档位语义需独立琥珀。
+    static let caution = Color.dynamic(light: 0xD95926, dark: 0xEB6834)
     /// 状态点"停 / 未连接"(`{colors.state-inactive}`,p2-review/03 入表):系统 secondary
     /// 降到 40%——与亮起态的指标色点成对,不是文字层级,所以单立令牌而非用 `.tertiary`。
     /// 容器行(未运行)与蓝牙设备行(未连接)共用。
