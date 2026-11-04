@@ -95,6 +95,7 @@
 		7700D89C75AA6D6D0EB794B6 /* DevServerFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41196C89D2456B23F701DF21 /* DevServerFeature.swift */; };
 		793FED693BFB62064DA0DE63 /* PageHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 784169E55AFE6F109F41B427 /* PageHeader.swift */; };
 		7A42BF5BE1ECD8D87989902C /* SoundSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A93981AEA461948386E597BB /* SoundSensor.swift */; };
+		7B78DA9310927EF3FB5CB0F3 /* UninstallModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 607B205CBD1C5DFC1F58E246 /* UninstallModelTests.swift */; };
 		7DA585A2786F7FEDFED5D08E /* EnergyHelperClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CDD19BA97EC142A19A465AE /* EnergyHelperClient.swift */; };
 		7EECD9B072C93FEBF647E76A /* LiveCleanTrashExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 402CDC78D088CCD268E214D9 /* LiveCleanTrashExecutor.swift */; };
 		7F19E400612A69AA2613B8C3 /* DevServerViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16D71F0A473C1329AEE02FF2 /* DevServerViews.swift */; };
@@ -272,6 +273,7 @@
 		5A686C29DAEAD2AC1D94E833 /* HistoryFeatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryFeatureTests.swift; sourceTree = "<group>"; };
 		5D074B7F60170564351BEE7F /* MenuBarBadgeDisplayModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarBadgeDisplayModelTests.swift; sourceTree = "<group>"; };
 		5E7F860EECC5F68388BB8FC6 /* AlertSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSettingsView.swift; sourceTree = "<group>"; };
+		607B205CBD1C5DFC1F58E246 /* UninstallModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UninstallModelTests.swift; sourceTree = "<group>"; };
 		614CDDAE340894E028545198 /* SoundCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundCardViews.swift; sourceTree = "<group>"; };
 		61B8D8E52DBAB492B5EDA31E /* MenuBarPopoverGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarPopoverGate.swift; sourceTree = "<group>"; };
 		6394DED2F224C5FC7939D499 /* GpuSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GpuSensor.swift; sourceTree = "<group>"; };
@@ -661,6 +663,7 @@
 				F037E709135740FF3012BA47 /* SyntheticProcessSourceTests.swift */,
 				215416C474EC313A5A138037 /* SystemStatsTests.swift */,
 				BE86A48D24949B3D225394BD /* TestHostIsolationTests.swift */,
+				607B205CBD1C5DFC1F58E246 /* UninstallModelTests.swift */,
 			);
 			path = PulseTests;
 			sourceTree = "<group>";
@@ -828,6 +831,7 @@
 				A94FE8284BA99E78188EAEA4 /* SyntheticProcessSourceTests.swift in Sources */,
 				A0969414B6C9885C75F7CACC /* SystemStatsTests.swift in Sources */,
 				73B3EC560B0C6A5339B55928 /* TestHostIsolationTests.swift in Sources */,
+				7B78DA9310927EF3FB5CB0F3 /* UninstallModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -11,18 +11,18 @@ import SwiftUI
 // 一律走 CardEmptyState(DESIGN.md 卡片家族,不手写空态)。
 
 enum CleanerSubTab: String, CaseIterable, Hashable {
+    // 顺序 = 2026-11-04 拍板 Q13:三个动手门在前、档案门殿后。
     case junk
     case map
-    case history
-    /// 应用卸载器(p4-uninstaller):spec 定案为第 4 个子药丸。
     case apps
+    case history
 
     var title: String {
         switch self {
         case .junk: "开发者垃圾"
         case .map: "空间地图"
-        case .history: "清理历史"
         case .apps: "应用"
+        case .history: "清理历史"
         }
     }
 }

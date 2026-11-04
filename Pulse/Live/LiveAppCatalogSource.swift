@@ -20,6 +20,9 @@ struct LiveAppCatalogFacts: Sendable {
     var candidates: [AppCatalogCandidate]
     /// "Bitwarden.app" → cask 名(目录名全等;冲突名已在 Core 侧丢弃)。
     var brewAppNames: [String: String]
+    /// cask 名 → zap 段残留路径(02 票残留候选的优先来源;parse 时已展开 ~,
+    /// Core 的 probes 对幂等输入再展开一次无副作用)。
+    var brewZapPaths: [String: [String]]
 }
 
 struct LiveAppCatalogSource {
@@ -47,9 +50,14 @@ struct LiveAppCatalogSource {
                 candidates.append(candidate(at: path, directoryName: entry))
             }
         }
+        let receipts = collectReceipts()
         return LiveAppCatalogFacts(
             candidates: candidates,
-            brewAppNames: CaskReceiptIndex.build(collectReceipts())
+            brewAppNames: CaskReceiptIndex.build(receipts),
+            brewZapPaths: Dictionary(
+                receipts.map { ($0.caskName, $0.zapTrashPaths) },
+                uniquingKeysWith: { first, _ in first }
+            )
         )
     }
 
@@ -153,5 +161,73 @@ struct LiveAppCatalogSource {
             }
         }
         return receipts
+    }
+}
+
+// MARK: - 残留探测(p4-uninstaller/02)
+
+extension LiveAppCatalogSource {
+    /// 探测候选清单:固定路径逐条 stat;Group Containers 枚举目录按谓词匹配;
+    /// 存在的目录批量聚合大小(复用扫描引擎,一趟),文件单 stat(block 口径)。
+    /// 不存在的候选直接丢弃——残留清单只列真在盘上的东西(推测不算数)。
+    func probeLeftovers(_ probes: [LeftoverProbe]) async -> [AppLeftoverRow] {
+        let fileManager = FileManager.default
+        var rows: [AppLeftoverRow] = []
+        var pendingDirectories: [AppLeftoverRow] = []
+
+        for probe in probes {
+            switch probe {
+            case let .path(path, site, key, isFile, checkFirst, source):
+                var isDirectory: ObjCBool = false
+                guard fileManager.fileExists(atPath: path, isDirectory: &isDirectory) else { continue }
+                if isDirectory.boolValue {
+                    pendingDirectories.append(
+                        AppLeftoverRow(path: path, site: site, matchKey: key, source: source, isCheckFirst: checkFirst)
+                    )
+                } else {
+                    // 文件(.plist / .binarycookies):单 stat,block 口径;读不到 = nil
+                    // 穿透(大小未知但条目真实存在,照列)。
+                    rows.append(
+                        AppLeftoverRow(
+                            path: path, site: site, matchKey: key, source: source,
+                            isCheckFirst: checkFirst, sizeBytes: fileSize(path)
+                        )
+                    )
+                    _ = isFile // 形状已由路径后缀体现,不再分支
+                }
+            case let .groupContainers(bundleID):
+                let groupPath = NSHomeDirectory() + "/Library/Group Containers"
+                guard let names = try? fileManager.contentsOfDirectory(atPath: groupPath) else { continue }
+                for name in names
+                    where AppLeftovers.matchesGroupContainer(directoryName: name, bundleID: bundleID) {
+                    pendingDirectories.append(
+                        AppLeftoverRow(
+                            path: groupPath + "/" + name,
+                            site: .groupContainers,
+                            matchKey: name,
+                            source: .generic
+                        )
+                    )
+                }
+            }
+        }
+        if !pendingDirectories.isEmpty {
+            let sizes = await scanAppSizes(appPaths: pendingDirectories.map(\.path))
+            rows.append(
+                contentsOf: pendingDirectories.map { row in
+                    var sized = row
+                    sized.sizeBytes = sizes[row.path]?.bytes
+                    sized.isPartial = sizes[row.path]?.partial ?? false
+                    return sized
+                }
+            )
+        }
+        return AppLeftovers.sortedRows(rows)
+    }
+
+    private func fileSize(_ path: String) -> Int64? {
+        var st = stat()
+        guard stat(path, &st) == 0 else { return nil }
+        return Int64(st.st_blocks) * 512
     }
 }
