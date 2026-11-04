@@ -19,14 +19,26 @@ public struct CleanRunRecord: Sendable, Equatable, Identifiable {
     public let itemCount: Int
     public let freedBytes: Int64
     public let failedCount: Int
+    /// 应用卸载的 run(p4-uninstaller/06 Q15:历史行类型标记;= 该 run 里存在
+    /// app-uninstall 项,查询时 EXISTS 判定,不落列)。默认 false 兼容旧构造。
+    public let isUninstall: Bool
 
-    public init(id: Int64, startedAt: Date, finishedAt: Date, itemCount: Int, freedBytes: Int64, failedCount: Int) {
+    public init(
+        id: Int64,
+        startedAt: Date,
+        finishedAt: Date,
+        itemCount: Int,
+        freedBytes: Int64,
+        failedCount: Int,
+        isUninstall: Bool = false
+    ) {
         self.id = id
         self.startedAt = startedAt
         self.finishedAt = finishedAt
         self.itemCount = itemCount
         self.freedBytes = freedBytes
         self.failedCount = failedCount
+        self.isUninstall = isUninstall
     }
 }
 
@@ -136,7 +148,11 @@ public actor CleanHistoryStore {
             try Row.fetchAll(
                 db,
                 sql: """
-                SELECT id, started_at, finished_at, item_count, freed_bytes, failed_count
+                SELECT id, started_at, finished_at, item_count, freed_bytes, failed_count,
+                    EXISTS (
+                        SELECT 1 FROM clean_item
+                        WHERE run_id = clean_run.id AND rule_id = 'app-uninstall'
+                    ) AS is_uninstall
                 FROM clean_run ORDER BY started_at DESC, id DESC LIMIT ?
                 """,
                 arguments: [limit]
@@ -147,7 +163,8 @@ public actor CleanHistoryStore {
                     finishedAt: Date(timeIntervalSince1970: TimeInterval(row["finished_at"] as Int)),
                     itemCount: row["item_count"],
                     freedBytes: row["freed_bytes"],
-                    failedCount: row["failed_count"]
+                    failedCount: row["failed_count"],
+                    isUninstall: row["is_uninstall"]
                 )
             }
         }

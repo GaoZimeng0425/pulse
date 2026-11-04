@@ -494,7 +494,8 @@ final class AlertCenterTests: XCTestCase {
         }
         await settle() // 发送是 Task 出口:让它在断言前跑完
         XCTAssertEqual(sender.sent.count, 1)
-        XCTAssertEqual(sender.sent.first?.route, .disk, "磁盘 → 磁盘页")
+        // p4-uninstaller/06 Q8:磁盘容量 → 清理页。
+        XCTAssertEqual(sender.sent.first?.route, .cleaner, "磁盘容量 → 清理页")
     }
 
     func testGroupIngestNamesSubjectAndRoutesToCPU() async {
