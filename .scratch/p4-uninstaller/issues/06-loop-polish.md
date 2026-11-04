@@ -9,9 +9,18 @@
 
 **Blocked by:** 03(历史新去向 / 图标形态依赖卸载执行落地)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] 空态文案与扫描按钮可达(没扫过才出现,扫过不占位)
-- [ ] 容量类跳清理页 / 吞吐类跳磁盘 tab 的路由断言(告警类型 → 落点映射测试)
-- [ ] 「在 Finder 中显示」只对有去向的记录亮;永久删除类不亮
-- [ ] 类型标记:卸载 run 与清理 run 视觉可分;不引入筛选 / 分页
+- [x] 空态文案与扫描按钮可达(没扫过才出现,扫过不占位)
+- [x] 容量类跳清理页 / 吞吐类跳磁盘 tab 的路由断言(告警类型 → 落点映射测试)
+- [x] 「在 Finder 中显示」只对有去向的记录亮;永久删除类不亮
+- [x] 类型标记:卸载 run 与清理 run 视觉可分;不引入筛选 / 分页
+
+## Comments
+
+- 2026-11-04 实施落地并合 develop(hook 装机):1067 例全绿(/tmp 复跑,用户发起)。
+- Q8 落法:AlertRoute 增 cleaner;吞吐类磁盘告警当前不存在,若将来加仍落 .disk
+  (注释注明)。Q15 落法:runs() 查询 EXISTS 判 isUninstall(不落列,
+  CleanRunRecord 默认值兼容旧构造),行首 app.dashed/trash 图标。Q12 仅 recycled
+  项亮按钮(activateFileViewerSelecting 直达并选中)。Q7 空态文案改拍板口径。
+- 目验项(告警真机点开跳转/历史找回/标记观感)归 07 收口清单。
