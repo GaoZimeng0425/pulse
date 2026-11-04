@@ -1,0 +1,311 @@
+<div id="junk-redesign-proto">
+<style>
+  #junk-redesign-proto{
+    --win:light-dark(#ffffff,#1a1a1d);
+    --card:light-dark(#f5f5f7,#1f1f22);
+    --card-hi:light-dark(#e8e8ed,#27272b);
+    --ink:light-dark(rgba(0,0,0,.88),rgba(255,255,255,.92));
+    --ink2:light-dark(rgba(0,0,0,.55),rgba(255,255,255,.55));
+    --ink3:light-dark(#a1a1a6,#6e6e73);
+    --sep:light-dark(rgba(0,0,0,.09),rgba(255,255,255,.1));
+    --gold:light-dark(#c98500,#eda100);
+    --green:light-dark(#2fa83a,#2fa83a);
+    --amber:light-dark(#d95926,#eb6834);
+    --glass:light-dark(rgba(255,255,255,.72),rgba(30,30,32,.72));
+    font-family:-apple-system,"SF Pro Text","PingFang SC",sans-serif;
+    color:var(--ink);font-size:12px;max-width:920px;margin:0 auto;
+  }
+  #junk-redesign-proto .pwin{border-radius:12px;overflow:hidden;background:var(--win);
+    box-shadow:0 24px 70px rgba(0,0,0,.35);outline:1px solid rgba(0,0,0,.2)}
+  #junk-redesign-proto .ubar{height:40px;background:var(--glass);display:flex;align-items:center;padding:0 12px;gap:3px}
+  #junk-redesign-proto .up{display:flex;align-items:center;gap:5px;height:26px;padding:0 10px;border-radius:9999px;
+    color:var(--ink2);font-size:12px;font-weight:500;white-space:nowrap}
+  #junk-redesign-proto .up.sel{background:color-mix(in srgb,var(--gold) 16%,transparent);color:var(--gold)}
+  #junk-redesign-proto .content{padding:16px 20px 20px;display:flex;flex-direction:column;gap:10px}
+  #junk-redesign-proto .ph{display:flex;align-items:flex-end;justify-content:space-between}
+  #junk-redesign-proto .ph h1{font-size:22px;font-weight:700;letter-spacing:-.3px;margin:0;color:var(--ink)}
+  #junk-redesign-proto .ph .sub{color:var(--ink2);font-size:11px;margin-top:2px}
+  #junk-redesign-proto .subpills{display:flex;gap:2px;background:var(--card);border-radius:9999px;padding:2px;width:max-content}
+  #junk-redesign-proto .sp{height:24px;padding:0 11px;border-radius:9999px;font-size:11.5px;font-weight:500;color:var(--ink2);
+    display:flex;align-items:center;border:none;background:transparent;cursor:default}
+  #junk-redesign-proto .sp.on{background:var(--win);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.18)}
+  #junk-redesign-proto .card{background:var(--card);border-radius:14px;padding:8px 6px}
+  #junk-redesign-proto .grphead{display:flex;align-items:center;gap:8px;padding:8px 12px 4px}
+  #junk-redesign-proto .grpname{font-size:13px;font-weight:700;color:var(--ink)}
+  #junk-redesign-proto .grpsize{font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums}
+  #junk-redesign-proto .selall{margin-left:auto;height:22px;padding:0 9px;border-radius:6px;border:none;cursor:pointer;
+    font-size:10.5px;font-weight:600;color:var(--ink2);background:transparent;font-family:inherit}
+  #junk-redesign-proto .selall:hover{background:var(--card-hi)}
+  #junk-redesign-proto .seg{display:flex;background:var(--win);border-radius:7px;padding:2px;gap:2px;margin-left:6px}
+  #junk-redesign-proto .seg button{height:20px;padding:0 8px;border-radius:5px;border:none;background:transparent;
+    font-size:10.5px;font-weight:600;color:var(--ink2);cursor:pointer;font-family:inherit}
+  #junk-redesign-proto .seg button.on{background:var(--card);color:var(--ink)}
+  #junk-redesign-proto .row{display:flex;align-items:center;gap:9px;padding:6px 12px;border-radius:9px;cursor:pointer}
+  #junk-redesign-proto .row:hover{background:color-mix(in srgb,var(--ink) 4%,transparent)}
+  #junk-redesign-proto .ck{width:14px;height:14px;border-radius:4px;border:1.5px solid var(--ink3);
+    background:transparent;cursor:pointer;flex:none;appearance:none;position:relative}
+  #junk-redesign-proto .ck:checked{background:var(--gold);border-color:var(--gold)}
+  #junk-redesign-proto .ck:checked::after{content:"";position:absolute;inset:2px 3px 4px;border:solid #fff;border-width:0 0 2px 2px;transform:rotate(-45deg) scale(.9)}
+  #junk-redesign-proto .tile{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    background:var(--card-hi);color:var(--ink2);flex:none}
+  #junk-redesign-proto .tile i{width:13px;height:13px}
+  #junk-redesign-proto .t1{font-size:12px;font-weight:600;color:var(--ink)}
+  #junk-redesign-proto .t2{font-size:10.5px;color:var(--ink3);font-family:ui-monospace,Menlo,monospace;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px}
+  #junk-redesign-proto .chip{display:inline-flex;align-items:center;height:17px;padding:0 6px;border-radius:9999px;
+    font-size:10px;font-weight:600;white-space:nowrap;flex:none}
+  #junk-redesign-proto .chip.safe{background:color-mix(in srgb,var(--green) 14%,transparent);color:var(--green)}
+  #junk-redesign-proto .proto-a .chip.check{background:color-mix(in srgb,var(--amber) 16%,transparent);color:var(--amber)}
+  #junk-redesign-proto .proto-b .chip.check{background:color-mix(in srgb,var(--ink3) 16%,transparent);color:var(--ink3)}
+  #junk-redesign-proto .meter{height:4px;border-radius:2px;background:var(--sep);overflow:hidden;flex:1;min-width:36px;max-width:80px}
+  #junk-redesign-proto .meter b{display:block;height:100%;background:var(--ink3);border-radius:2px}
+  #junk-redesign-proto .size{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;width:66px;text-align:right;flex:none}
+  #junk-redesign-proto .projrow{display:flex;align-items:center;gap:9px;padding:7px 12px 3px;margin-top:6px;cursor:pointer}
+  #junk-redesign-proto .projname{font-size:12px;font-weight:700;color:var(--ink)}
+  #junk-redesign-proto .projmeta{font-size:10.5px;color:var(--ink2);font-variant-numeric:tabular-nums}
+  #junk-redesign-proto .subrow{padding:4px 12px 4px 46px}
+  #junk-redesign-proto .footer{display:flex;align-items:center;gap:8px;padding:10px 12px 6px}
+  #junk-redesign-proto .total{font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums}
+  #junk-redesign-proto .cta{margin-left:auto;height:30px;padding:0 14px;border-radius:8px;border:none;cursor:pointer;
+    font-size:12.5px;font-weight:700;background:var(--gold);color:#fff;font-family:inherit}
+  #junk-redesign-proto .note{font-size:10.5px;color:var(--ink3);padding:0 12px 6px}
+  #junk-redesign-proto .dim{opacity:.5}
+</style>
+
+<div class="viz-carousel" id="jr-carousel" aria-label="开发者垃圾页重设计两个变体">
+  <!-- ============ 变体 A:琥珀「先检查」 ============ -->
+  <section class="proto-a" data-variant="A 琥珀档位色" aria-label="变体A:先检查用琥珀橙与金色区分">
+    <div class="pwin">
+      <div class="ubar">
+        <span class="up"><i data-lucide="activity"></i></span>
+        <span class="up"><i data-lucide="cpu"></i>CPU</span>
+        <span class="up sel"><i data-lucide="sparkles"></i>清理</span>
+        <span class="up"><i data-lucide="history"></i>历史</span>
+      </div>
+      <div class="content">
+        <div class="ph">
+          <div><h1>开发者垃圾</h1><div class="sub">共可回收 48.2 GB · 可安全清理 31.5 GB / 先检查 16.7 GB</div></div>
+        </div>
+        <div class="subpills">
+          <button class="sp on">开发者垃圾</button><button class="sp">空间地图</button><button class="sp">应用</button><button class="sp">清理历史</button>
+        </div>
+
+        <div class="card">
+          <div class="grphead">
+            <span class="grpname">全局工具缓存</span><span class="grpsize">12.4 GB</span>
+            <span class="seg"><button class="on">大小</button><button>新旧</button></span>
+            <button class="selall" data-x="1">全选安全项</button>
+          </div>
+          <label class="row" style="cursor:pointer">
+            <input type="checkbox" class="ck" checked>
+            <span class="tile"><i data-lucide="hammer"></i></span>
+            <span class="grow"><div class="t1">Xcode DerivedData</div><div class="t2">~/Library/Developer/Xcode/DerivedData</div></span>
+            <span class="chip safe">可安全清理</span>
+            <span class="meter"><b style="width:92%"></b></span>
+            <span class="size">8.2 GB</span>
+          </label>
+          <label class="row" style="cursor:pointer">
+            <input type="checkbox" class="ck">
+            <span class="tile"><i data-lucide="square-stack-3d-up"></i></span>
+            <span class="grow"><div class="t1">Docker Desktop 数据</div><div class="t2">~/Library/Containers/com.docker.docker/Data</div></span>
+            <span class="chip check">先检查</span>
+            <span class="meter"><b style="width:34%"></b></span>
+            <span class="size">3.1 GB</span>
+          </label>
+          <label class="row dim" style="cursor:default">
+            <input type="checkbox" class="ck" disabled>
+            <span class="tile"><i data-lucide="terminal"></i></span>
+            <span class="grow"><div class="t1">SwiftPM 缓存</div><div class="t2">~/Library/Caches/org.swift.swiftpm</div></span>
+            <span class="chip" style="background:color-mix(in srgb,var(--ink3) 16%,transparent);color:var(--ink3)">在用保护 · 终端</span>
+            <span class="meter"><b style="width:12%"></b></span>
+            <span class="size">1.1 GB</span>
+          </label>
+
+          <div class="grphead" style="margin-top:4px">
+            <span class="grpname">项目产物</span><span class="grpsize">35.8 GB</span>
+            <span class="seg"><button class="on">大小</button><button>新旧</button></span>
+            <button class="selall">全选安全项</button>
+          </div>
+
+          <div class="projrow">
+            <input type="checkbox" class="ck" checked>
+            <span class="projname">octok-platform</span>
+            <span class="projmeta">2 项 · 3.2 GB · 3 天前动过</span>
+          </div>
+          <label class="row subrow" style="cursor:pointer">
+            <input type="checkbox" class="ck" checked>
+            <span class="grow"><div class="t1">node_modules <span style="font-weight:400;color:var(--ink3)">· npm 依赖,重装可重建</span></div></span>
+            <span class="chip safe">可安全清理</span>
+            <span class="size">2.1 GB</span>
+          </label>
+          <label class="row subrow" style="cursor:pointer">
+            <input type="checkbox" class="ck" checked>
+            <span class="grow"><div class="t1">target <span style="font-weight:400;color:var(--ink3)">· Rust 构建产物</span></div></span>
+            <span class="chip safe">可安全清理</span>
+            <span class="size">1.1 GB</span>
+          </label>
+
+          <div class="projrow">
+            <input type="checkbox" class="ck">
+            <span class="projname">pulse</span>
+            <span class="projmeta">1 项 · 640 MB · 2 小时前动过</span>
+          </div>
+          <label class="row subrow" style="cursor:pointer">
+            <input type="checkbox" class="ck">
+            <span class="grow"><div class="t1">node_modules <span style="font-weight:400;color:var(--ink3)">· npm 依赖,重装可重建</span></div></span>
+            <span class="chip safe">可安全清理</span>
+            <span class="size">640 MB</span>
+          </label>
+
+          <div class="projrow">
+            <input type="checkbox" class="ck">
+            <span class="projname">voiceos</span>
+            <span class="projmeta">2 项 · 1.9 GB · 8 个月未动</span>
+          </div>
+          <label class="row subrow" style="cursor:pointer">
+            <input type="checkbox" class="ck">
+            <span class="grow"><div class="t1">.venv <span style="font-weight:400;color:var(--ink3)">· Python 虚拟环境,重建即可</span></div></span>
+            <span class="chip safe">可安全清理</span>
+            <span class="size">1.2 GB</span>
+          </label>
+          <label class="row subrow" style="cursor:pointer">
+            <input type="checkbox" class="ck">
+            <span class="grow"><div class="t1">venv <span style="font-weight:400;color:var(--ink3)">· Python 虚拟环境,重建即可</span></div></span>
+            <span class="chip check">先检查</span>
+            <span class="size">710 MB</span>
+          </label>
+
+          <div class="footer">
+            <span class="total">已选 4 项 · 12.5 GB</span>
+            <button class="cta">移入废纸篓…</button>
+          </div>
+          <div class="note">「全选安全项」只勾「可安全清理」且不在用的项;「先检查」与在用保护项永远要你亲手勾。项目按最近活动排序可切「新旧」。</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 变体 B:灰「先检查」 ============ -->
+  <section class="proto-b" data-variant="B 灰档位色" aria-label="变体B:先检查用中性灰" hidden>
+    <div class="pwin">
+      <div class="ubar">
+        <span class="up"><i data-lucide="activity"></i></span>
+        <span class="up"><i data-lucide="cpu"></i>CPU</span>
+        <span class="up sel"><i data-lucide="sparkles"></i>清理</span>
+        <span class="up"><i data-lucide="history"></i>历史</span>
+      </div>
+      <div class="content">
+        <div class="ph">
+          <div><h1>开发者垃圾</h1><div class="sub">共可回收 48.2 GB · 可安全清理 31.5 GB / 先检查 16.7 GB</div></div>
+        </div>
+        <div class="subpills">
+          <button class="sp on">开发者垃圾</button><button class="sp">空间地图</button><button class="sp">应用</button><button class="sp">清理历史</button>
+        </div>
+
+        <div class="card">
+          <div class="grphead">
+            <span class="grpname">全局工具缓存</span><span class="grpsize">12.4 GB</span>
+            <span class="seg"><button class="on">大小</button><button>新旧</button></span>
+            <button class="selall">全选安全项</button>
+          </div>
+          <label class="row" style="cursor:pointer">
+            <input type="checkbox" class="ck" checked>
+            <span class="tile"><i data-lucide="hammer"></i></span>
+            <span class="grow"><div class="t1">Xcode DerivedData</div><div class="t2">~/Library/Developer/Xcode/DerivedData</div></span>
+            <span class="chip safe">可安全清理</span>
+            <span class="meter"><b style="width:92%"></b></span>
+            <span class="size">8.2 GB</span>
+          </label>
+          <label class="row" style="cursor:pointer">
+            <input type="checkbox" class="ck">
+            <span class="tile"><i data-lucide="square-stack-3d-up"></i></span>
+            <span class="grow"><div class="t1">Docker Desktop 数据</div><div class="t2">~/Library/Containers/com.docker.docker/Data</div></span>
+            <span class="chip check">先检查</span>
+            <span class="meter"><b style="width:34%"></b></span>
+            <span class="size">3.1 GB</span>
+          </label>
+          <label class="row dim" style="cursor:default">
+            <input type="checkbox" class="ck" disabled>
+            <span class="tile"><i data-lucide="terminal"></i></span>
+            <span class="grow"><div class="t1">SwiftPM 缓存</div><div class="t2">~/Library/Caches/org.swift.swiftpm</div></span>
+            <span class="chip" style="background:color-mix(in srgb,var(--ink3) 16%,transparent);color:var(--ink3)">在用保护 · 终端</span>
+            <span class="meter"><b style="width:12%"></b></span>
+            <span class="size">1.1 GB</span>
+          </label>
+
+          <div class="grphead" style="margin-top:4px">
+            <span class="grpname">项目产物</span><span class="grpsize">35.8 GB</span>
+            <span class="seg"><button class="on">大小</button><button>新旧</button></span>
+            <button class="selall">全选安全项</button>
+          </div>
+
+          <div class="projrow">
+            <input type="checkbox" class="ck" checked>
+            <span class="projname">octok-platform</span>
+            <span class="projmeta">2 项 · 3.2 GB · 3 天前动过</span>
+          </div>
+          <label class="row subrow" style="cursor:pointer">
+            <input type="checkbox" class="ck" checked>
+            <span class="grow"><div class="t1">node_modules <span style="font-weight:400;color:var(--ink3)">· npm 依赖,重装可重建</span></div></span>
+            <span class="chip safe">可安全清理</span>
+            <span class="size">2.1 GB</span>
+          </label>
+
+          <div class="projrow">
+            <input type="checkbox" class="ck">
+            <span class="projname">voiceos</span>
+            <span class="projmeta">2 项 · 1.9 GB · 8 个月未动</span>
+          </div>
+          <label class="row subrow" style="cursor:pointer">
+            <input type="checkbox" class="ck">
+            <span class="grow"><div class="t1">venv <span style="font-weight:400;color:var(--ink3)">· Python 虚拟环境,重建即可</span></div></span>
+            <span class="chip check">先检查</span>
+            <span class="size">710 MB</span>
+          </label>
+
+          <div class="footer">
+            <span class="total">已选 3 项 · 11.4 GB</span>
+            <button class="cta">移入废纸篓…</button>
+          </div>
+          <div class="note">同 A,唯一差异:「先检查」chip 用中性灰(绿=放心,灰=留个心眼,整页只剩金主按钮一个彩色焦点)。</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  var root=document.getElementById('junk-redesign-proto');
+  root.querySelectorAll('.selall').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var section=btn.closest('section');
+      var scope=btn.closest('.grphead').nextElementSibling;
+      // 勾到下一个组头/页脚为止的安全行(演示语义)
+      var node=scope, first=true;
+      while(node && !node.classList.contains('grphead') && !node.classList.contains('footer')){
+        if(node.classList.contains('row') && !node.classList.contains('dim')
+           && node.querySelector('.chip.safe') && !node.querySelector('.ck').disabled){
+          node.querySelector('.ck').checked=true;
+        }
+        // 项目组:组头的全选也吃子项目产物的安全行(演示:全部安全行)
+        node=node.nextElementSibling;
+      }
+      section.querySelectorAll('.row:not(.dim)').forEach(function(r){
+        if(r.querySelector('.chip.safe') && !r.querySelector('.ck').disabled){
+          var p=r.parentElement;
+          r.querySelector('.ck').checked=true;
+        }
+      });
+    });
+  });
+  // 页脚合计随勾选联动(演示)
+  root.querySelectorAll('section').forEach(function(sec){
+    sec.addEventListener('change',function(){
+      var checked=sec.querySelectorAll('.ck:checked').length;
+      sec.querySelector('.total').textContent='已选 '+checked+' 项(演示计数)';
+    });
+  });
+})();
+</script>
+</div>
