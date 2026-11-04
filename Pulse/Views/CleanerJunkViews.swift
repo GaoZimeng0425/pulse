@@ -124,40 +124,13 @@ private struct JunkListCard: View {
     }
 
     private var groups: some View {
-        let byGroup = Dictionary(grouping: candidates, by: \.group)
-        // 活动条目每次渲染现查一次(判定永不缓存),行级原因复用同一份。
-        let activity = model.currentActivityEntries()
-        return ScrollViewReader { proxy in
-            LazyVStack(alignment: .leading, spacing: 2) {
-                ForEach(JunkGroup.allCases.filter { byGroup[$0] != nil }, id: \.self) { group in
-                    let items = byGroup[group] ?? []
-                    // 整组勾选只吃组内「可安全清理」且**非在用**的项(拍板 B + 在用保护):
-                    // 先检查项、在用项都不参与组勾选,组里没有可勾项就不画 checkbox。
-                    let safeItems = items
-                        .filter { $0.tier == .safe && model.inUseReasons(for: $0, entries: activity) == nil }
-                    groupHeader(group, items: items, safeItems: safeItems)
-                        .id(group)
-                        .background(
-                            // 轻桥定位高亮(p4-uninstaller/05):跳转落地闪一下,1.5s 自灭。
-                            flashGroup == group ? Metric.disk.accentColor.opacity(0.12) : Color.clear
-                        )
-                    ForEach(items) { candidate in
-                        JunkRow(
-                            candidate: candidate,
-                            leader: candidates.map(\.bytes).max() ?? 0,
-                            accent: accent,
-                            isSelected: model.isSelected(candidate),
-                            inUseReasons: model.inUseReasons(for: candidate, entries: activity),
-                            disabled: isBusy,
-                            onToggle: { model.toggle(candidate) },
-                            onExclude: { model.exclude(candidate.path) }
-                        )
-                    }
-                }
-                if byGroup[.projectArtifacts] == nil {
-                    scanRootsHint
-                }
+        // 08 增补(用户实报):列表自己滚(限高),合计/主按钮条钉在卡片底常驻——
+        // 不再跟着内容滚到底才见;720 最小窗高下列表区约半屏,页面级滚动基本不触发。
+        ScrollViewReader { proxy in
+            ScrollView {
+                groupsBody
             }
+            .frame(maxHeight: 520)
             .onChange(of: pendingGroup.wrappedValue) { _, group in
                 guard let group else { return }
                 proxy.scrollTo(group, anchor: .top)
@@ -173,6 +146,65 @@ private struct JunkListCard: View {
         }
     }
 
+    /// 滚动体(拆分自 groups:单表达式过深触发 type-check 超时,2026-11-04 实锤)。
+    private var groupsBody: some View {
+        let byGroup = Dictionary(grouping: candidates, by: \.group)
+        // 活动条目每次渲染现查一次(判定永不缓存),行级原因复用同一份。
+        let activity = model.currentActivityEntries()
+        return LazyVStack(alignment: .leading, spacing: 2) {
+            ForEach(JunkGroup.allCases.filter { byGroup[$0] != nil }, id: \.self) { group in
+                let items = (byGroup[group] ?? []).sortedForDisplay(by: sortMode(for: group))
+                // 组选只吃组内「可安全清理」且**非在用**的项(拍板 B + 在用保护):
+                // 先检查项、在用项都不参与组选,组里没有可勾项就不给按钮。
+                let safeItems = items
+                    .filter { $0.tier == .safe && model.inUseReasons(for: $0, entries: activity) == nil }
+                groupHeader(group, items: items, safeItems: safeItems)
+                    .id(group)
+                    .background(
+                        // 轻桥定位高亮(p4-uninstaller/05):跳转落地闪一下,1.5s 自灭。
+                        flashGroup == group ? Metric.disk.accentColor.opacity(0.12) : Color.clear
+                    )
+                if group == .projectArtifacts {
+                    // 08 重设计:按项目分子组(同 projectName 聚合),产物行缩进挂项目下。
+                    ForEach(ProjectJunkGrouping.group(items)) { projectGroup in
+                        let projectSafe = projectGroup.items
+                            .filter { $0.tier == .safe && model.inUseReasons(for: $0, entries: activity) == nil }
+                        projectHeader(projectGroup, safeItems: projectSafe)
+                        ForEach(projectGroup.items) { candidate in
+                            JunkRow(
+                                candidate: candidate,
+                                leader: candidates.map(\.bytes).max() ?? 0,
+                                accent: accent,
+                                isSelected: model.isSelected(candidate),
+                                inUseReasons: model.inUseReasons(for: candidate, entries: activity),
+                                disabled: isBusy,
+                                onToggle: { model.toggle(candidate) },
+                                onExclude: { model.exclude(candidate.path) },
+                                indented: true
+                            )
+                        }
+                    }
+                } else {
+                    ForEach(items) { candidate in
+                        JunkRow(
+                            candidate: candidate,
+                            leader: candidates.map(\.bytes).max() ?? 0,
+                            accent: accent,
+                            isSelected: model.isSelected(candidate),
+                            inUseReasons: model.inUseReasons(for: candidate, entries: activity),
+                            disabled: isBusy,
+                            onToggle: { model.toggle(candidate) },
+                            onExclude: { model.exclude(candidate.path) }
+                        )
+                    }
+                }
+            }
+            if byGroup[.projectArtifacts] == nil {
+                scanRootsHint
+            }
+        }
+    }
+
     /// 项目产物组的空态(05):没配扫描根时给一条去设置的引导,不硬造空组。
     private var scanRootsHint: some View {
         Text(model.hasScanRoots
@@ -184,49 +216,99 @@ private struct JunkListCard: View {
             .padding(.horizontal, RankingListMetrics.rowInset)
     }
 
+    /// 组排序(08:两组各自独立,互不影响)。
+    private func sortMode(for group: JunkGroup) -> JunkSortOrder {
+        group == .projectArtifacts ? model.artifactSort : model.toolCacheSort
+    }
+
+    /// 组头(08 重设计):组名中性加粗 + 总量 + 排序 seg + 「全选安全项」文字按钮
+    /// (替代突兀的 NSButton 三态 checkbox;语义钉死 = 只勾安全且非在用项)。
     private func groupHeader(
         _ group: JunkGroup,
         items: [JunkCandidate],
         safeItems: [JunkCandidate]
     ) -> some View {
         let sum = items.reduce(Int64(0)) { $0 + $1.bytes }
-        return HStack {
-            if !safeItems.isEmpty {
-                GroupCheckBox(
-                    state: model.groupState(of: safeItems),
-                    disabled: isBusy,
-                    action: { model.toggleGroup(safeItems) }
-                )
-                .padding(.trailing, 2)
-            }
+        return HStack(spacing: 8) {
             Text(group.title)
-            if group == .projectArtifacts {
-                // 大小 ⇄ 新旧(05 用户拍板:默认大小、可切新旧)。新旧 = 最久未动在前。
-                Picker(
-                    "排序",
-                    selection: Binding(
-                        get: { model.artifactSort },
-                        set: { model.artifactSort = $0 }
-                    )
-                ) {
-                    Text("大小").tag(CleanerModel.ProjectArtifactSort.size)
-                    Text("新旧").tag(CleanerModel.ProjectArtifactSort.age)
-                }
-                .pickerStyle(.segmented)
-                .controlSize(.mini)
-                .frame(width: 108)
-                .padding(.leading, 8)
-            }
-            Spacer()
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.primary)
             Text(PulseFormat.memory(UInt64(max(0, sum))))
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+            // 大小 ⇄ 新旧(05 拍板;08 扩到两组)。新旧 = 最久未动在前,未知排最后。
+            Picker(
+                "排序",
+                selection: Binding(
+                    get: { sortMode(for: group) },
+                    set: {
+                        if group == .projectArtifacts {
+                            model.artifactSort = $0
+                        } else {
+                            model.toolCacheSort = $0
+                        }
+                    }
+                )
+            ) {
+                Text("大小").tag(JunkSortOrder.size)
+                Text("新旧").tag(JunkSortOrder.age)
+            }
+            .pickerStyle(.segmented)
+            .controlSize(.mini)
+            .frame(width: 108)
+            .fixedSize()
+            .labelsHidden()
+            Spacer()
+            if !safeItems.isEmpty {
+                Button("全选安全项") {
+                    model.toggleGroup(safeItems)
+                }
+                .font(.system(size: 10.5, weight: .semibold))
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .disabled(isBusy)
+                .help("只勾「可安全清理」且不在用的项;「先检查」与在用保护项永远要你亲手勾")
+            }
+        }
+        .padding(.top, 8)
+        .padding(.bottom, 3)
+        .padding(.horizontal, RankingListMetrics.rowInset)
+    }
+
+    /// 项目子组行(08):项目名 + 项数/总量/最近活动;子组勾选 = 该项目全部安全产物。
+    private func projectHeader(
+        _ projectGroup: ProjectJunkGroup,
+        safeItems: [JunkCandidate]
+    ) -> some View {
+        HStack(spacing: 8) {
+            Toggle("", isOn: .constant(!safeItems.isEmpty && safeItems.allSatisfy { model.isSelected($0) }))
+                .toggleStyle(.checkbox)
+                .labelsHidden()
+                .disabled(safeItems.isEmpty || isBusy)
+                .onTapGesture { model.toggleGroup(safeItems) }
+                .help("勾选本项目全部「可安全清理」且不在用的产物")
+            Text(projectGroup.projectName)
+                .font(.system(size: 12, weight: .bold))
+                .lineLimit(1)
+            Text(projectMeta(projectGroup))
+                .font(.system(size: 10.5))
                 .foregroundStyle(.tertiary)
                 .monospacedDigit()
+            Spacer(minLength: 8)
         }
-        .font(.system(size: 11, weight: .semibold))
-        .foregroundStyle(.secondary)
-        .padding(.top, 6)
-        .padding(.bottom, 2)
-        .padding(.horizontal, RankingListMetrics.rowInset)
+        .padding(.top, 5)
+        .padding(.horizontal, RankingListMetrics.rowInset + 6)
+    }
+
+    /// 「2 项 · 3.2 GB · 3 天前动过」;活动时间未知如实省略,不编。
+    private func projectMeta(_ projectGroup: ProjectJunkGroup) -> String {
+        var text = "\(projectGroup.items.count) 项 · \(PulseFormat.memory(UInt64(max(0, projectGroup.totalBytes))))"
+        if let epoch = projectGroup.newestChangeEpoch {
+            let days = Int(Date(timeIntervalSince1970: epoch).timeIntervalSinceNow / 86400)
+            text += days <= 0 ? " · 今天动过" : " · \(days) 天前动过"
+        }
+        return text
     }
 
     private var isBusy: Bool {
@@ -235,8 +317,6 @@ private struct JunkListCard: View {
         }
         return false
     }
-
-    // MARK: 动作条(勾选后的唯一删除入口)
 
     @ViewBuilder private var actionBar: some View {
         let plan = model.plan
@@ -334,6 +414,8 @@ private struct JunkRow: View {
     let disabled: Bool
     let onToggle: () -> Void
     let onExclude: () -> Void
+    /// 项目产物行(08):挂在项目子组下,缩进 + 副标改 rationale 人话。
+    var indented: Bool = false
 
     private var isInUse: Bool {
         inUseReasons != nil
@@ -354,16 +436,17 @@ private struct JunkRow: View {
             }
             CategoryIconTile(
                 symbolName: candidate.symbolName,
-                color: candidate.tier == .safe ? accent : Surface.warning,
+                // 08 色彩纪律:行图标中性灰(此前 safe=金 / checkFirst=金撞色难分)。
+                color: Surface.inkTertiary,
                 size: RankingListMetrics.iconSize(compact: false)
             )
             VStack(alignment: .leading, spacing: 1) {
                 Text(candidate.title)
                     .font(.system(size: RankingListMetrics.valueFontSize(compact: false), weight: .medium))
                     .lineLimit(1)
-                Text(subtitle)
+                Text(indented ? candidate.rationale : subtitle)
                     .font(.system(size: 10.5))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(indented ? .tertiary : .secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .textSelection(.enabled)
@@ -376,7 +459,8 @@ private struct JunkRow: View {
             }
             MeterBar(
                 fraction: MeterNormalization.fraction(Double(candidate.bytes), leader: Double(leader)),
-                tint: accent
+                // 08 色彩纪律:大小条中性,金只留给页脚主按钮与选中 tab。
+                tint: .secondary
             )
             .frame(width: RankingListMetrics.meterWidth(compact: false))
             Text(PulseFormat.memory(UInt64(max(0, candidate.bytes))))
@@ -386,7 +470,8 @@ private struct JunkRow: View {
                 .foregroundStyle(.primary)
                 .frame(width: RankingListMetrics.valueWidth(compact: false), alignment: .trailing)
         }
-        .padding(.horizontal, RankingListMetrics.rowInset)
+        .padding(.leading, indented ? RankingListMetrics.rowInset + 34 : RankingListMetrics.rowInset)
+        .padding(.trailing, RankingListMetrics.rowInset)
         .padding(.vertical, 7)
         .opacity(isInUse ? 0.55 : 1)
         .background(
@@ -457,7 +542,8 @@ struct TierChip: View {
     let tier: CleanSafetyTier
 
     private var tint: Color {
-        tier == .safe ? Surface.positive : Surface.warning
+        // 08:「先检查」换 state-caution 琥珀(warning 是磁盘金别名,与页面 accent 撞色)。
+        tier == .safe ? Surface.positive : Surface.caution
     }
 
     var body: some View {
@@ -476,47 +562,6 @@ struct TierChip: View {
 /// (SwiftUI `Toggle` 没有混合态,画不出 mixed 虚线,所以包一层)。点击语义不走系统的
 /// off→mixed→on 轮巡:组勾选是「一键全选/全清」——none / mixed 点了全勾,all 点了全清
 /// (动作由模型 `toggleGroup` 决定,这里只报点击)。
-private struct GroupCheckBox: NSViewRepresentable {
-    let state: JunkSelection.GroupState
-    let disabled: Bool
-    let action: () -> Void
-
-    func makeNSView(context: Context) -> NSButton {
-        let button = NSButton(checkboxWithTitle: "", target: nil, action: nil)
-        button.allowsMixedState = true
-        button.isBordered = false
-        button.toolTip = "勾选本组全部「可安全清理」项;「先检查」项需单独勾选"
-        button.target = context.coordinator
-        button.action = #selector(Coordinator.clicked)
-        context.coordinator.action = action
-        return button
-    }
-
-    func updateNSView(_ button: NSButton, context: Context) {
-        button.state = switch state {
-        case .none: .off
-        case .mixed: .mixed
-        case .all: .on
-        }
-        button.isEnabled = !disabled
-        context.coordinator.action = action
-    }
-
-    /// Coordinator 持最新闭包(每次 update 覆盖);NSButton 主线程回调,无并发面。
-    /// 不加 private:NSViewRepresentable 要求 Coordinator 与 makeCoordinator 的可见性
-    /// 跟随遵循类型(本 struct 已是 private,嵌套类继承该层级即可)。
-    final class Coordinator: NSObject {
-        var action: () -> Void = {}
-        @objc func clicked() {
-            action()
-        }
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-}
-
 // MARK: 确认清单 sheet
 
 /// 确认清单(ADR-0008 多重闸门之一):逐行 + 总量 + 实际占用口径注记。

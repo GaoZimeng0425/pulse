@@ -440,8 +440,81 @@ public struct JunkCandidate: Sendable, Identifiable, Equatable {
             isPartial: node.isPartial,
             allReclaimableAccounting: node.allReclaimableAccounting,
             rationale: rule.rationale,
-            symbolName: rule.symbolName
+            symbolName: rule.symbolName,
+            // 08 票:目录内任何文件的最近变动(与项目年龄的 05 语义不同口径——
+            // 那是「项目直属非产物文件的变动」,这个就是该缓存目录自己的动静;
+            // 供「大小|新旧」排序,界面不直接展示)。
+            newestChangeEpoch: node.newestChangeEpoch
         )
+    }
+}
+
+// MARK: - 展示层纯值(p4-uninstaller/08:两组排序 + 项目产物按项目分组)
+
+/// 清单排序(两组通用)。
+public enum JunkSortOrder: String, Sendable, Equatable {
+    /// 实际占用降序(默认,腾空间第一动机)。
+    case size
+    /// 新旧 = 最久未动在前(epoch 升序);epoch 未知排最后,不伪造。
+    case age
+}
+
+public extension [JunkCandidate] {
+    func sortedForDisplay(by order: JunkSortOrder) -> [JunkCandidate] {
+        switch order {
+        case .size:
+            sorted { lhs, rhs in lhs.bytes != rhs.bytes ? lhs.bytes > rhs.bytes : lhs.path < rhs.path }
+        case .age:
+            sorted { lhs, rhs in
+                switch (lhs.newestChangeEpoch, rhs.newestChangeEpoch) {
+                case let (l?, r?): l != r ? l < r : lhs.path < rhs.path
+                case (_?, nil): true
+                case (nil, _?): false
+                case (nil, nil): lhs.path < rhs.path
+                }
+            }
+        }
+    }
+}
+
+/// 项目产物分组(08:同 projectName 聚合;无 projectName 的候选(异常)单列兜底)。
+public struct ProjectJunkGroup: Sendable, Equatable, Identifiable {
+    public var id: String {
+        projectName
+    }
+
+    public let projectName: String
+    public let items: [JunkCandidate]
+
+    /// 项目总占用(实际占用口径)。
+    public var totalBytes: Int64 {
+        items.reduce(0) { $0 + $1.bytes }
+    }
+
+    /// 项目最近活动(组内最新 epoch;nil = 全未知,界面如实标)。
+    public var newestChangeEpoch: Double? {
+        items.compactMap(\.newestChangeEpoch).max()
+    }
+
+    public init(projectName: String, items: [JunkCandidate]) {
+        self.projectName = projectName
+        self.items = items
+    }
+}
+
+public enum ProjectJunkGrouping {
+    public static func group(_ candidates: [JunkCandidate]) -> [ProjectJunkGroup] {
+        // 保持入参顺序为项目首现序(组内行序由调用方先排好);稳定分组不重排组间。
+        var order: [String] = []
+        var buckets: [String: [JunkCandidate]] = [:]
+        for candidate in candidates {
+            let name = candidate.projectName ?? candidate.title
+            if buckets[name] == nil {
+                order.append(name)
+            }
+            buckets[name, default: []].append(candidate)
+        }
+        return order.map { ProjectJunkGroup(projectName: $0, items: buckets[$0] ?? []) }
     }
 }
 

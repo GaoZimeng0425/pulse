@@ -20,6 +20,7 @@ colors:
   state-positive: = {accent-battery}
   state-negative: "#e0352b / #ff453a"
   state-warning: = {accent-disk}
+  state-caution: "#d95926 / #eb6834"
   state-inactive: "secondary @ 40%(系统语义色,随外观)"
   category-app: "#a2845e / #ac8e68"
   category-project: = {accent-cpu}
@@ -94,6 +95,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{colors.accent-cpu}` … `{colors.accent-battery}`、`{colors.accent-gpu}`、`{colors.accent-sound}`、`{colors.accent-bluetooth}`、`{colors.accent-containers}` | `Metric.accentColor` | 每指标一色:tab、图表、徽章、大数字(GPU 入表 p2-sensors/02;Neural 与 Memory 同色,03 票再议;Sound/Bluetooth 入表 p2-sensors/05、Containers 取 §1.1 Projects 行(p2-sensors/07),均现成行零发明,外设页 tab 强调取 Bluetooth 青) |
 | `{colors.state-positive}` | `Surface.positive` | ✓正常、充电中 |
 | `{colors.state-warning}` | `Surface.warning`(= Disk 指标色别名) | 压力偏高、优化充电介入、触发中告警横幅(琥珀语义) |
+| `{colors.state-caution}` | `Surface.caution` | 清理档位「先检查」chip(p4-uninstaller/08 立项:清理页 accent 即磁盘金,warning 别名与它全页撞色,故独立琥珀橙;不用于负载/告警) |
 | `{colors.category-*}` | `GroupCategory.identityColor` | 非 App 组的图标瓦片底色;孤儿另作组行强调色(见下) |
 | `{colors.state-negative}` | `Surface.negative` | 高负载、紧张、结束进程等负面偏差 |
 | `{colors.state-inactive}` | `Surface.inactive` | 行首状态点的"停 / 未连接"态(容器未运行、蓝牙设备未连接);亮起态取所在页指标色(p2-review/03 入表) |
