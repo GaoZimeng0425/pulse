@@ -93,6 +93,34 @@ public struct JunkPathPattern: Sendable, Equatable {
         return frontier
     }
 
+    /// 轻桥判定(p4-uninstaller/05):一条绝对路径是否落在本模式的命中域内。
+    /// 与 matches(from:) 同一套组件语义(逐层对齐,不另立口径);命中含两种:
+    /// 模式终点自身(matches 的产物)与其子孙(地图下钻到白名单目录里面的块,
+    /// 仍属于「这块能清」的域——跳转去对应组,不做块级删除)。
+    func covers(path: String, home: String) -> Bool {
+        let homeParts = home.split(separator: "/").map(String.init)
+        var parts = path.split(separator: "/").map(String.init)
+        guard parts.count >= homeParts.count,
+              Array(parts.prefix(homeParts.count)) == homeParts
+        else { return false }
+        parts.removeFirst(homeParts.count)
+        guard parts.count >= components.count else { return false }
+        for (index, component) in components.enumerated() {
+            let name = parts[index]
+            switch component {
+            case let .literal(expected):
+                if name != expected {
+                    return false
+                }
+            case let .suffix(suffix):
+                if !(name.hasSuffix(suffix) && name != suffix) {
+                    return false
+                }
+            }
+        }
+        return true
+    }
+
     /// 是否含非字面分量(命中项的标题需带上实际目录名区分,如「iOS」)。
     var hasVariants: Bool {
         components.contains {
@@ -318,6 +346,18 @@ public enum JunkRuleTable {
             symbolName: "square.stack.3d.up"
         ),
     ]
+
+    /// 轻桥判定(p4-uninstaller/05):路径命中内置白名单 → 对应组;不命中 → nil。
+    /// 与开发者垃圾清单**同源**(同一个规则表、同一套 JunkPathPattern 语义),
+    /// 规则表变更两侧自动一致——checklist 明令不许两套口径漂移。
+    public static func cleanableGroup(for path: String, home: String) -> JunkGroup? {
+        for rule in builtin {
+            for pattern in rule.patterns where pattern.covers(path: path, home: home) {
+                return rule.group
+            }
+        }
+        return nil
+    }
 
     public static func rule(id: String) -> JunkRule? {
         builtin.first { $0.id == id }

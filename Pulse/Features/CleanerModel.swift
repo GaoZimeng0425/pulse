@@ -99,6 +99,11 @@ final class CleanerModel {
     private let scanCache: CleanScanResultStore?
     private let homeDirectory: String
 
+    /// 只读暴露(轻桥 p4-uninstaller/05:地图角标判定与垃圾清单共用同一家目录口径)。
+    var junkHome: String {
+        homeDirectory
+    }
+
     /// 项目产物的排序(05,用户拍板:默认大小、可切新旧)。新旧 = 项目年龄升序
     /// (最久未动在前),年龄未知排最后。
     enum ProjectArtifactSort: Hashable {
