@@ -266,6 +266,9 @@ struct MainWindowView: View {
         // 不进 MetricTabStack;弹窗侧不会走到(popoverAxis 已排除)。
         if tabSelection.current == .cleaner {
             CleanerTabView(model: cleanerModel, uninstallModel: uninstallModel)
+                // flex:1(用户拍板 2026-11-05):title 顶格,content 吃满剩余——
+                // 沿链路逐层传 .infinity,任何一层断了整列回退「按内容自适应」。
+                .frame(maxHeight: .infinity)
         } else {
             MetricTabStack(
                 tab: tabSelection.current,

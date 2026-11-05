@@ -20,6 +20,13 @@ struct JunkListSection: View {
     var pendingGroup: Binding<JunkGroup?> = .constant(nil)
 
     var body: some View {
+        // flex:1 链路(section 层):壳层传下的 .infinity 在这接力,
+        // 否则 switch 按内容自适应把信号吞了。
+        bodyContent
+            .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    @ViewBuilder private var bodyContent: some View {
         switch model.phase {
         case .idle:
             // 扫描前就给出扫描根指引(2026-11-02 用户实测找不到入口:配置只在

@@ -130,12 +130,20 @@ struct CleanerTabView: View {
             }
             subPillBar
             switch subTab {
-            case .junk: JunkListSection(model: model, pendingGroup: $pendingJunkGroup)
-            case .map: mapSection
-            case .history: CleanHistorySection(model: model)
-            case .apps: AppListSection(model: uninstallModel)
+            case .junk:
+                JunkListSection(model: model, pendingGroup: $pendingJunkGroup)
+                    .frame(maxHeight: .infinity)
+            case .map:
+                mapSection
+                    .frame(maxHeight: .infinity)
+            case .apps:
+                AppListSection(model: uninstallModel)
+                    .frame(maxHeight: .infinity)
+            case .history:
+                CleanHistorySection(model: model)
             }
         }
+        .frame(maxHeight: .infinity, alignment: .top)
         // 进清理页即试装载落盘缓存(p4-cleaner/11):空态且无在跑扫描才读盘
         // (后台解码),已有结果 / 扫描中 / 无缓存都零动作;常驻稳态零成本。
         .task { model.loadCachedScan() }
