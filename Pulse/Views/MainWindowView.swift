@@ -91,16 +91,24 @@ struct MainWindowView: View {
 
     var body: some View {
         @Bindable var model = model
-        return ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                pageHeader
-                AlertBannerView(center: monitor.alerts)
-                tabBody
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 12)
-            .padding(.bottom, 24)
+        // 清理页(p4-uninstaller/08 后续):列表区自己滚 + 合计条钉底,
+        // 不进外层页面滚动(嵌套滚动 = 按钮跟着内容滚走,用户实报);
+        // 其余 tab 保持整页滚(卡片流)。
+        let pageContent = VStack(alignment: .leading, spacing: 16) {
+            pageHeader
+            AlertBannerView(center: monitor.alerts)
+            tabBody
         }
+        .padding(.horizontal, 24)
+        return Group {
+            if tabSelection.current == .cleaner {
+                pageContent
+            } else {
+                ScrollView { pageContent }
+            }
+        }
+        .padding(.top, 12)
+        .padding(.bottom, 24)
         // 首次电池读数落地 → 电池页入轴(工单 02);被隐藏的当前 tab 回落总览。
         .onChange(of: monitor.battery.hasBattery) { _, hasBattery in
             tabSelection.setAxis(MetricTab.displayAxis(hasBattery: hasBattery))

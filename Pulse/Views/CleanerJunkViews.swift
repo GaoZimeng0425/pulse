@@ -77,11 +77,13 @@ private struct JunkListCard: View {
                     title: "白名单没有识别出可回收项",
                     detail: "只显示担保过的目录(ADR-0008);这台机器的全局工具缓存已经干净"
                 )
+                Spacer(minLength: 0)
             } else {
                 groups
                 actionBar
             }
         }
+        .frame(maxHeight: .infinity, alignment: .top)
         .cardShell(compact: false)
         .sheet(isPresented: confirmPresented) {
             CleanConfirmSheet(model: model, plan: model.plan)
@@ -106,7 +108,8 @@ private struct JunkListCard: View {
     }
 
     private var header: some View {
-        CardHeader(symbolName: "trash", title: "开发者垃圾", tint: accent) {
+        // 08 色彩纪律:卡头也中性(此前金色 sparkles 图标是「全页黄」的源头之一)。
+        CardHeader(symbolName: "trash", title: "开发者垃圾", tint: .primary) {
             Text(summaryText)
                 .font(.system(size: 10.5))
                 .foregroundStyle(.tertiary)
@@ -130,7 +133,9 @@ private struct JunkListCard: View {
             ScrollView {
                 groupsBody
             }
-            .frame(maxHeight: 520)
+            // 弹性:列表吃卡内剩余空间(清理页不进外层滚动后卡片撑满窗口,
+            // .infinity 即「到 actionBar 为止」);最小 160 防短窗挤没。
+            .frame(minHeight: 160, maxHeight: .infinity)
             .onChange(of: pendingGroup.wrappedValue) { _, group in
                 guard let group else { return }
                 proxy.scrollTo(group, anchor: .top)
@@ -333,32 +338,35 @@ private struct JunkListCard: View {
             .padding(.vertical, 8)
             .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
         case .idle, .finished, .confirming:
-            if plan.isEmpty {
-                Text("默认全不勾 · 右键任意行可排除该目录")
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-            } else {
-                HStack(spacing: 12) {
+            // CTA 常驻(用户实报:空选时按钮消失 = 不知道下一步干嘛):
+            // 空选灰显 + 注脚;有选则清选 + 金色主按钮。
+            HStack(spacing: 12) {
+                if plan.isEmpty {
+                    Text("默认全不勾 · 勾选后可清理,右键行可排除")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.tertiary)
+                } else {
                     Text("已选 \(plan.items.count) 项 · \(PulseFormat.memory(UInt64(max(0, plan.totalBytes))))")
-                        .font(.system(size: 12.5, weight: .medium))
+                        .font(.system(size: 12.5, weight: .bold))
                         .monospacedDigit()
-                    Spacer()
+                }
+                Spacer()
+                if !plan.isEmpty {
                     Button("清除勾选") {
                         model.clearSelection()
                     }
-                    Button("清理…") {
-                        model.requestClean()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(accent)
                 }
-                .controlSize(.regular)
-                .padding(.vertical, 8)
-                .padding(.horizontal, 12)
-                .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
+                Button(plan.isEmpty ? "移入废纸篓…" : "清理…") {
+                    model.requestClean()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(accent)
+                .disabled(plan.isEmpty)
             }
+            .controlSize(.regular)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
         }
     }
 
