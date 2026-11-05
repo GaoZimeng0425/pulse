@@ -4,10 +4,11 @@
 
 **Status:** done(立票即分诊:用户直报 + 拍板已定;纯文案/展示层,无行为变化)
 
-- [x] `RingCardView` 加可选 `footnote`(`{typography.micro}` 10.5 tertiary,统计卡注脚同款角色;nil = 不画);`memoryByApp` 工厂传「含压缩(按原大小)与共享重复计,合计可超物理内存」,`memoryByType` 不受影响
+- [x] ~~`RingCardView` 加可选 `footnote`(10.5 tertiary 注脚)~~ **已撤销**(2026-11-05 用户:「不在app页面上加啊, mcp 里加就可以了」;撤销提交恢复 `9fc7b72` 逐字节原状,`git diff` 为空验证)
 - [x] pulse-mcp `current_metrics` 标签:「内存(全组峰值合计)」→「内存(全部应用·当分钟峰值合计,含压缩可超物理内存)」
-- [x] `sh scripts/check.sh`(`.worktrees/memory-caption` 内直跑,无挂死):lint 过、PulseMCP/PulseHelper 构建过、**1072 例 0 失败**(核心 634 + app 438)
-- [ ] 用户目验:弹窗/主窗口内存 tab「按应用」卡图例下有一行灰色小字;MCP `current_metrics` 内存行新标签
+- [x] `sh scripts/check.sh`(撤销前那轮,`.worktrees/memory-caption` 内直跑,无挂死):lint 过、PulseMCP/PulseHelper 构建过、**1072 例 0 失败**(核心 634 + app 438)
+- [x] 撤销轮 `check.sh`(`.worktrees/caption-app-revert`):结果见 Comments
+- [ ] 用户目验:MCP `current_metrics` 内存行新标签(app 侧注脚已按拍板撤销,不再有目验点)
 
 ## Comments
 
