@@ -14,20 +14,46 @@ import Foundation
 // 也是文件,天然计入。目录自身 mtime 有意不算(引擎侧就没聚合,见
 // `SpaceNode.newestChangeEpoch`)。
 
-/// 项目产物规则:目录名全等匹配 + 安全档 + 说明。
+/// 项目标记:佐证「这个同名目录真是构建产物」的文件(cleaner-hardening/02)。
+/// 扫描树只留目录节点,标记要现查盘——经 `fileExists` 注入,本文件仍无 IO。
+public enum ArtifactMarker: Sendable, Equatable {
+    /// 产物旁边的同级文件(`target` 旁的 `Cargo.toml`)。
+    case sibling(String)
+    /// 产物里面的文件(`.venv/pyvenv.cfg`)。
+    case inside(String)
+
+    func path(forArtifactAt artifactPath: String) -> String {
+        switch self {
+        case let .sibling(name): (artifactPath as NSString).deletingLastPathComponent + "/" + name
+        case let .inside(name): artifactPath + "/" + name
+        }
+    }
+}
+
+/// 项目产物规则:目录名全等匹配 + 安全档 + 说明 + 项目标记(任一存在即算命中;
+/// 空 = 不要求——只许用于「先检查」档,安全档必须带标记,有测试钉住)。
 public struct ProjectArtifactRule: Sendable, Equatable, Identifiable {
     public var id: String
     public var directoryName: String
     public var tier: CleanSafetyTier
     public var rationale: String
     public var symbolName: String
+    public var markers: [ArtifactMarker]
 
-    public init(id: String, directoryName: String, tier: CleanSafetyTier, rationale: String, symbolName: String) {
+    public init(
+        id: String,
+        directoryName: String,
+        tier: CleanSafetyTier,
+        rationale: String,
+        symbolName: String,
+        markers: [ArtifactMarker] = []
+    ) {
         self.id = id
         self.directoryName = directoryName
         self.tier = tier
         self.rationale = rationale
         self.symbolName = symbolName
+        self.markers = markers
     }
 }
 
@@ -42,49 +68,56 @@ public enum ProjectArtifactRuleTable {
             directoryName: "node_modules",
             tier: .safe,
             rationale: "npm / pnpm / yarn 依赖,删除后重新 install 重建",
-            symbolName: "shippingbox"
+            symbolName: "shippingbox",
+            markers: [.sibling("package.json")]
         ),
         ProjectArtifactRule(
             id: "artifact.pods",
             directoryName: "Pods",
             tier: .safe,
             rationale: "CocoaPods 依赖,删除后 pod install 重建",
-            symbolName: "cube"
+            symbolName: "cube",
+            markers: [.sibling("Podfile")]
         ),
         ProjectArtifactRule(
             id: "artifact.venv",
             directoryName: "venv",
             tier: .safe,
             rationale: "Python 虚拟环境,重建即可",
-            symbolName: "cube"
+            symbolName: "cube",
+            markers: [.inside("pyvenv.cfg")]
         ),
         ProjectArtifactRule(
             id: "artifact.dot-venv",
             directoryName: ".venv",
             tier: .safe,
             rationale: "Python 虚拟环境,重建即可",
-            symbolName: "cube"
+            symbolName: "cube",
+            markers: [.inside("pyvenv.cfg")]
         ),
         ProjectArtifactRule(
             id: "artifact.cargo-target",
             directoryName: "target",
             tier: .safe,
             rationale: "Rust / Cargo 构建产物,删除后 cargo build 重建",
-            symbolName: "hammer"
+            symbolName: "hammer",
+            markers: [.sibling("Cargo.toml")]
         ),
         ProjectArtifactRule(
             id: "artifact.swiftpm-build",
             directoryName: ".build",
             tier: .safe,
             rationale: "SwiftPM 构建产物,删除后 swift build 重建",
-            symbolName: "hammer"
+            symbolName: "hammer",
+            markers: [.sibling("Package.swift")]
         ),
         ProjectArtifactRule(
             id: "artifact.next-cache",
             directoryName: ".next",
             tier: .safe,
             rationale: "Next.js 构建缓存,重新构建时再生",
-            symbolName: "hammer"
+            symbolName: "hammer",
+            markers: [.sibling("package.json")]
         ),
         ProjectArtifactRule(
             id: "artifact.gradle-build",
@@ -109,13 +142,15 @@ public enum ProjectArtifactMatcher {
     ///   - trees: 扫描产出(`SpaceScanResult.trees`)。
     ///   - roots: 清理扫描根(用户配置;不在树覆盖内的根静默跳过——多半没扫到)。
     ///   - excludedPathPrefixes: 排除目录(GLOSSARY)——与 04 同款双保险,扫后新加的排除即时生效。
+    ///   - fileExists: 项目标记探测(Live 传 FileManager;只对目录名已命中的少数目录调用)。
     /// - Returns: 每个产物一个候选(按项目分组语义由 `projectName` 携带),
     ///   组内大到小;`newestChangeEpoch` = 项目年龄(不是产物自身的)。
     public static func artifacts(
         in trees: [SpaceNode],
         roots: [String],
         rules: [ProjectArtifactRule] = ProjectArtifactRuleTable.builtin,
-        excludedPathPrefixes: [String] = []
+        excludedPathPrefixes: [String] = [],
+        fileExists: (String) -> Bool
     ) -> [JunkCandidate] {
         let rulesByName = Dictionary(uniqueKeysWithValues: rules.map { ($0.directoryName, $0) })
         var out: [JunkCandidate] = []
@@ -131,6 +166,7 @@ public enum ProjectArtifactMatcher {
                 project: rootNode,
                 rulesByName: rulesByName,
                 excluded: excludedPathPrefixes,
+                fileExists: fileExists,
                 into: &out
             )
 
@@ -143,6 +179,7 @@ public enum ProjectArtifactMatcher {
                         project: project,
                         rulesByName: rulesByName,
                         excluded: excludedPathPrefixes,
+                        fileExists: fileExists,
                         into: &out
                     )
                     for child in node.children
@@ -164,11 +201,15 @@ public enum ProjectArtifactMatcher {
         project: SpaceNode,
         rulesByName: [String: ProjectArtifactRule],
         excluded: [String],
+        fileExists: (String) -> Bool,
         into out: inout [JunkCandidate]
     ) {
         for child in node.children where child.kind == .directory {
             guard let rule = rulesByName[child.name], !CleanExclusions.isExcluded(child.path, by: excluded),
-                  child.accountedBytes > 0 || child.isPartial else { continue }
+                  child.accountedBytes > 0 || child.isPartial,
+                  rule.markers.isEmpty || rule.markers
+                      .contains(where: { fileExists($0.path(forArtifactAt: child.path)) })
+            else { continue }
             out.append(JunkCandidate(
                 ruleID: rule.id,
                 group: .projectArtifacts,

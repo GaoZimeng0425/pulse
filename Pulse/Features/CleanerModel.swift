@@ -118,6 +118,7 @@ final class CleanerModel {
     ///     测试 FakeCleanActivitySource;nil = 无活动源,在用保护按无活动处理)。
     ///   - volumeSummaries: 只读系统卷卷级摘要源(生产 statfs;测试固定值)。
     ///   - homeDirectory: 规则表相对它展开;测试注入假家目录。
+    ///   - markerExists: 项目产物标记探测(cleaner-hardening/02;生产查盘,测试注入假集合)。
     init(
         exclusions: CleanExclusionsStore = CleanExclusionsStore(load: { [] }, persist: { _ in }),
         scanRoots: CleanScanRootsStore = CleanScanRootsStore(load: { [] }, persist: { _ in }),
@@ -127,6 +128,7 @@ final class CleanerModel {
         volumeSummaries: (@Sendable () -> [SpaceMapVolumeSummary])? = nil,
         scanCache: CleanScanResultStore? = nil,
         homeDirectory: String = NSHomeDirectory(),
+        markerExists: @escaping (String) -> Bool = { FileManager.default.fileExists(atPath: $0) },
         trashInventory: @escaping @Sendable () async -> TrashInventory = {
             await LiveCleanTrashExecutor().inventory()
         }
@@ -139,9 +141,11 @@ final class CleanerModel {
         self.volumeSummaries = volumeSummaries
         self.scanCache = scanCache
         self.homeDirectory = PathNormalization.normalize(homeDirectory)
+        self.markerExists = markerExists
         trashInventorySource = trashInventory
     }
 
+    @ObservationIgnored private let markerExists: (String) -> Bool
     @ObservationIgnored private let trashInventorySource: @Sendable () async -> TrashInventory
 
     /// 点「清空废纸篓」:先清点(数字进确认弹窗);空废纸篓给短提示不弹窗。
@@ -417,7 +421,8 @@ final class CleanerModel {
         var artifacts = ProjectArtifactMatcher.artifacts(
             in: result.trees,
             roots: scanRoots.paths,
-            excludedPathPrefixes: excluded
+            excludedPathPrefixes: excluded,
+            fileExists: markerExists
         )
 
         return (global + artifacts)

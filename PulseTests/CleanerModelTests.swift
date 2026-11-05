@@ -347,7 +347,8 @@ final class CleanerModelTests: XCTestCase {
             scanRoots: CleanScanRootsStore(load: { ["/Users/dev/code"] }, persist: { _ in }),
             trash: trash,
             activity: activity,
-            homeDirectory: "/Users/dev"
+            homeDirectory: "/Users/dev",
+            markerExists: { _ in true } // 本组测分组 / 年龄 / 在用,标记口径见 ProjectArtifactTests
         )
     }
 

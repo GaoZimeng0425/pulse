@@ -42,6 +42,56 @@ final class ProjectArtifactTests: XCTestCase {
         return dir("code", under: "/Users/dev", children: [oldApp, newTool])
     }
 
+    /// 匹配入口:`files` = 盘上存在的标记文件全集;nil = 一律视作存在(只测非标记口径的用例)。
+    private func match(
+        in trees: [SpaceNode],
+        roots: [String],
+        excludedPathPrefixes: [String] = [],
+        files: Set<String>? = nil
+    ) -> [JunkCandidate] {
+        ProjectArtifactMatcher.artifacts(
+            in: trees,
+            roots: roots,
+            excludedPathPrefixes: excludedPathPrefixes,
+            fileExists: { path in files.map { $0.contains(path) } ?? true }
+        )
+    }
+
+    // MARK: 项目标记(cleaner-hardening/02):安全档产物必须有对应项目文件佐证
+
+    func testSafeArtifactWithoutMarkerIsNotListed() {
+        // ~/Documents/市场/target:普通文件夹碰巧叫 target,旁边没有 Cargo.toml。
+        let project = dir("市场", under: "/u/Documents", children: [
+            dir("target", under: "/u/Documents/市场", bytes: 900),
+            dir("node_modules", under: "/u/Documents/市场", bytes: 900),
+            dir("venv", under: "/u/Documents/市场", bytes: 900),
+        ])
+        let root = dir("Documents", under: "/u", children: [project])
+        XCTAssertTrue(match(in: [root], roots: ["/u/Documents"], files: []).isEmpty)
+    }
+
+    func testSafeArtifactWithMarkerIsListed() {
+        let project = dir("app", under: "/dev", children: [
+            dir("target", under: "/dev/app", bytes: 10),
+            dir("node_modules", under: "/dev/app", bytes: 10),
+            dir(".venv", under: "/dev/app", bytes: 10),
+            dir(".build", under: "/dev/app", bytes: 10),
+        ])
+        let root = dir("dev", under: "/", children: [project])
+        let out = match(in: [root], roots: ["/dev"], files: [
+            "/dev/app/Cargo.toml", "/dev/app/package.json", "/dev/app/.venv/pyvenv.cfg", "/dev/app/Package.swift",
+        ])
+        XCTAssertEqual(Set(out.map(\.path)), [
+            "/dev/app/target", "/dev/app/node_modules", "/dev/app/.venv", "/dev/app/.build",
+        ])
+    }
+
+    func testEverySafeRuleRequiresAMarker() {
+        for rule in ProjectArtifactRuleTable.builtin where rule.tier == .safe {
+            XCTAssertFalse(rule.markers.isEmpty, "安全档规则 \(rule.id) 必须声明项目标记")
+        }
+    }
+
     // MARK: 登记完整性(新增规则不写正例过不了这里)
 
     func testEveryBuiltinRuleHasAPositiveExample() {
@@ -54,7 +104,7 @@ final class ProjectArtifactTests: XCTestCase {
         let project = dir("proj", under: "/dev", children: children)
         let root = dir("dev", under: "/", children: [project])
 
-        let hit = Set(ProjectArtifactMatcher.artifacts(in: [root], roots: ["/dev"]).map(\.ruleID))
+        let hit = Set(match(in: [root], roots: ["/dev"]).map(\.ruleID))
         for rule in rules {
             XCTAssertTrue(hit.contains(rule.id), "规则 \(rule.id) 没有正例——补 fixture 或删规则")
         }
@@ -63,7 +113,7 @@ final class ProjectArtifactTests: XCTestCase {
     // MARK: 分组与排序
 
     func testGroupsByProjectAndSortsBySize() {
-        let out = ProjectArtifactMatcher.artifacts(in: [tree()], roots: ["/Users/dev/code"])
+        let out = match(in: [tree()], roots: ["/Users/dev/code"])
         XCTAssertEqual(out.map(\.projectName), ["old-app", "old-app", "new-tool"], "按项目归组语义")
         XCTAssertEqual(out.first?.path, "/Users/dev/code/old-app/node_modules", "组内大到小")
         XCTAssertEqual(out.first?.group, .projectArtifacts)
@@ -85,7 +135,7 @@ final class ProjectArtifactTests: XCTestCase {
         ])
         let root = dir("dev", under: "/", children: [project])
 
-        let out = ProjectArtifactMatcher.artifacts(in: [root], roots: ["/dev"])
+        let out = match(in: [root], roots: ["/dev"])
         XCTAssertEqual(out.map(\.path), ["/dev/proj/node_modules"], "嵌套产物不单独成行")
         XCTAssertEqual(out.first?.bytes, 500)
     }
@@ -99,14 +149,14 @@ final class ProjectArtifactTests: XCTestCase {
             dir("node_modules", under: "/dev", bytes: 70),
             project,
         ])
-        let out = ProjectArtifactMatcher.artifacts(in: [root], roots: ["/dev"])
+        let out = match(in: [root], roots: ["/dev"])
         XCTAssertEqual(Set(out.map(\.path)), ["/dev/node_modules", "/dev/child/target"])
         XCTAssertEqual(out.first { $0.path == "/dev/node_modules" }?.projectName, "dev")
     }
 
     func testRootMissingFromTreeIsSkippedAndFullVolumeRootRefused() {
-        XCTAssertTrue(ProjectArtifactMatcher.artifacts(in: [tree()], roots: ["/nope"]).isEmpty)
-        XCTAssertTrue(ProjectArtifactMatcher.artifacts(in: [tree()], roots: ["/"]).isEmpty, "全卷不许当项目扫描根")
+        XCTAssertTrue(match(in: [tree()], roots: ["/nope"]).isEmpty)
+        XCTAssertTrue(match(in: [tree()], roots: ["/"]).isEmpty, "全卷不许当项目扫描根")
     }
 
     func testZeroByteHiddenPartialListedAndExclusionNarrows() {
@@ -117,17 +167,17 @@ final class ProjectArtifactTests: XCTestCase {
             ]),
         ])
         let root = dir("dev", under: "/", children: [project])
-        var out = ProjectArtifactMatcher.artifacts(in: [root], roots: ["/dev"])
+        var out = match(in: [root], roots: ["/dev"])
         XCTAssertEqual(out.map(\.path), ["/dev/proj/target"], "零字节不列、部分扫描如实列")
 
-        out = ProjectArtifactMatcher.artifacts(in: [root], roots: ["/dev"], excludedPathPrefixes: ["/dev/proj/target"])
+        out = match(in: [root], roots: ["/dev"], excludedPathPrefixes: ["/dev/proj/target"])
         XCTAssertTrue(out.isEmpty, "排除双保险:扫后新加的排除立即生效")
     }
 
     // MARK: 年龄口径(票面钉死:重装依赖不刷新年龄)
 
     func testProjectAgeIgnoresArtifactMtimes() {
-        let out = ProjectArtifactMatcher.artifacts(in: [tree()], roots: ["/Users/dev/code"])
+        let out = match(in: [tree()], roots: ["/Users/dev/code"])
         let oldAppNode = out.first { $0.projectName == "old-app" }
         // node_modules 里文件 mtime = 1_700_100_000(新),源码 = 40 天前——
         // 年龄必须是源码那个,产物自身 mtime 一点不算。
@@ -144,7 +194,7 @@ final class ProjectArtifactTests: XCTestCase {
             git,
         ])
         let root = dir("dev", under: "/", children: [project])
-        let out = ProjectArtifactMatcher.artifacts(in: [root], roots: ["/dev"])
+        let out = match(in: [root], roots: ["/dev"])
         XCTAssertEqual(out.first?.newestChangeEpoch, 1_700_300_000, "git 活动计入项目年龄")
     }
 
