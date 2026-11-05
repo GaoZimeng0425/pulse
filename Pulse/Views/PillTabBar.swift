@@ -39,10 +39,19 @@ struct PillTabBar<Item: Hashable>: View {
         case always
     }
 
+    /// 两档尺寸(DESIGN.md §PillTabBar):`.regular` = 现状(callout 12 + 9×5,
+    /// 工具栏/历史页);`.comfortable` = 清理页舒适密度档(2026-11-05 用户拍板,
+    /// 13.5 + 14×8,高≈34)——工具栏与弹窗的宽度预算不许被这档波及。
+    enum Size {
+        case regular
+        case comfortable
+    }
+
     let items: [Item]
     @Binding var selection: Item
     var textVisibility: TextVisibility = .always
     var isGlassContainer = false
+    var size: Size = .regular
     let item: (Item) -> PillTabItem
 
     /// 第一参数裸传(items 语义自明),其余带标签;item 映射放尾随闭包。
@@ -51,12 +60,14 @@ struct PillTabBar<Item: Hashable>: View {
         selection: Binding<Item>,
         textVisibility: TextVisibility = .always,
         isGlassContainer: Bool = false,
+        size: Size = .regular,
         item: @escaping (Item) -> PillTabItem
     ) {
         self.items = items
         _selection = selection
         self.textVisibility = textVisibility
         self.isGlassContainer = isGlassContainer
+        self.size = size
         self.item = item
     }
 
@@ -100,9 +111,9 @@ struct PillTabBar<Item: Hashable>: View {
                         )
                 }
             }
-            .font(.callout.weight(.medium))
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
+            .font(size == .comfortable ? .system(size: 13.5, weight: .medium) : .callout.weight(.medium))
+            .padding(.horizontal, size == .comfortable ? 14 : 9)
+            .padding(.vertical, size == .comfortable ? 8 : 5)
             .foregroundStyle(isSelected ? spec.tint : Color.secondary)
             .background(
                 isSelected ? spec.tint.opacity(0.15) : Color.clear,

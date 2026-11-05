@@ -44,7 +44,7 @@ struct AppListSection: View {
             HStack(spacing: 8) {
                 if let output = model.output {
                     Text(summaryText(output))
-                        .font(.system(size: 10.5))
+                        .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
                         .monospacedDigit()
                         .lineLimit(2)
@@ -54,7 +54,7 @@ struct AppListSection: View {
                     model.refresh()
                 } label: {
                     Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                 }
                 .buttonStyle(.plain)
                 .disabled(model.isBusy)
@@ -242,30 +242,31 @@ struct AppListSection: View {
     }
 
     /// 搜索 + 排序 + 操作提示(Q5:默认占用降序,可切按名;子页内过滤)。
+    /// 舒适密度档(2026-11-05):搜索框/提示与行同档放大;seg 保持默认 regular(=B 档)。
     private var controlsBar: some View {
         @Bindable var model = model
         return HStack(spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundStyle(.tertiary)
                 TextField("搜索应用", text: $model.searchQuery)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                 if !model.searchQuery.isEmpty {
                     Button {
                         model.searchQuery = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 11))
+                            .font(.system(size: 12))
                             .foregroundStyle(.tertiary)
                     }
                     .buttonStyle(.plain)
                     .help("清空搜索")
                 }
             }
-            .padding(.horizontal, 8)
-            .frame(width: 200, height: 26, alignment: .leading)
+            .padding(.horizontal, 9)
+            .frame(width: 220, height: 30, alignment: .leading)
             .background(Surface.cardHigh, in: .rect(cornerRadius: 8))
 
             Picker("排序", selection: $model.sortOrder) {
@@ -279,7 +280,7 @@ struct AppListSection: View {
 
             Spacer(minLength: 8)
             Text("点行选中 · 箭头看残留")
-                .font(.system(size: 10.5))
+                .font(.system(size: 11.5))
                 .foregroundStyle(.tertiary)
         }
     }
@@ -299,7 +300,7 @@ struct AppListSection: View {
                 .font(.system(size: 22))
                 .foregroundStyle(.tertiary)
             Text(model.searchQuery.isEmpty ? "未发现可卸载的应用" : "没有匹配的应用")
-                .font(.system(size: 12))
+                .font(.system(size: 13))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -311,7 +312,7 @@ struct AppListSection: View {
             ProgressView()
                 .controlSize(.small)
             Text(text)
-                .font(.system(size: 12))
+                .font(.system(size: 13))
                 .foregroundStyle(.secondary)
             Spacer()
         }
@@ -336,22 +337,22 @@ private struct AppRow: View {
     }
 
     var body: some View {
-        HStack(spacing: RankingListMetrics.spacing(compact: false)) {
+        HStack(spacing: CleanerListMetrics.spacing) {
             // 灰行不给出可勾的假象:复选框画在那但禁用(陈述「先退出/无权限」)。
             Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                .font(.system(size: 13))
+                .font(.system(size: 15))
                 .foregroundStyle(isSelected ? Metric.disk.accentColor : Surface.inkTertiary)
                 .opacity(isDimmed ? 0.4 : 1)
-            Image(nsImage: AppIconCache.icon(forBundle: entry.path, pointSize: 22))
+            Image(nsImage: AppIconCache.icon(forBundle: entry.path, pointSize: CleanerListMetrics.iconSize))
                 .resizable()
-                .frame(width: 22, height: 22)
+                .frame(width: CleanerListMetrics.iconSize, height: CleanerListMetrics.iconSize)
                 .opacity(isDimmed ? 0.55 : 1)
             VStack(alignment: .leading, spacing: 1) {
                 Text(entry.name)
-                    .font(.system(size: RankingListMetrics.valueFontSize(compact: false), weight: .medium))
+                    .font(.system(size: CleanerListMetrics.titleFontSize, weight: .medium))
                     .lineLimit(1)
                 Text(entry.path)
-                    .font(.system(size: 10.5))
+                    .font(.system(size: CleanerListMetrics.subFontSize))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -367,33 +368,33 @@ private struct AppRow: View {
                 fraction: meterFraction,
                 tint: .secondary
             )
-            .frame(width: RankingListMetrics.meterWidth(compact: false))
+            .frame(width: CleanerListMetrics.meterWidth)
             HStack(spacing: 4) {
                 Text(sizeText)
-                    .font(.system(size: RankingListMetrics.valueFontSize(compact: false), weight: .semibold))
+                    .font(.system(size: CleanerListMetrics.valueFontSize, weight: .semibold))
                     .monospacedDigit()
                     .lineLimit(1)
                     .foregroundStyle(.primary)
                 if entry.isPartial {
                     Text("部分")
-                        .font(.system(size: 10.5))
+                        .font(.system(size: 11.5))
                         .foregroundStyle(.tertiary)
                 }
             }
-            .frame(width: RankingListMetrics.valueWidth(compact: false), alignment: .trailing)
+            .frame(width: CleanerListMetrics.valueWidthWithMark, alignment: .trailing)
             Button(action: onToggleExpand) {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.tertiary)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                    .frame(width: 20, height: 20)
+                    .frame(width: 24, height: 24)
                     .contentShape(.rect)
             }
             .buttonStyle(.plain)
             .help(entry.bundleID == nil ? "该应用读不到 bundle id,残留无法精确匹配" : "展开残留清单")
         }
-        .padding(.horizontal, RankingListMetrics.rowInset)
-        .padding(.vertical, 4)
+        .padding(.horizontal, CleanerListMetrics.rowInset)
+        .padding(.vertical, CleanerListMetrics.rowVerticalPadding)
         .background(
             // 选中高亮(原型裁决):点行选中后行底染磁盘色族浅底。
             isSelected ? Metric.disk.accentColor.opacity(0.1) : Color.clear
@@ -455,19 +456,19 @@ private struct LeftoverDisclosure: View {
             if entry.bundleID == nil {
                 // Q4:只剩应用名一把键,~/Library 里按名字撞目录误中风险高于收益。
                 Text("未识别,不敢猜——这个应用读不到 bundle id,残留无法精确匹配,不列。")
-                    .font(.system(size: 10.5))
+                    .font(.system(size: 11.5))
                     .foregroundStyle(.tertiary)
-                    .padding(.horizontal, RankingListMetrics.rowInset + 28)
+                    .padding(.horizontal, CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading)
                     .padding(.bottom, 6)
             } else if model.leftoverLoading.contains(entry.path) {
                 HStack(spacing: 6) {
                     ProgressView()
                         .controlSize(.mini)
                     Text("正在查找残留…")
-                        .font(.system(size: 10.5))
+                        .font(.system(size: 11.5))
                         .foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, RankingListMetrics.rowInset + 28)
+                .padding(.horizontal, CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading)
                 .padding(.bottom, 6)
             } else if let rows, !rows.isEmpty {
                 header(rows)
@@ -481,9 +482,9 @@ private struct LeftoverDisclosure: View {
                 footnote(rows)
             } else if rows != nil {
                 Text("没有找到残留")
-                    .font(.system(size: 10.5))
+                    .font(.system(size: 11.5))
                     .foregroundStyle(.tertiary)
-                    .padding(.horizontal, RankingListMetrics.rowInset + 28)
+                    .padding(.horizontal, CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading)
                     .padding(.bottom, 6)
             }
         }
@@ -497,7 +498,7 @@ private struct LeftoverDisclosure: View {
                 set: { _ in model.togglePermanentDelete(entry) }
             )) {
                 Text("彻底删除:不进废纸篓,不可恢复")
-                    .font(.system(size: 10.5, weight: .semibold))
+                    .font(.system(size: 11.5, weight: .semibold))
                     .foregroundStyle(Surface.negative)
             }
             .toggleStyle(.checkbox)
@@ -505,13 +506,14 @@ private struct LeftoverDisclosure: View {
             Spacer()
             Button(action: { model.requestUninstall(entry) }) {
                 Text(model.isPermanentDeleteSelected(entry) ? "永久卸载 \(entry.name)…" : "卸载 \(entry.name)…")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
             }
             .buttonStyle(.borderedProminent)
+            .controlSize(.large)
             .tint(model.isPermanentDeleteSelected(entry) ? Surface.negative : Metric.disk.accentColor)
             .disabled(model.uninstallPhase == .running)
         }
-        .padding(.horizontal, RankingListMetrics.rowInset + 28)
+        .padding(.horizontal, CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading)
         .padding(.vertical, 4)
     }
 
@@ -519,24 +521,24 @@ private struct LeftoverDisclosure: View {
         let total = rows.compactMap(\.sizeBytes).reduce(Int64(0), +)
         return HStack {
             Text("残留 · \(rows.count) 项 · 共 \(PulseFormat.memory(UInt64(max(0, total)))) · 默认不勾")
-                .font(.system(size: 10.5, weight: .semibold))
+                .font(.system(size: 11.5, weight: .semibold))
                 .foregroundStyle(Metric.disk.accentColor)
             Spacer()
             Button("全选残留") {
                 model.selectAllLeftovers(for: entry)
             }
-            .font(.system(size: 11))
+            .font(.system(size: 12))
             .buttonStyle(.borderless)
             .help("只勾通用位置残留;「先检查」项恒不进全选,可单独勾")
         }
-        .padding(.horizontal, RankingListMetrics.rowInset + 28)
+        .padding(.horizontal, CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading)
     }
 
     private func footnote(_ rows: [AppLeftoverRow]) -> some View {
         Text(footnoteText(rows))
-            .font(.system(size: 10.5))
+            .font(.system(size: 11.5))
             .foregroundStyle(.tertiary)
-            .padding(.horizontal, RankingListMetrics.rowInset + 28)
+            .padding(.horizontal, CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading)
             .padding(.bottom, 2)
     }
 
@@ -560,14 +562,14 @@ private struct LeftoverRowView: View {
     var body: some View {
         HStack(spacing: 9) {
             Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                .font(.system(size: 13))
+                .font(.system(size: 15))
                 .foregroundStyle(isSelected ? Metric.disk.accentColor : Surface.inkTertiary)
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
                     Text(row.site.plainTitle)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 13.5, weight: .medium))
                     Text("· \(row.site.consequenceNote)")
-                        .font(.system(size: 10.5))
+                        .font(.system(size: 11.5))
                         .foregroundStyle(.tertiary)
                     if row.isCheckFirst {
                         StateChip(text: "先检查")
@@ -575,7 +577,7 @@ private struct LeftoverRowView: View {
                 }
                 .lineLimit(1)
                 Text(row.path)
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -583,13 +585,13 @@ private struct LeftoverRowView: View {
             }
             Spacer(minLength: 8)
             Text(row.sizeBytes.map { PulseFormat.memory(UInt64(max(0, $0))) } ?? "—")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 13.5, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
-                .frame(width: 72, alignment: .trailing)
+                .frame(width: 78, alignment: .trailing)
         }
-        .padding(.horizontal, RankingListMetrics.rowInset + 28)
-        .padding(.vertical, 3)
+        .padding(.horizontal, CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading)
+        .padding(.vertical, 6)
         .contentShape(.rect)
         .onTapGesture { onToggle() }
     }
@@ -601,10 +603,10 @@ private struct StateChip: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 10.5, weight: .semibold))
+            .font(.system(size: CleanerListMetrics.chipFontSize, weight: .semibold))
             .foregroundStyle(Surface.inkTertiary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 2)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 3)
             .background(Surface.inkTertiary.opacity(0.15), in: .capsule)
             .lineLimit(1)
     }
@@ -616,10 +618,10 @@ private struct BrewChip: View {
 
     var body: some View {
         Text("brew")
-            .font(.system(size: 10.5, weight: .semibold))
+            .font(.system(size: CleanerListMetrics.chipFontSize, weight: .semibold))
             .foregroundStyle(Surface.inkTertiary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 2)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 3)
             .background(Surface.inkTertiary.opacity(0.15), in: .capsule)
             .help("由 Homebrew 安装(卸载时将由它执行,票 03)")
     }
@@ -674,7 +676,7 @@ private struct AppUninstallConfirmSheet: View {
             Text("卸载 \(plan.appName)")
                 .font(.system(size: 17, weight: .bold))
             Text(subtitle)
-                .font(.system(size: 11))
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
             ScrollView {
                 VStack(spacing: 0) {
@@ -687,17 +689,19 @@ private struct AppUninstallConfirmSheet: View {
             .frame(maxHeight: 220)
             .background(Surface.card, in: .rect(cornerRadius: 12))
             Text(footerText)
-                .font(.system(size: 12.5, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(plan.permanent ? Surface.negative : .primary)
             HStack(spacing: 8) {
                 Text(footnote)
-                    .font(.system(size: 10.5))
+                    .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button("取消", action: onCancel)
+                    .controlSize(.large)
                 Button(confirmButtonTitle, action: onConfirm)
                     .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
                     .tint(plan.permanent ? Surface.negative : accent)
             }
         }
@@ -741,10 +745,10 @@ private struct AppUninstallConfirmSheet: View {
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 1) {
                 Text(row.title)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 13.5, weight: .medium))
                     .lineLimit(1)
                 Text(row.path)
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -753,20 +757,20 @@ private struct AppUninstallConfirmSheet: View {
             Spacer(minLength: 8)
             if row.permanent {
                 Text(row.viaBrew ? "已卸载(brew,永久)" : "永久删除")
-                    .font(.system(size: 10.5, weight: .semibold))
+                    .font(.system(size: 11.5, weight: .semibold))
                     .foregroundStyle(Surface.negative)
             } else {
                 Text("废纸篓")
-                    .font(.system(size: 10.5))
+                    .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)
             }
             Text(row.bytes.map { PulseFormat.memory(UInt64(max(0, $0))) } ?? "—")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 13.5, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
-                .frame(width: 72, alignment: .trailing)
+                .frame(width: 78, alignment: .trailing)
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 5)
+        .padding(.vertical, 7)
     }
 }
