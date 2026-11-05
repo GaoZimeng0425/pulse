@@ -28,6 +28,7 @@
 		1C5A865136AB22A28BB0D947 /* NettopProcessRateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A98A79159A39E317CC43DA0 /* NettopProcessRateTests.swift */; };
 		1C68C42F1E98C6B386C6CF43 /* AlertSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E7F860EECC5F68388BB8FC6 /* AlertSettingsView.swift */; };
 		1E59240E9CB5EE8E9C08ACB7 /* CleanFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = F852219B5F9D1F164FD759CD /* CleanFixture.swift */; };
+		1EC99DA794DBE3C8C9787753 /* DockPresence.swift in Sources */ = {isa = PBXBuildFile; fileRef = E353A0118896B05E3761D72A /* DockPresence.swift */; };
 		1F7A55CC3A6CF75D16DEF819 /* RankingListMetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E406A1D678E2CAF14F3E30 /* RankingListMetricsTests.swift */; };
 		20550F03DAEF45E3DEBE36E7 /* AlertSettingsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24703C16273CB98970E4297 /* AlertSettingsStoreTests.swift */; };
 		21BAA7AE4F5D186DD8EF781F /* GpuSensorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 997E4A682EAB7F54A6FEB9BE /* GpuSensorTests.swift */; };
@@ -178,6 +179,7 @@
 		F9A396D8A1532DCE83296553 /* LogServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A5BBAE60025E3EB318E411 /* LogServiceTests.swift */; };
 		FA39C087AD11F34D92DFDDFF /* KillEndToEndTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94AE23A1D17532F33018843D /* KillEndToEndTests.swift */; };
 		FA789253D93CF7D04F65CACD /* AgentEnergy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FB3411DD59194CA8264149E /* AgentEnergy.swift */; };
+		FCD182D71A4DC761A91EE8C5 /* DockPresenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B776C2ED787C3294C4F2E33 /* DockPresenceTests.swift */; };
 		FDC1890BBEEC4851C1070282 /* AlertViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E21F1F65F4010BF7A6C0C88 /* AlertViews.swift */; };
 		FDE435939BE1165CF3D5121F /* ParentChainQueryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A05CDA8C1EBF16044C21BFD /* ParentChainQueryTests.swift */; };
 		FF152BDE6343A10B8627BC3C /* CocoaLumberjackSwift in Frameworks */ = {isa = PBXBuildFile; productRef = EB19A82C19BDD54230DEE6F8 /* CocoaLumberjackSwift */; };
@@ -218,6 +220,7 @@
 		09C5195738D18D24F08D8281 /* LogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogService.swift; sourceTree = "<group>"; };
 		0AEE9CD05DD0A6FAA15E6014 /* PulseApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PulseApp.swift; sourceTree = "<group>"; };
 		0B5633EC929F85A22B2BB45E /* BundleDisplayNameReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundleDisplayNameReaderTests.swift; sourceTree = "<group>"; };
+		0B776C2ED787C3294C4F2E33 /* DockPresenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockPresenceTests.swift; sourceTree = "<group>"; };
 		0C38D7DFC6277C706723DEF7 /* MenuBarBadgeComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarBadgeComposer.swift; sourceTree = "<group>"; };
 		0C6CEE6C6B6AE62D9C87C5E1 /* CleanerSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanerSettingsView.swift; sourceTree = "<group>"; };
 		0D85BCEEF64EDEAAFC5AE256 /* HistoryFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryFeature.swift; sourceTree = "<group>"; };
@@ -365,6 +368,7 @@
 		DF43629A17EF4D982135C6DC /* ProjectRootsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRootsStoreTests.swift; sourceTree = "<group>"; };
 		E0C2BC1088F0581063C1D49A /* DiskSensorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskSensorTests.swift; sourceTree = "<group>"; };
 		E30359B7325F49ACFB28D448 /* NetworkFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkFeature.swift; sourceTree = "<group>"; };
+		E353A0118896B05E3761D72A /* DockPresence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockPresence.swift; sourceTree = "<group>"; };
 		E47B1B2BE308D9127A0DB19A /* RankingsFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingsFeature.swift; sourceTree = "<group>"; };
 		E98C287752EFC374E2CC7F9A /* PowerFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerFeature.swift; sourceTree = "<group>"; };
 		EA32BC4006AFA168EE6CF9B5 /* RoundSpineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoundSpineTests.swift; sourceTree = "<group>"; };
@@ -428,6 +432,7 @@
 		38F29541A06B8A159C0EFF06 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				E353A0118896B05E3761D72A /* DockPresence.swift */,
 				2395D7D9D7A918F62EDFADD8 /* InertSources.swift */,
 				09C5195738D18D24F08D8281 /* LogService.swift */,
 				BD3B00277D6CF515AEA81E6C /* MenuBarController.swift */,
@@ -627,6 +632,7 @@
 				DF3E209527FBD12B7B4014D9 /* DevServerFinderTests.swift */,
 				276EA0F7DAC2C0AC558E9614 /* DiagnosticReportTests.swift */,
 				E0C2BC1088F0581063C1D49A /* DiskSensorTests.swift */,
+				0B776C2ED787C3294C4F2E33 /* DockPresenceTests.swift */,
 				CB2143C633E5F922EDA23B55 /* EnergyImpactFeatureTests.swift */,
 				1C01F3A4AB4BC765537F64DA /* EnergyModelSensorTests.swift */,
 				997E4A682EAB7F54A6FEB9BE /* GpuSensorTests.swift */,
@@ -794,6 +800,7 @@
 				3A4696425FA64D6D47C5ED02 /* DiagnosticReportTests.swift in Sources */,
 				114C6C63ADBC73CF7E07FFEB /* DiskFixture.swift in Sources */,
 				C54E62D5C96A4FFA4851744E /* DiskSensorTests.swift in Sources */,
+				FCD182D71A4DC761A91EE8C5 /* DockPresenceTests.swift in Sources */,
 				F64753C9B30A91EA24799BB1 /* EnergyImpactFeatureTests.swift in Sources */,
 				6164A801BF9C51036BBF73BC /* EnergyModelSensorTests.swift in Sources */,
 				21BAA7AE4F5D186DD8EF781F /* GpuSensorTests.swift in Sources */,
@@ -876,6 +883,7 @@
 				1373C9B67FAC501E4118ACD4 /* DiskCardViews.swift in Sources */,
 				C8AB0C6A391C20BB6FAB3B82 /* DiskFeature.swift in Sources */,
 				3CF021A14DA00F8F1381EBF7 /* DiskSensor.swift in Sources */,
+				1EC99DA794DBE3C8C9787753 /* DockPresence.swift in Sources */,
 				7DA585A2786F7FEDFED5D08E /* EnergyHelperClient.swift in Sources */,
 				4B9D8CCCFE156DEBEB5FAA2D /* EnergyImpactFeature.swift in Sources */,
 				468E4F4F50FB387354742865 /* EnergyModelSensor.swift in Sources */,
@@ -1045,6 +1053,7 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Pulse 读取已配对蓝牙设备的连接状态与电量,用于外设页展示。";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1071,6 +1080,7 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Pulse 读取已配对蓝牙设备的连接状态与电量,用于外设页展示。";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

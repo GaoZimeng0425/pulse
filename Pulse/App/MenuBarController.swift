@@ -415,8 +415,8 @@ final class KeepAliveAppDelegate: NSObject, NSApplicationDelegate {
         return .terminateCancel
     }
 
-    /// 点 Dock 图标:已有可见窗交给系统置前;主窗已关(常规 app 现在有常驻 Dock 图标,
-    /// 2026-11-03 用户拍板)则走既有广播通路重开主窗——与弹窗「打开主窗口」同一条路,
+    /// 重开请求(点 Dock 图标 / Finder 再次双击 app):已有可见窗交给系统置前;主窗已关
+    /// (Dock 图标随主窗出没,见 DockPresence)则走既有广播通路重开主窗——与弹窗「打开主窗口」同一条路,
     /// 收面板 + 经桥开窗 + tab 路由全都复用。
     func applicationShouldHandleReopen(
         _ sender: NSApplication,

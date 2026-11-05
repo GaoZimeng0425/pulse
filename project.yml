@@ -39,8 +39,9 @@ targets:
         # 生成;改图标改脚本重跑,不手工替换 png。
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: YES
-        # 常规 app(非 LSUIElement):Dock 常驻图标,点 Dock 图标重开主窗(2026-11-03
-        # 用户拍板;菜单栏 NSStatusItem 在常规 app 下照常工作,登录自启只是多个图标)。
+        # LSUIElement:启动无 Dock 图标;主窗口打开时现身 Dock、关闭即隐去
+        # (DockPresence 运行时切激活策略;2026-11-05 用户拍板,取代 11-03 的 Dock 常驻)。
+        INFOPLIST_KEY_LSUIElement: YES
         # 蓝牙家族(p2-sensors/06):IOBluetooth/CoreBluetooth 读设备表与电量,
         # TCC 强制 usage description——缺键即崩(2026-10-22 测试宿主崩溃实证)。
         INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: Pulse 读取已配对蓝牙设备的连接状态与电量,用于外设页展示。
