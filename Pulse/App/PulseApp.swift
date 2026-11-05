@@ -97,6 +97,7 @@ struct PulseApp: App {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             MainWindowView.repositionIfOffscreen()
         }
+        DockPresence.install()
         LogService.info("Pulse 启动(项目根 \(store.projectRoots.count) 个)", category: "App")
     }
 
