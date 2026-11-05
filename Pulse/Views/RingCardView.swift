@@ -78,9 +78,6 @@ struct RingCardView: View {
     let centerCaption: String
     let slices: [RingSlice]
     var isCompact = false
-    /// 口径注脚(`{typography.micro}` 10.5 tertiary,统计卡注脚同款角色):nil = 不画。
-    /// Memory by App 用它说明合计为何可超物理内存(memory-caption/01)。
-    var footnote: String?
 
     var body: some View {
         // 两档都画卡头:弹窗里两张环上下排(2026-10-20 起与主窗口同内容),没有标题分不清。
@@ -92,11 +89,6 @@ struct RingCardView: View {
                 HStack(spacing: isCompact ? 14 : 20) {
                     ring
                     legend
-                }
-                if let footnote {
-                    Text(footnote)
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.tertiary)
                 }
             }
         }
@@ -186,8 +178,6 @@ extension RingCardView {
     }
 
     /// Memory by App 卡:环心 = 全部组内存合计。
-    /// 注脚交代合计口径——footprint 含被压缩部分(按压缩前大小记账)、共享内存
-    /// 在多个应用重复计,合计可超物理内存(memory-caption/01,防"物理不可能"误判)。
     static func memoryByApp(
         segments: [MemoryRingSegment],
         totalBytes: UInt64,
@@ -202,8 +192,7 @@ extension RingCardView {
             centerUnit: figure.unit,
             centerCaption: "全部应用",
             slices: RingSlice.memoryByApp(segments),
-            isCompact: isCompact,
-            footnote: "含压缩(按原大小)与共享重复计,合计可超物理内存"
+            isCompact: isCompact
         )
     }
 }
