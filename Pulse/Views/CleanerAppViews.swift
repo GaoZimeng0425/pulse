@@ -338,11 +338,9 @@ private struct AppRow: View {
 
     var body: some View {
         HStack(spacing: CleanerListMetrics.spacing) {
-            // 灰行不给出可勾的假象:复选框画在那但禁用(陈述「先退出/无权限」)。
-            Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                .font(.system(size: 15))
-                .foregroundStyle(isSelected ? Metric.disk.accentColor : Surface.inkTertiary)
-                .opacity(isDimmed ? 0.4 : 1)
+            // 灰行不给出可勾的假象:勾选框画在那但压暗(陈述「先退出/无权限」)。
+            // 2026-11-05 换统一自绘 CleanerCheckBox(此前 SF 方块与垃圾页系统框两套)。
+            CleanerCheckBox(state: isSelected ? .on : .off, disabled: isDimmed)
             Image(nsImage: AppIconCache.icon(forBundle: entry.path, pointSize: CleanerListMetrics.iconSize))
                 .resizable()
                 .frame(width: CleanerListMetrics.iconSize, height: CleanerListMetrics.iconSize)
@@ -491,17 +489,24 @@ private struct LeftoverDisclosure: View {
     }
 
     /// 动作排(03):彻底删除勾选(Q6,红字行内、每次展开重置)+ 卸载主按钮。
+    /// 勾选框 = 统一自绘件、destructive 红 tint(2026-11-05)。
     private var actionRow: some View {
         HStack(spacing: 8) {
-            Toggle(isOn: Binding(
-                get: { model.isPermanentDeleteSelected(entry) },
-                set: { _ in model.togglePermanentDelete(entry) }
-            )) {
-                Text("彻底删除:不进废纸篓,不可恢复")
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundStyle(Surface.negative)
+            Button {
+                model.togglePermanentDelete(entry)
+            } label: {
+                HStack(spacing: 8) {
+                    CleanerCheckBox(
+                        state: model.isPermanentDeleteSelected(entry) ? .on : .off,
+                        tint: Surface.negative
+                    )
+                    Text("彻底删除:不进废纸篓,不可恢复")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(Surface.negative)
+                }
             }
-            .toggleStyle(.checkbox)
+            .buttonStyle(.plain)
+            .disabled(model.uninstallPhase == .running)
             .help("默认移入废纸篓,可从 Finder 恢复;勾选后直接永久删除(brew 应用走 --zap)")
             Spacer()
             Button(action: { model.requestUninstall(entry) }) {
@@ -561,9 +566,7 @@ private struct LeftoverRowView: View {
 
     var body: some View {
         HStack(spacing: 9) {
-            Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                .font(.system(size: 15))
-                .foregroundStyle(isSelected ? Metric.disk.accentColor : Surface.inkTertiary)
+            CleanerCheckBox(state: isSelected ? .on : .off)
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
                     Text(row.site.plainTitle)
