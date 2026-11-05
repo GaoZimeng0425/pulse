@@ -94,7 +94,7 @@ private func currentMetricsText() -> String {
         if let memory = snapshot.memoryBytes {
             lines
                 .append(
-                    "内存(全组峰值合计):\(PulseFormat.memory(UInt64(max(0, memory.value))))(\(ageText(atSeconds: memory.atSeconds, now: now)))"
+                    "内存(全部应用·当分钟峰值合计,含压缩可超物理内存):\(PulseFormat.memory(UInt64(max(0, memory.value))))(\(ageText(atSeconds: memory.atSeconds, now: now)))"
                 )
         }
         if let network = snapshot.networkBytesPerSec {
