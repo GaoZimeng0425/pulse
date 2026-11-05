@@ -66,6 +66,8 @@ private struct JunkListCard: View {
     /// 轻桥落点(p4-uninstaller/05):待定位组;滚动+高亮后自清(同组再跳也能再闪)。
     var pendingGroup: Binding<JunkGroup?> = .constant(nil)
     @State private var flashGroup: JunkGroup?
+    /// 收起的项目产物子组(用户实报:产物没法收起;默认全展开,点项目行切换)。
+    @State private var collapsedProjects: Set<String> = []
 
     private var accent: Color {
         Metric.disk.accentColor
@@ -181,19 +183,30 @@ private struct JunkListCard: View {
                     ForEach(ProjectJunkGrouping.group(items)) { projectGroup in
                         let projectSafe = projectGroup.items
                             .filter { $0.tier == .safe && model.inUseReasons(for: $0, entries: activity) == nil }
-                        projectHeader(projectGroup, safeItems: projectSafe)
-                        ForEach(projectGroup.items) { candidate in
-                            JunkRow(
-                                candidate: candidate,
-                                leader: candidates.map(\.bytes).max() ?? 0,
-                                accent: accent,
-                                isSelected: model.isSelected(candidate),
-                                inUseReasons: model.inUseReasons(for: candidate, entries: activity),
-                                disabled: isBusy,
-                                onToggle: { model.toggle(candidate) },
-                                onExclude: { model.exclude(candidate.path) },
-                                indented: true
-                            )
+                        let isCollapsed = collapsedProjects.contains(projectGroup.projectName)
+                        projectHeader(projectGroup, safeItems: projectSafe, isCollapsed: isCollapsed)
+                            .contentShape(.rect)
+                            .onTapGesture {
+                                if collapsedProjects.contains(projectGroup.projectName) {
+                                    collapsedProjects.remove(projectGroup.projectName)
+                                } else {
+                                    collapsedProjects.insert(projectGroup.projectName)
+                                }
+                            }
+                        if !isCollapsed {
+                            ForEach(projectGroup.items) { candidate in
+                                JunkRow(
+                                    candidate: candidate,
+                                    leader: candidates.map(\.bytes).max() ?? 0,
+                                    accent: accent,
+                                    isSelected: model.isSelected(candidate),
+                                    inUseReasons: model.inUseReasons(for: candidate, entries: activity),
+                                    disabled: isBusy,
+                                    onToggle: { model.toggle(candidate) },
+                                    onExclude: { model.exclude(candidate.path) },
+                                    indented: true
+                                )
+                            }
                         }
                     }
                 } else {
@@ -291,9 +304,14 @@ private struct JunkListCard: View {
     /// 项目子组行(08):项目名 + 项数/总量/最近活动;子组勾选 = 该项目全部安全产物。
     private func projectHeader(
         _ projectGroup: ProjectJunkGroup,
-        safeItems: [JunkCandidate]
+        safeItems: [JunkCandidate],
+        isCollapsed: Bool
     ) -> some View {
         HStack(spacing: 8) {
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.tertiary)
+                .rotationEffect(.degrees(isCollapsed ? 0 : 90))
             Toggle("", isOn: .constant(!safeItems.isEmpty && safeItems.allSatisfy { model.isSelected($0) }))
                 .toggleStyle(.checkbox)
                 .labelsHidden()
