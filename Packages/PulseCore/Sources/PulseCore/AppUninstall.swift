@@ -155,7 +155,7 @@ public enum AppUninstallRunner {
         case .brewMissing:
             return .aborted(reason: "未找到 Homebrew——这个应用由它安装,请先安装 brew 或在 Finder 手动删除")
         case let .failed(message):
-            return .aborted(reason: "Homebrew 卸载失败,本次未删除任何文件:\(message)")
+            return .aborted(reason: "Homebrew 卸载失败:\(message)。Pulse 没有删除任何文件;brew 中途失败时可能已删掉部分内容,可在 Finder 确认")
         case .success:
             break
         }

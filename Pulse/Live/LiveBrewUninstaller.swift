@@ -11,7 +11,14 @@ struct LiveBrewUninstaller: Sendable {
     /// 网络问题不背锅:卸载是本地操作,但 cask 可能带 uninstall 脚本,给足余量。
     static let timeout: TimeInterval = 120
 
+    /// 测试注入:替身可执行文件(不传 = 按双候选找真 brew)。
+    var executableOverride: String?
+    var timeout: TimeInterval = Self.timeout
+
     private func brewPath() -> String? {
+        if let executableOverride {
+            return executableOverride
+        }
         let fileManager = FileManager.default
         return Self.brewCandidates.first { fileManager.isExecutableFile(atPath: $0) }
     }
@@ -33,38 +40,82 @@ struct LiveBrewUninstaller: Sendable {
         var environment = ProcessInfo.processInfo.environment
         environment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:\(environment["PATH"] ?? "")"
         process.environment = environment
+        let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
+        process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
-        process.standardOutput = Pipe() // 丢弃;失败信息走 stderr
-
-        do {
-            try process.run()
-        } catch {
-            return .failed(message: "无法启动 brew:\(error.localizedDescription)")
+        // 两路输出都必须边跑边读:管道缓冲(~64KB)写满后 brew 阻塞在 write,永远
+        // 等不到退出,只能被超时强杀(cleaner-hardening/03)。stdout 读了即丢,stderr 留尾部。
+        let stderrBuffer = OutputBuffer()
+        stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
+            _ = handle.availableData
         }
-        // 超时强杀:waiting 阻塞在后台线程,主流程不挂。
+        stderrPipe.fileHandleForReading.readabilityHandler = { handle in
+            stderrBuffer.append(handle.availableData)
+        }
+
+        // 超时强杀:watchdog 只负责 terminate,等待走 terminationHandler 续体——
+        // 不在协作线程池里同步 waitUntilExit 占线程。
         let timedOut = TimeoutBox()
+        let timeout = timeout
         let watchdog = Task.detached(priority: .utility) { [weak process = process, timedOut] in
-            try? await Task.sleep(nanoseconds: UInt64(Self.timeout * 1_000_000_000))
+            try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
             if process?.isRunning == true {
                 timedOut.mark()
                 process?.terminate()
             }
         }
-        process.waitUntilExit()
+        let status: Int32
+        do {
+            status = try await withCheckedThrowingContinuation { continuation in
+                process.terminationHandler = { finished in
+                    continuation.resume(returning: finished.terminationStatus)
+                }
+                do {
+                    try process.run()
+                } catch {
+                    process.terminationHandler = nil
+                    continuation.resume(throwing: error)
+                }
+            }
+        } catch {
+            watchdog.cancel()
+            stdoutPipe.fileHandleForReading.readabilityHandler = nil
+            stderrPipe.fileHandleForReading.readabilityHandler = nil
+            return .failed(message: "无法启动 brew:\(error.localizedDescription)")
+        }
         watchdog.cancel()
+        // 先摘回调再收尾巴:同一 FileHandle 不许回调与同步读并发。
+        stdoutPipe.fileHandleForReading.readabilityHandler = nil
+        stderrPipe.fileHandleForReading.readabilityHandler = nil
+        stderrBuffer.append(stderrPipe.fileHandleForReading.readDataToEndOfFile())
 
         guard !timedOut.isMarked() else {
-            return .failed(message: "brew 超过 \(Int(Self.timeout)) 秒未完成,已终止")
+            return .failed(message: "brew 超过 \(Int(timeout)) 秒未完成,已终止")
         }
-        guard process.terminationStatus == 0 else {
-            let data = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-            let tail = String(data: data, encoding: .utf8)?
+        guard status == 0 else {
+            let tail = String(data: stderrBuffer.data(), encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .split(separator: "\n").last
-            return .failed(message: tail.flatMap(String.init) ?? "brew 退出码 \(process.terminationStatus)")
+            return .failed(message: tail.flatMap(String.init) ?? "brew 退出码 \(status)")
         }
         return .success
+    }
+}
+
+/// stderr 累积(readabilityHandler 在 FileHandle 私有队列回调,与等待方跨线程)。
+private final class OutputBuffer: @unchecked Sendable {
+    /// @unchecked Sendable 前提:全部读写经 lock 串行。
+    private let lock = NSLock()
+    private var bytes = Data()
+
+    func append(_ chunk: Data) {
+        guard !chunk.isEmpty else { return }
+        lock.withLock { bytes.append(chunk) }
+    }
+
+    func data() -> Data {
+        lock.withLock { bytes }
     }
 }
 

@@ -160,6 +160,7 @@
 		D58BA01E33941290CC66A462 /* HistoryFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D85BCEEF64EDEAAFC5AE256 /* HistoryFeature.swift */; };
 		D89BE77424B91E56B9FF1441 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0EEF346D1A5F99B6D75474EC /* Assets.xcassets */; };
 		D89F1D815D05E848BE31A83E /* AlertCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 556E90C2DDB739846AA22485 /* AlertCenter.swift */; };
+		DBBB83A52145048627D0E2D7 /* LiveBrewUninstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 865415F5B0ED2A2E5C81362F /* LiveBrewUninstallerTests.swift */; };
 		E0391947A668FC976A3C1FEC /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 992920D9BD4AE699DFE1A1B5 /* SettingsView.swift */; };
 		E193DEFD26CEB49C029AF9BC /* CleanScanRootsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48832042B66772435003651D /* CleanScanRootsStoreTests.swift */; };
 		E3B976A319DD3E4CA4DF499F /* AlertSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0853EEEEB0FB9F6834A00E /* AlertSettingsStore.swift */; };
@@ -301,6 +302,7 @@
 		7FFE17F679EFFD8CCA29B0DC /* LiveCleanDirectoryEnumerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCleanDirectoryEnumerator.swift; sourceTree = "<group>"; };
 		84AFAFC8D33B01908457ADE1 /* BluetoothCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothCardViews.swift; sourceTree = "<group>"; };
 		8576B450296CE59084093EDC /* ContainerSensorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerSensorTests.swift; sourceTree = "<group>"; };
+		865415F5B0ED2A2E5C81362F /* LiveBrewUninstallerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveBrewUninstallerTests.swift; sourceTree = "<group>"; };
 		8B93B7757A455F9566934A21 /* MainWindowGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowGate.swift; sourceTree = "<group>"; };
 		8C71FCD146BC0C56EF25AEE9 /* AcceptanceAnchorEndToEndTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcceptanceAnchorEndToEndTests.swift; sourceTree = "<group>"; };
 		8D0336878D6164F8E0FA0FCD /* BatterySensorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySensorTests.swift; sourceTree = "<group>"; };
@@ -646,6 +648,7 @@
 				6B76926FB48518EBB58CAA6F /* LaunchdManifestFeatureTests.swift */,
 				660FB2721DCBDC67C5B3E98A /* LineagePruningTests.swift */,
 				F686C4FCD1571352152AE894 /* LiveBatterySourceSmokeTests.swift */,
+				865415F5B0ED2A2E5C81362F /* LiveBrewUninstallerTests.swift */,
 				C52DB5F7C6F83EAC51BD568F /* LiveCleanDirectoryEnumeratorTests.swift */,
 				23CC14BC245E753EAACD6E13 /* LiveCoreTickSourceSmokeTests.swift */,
 				9F27F7F4AB085BB21BC93D75 /* LiveDiskSourceSmokeTests.swift */,
@@ -814,6 +817,7 @@
 				AA528E9EE2DB20755AA5481C /* LaunchdManifestFeatureTests.swift in Sources */,
 				AD213F94A8779D13A260C332 /* LineagePruningTests.swift in Sources */,
 				C28472B069243FA1523B97C5 /* LiveBatterySourceSmokeTests.swift in Sources */,
+				DBBB83A52145048627D0E2D7 /* LiveBrewUninstallerTests.swift in Sources */,
 				AD87D87D84AB65ECA89DDFD6 /* LiveCleanDirectoryEnumeratorTests.swift in Sources */,
 				C3D5DEE96491A119F8648790 /* LiveCoreTickSourceSmokeTests.swift in Sources */,
 				04BFB76AC65777ABAFFF1897 /* LiveDiskSourceSmokeTests.swift in Sources */,
