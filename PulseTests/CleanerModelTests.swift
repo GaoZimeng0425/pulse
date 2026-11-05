@@ -437,6 +437,49 @@ final class CleanerModelTests: XCTestCase {
         XCTAssertEqual(calls.map { Set($0) }, [Set([newPath])], "在用项绝不到执行器")
     }
 
+    /// 清单快照(cleaner-hardening/05):重复读取不重跑匹配器(标记探测次数当计数器);
+    /// 输入一变(排除目录)立即重算——设置页改动即时反映的语义不丢。
+    func testCandidatesMemoizedUntilInputsChange() async {
+        final class Counter: @unchecked Sendable {
+            private let lock = NSLock()
+            private var count = 0
+            func bump() {
+                lock.withLock { count += 1 }
+            }
+
+            var value: Int {
+                lock.withLock { count }
+            }
+        }
+        let probes = Counter()
+        let exclusions = CleanExclusionsStore(load: { [] }, persist: { _ in })
+        let model = CleanerModel(
+            exclusions: exclusions,
+            scanRoots: CleanScanRootsStore(load: { ["/Users/dev/code"] }, persist: { _ in }),
+            trash: FakeCleanTrashExecutor(),
+            homeDirectory: "/Users/dev",
+            markerExists: { _ in probes.bump()
+                return true
+            }
+        )
+        let fake = FakeCleanDirectoryEnumerator(listings: CleanFixture.homeListings(
+            home: "/Users/dev",
+            directories: ["code/a/node_modules": 800, "code/b/node_modules": 400]
+        ))
+        model.startScan(using: fake, roots: ["/Users/dev"])
+        await waitUntil { !model.isScanning }
+
+        XCTAssertEqual(model.candidates.count, 2)
+        let afterFirst = probes.value
+        for _ in 0 ..< 5 {
+            _ = model.candidates
+        }
+        XCTAssertEqual(probes.value, afterFirst, "输入不变,重复读取不重算")
+
+        exclusions.add("/Users/dev/code/a/node_modules")
+        XCTAssertEqual(model.candidates.map(\.path), ["/Users/dev/code/b/node_modules"], "排除即时生效")
+    }
+
     // MARK: 方案 A(票 10):默认根 = Data 卷 + 卷级密封注入
 
     func testDefaultScanRootIsDataVolumeWithSealedVolumeInjection() async {

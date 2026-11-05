@@ -36,7 +36,12 @@ final class CleanerModel {
         case finished(CleanRunReport, historyRecorded: Bool)
     }
 
-    private(set) var phase: Phase = .idle
+    private(set) var phase: Phase = .idle {
+        didSet { phaseGeneration &+= 1 }
+    }
+
+    /// phase 每次赋值 +1:清单快照的「扫描结果换了没有」判据(结果是大值类型,不比内容)。
+    @ObservationIgnored private var phaseGeneration = 0
     private(set) var scanStartedAt: Date?
     private(set) var scanFinishedAt: Date?
 
@@ -409,25 +414,52 @@ final class CleanerModel {
     // MARK: 清单(04 全局缓存 + 05 项目产物)
 
     /// 白名单命中的可删单元:全局缓存(04)+ 项目产物(05)都跑在同一棵扫描树上,
-    /// 排除目录与本会话已回收的项不列。计算属性——读 `exclusions.paths` /
-    /// `scanRoots.paths` / `artifactSort`,设置页改动即时反映,不必重扫。
+    /// 排除目录与本会话已回收的项不列。仍是计算属性——读 `phase` / `exclusions.paths` /
+    /// `scanRoots.paths` / `recycledPaths` 照常登记观察,设置页改动即时反映、不必重扫;
+    /// 但按这四样输入记忆化(cleaner-hardening/05):一次渲染读好几次、点勾选整卡重绘,
+    /// 输入不变就不重跑匹配器(项目产物要整棵 DFS + 查标记文件)。
     var candidates: [JunkCandidate] {
+        let key = CandidatesKey(
+            phaseGeneration: phaseGeneration,
+            excluded: exclusions.paths,
+            roots: scanRoots.paths,
+            recycled: recycledPaths
+        )
+        // 先读 phase 再判缓存:保证观察登记与未命中时一致。
         guard let result else { return [] }
-        let excluded = exclusions.paths
+        if let candidatesMemo, candidatesMemo.key == key {
+            return candidatesMemo.value
+        }
+        let value = computeCandidates(in: result, key: key)
+        candidatesMemo = (key, value)
+        return value
+    }
+
+    private struct CandidatesKey: Equatable {
+        let phaseGeneration: Int
+        let excluded: [String]
+        let roots: [String]
+        let recycled: Set<String>
+    }
+
+    @ObservationIgnored private var candidatesMemo: (key: CandidatesKey, value: [JunkCandidate])?
+
+    private func computeCandidates(in result: SpaceScanResult, key: CandidatesKey) -> [JunkCandidate] {
+        let excluded = key.excluded
         let global = JunkMatcher.candidates(
             in: result.trees,
             home: homeDirectory,
             excludedPathPrefixes: excluded
         )
-        var artifacts = ProjectArtifactMatcher.artifacts(
+        let artifacts = ProjectArtifactMatcher.artifacts(
             in: result.trees,
-            roots: scanRoots.paths,
+            roots: key.roots,
             excludedPathPrefixes: excluded,
             fileExists: markerExists
         )
 
         return (global + artifacts)
-            .filter { !recycledPaths.contains($0.path) }
+            .filter { !key.recycled.contains($0.path) }
     }
 
     /// 配置了项目扫描根没有(设置页引导文案与项目产物空态的判据)。
