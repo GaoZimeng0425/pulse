@@ -141,8 +141,10 @@ public enum AppLeftovers {
     /// 展开两把键 → 待探测清单。`brewZapPaths` 只在 app 带 brew 徽标时由调用方传入。
     /// 无 bundle id → 空清单(见文件头口径)。
     public static func probes(bundleID: String?, appName: String?, brewZapPaths: [String] = []) -> [LeftoverProbe] {
-        guard let bundleID, !bundleID.isEmpty else { return [] }
-        let name = (appName ?? "").isEmpty ? nil : appName
+        // 两把键都来自第三方 Info.plist(不可信):只收单一路径组件,带 `/` 或
+        // `.` / `..` 的键会把拼出的路径带出 ~/Library(cleaner-hardening/01)。
+        guard let bundleID, isSafePathComponent(bundleID) else { return [] }
+        let name = appName.flatMap { isSafePathComponent($0) ? $0 : nil }
         let library = NSHomeDirectory() + "/Library"
 
         var result: [LeftoverProbe] = []
@@ -249,7 +251,9 @@ public enum AppLeftovers {
         var zapExtra: [String] = []
         var seen = Set(result.compactMap(\.fixedPath))
         for raw in brewZapPaths {
-            let path = CaskReceipt.expandTilde(raw)
+            // 先词法规范化(消 `..` / `.` / 重复斜杠)再判家域,否则
+            // `~/Library/../../x` 字符串前缀过得去、实际落在家目录外。
+            let path = URL(fileURLWithPath: CaskReceipt.expandTilde(raw)).standardized.path
             // 家域过滤 + PrivilegedHelperTools 显式排除:它在 ~/Library 下(家域
             // 前缀拦不住)但语义是 root 域(特权助手安装处,root 属主),ADR-0009
             // 恒不碰——收据声明了也不进清单(testPrivilegedHelperToolsNeverProbed)。
@@ -293,6 +297,11 @@ public enum AppLeftovers {
         let teamID = String(directoryName.dropLast(suffix.count))
         // 数字无大小写(isUppercase=false),字母才判大写——否则带数字的团队 id 被误拒。
         return teamID.count == 10 && teamID.allSatisfy { $0.isNumber || ($0.isLetter && $0.isUppercase) }
+    }
+
+    /// 可安全拼进路径的单一组件:非空、无 `/` 与 NUL、不是 `.` / `..`。
+    static func isSafePathComponent(_ key: String) -> Bool {
+        !key.isEmpty && key != "." && key != ".." && !key.contains("/") && !key.contains("\0")
     }
 
     static func keys(bundleID: String, appName: String?) -> [String] {

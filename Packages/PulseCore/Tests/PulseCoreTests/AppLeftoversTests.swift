@@ -110,6 +110,39 @@ final class AppLeftoversTests: XCTestCase {
 
     // MARK: PrivilegedHelperTools 永不出现
 
+    // MARK: 路径越界(cleaner-hardening/01):键来自第三方 Info.plist,不可信
+
+    func testAppNameWithTraversalIsDropped() {
+        let probes = AppLeftovers.probes(bundleID: "com.evil.app", appName: "../../Documents")
+        let paths = fixedPaths(probes)
+        XCTAssertFalse(paths.contains { $0.contains("..") }, "\(paths)")
+        XCTAssertTrue(paths.allSatisfy { $0.hasPrefix("\(home)/Library/") }, "\(paths)")
+        XCTAssertTrue(paths.contains("\(home)/Library/Caches/com.evil.app"), "bundle id 键照常")
+    }
+
+    func testAppNameWithSlashIsDropped() {
+        let paths = fixedPaths(AppLeftovers.probes(bundleID: "com.evil.app", appName: "a/b"))
+        XCTAssertFalse(paths.contains { $0.hasSuffix("/a/b") }, "\(paths)")
+    }
+
+    func testUnsafeBundleIDYieldsEmptyProbes() {
+        XCTAssertTrue(AppLeftovers.probes(bundleID: "../..", appName: "X").isEmpty)
+        XCTAssertTrue(AppLeftovers.probes(bundleID: "com/evil", appName: "X").isEmpty)
+        XCTAssertTrue(AppLeftovers.probes(bundleID: "..", appName: "X").isEmpty)
+    }
+
+    func testZapPathEscapingHomeViaDotDotFiltered() {
+        let probes = AppLeftovers.probes(
+            bundleID: "com.x.app",
+            appName: "X",
+            brewZapPaths: ["~/Library/../../../etc/hosts", "~/Library/Caches/../Application Support/X-zap"]
+        )
+        let paths = fixedPaths(probes)
+        XCTAssertFalse(paths.contains { $0.contains("..") }, "\(paths)")
+        XCTAssertFalse(paths.contains { $0.contains("/etc/hosts") }, "\(paths)")
+        XCTAssertTrue(paths.contains("\(home)/Library/Application Support/X-zap"), "规范化后仍在家域的照收")
+    }
+
     func testPrivilegedHelperToolsNeverProbed() {
         let probes = AppLeftovers.probes(bundleID: "com.any.thing", appName: "Any", brewZapPaths: [
             "\(home)/Library/PrivilegedHelperTools/com.any.thing",

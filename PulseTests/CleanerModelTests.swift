@@ -347,7 +347,8 @@ final class CleanerModelTests: XCTestCase {
             scanRoots: CleanScanRootsStore(load: { ["/Users/dev/code"] }, persist: { _ in }),
             trash: trash,
             activity: activity,
-            homeDirectory: "/Users/dev"
+            homeDirectory: "/Users/dev",
+            markerExists: { _ in true } // 本组测分组 / 年龄 / 在用,标记口径见 ProjectArtifactTests
         )
     }
 
@@ -434,6 +435,49 @@ final class CleanerModelTests: XCTestCase {
         await waitForCleanFinished(model)
         let calls = await spy.recycleCalls
         XCTAssertEqual(calls.map { Set($0) }, [Set([newPath])], "在用项绝不到执行器")
+    }
+
+    /// 清单快照(cleaner-hardening/05):重复读取不重跑匹配器(标记探测次数当计数器);
+    /// 输入一变(排除目录)立即重算——设置页改动即时反映的语义不丢。
+    func testCandidatesMemoizedUntilInputsChange() async {
+        final class Counter: @unchecked Sendable {
+            private let lock = NSLock()
+            private var count = 0
+            func bump() {
+                lock.withLock { count += 1 }
+            }
+
+            var value: Int {
+                lock.withLock { count }
+            }
+        }
+        let probes = Counter()
+        let exclusions = CleanExclusionsStore(load: { [] }, persist: { _ in })
+        let model = CleanerModel(
+            exclusions: exclusions,
+            scanRoots: CleanScanRootsStore(load: { ["/Users/dev/code"] }, persist: { _ in }),
+            trash: FakeCleanTrashExecutor(),
+            homeDirectory: "/Users/dev",
+            markerExists: { _ in probes.bump()
+                return true
+            }
+        )
+        let fake = FakeCleanDirectoryEnumerator(listings: CleanFixture.homeListings(
+            home: "/Users/dev",
+            directories: ["code/a/node_modules": 800, "code/b/node_modules": 400]
+        ))
+        model.startScan(using: fake, roots: ["/Users/dev"])
+        await waitUntil { !model.isScanning }
+
+        XCTAssertEqual(model.candidates.count, 2)
+        let afterFirst = probes.value
+        for _ in 0 ..< 5 {
+            _ = model.candidates
+        }
+        XCTAssertEqual(probes.value, afterFirst, "输入不变,重复读取不重算")
+
+        exclusions.add("/Users/dev/code/a/node_modules")
+        XCTAssertEqual(model.candidates.map(\.path), ["/Users/dev/code/b/node_modules"], "排除即时生效")
     }
 
     // MARK: 方案 A(票 10):默认根 = Data 卷 + 卷级密封注入
@@ -573,6 +617,44 @@ final class CleanerModelTests: XCTestCase {
         second.startScan(using: makeCacheFixture())
         await waitUntil { !second.isScanning && !second.loadedFromCache }
         XCTAssertFalse(second.loadedFromCache)
+    }
+
+    /// 取消的扫描是半棵树:不得覆盖上一份完整缓存(cleaner-hardening/04)。
+    func testCancelledScanDoesNotOverwriteCache() async {
+        final class SaveCounter: @unchecked Sendable {
+            private let lock = NSLock()
+            private var count = 0
+            func bump() {
+                lock.withLock { count += 1 }
+            }
+
+            var value: Int {
+                lock.withLock { count }
+            }
+        }
+        // 每进一个目录慢 50ms:保证取消落在扫描中途。
+        actor SlowEnumerator: CleanDirectoryEnumerator {
+            let inner: FakeCleanDirectoryEnumerator
+            init(_ inner: FakeCleanDirectoryEnumerator) {
+                self.inner = inner
+            }
+
+            func entries(ofDirectory path: String) async throws -> [FsEntrySnapshot] {
+                try? await Task.sleep(nanoseconds: 50_000_000)
+                return try await inner.entries(ofDirectory: path)
+            }
+        }
+        let saves = SaveCounter()
+        let cache = CleanScanResultStore(load: { nil }, save: { _ in saves.bump() })
+        let model = CleanerModel(
+            exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
+            scanCache: cache,
+            homeDirectory: "/Users/me"
+        )
+        model.startScan(using: SlowEnumerator(makeCacheFixture()))
+        model.cancelScan()
+        await waitUntil { !model.isScanning }
+        XCTAssertEqual(saves.value, 0, "取消的扫描不落盘")
     }
 
     func testCacheStalenessHintWhenExclusionsChangedAfterScan() async {
