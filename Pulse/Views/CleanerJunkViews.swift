@@ -318,17 +318,21 @@ private struct JunkListCard: View {
                 .disabled(safeItems.isEmpty || isBusy)
                 .onTapGesture { model.toggleGroup(safeItems) }
                 .help("勾选本项目全部「可安全清理」且不在用的产物")
+            // 项目行视觉权重 ≥ 产物行(用户实报:项目比展开后的行还小)——
+            // 尺寸加到 13pt + 图标 tile 同产物行的 24pt,元信息跟大字同排。
             Text(projectGroup.projectName)
-                .font(.system(size: 12, weight: .bold))
+                .font(.system(size: 13, weight: .bold))
                 .lineLimit(1)
             Text(projectMeta(projectGroup))
-                .font(.system(size: 10.5))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
                 .monospacedDigit()
             Spacer(minLength: 8)
         }
-        .padding(.top, 5)
+        .padding(.vertical, 7)
         .padding(.horizontal, RankingListMetrics.rowInset + 6)
+        .background(Surface.cardHigh.opacity(0.5), in: .rect(cornerRadius: 8))
+        .padding(.horizontal, 4)
     }
 
     /// 「2 项 · 3.2 GB · 3 天前动过」;活动时间未知如实省略,不编。
