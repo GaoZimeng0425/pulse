@@ -14,3 +14,4 @@
 
 - **背案(2026-11-05)**:NemoNotch 组 8.80GB = 其包内 `mediaremote-mini.pl` 守护真实泄漏(`ri_phys_footprint` 8.69GB 而 RSS 10MB,库内三日两周期锯齿 0.2→14.29GB;主进程 0.17GB 健康)。Pulse 数字与内核/`top` 完全一致,「按应用内存 = 每轮活进程 footprint 求和」(`GroupingEngine.swift` 归组求和)无罪——但对账成本高,本票只降误解面,不动口径。
 - MCP 数值本身仍是「最新一分钟各组 `mem_max` 求和」(`InsightQueries.latestSnapshot`),标签改写不触碰查询。
+- **撤销轮 check(2026-11-05)**:全量跑挂 1 例 `AcceptanceAnchorEndToEndTests.testAnchorScenarioGroupDrilldownAndKillThroughRealPipeline`(忙循环断言组 CPU>100%,实测 87%——机器当时被 rustc 编译压满,已知自扰体质,见 pulse-live-smoke-flakes 记忆);`--only` 单跑该套件**绿**。结合还原内容与 `9fc7b72` 逐字节一致(diff 空)+ 撤销前一轮 1072 全绿,判环境自扰非回归,照旧合并。
