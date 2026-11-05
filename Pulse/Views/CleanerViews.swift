@@ -36,6 +36,7 @@ struct CleanerPageHeader: View {
 
     var body: some View {
         PageHeader(title: MetricTab.cleaner.title, subtitle: subtitle, style: .full) {
+            // 页头动作按钮 B 档 .large(2026-11-05 清理页密度拍板)。
             HStack(spacing: 8) {
                 Button {
                     model.beginEmptyTrash()
@@ -46,15 +47,18 @@ struct CleanerPageHeader: View {
                         Text("清空废纸篓")
                     }
                 }
+                .controlSize(.large)
                 .disabled(model.trashPhase != .idle)
                 .help("清空所有卷的废纸篓(永久删除,不可恢复)——腾出它占着的空间")
                 if model.isScanning {
                     Button("取消扫描") { model.cancelScan() }
                         .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
                         .tint(Metric.disk.accentColor)
                 } else {
                     Button(model.result == nil ? "扫描整台 Mac" : "重新扫描") { model.startScan() }
                         .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
                         .tint(Metric.disk.accentColor)
                 }
             }
@@ -260,8 +264,10 @@ struct CleanerTabView: View {
                 HStack {
                     Spacer()
                     Button("取消", action: onCancel)
+                        .controlSize(.large)
                     Button("永久清空", action: onConfirm)
                         .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
                         .tint(Surface.negative)
                 }
             }
@@ -309,7 +315,9 @@ struct CleanerTabView: View {
     }
 
     private var subPillBar: some View {
-        PillTabBar(CleanerSubTab.allCases, selection: $subTab, isGlassContainer: true) { tab in
+        // 舒适密度档(2026-11-05 拍板):清理页子页条用 comfortable,高≈34;
+        // 主窗口工具栏/历史页维持 regular 不受影响。
+        PillTabBar(CleanerSubTab.allCases, selection: $subTab, isGlassContainer: true, size: .comfortable) { tab in
             PillTabItem(title: tab.title, symbol: nil, tint: accent)
         }
     }

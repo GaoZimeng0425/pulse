@@ -263,12 +263,22 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   环境值 `rankingRowsInList` 拆成卡头 / 每行 / 卡尾各一行,底色按段 `cardSlice` 切开拼回整卡
   (真机触控板滚动 LazyVStack 36–43%,sample 一半在每帧重出绘制指令、四分之一在重布局)。
   卡外 8pt 间距 = 首尾段底色外各 4 透明边,不用 listRowInsets 的 bottom(macOS 上被忽略)。
-- **清理清单行**(p4-cleaner/04,`CleanerJunkViews.swift`):借排行列表行配方
-  (`RankingListMetrics` 全套:图标 22 / 名称 13 medium + 副文 10.5 secondary / meter 110
-  榜首归一 / 数值 13 semibold 等宽定宽列 / 行内距 6×7),行首加系统 checkbox;行选中底 =
+- **清理页舒适密度档**(2026-11-05 用户拍板,原型三档裁决:行 = A 档,按钮与
+  segmented = B 档,行左右内距加大;参考竞品 Purge 后全页从排行紧凑档升密度):
+  清理页四子页(垃圾/应用/历史/地图周边)的行与控件**不再借** `RankingListMetrics`
+  (那是排行页多轮拍板的紧凑档,弹窗/排行不动),尺寸单一出处
+  `CleanerListMetrics`(`CleanerJunkViews.swift`):行 = 图标 28 / 名称 14.5 medium
+  + 副文 12 secondary / meter 130 榜首归一 / 数值 14.5 semibold 等宽**定宽列**
+  (同法按 14.5pt 量最宽现实读数 "999.9 GB" + 2)/ 行内距 12(左右)×10(上下)
+  / 勾选框 `.controlSize(.large)`;安全档 chip 文字 11.5 semibold、内距 10×3;
+  组头 14.5 bold + 总量 12;子页 tab 药丸 = `PillTabBar.comfortable`;**动作按钮与
+  「大小|新旧」segmented 一律 B 档**(按钮 `.controlSize(.large)`、seg 默认 regular
+  不再 mini);项目子组行 = 14.5 bold、上下距 10、**无背景**(权重靠字号与内距)。
+- **清理清单行**(p4-cleaner/04,`CleanerJunkViews.swift`):**舒适密度档**(上行)
+  之下的既有配方:行首系统 checkbox(large);行选中底 =
   `{colors.surface-card-high}` 70% + `{rounded.inner}` 10。**安全档 chip**(`TierChip`)=
-  状态 chip 配方(胶囊、tint 15% 底 + 同色文字、`{typography.micro}` 10.5 semibold),
-  两态:可安全清理 = `{colors.state-positive}`、先检查 = `{colors.state-warning}`——映射的是
+  状态 chip 配方(胶囊、tint 15% 底 + 同色文字、11.5 semibold),两态:可安全清理 =
+  `{colors.state-positive}`、先检查 = `{colors.state-caution}`——映射的是
   GLOSSARY「安全档」(删除安全语义),不是负载警示,只在此组件出。勾选动作条 =
   `{colors.surface-card-high}` + `{rounded.card-compact}` 12,内距 8×12,右侧
   「清除勾选」bordered + 「清理…」borderedProminent(所在页指标色);确认清单走
@@ -279,7 +289,8 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   (NSButton allowsMixedState,SwiftUI `Toggle` 无混合态才包一层),**只吃组内「可安全
   清理」且非在用的项**——none / mixed 点击全勾、all 点击全清,先检查项与在用项
   永不被组勾选带上;组内无可勾项则不画。**项目产物组与在用灰行**(p4-cleaner/05):
-  组头多一枚 segmented mini Picker「大小|新旧」(默认大小;新旧 = 最久未动在前,
+  组头多一枚 segmented Picker「大小|新旧」(默认大小、regular 档——2026-11-05
+  密度拍板升 B 档,不再 mini;新旧 = 最久未动在前,
   年龄未知排最后),行副标末尾追加年龄人话(「今天动过 / N 天未动 / N 个月未动 /
   N 年未动」,口径 = 项目内非产物文件的最后变动含 git 活动);未配扫描根时组位置
   出一行 `{typography.caption}` 三级墨色引导文案(不硬造空组)。**在用保护行**:整行
@@ -311,8 +322,11 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   2% 左垫底;**StripChartView**:44 柱、36pt 高。二者都是自绘 Canvas,不引 Charts。
 - **PillTabBar(通用药丸 tab 条,用户拍板 2026-10-22:tab 是通用组件样式)**:
   唯一视觉配方在 `Pulse/Views/PillTabBar.swift`——选中 = 该项强调色 15% 胶囊底
-  + 同色前景,未选中 = secondary 前景无底;内距 9(水平)×5(垂直)、药丸间距 4;
+  + 同色前景,未选中 = secondary 前景无底;药丸间距 4;
   切换动画 0.2s snappy(选中文字自图标侧展开、胶囊生长、其余药丸滑移让位)。
+  两档尺寸:`.regular`(默认 = 现状:callout 12 medium + 内距 9×5,高≈24,
+  工具栏/历史页用)与 `.comfortable`(13.5 medium + 内距 14×8,高≈34;
+  2026-11-05 用户拍板清理页整体升「舒适密度」,唯清理页子页条用此档)。
   两种文字形态:`.selectedOnly`(未选中纯图标 / 选中图标+文字;图标-only 必带
   a11y label + help)与 `.always`(文字恒显)。四处用法同一组件:主窗口工具栏
   tab(`MetricPillTabBar` 薄封装 = `.selectedOnly` + ←/→ 键盘 + 首尾再留 4pt

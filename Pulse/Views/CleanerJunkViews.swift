@@ -2,15 +2,50 @@ import AppKit
 import PulseCore
 import SwiftUI
 
-// MARK: - 开发者垃圾清单(p4-cleaner/04;形态 = 原型 B 变体,DESIGN.md 卡片家族 + 排行行配方)
+// MARK: - 开发者垃圾清单(p4-cleaner/04;形态 = 原型 B 变体,DESIGN.md 卡片家族)
 
 //
 // 本文件只做呈现与转发,状态全在 CleanerModel(PulseCore 纯值驱动):
 //   清单卡(组分段 → 行 → 动作条)→ 确认 sheet(逐行 + 总量 + 口径注记)→ 结果卡
 //   (失败如实报)→ 右键排除(持久化,再扫描 / 再列清单立即生效)。
-// 行配方借自排行列表(RankingListMetrics:图标 22 / 间距 10 / meter 110 / 数值 13
-// semibold 等宽定宽列 / 行内距 6×7);档位 chip 用状态 chip 配方(胶囊、tint 14~16% 底
-// + 同色文字,DESIGN.md §状态 chip——此处映射的是 GLOSSARY「安全档」两态,不是负载警示)。
+// 行配方 = 清理页「舒适密度档」CleanerListMetrics(2026-11-05 用户拍板,三档原型
+// 裁决 A:全页升密度;按钮与 segmented B 档;行左右内距加大)——不再借排行的
+// RankingListMetrics(那是弹窗/排行多轮拍板的紧凑档)。档位 chip 用状态 chip 配方
+// (胶囊、tint 14~16% 底 + 同色文字,DESIGN.md §状态 chip——此处映射的是
+// GLOSSARY「安全档」两态,不是负载警示)。
+
+/// 清理页「舒适密度档」尺寸表(DESIGN.md §清理页舒适密度档,2026-11-05 拍板):
+/// 清理页四子页(垃圾/应用/历史)共用的行控件尺寸——图标 28 / 名称 14.5 /
+/// 副文 12 / 数值 14.5 定宽列 / meter 130 / 行内距 12×10。排行的
+/// `RankingListMetrics` 是紧凑档,弹窗与排行页保持不动,两套不混用。
+enum CleanerListMetrics {
+    /// 行内水平内距(组头/项目行/动作条与行对齐;拍板「左右 padding 增加一些」6→12)。
+    static let rowInset: CGFloat = 12
+    static let spacing: CGFloat = 10
+    static let iconSize: CGFloat = 28
+    static let titleFontSize: CGFloat = 14.5
+    /// 副文/路径行字号。
+    static let subFontSize: CGFloat = 12
+    static let valueFontSize: CGFloat = 14.5
+    static let meterWidth: CGFloat = 130
+    static let rowVerticalPadding: CGFloat = 10
+    static let chipFontSize: CGFloat = 11.5
+    /// 项目产物缩进行 = 行内距 + 图标列(icon 28 + spacing 10)。
+    static let indentLeading: CGFloat = 38
+
+    /// 数值**定宽列**(排行同法:按最宽现实读数以实际绘制字体量宽 + 2;
+    /// 清理读数上限 "999.9 GB")。同卡各行同一竖线,不许按内容撑宽。
+    static let valueWidth: CGFloat = {
+        let font = NSFont.monospacedDigitSystemFont(ofSize: valueFontSize, weight: .semibold)
+        let widest = ["999.9 GB", "99.9 TB"]
+            .map { ($0 as NSString).size(withAttributes: [.font: font]).width }
+            .max() ?? 0
+        return ceil(widest) + 2
+    }()
+
+    /// 应用行的数值列(valueWidth + 「部分」附标留量;垃圾行不带附标用 valueWidth)。
+    static let valueWidthWithMark: CGFloat = valueWidth + 30
+}
 
 /// 清单子页(换掉 03 票的占位卡):未扫描给 CTA,扫描中给提示,完成给清单卡。
 struct JunkListSection: View {
@@ -42,7 +77,7 @@ struct JunkListSection: View {
                 )
                 if !model.hasScanRoots {
                     Text("想清项目产物(node_modules 等)?先到 设置 → 清理 配置项目目录:工具栏齿轮打开设置,勾选建议目录或自添(如 ~/Documents/Learn/macos)。")
-                        .font(.system(size: 10.5))
+                        .font(.system(size: 11.5))
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -120,7 +155,7 @@ private struct JunkListCard: View {
         // 08 色彩纪律:卡头也中性(此前金色 sparkles 图标是「全页黄」的源头之一)。
         CardHeader(symbolName: "trash", title: "开发者垃圾", tint: .primary) {
             Text(summaryText)
-                .font(.system(size: 10.5))
+                .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
                 .monospacedDigit()
                 .lineLimit(2)
@@ -235,10 +270,10 @@ private struct JunkListCard: View {
         Text(model.hasScanRoots
             ? "项目产物:配置的扫描根在本次扫描里没有找到产物目录。"
             : "项目产物:还没配置项目目录——设置 → 清理,勾选常见开发目录或自添(与归组的项目根互不影响)。")
-            .font(.system(size: 10.5))
+            .font(.system(size: 11.5))
             .foregroundStyle(.tertiary)
             .padding(.top, 6)
-            .padding(.horizontal, RankingListMetrics.rowInset)
+            .padding(.horizontal, CleanerListMetrics.rowInset)
     }
 
     /// 组排序(08:两组各自独立,互不影响)。
@@ -256,13 +291,15 @@ private struct JunkListCard: View {
         let sum = items.reduce(Int64(0)) { $0 + $1.bytes }
         return HStack(spacing: 8) {
             Text(group.title)
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: 14.5, weight: .bold))
                 .foregroundStyle(.primary)
             Text(PulseFormat.memory(UInt64(max(0, sum))))
-                .font(.system(size: 11))
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
             // 大小 ⇄ 新旧(05 拍板;08 扩到两组)。新旧 = 最久未动在前,未知排最后。
+            // seg 走默认 regular(2026-11-05 密度拍板 B 档,不再 mini;不定宽——
+            // 定宽曾把文字挤竖排,自然宽 + fixedSize 即可)。
             Picker(
                 "排序",
                 selection: Binding(
@@ -280,8 +317,6 @@ private struct JunkListCard: View {
                 Text("新旧").tag(JunkSortOrder.age)
             }
             .pickerStyle(.segmented)
-            .controlSize(.mini)
-            .frame(width: 108)
             .fixedSize()
             .labelsHidden()
             Spacer()
@@ -289,7 +324,7 @@ private struct JunkListCard: View {
                 Button("全选安全项") {
                     model.toggleGroup(safeItems)
                 }
-                .font(.system(size: 10.5, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .buttonStyle(.borderless)
                 .foregroundStyle(.secondary)
                 .disabled(isBusy)
@@ -297,8 +332,8 @@ private struct JunkListCard: View {
             }
         }
         .padding(.top, 8)
-        .padding(.bottom, 3)
-        .padding(.horizontal, RankingListMetrics.rowInset)
+        .padding(.bottom, 4)
+        .padding(.horizontal, CleanerListMetrics.rowInset)
     }
 
     /// 项目子组行(08):项目名 + 项数/总量/最近活动;子组勾选 = 该项目全部安全产物。
@@ -309,30 +344,29 @@ private struct JunkListCard: View {
     ) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "chevron.right")
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.tertiary)
                 .rotationEffect(.degrees(isCollapsed ? 0 : 90))
             Toggle("", isOn: .constant(!safeItems.isEmpty && safeItems.allSatisfy { model.isSelected($0) }))
                 .toggleStyle(.checkbox)
+                .controlSize(.large)
                 .labelsHidden()
                 .disabled(safeItems.isEmpty || isBusy)
                 .onTapGesture { model.toggleGroup(safeItems) }
                 .help("勾选本项目全部「可安全清理」且不在用的产物")
-            // 项目行视觉权重 ≥ 产物行(用户实报:项目比展开后的行还小)——
-            // 尺寸加到 13pt + 图标 tile 同产物行的 24pt,元信息跟大字同排。
+            // 项目行视觉权重 ≥ 产物行(用户实报两次:高度比产物行小 / 不要背景色)——
+            // 权重只靠字号 14.5 bold + 上下距 10,无底色。
             Text(projectGroup.projectName)
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: 14.5, weight: .bold))
                 .lineLimit(1)
             Text(projectMeta(projectGroup))
-                .font(.system(size: 11))
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
             Spacer(minLength: 8)
         }
-        .padding(.vertical, 7)
-        .padding(.horizontal, RankingListMetrics.rowInset + 6)
-        .background(Surface.cardHigh.opacity(0.5), in: .rect(cornerRadius: 8))
-        .padding(.horizontal, 4)
+        .padding(.vertical, 10)
+        .padding(.horizontal, CleanerListMetrics.rowInset)
     }
 
     /// 「2 项 · 3.2 GB · 3 天前动过」;活动时间未知如实省略,不编。
@@ -360,23 +394,23 @@ private struct JunkListCard: View {
                 ProgressView()
                     .controlSize(.small)
                 Text("正在移入废纸篓…(完成后才可退出 app)")
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            .padding(.vertical, 10)
             .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
         case .idle, .finished, .confirming:
             // CTA 常驻(用户实报:空选时按钮消失 = 不知道下一步干嘛):
-            // 空选灰显 + 注脚;有选则清选 + 金色主按钮。
+            // 空选灰显 + 注脚;有选则清选 + 金色主按钮。按钮 B 档 .large(2026-11-05 密度拍板)。
             HStack(spacing: 12) {
                 if plan.isEmpty {
                     Text("默认全不勾 · 勾选后可清理,右键行可排除")
-                        .font(.system(size: 10.5))
+                        .font(.system(size: 11.5))
                         .foregroundStyle(.tertiary)
                 } else {
                     Text("已选 \(plan.items.count) 项 · \(PulseFormat.memory(UInt64(max(0, plan.totalBytes))))")
-                        .font(.system(size: 12.5, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                         .monospacedDigit()
                 }
                 Spacer()
@@ -384,16 +418,17 @@ private struct JunkListCard: View {
                     Button("清除勾选") {
                         model.clearSelection()
                     }
+                    .controlSize(.large)
                 }
                 Button(plan.isEmpty ? "移入废纸篓…" : "清理…") {
                     model.requestClean()
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.large)
                 .tint(accent)
                 .disabled(plan.isEmpty)
             }
-            .controlSize(.regular)
-            .padding(.vertical, 8)
+            .padding(.vertical, 10)
             .padding(.horizontal, 12)
             .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
         }
@@ -411,22 +446,22 @@ private struct JunkListCard: View {
                         ? "已移入废纸篓 \(report.recycled.count) 项 · 释放 \(PulseFormat.memory(UInt64(max(0, report.freedBytes))))"
                         :
                         "已移入废纸篓 \(report.recycled.count) 项 · 释放 \(PulseFormat.memory(UInt64(max(0, report.freedBytes)))) · \(report.failed.count) 项失败")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .monospacedDigit()
                     Spacer()
                     Button("知道了") {
                         model.dismissCleanReport()
                     }
                     .buttonStyle(.link)
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                 }
                 Text(historyRecorded ? "已记入清理历史" : "清理历史不可用,本次未记录(历史库未打开)")
-                    .font(.system(size: 10.5))
+                    .font(.system(size: 11.5))
                     .foregroundStyle(historyRecorded ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Surface.warning))
                 ForEach(report.failed, id: \.path) { item in
                     if case let .failed(reason) = item.outcome {
                         Text("\(item.path) — \(reason)")
-                            .font(.system(size: 10.5))
+                            .font(.system(size: 11.5))
                             .foregroundStyle(Surface.negative)
                             .lineLimit(1)
                             .truncationMode(.middle)
@@ -459,15 +494,16 @@ private struct JunkRow: View {
     }
 
     var body: some View {
-        HStack(spacing: RankingListMetrics.spacing(compact: false)) {
+        HStack(spacing: CleanerListMetrics.spacing) {
             if isInUse {
                 Image(systemName: "lock.fill")
-                    .font(.system(size: 11))
+                    .font(.system(size: 13))
                     .foregroundStyle(.tertiary)
                     .help("在用保护:该项目有进程活动,不参与本次清理")
             } else {
                 Toggle("", isOn: Binding(get: { isSelected }, set: { _ in onToggle() }))
                     .toggleStyle(.checkbox)
+                    .controlSize(.large)
                     .labelsHidden()
                     .disabled(disabled)
             }
@@ -475,14 +511,14 @@ private struct JunkRow: View {
                 symbolName: candidate.symbolName,
                 // 08 色彩纪律:行图标中性灰(此前 safe=金 / checkFirst=金撞色难分)。
                 color: Surface.inkTertiary,
-                size: RankingListMetrics.iconSize(compact: false)
+                size: CleanerListMetrics.iconSize
             )
             VStack(alignment: .leading, spacing: 1) {
                 Text(candidate.title)
-                    .font(.system(size: RankingListMetrics.valueFontSize(compact: false), weight: .medium))
+                    .font(.system(size: CleanerListMetrics.titleFontSize, weight: .medium))
                     .lineLimit(1)
                 Text(indented ? candidate.rationale : subtitle)
-                    .font(.system(size: 10.5))
+                    .font(.system(size: CleanerListMetrics.subFontSize))
                     .foregroundStyle(indented ? .tertiary : .secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -499,17 +535,20 @@ private struct JunkRow: View {
                 // 08 色彩纪律:大小条中性,金只留给页脚主按钮与选中 tab。
                 tint: .secondary
             )
-            .frame(width: RankingListMetrics.meterWidth(compact: false))
+            .frame(width: CleanerListMetrics.meterWidth)
             Text(PulseFormat.memory(UInt64(max(0, candidate.bytes))))
-                .font(.system(size: RankingListMetrics.valueFontSize(compact: false), weight: .semibold))
+                .font(.system(size: CleanerListMetrics.valueFontSize, weight: .semibold))
                 .monospacedDigit()
                 .lineLimit(1)
                 .foregroundStyle(.primary)
-                .frame(width: RankingListMetrics.valueWidth(compact: false), alignment: .trailing)
+                .frame(width: CleanerListMetrics.valueWidth, alignment: .trailing)
         }
-        .padding(.leading, indented ? RankingListMetrics.rowInset + 34 : RankingListMetrics.rowInset)
-        .padding(.trailing, RankingListMetrics.rowInset)
-        .padding(.vertical, 7)
+        .padding(
+            .leading,
+            indented ? CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading : CleanerListMetrics.rowInset
+        )
+        .padding(.trailing, CleanerListMetrics.rowInset)
+        .padding(.vertical, CleanerListMetrics.rowVerticalPadding)
         .opacity(isInUse ? 0.55 : 1)
         .background(
             isSelected ? Surface.cardHigh.opacity(0.7) : Color.clear,
@@ -563,10 +602,10 @@ struct InUseChip: View {
 
     var body: some View {
         Text("在用保护 · \(reasons.title)正在此项目")
-            .font(.system(size: 10.5, weight: .semibold))
+            .font(.system(size: CleanerListMetrics.chipFontSize, weight: .semibold))
             .foregroundStyle(Surface.inkTertiary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 2)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 3)
             .background(Surface.inkTertiary.opacity(0.15), in: .capsule)
             .lineLimit(1)
     }
@@ -585,21 +624,17 @@ struct TierChip: View {
 
     var body: some View {
         Text(tier.title)
-            .font(.system(size: 10.5, weight: .semibold))
+            .font(.system(size: CleanerListMetrics.chipFontSize, weight: .semibold))
             .foregroundStyle(tint)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 2)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 3)
             .background(tint.opacity(0.15), in: .capsule)
     }
 }
 
-// MARK: 组头三态 checkbox(整组勾选,2026-10-30 用户拍板 B)
-
-/// 组头的三态勾选框:系统 NSButton(allowsMixedState),渲染与行内系统 checkbox 同款
-/// (SwiftUI `Toggle` 没有混合态,画不出 mixed 虚线,所以包一层)。点击语义不走系统的
-/// off→mixed→on 轮巡:组勾选是「一键全选/全清」——none / mixed 点了全勾,all 点了全清
-/// (动作由模型 `toggleGroup` 决定,这里只报点击)。
 // MARK: 确认清单 sheet
+
+// (08 票前的组头三态 checkbox 组件已随「全选安全项」文字按钮方案移除,注释一并清理。)
 
 /// 确认清单(ADR-0008 多重闸门之一):逐行 + 总量 + 实际占用口径注记。
 /// 「移入废纸篓」按钮直接执行——常规二次确认就是这个 sheet 本身。
@@ -615,7 +650,7 @@ private struct CleanConfirmSheet: View {
             Text("清理 \(plan.items.count) 项")
                 .font(.system(size: 17, weight: .bold))
             Text("确认后全部移入废纸篓——清空废纸篓前可随时在 Finder 恢复")
-                .font(.system(size: 11))
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
             ScrollView {
                 VStack(spacing: 0) {
@@ -628,20 +663,22 @@ private struct CleanConfirmSheet: View {
             .frame(maxHeight: 220)
             .background(Surface.card, in: .rect(cornerRadius: 12))
             Text("共释放 \(PulseFormat.memory(UInt64(max(0, plan.totalBytes))))(实际占用口径:\(accountingNote))")
-                .font(.system(size: 12.5, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .monospacedDigit()
             HStack(spacing: 8) {
                 Text("大小按实际占用计:APFS 克隆与硬链接不重复计。唯一不可逆的操作是「清空废纸篓」,不在这里。")
-                    .font(.system(size: 10.5))
+                    .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button("取消") {
                     model.cancelClean()
                 }
+                .controlSize(.large)
                 Button("移入废纸篓") {
                     model.confirmClean()
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.large)
                 .tint(accent)
                 .disabled(plan.isEmpty)
             }
@@ -660,18 +697,18 @@ private struct CleanConfirmSheet: View {
     }
 
     private func confirmRow(_ item: JunkCandidate) -> some View {
-        HStack(spacing: RankingListMetrics.spacing(compact: false)) {
+        HStack(spacing: CleanerListMetrics.spacing) {
             CategoryIconTile(
                 symbolName: item.symbolName,
                 color: item.tier == .safe ? accent : Surface.warning,
-                size: RankingListMetrics.iconSize(compact: false)
+                size: CleanerListMetrics.iconSize
             )
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: CleanerListMetrics.titleFontSize, weight: .medium))
                     .lineLimit(1)
                 Text(item.path)
-                    .font(.system(size: 10.5))
+                    .font(.system(size: CleanerListMetrics.subFontSize))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -679,11 +716,11 @@ private struct CleanConfirmSheet: View {
             Spacer(minLength: 8)
             TierChip(tier: item.tier)
             Text(PulseFormat.memory(UInt64(max(0, item.bytes))))
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: CleanerListMetrics.valueFontSize, weight: .semibold))
                 .monospacedDigit()
-                .frame(width: RankingListMetrics.valueWidth(compact: false), alignment: .trailing)
+                .frame(width: CleanerListMetrics.valueWidth, alignment: .trailing)
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
     }
 }
 
@@ -735,7 +772,7 @@ struct CleanHistorySection: View {
         LazyVStack(alignment: .leading, spacing: 12) {
             CardHeader(symbolName: "clock.arrow.circlepath", title: "清理历史", tint: Metric.disk.accentColor) {
                 Text("\(model.historyRuns?.count ?? 0) 次")
-                    .font(.system(size: 10.5))
+                    .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
                     .monospacedDigit()
             }
@@ -743,7 +780,7 @@ struct CleanHistorySection: View {
                 CleanRunDisclosureRow(model: model, run: run)
             }
             Text("清理历史永久保留在本地;大小按清理当时扫描的实际占用口径。")
-                .font(.system(size: 10.5))
+                .font(.system(size: 11.5))
                 .foregroundStyle(.tertiary)
         }
         .cardShell(compact: false)
@@ -765,23 +802,23 @@ private struct CleanRunDisclosureRow: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: expanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.tertiary)
                     // 类型标记(Q15):卸载带应用图标、清理带垃圾桶,扫一眼可分;不做筛选分页。
                     Image(systemName: run.isUninstall ? "app.dashed" : "trash")
-                        .font(.system(size: 11))
+                        .font(.system(size: 13))
                         .foregroundStyle(.tertiary)
                         .help(run.isUninstall ? "应用卸载" : "清理")
                     Text(run.startedAt.formatted(date: .abbreviated, time: .shortened))
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 13.5, weight: .medium))
                         .monospacedDigit()
                     Text("\(run.itemCount) 项 · 释放 \(PulseFormat.memory(UInt64(max(0, run.freedBytes))))")
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                     if run.failedCount > 0 {
                         Text("\(run.failedCount) 项失败")
-                            .font(.system(size: 11))
+                            .font(.system(size: 12))
                             .foregroundStyle(Surface.negative)
                     }
                     Spacer()
@@ -792,8 +829,8 @@ private struct CleanRunDisclosureRow: View {
                 items
             }
         }
-        .padding(.horizontal, RankingListMetrics.rowInset)
-        .padding(.vertical, 6)
+        .padding(.horizontal, CleanerListMetrics.rowInset)
+        .padding(.vertical, 8)
     }
 
     @ViewBuilder private var items: some View {
@@ -821,21 +858,21 @@ private struct CleanHistoryItemRow: View {
             TierChip(tier: record.tier)
             VStack(alignment: .leading, spacing: 1) {
                 Text(record.title)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 13.5, weight: .medium))
                     .lineLimit(1)
                 Text(record.path)
-                    .font(.system(size: 10.5))
+                    .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
             Spacer(minLength: 8)
             Text(PulseFormat.memory(UInt64(max(0, record.bytes))))
-                .font(.system(size: 12))
+                .font(.system(size: 13.5))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
             Text(outcomeText)
-                .font(.system(size: 10.5))
+                .font(.system(size: 11.5))
                 .monospacedDigit()
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -845,7 +882,7 @@ private struct CleanHistoryItemRow: View {
                     NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: destination)])
                 } label: {
                     Image(systemName: "magnifyingglass.circle")
-                        .font(.system(size: 12))
+                        .font(.system(size: 13))
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
