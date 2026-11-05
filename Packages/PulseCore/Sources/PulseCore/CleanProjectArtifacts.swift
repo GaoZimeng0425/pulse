@@ -163,7 +163,6 @@ public enum ProjectArtifactMatcher {
             // 扫描根本身是一个项目:只认直接产物子目录(DFS 会把子项目的产物全吞进来)。
             appendArtifacts(
                 ofDirectChildrenOf: rootNode,
-                project: rootNode,
                 rulesByName: rulesByName,
                 excluded: excludedPathPrefixes,
                 fileExists: fileExists,
@@ -176,7 +175,6 @@ public enum ProjectArtifactMatcher {
                 while let node = stack.popLast() {
                     appendArtifacts(
                         ofDirectChildrenOf: node,
-                        project: project,
                         rulesByName: rulesByName,
                         excluded: excludedPathPrefixes,
                         fileExists: fileExists,
@@ -196,9 +194,13 @@ public enum ProjectArtifactMatcher {
     }
 
     /// 一个目录的直接子项里命中规则的 → 候选;零字节非部分不列(与 04 同款噪音纪律)。
+    ///
+    /// projectName 用 `node.name`(产物的**直接父目录**),不用 DFS 顶层项目名
+    /// (用户实报 2026-11-05:worktree 里的 node_modules 全标了主项目名,
+    /// 同组冒出三个同名行)。monorepo 场景同理:packages/app1/node_modules
+    /// 归 "app1" 不归 monorepo 顶层。年龄也按直接父目录算,口径一致。
     private static func appendArtifacts(
         ofDirectChildrenOf node: SpaceNode,
-        project: SpaceNode,
         rulesByName: [String: ProjectArtifactRule],
         excluded: [String],
         fileExists: (String) -> Bool,
@@ -222,8 +224,8 @@ public enum ProjectArtifactMatcher {
                 allReclaimableAccounting: child.allReclaimableAccounting,
                 rationale: rule.rationale,
                 symbolName: rule.symbolName,
-                projectName: project.name,
-                newestChangeEpoch: projectAge(of: project, rulesByName: rulesByName)
+                projectName: node.name,
+                newestChangeEpoch: projectAge(of: node, rulesByName: rulesByName)
             ))
         }
     }
