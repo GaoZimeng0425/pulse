@@ -370,8 +370,9 @@ final class CleanerModel {
                 category: "Cleaner"
             )
             // 落盘缓存(票 11):写一次,失败只记日志不影响扫描结果;体积/耗时实测
-            // 见票面(真机 60 万节点 Release 基准)。
-            if let scanCache {
+            // 见票面(真机 60 万节点 Release 基准)。取消的扫描是半棵树,不落盘——
+            // 否则覆盖掉上一份完整缓存,重开看到残缺地图(cleaner-hardening/04)。
+            if let scanCache, !result.cancelled {
                 let started = await MainActor.run { self?.scanStartedAt ?? Date() }
                 let excluded = await MainActor.run { self?.exclusions.paths ?? [] }
                 let meta = SpaceScanMeta(

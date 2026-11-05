@@ -576,6 +576,44 @@ final class CleanerModelTests: XCTestCase {
         XCTAssertFalse(second.loadedFromCache)
     }
 
+    /// 取消的扫描是半棵树:不得覆盖上一份完整缓存(cleaner-hardening/04)。
+    func testCancelledScanDoesNotOverwriteCache() async {
+        final class SaveCounter: @unchecked Sendable {
+            private let lock = NSLock()
+            private var count = 0
+            func bump() {
+                lock.withLock { count += 1 }
+            }
+
+            var value: Int {
+                lock.withLock { count }
+            }
+        }
+        // 每进一个目录慢 50ms:保证取消落在扫描中途。
+        actor SlowEnumerator: CleanDirectoryEnumerator {
+            let inner: FakeCleanDirectoryEnumerator
+            init(_ inner: FakeCleanDirectoryEnumerator) {
+                self.inner = inner
+            }
+
+            func entries(ofDirectory path: String) async throws -> [FsEntrySnapshot] {
+                try? await Task.sleep(nanoseconds: 50_000_000)
+                return try await inner.entries(ofDirectory: path)
+            }
+        }
+        let saves = SaveCounter()
+        let cache = CleanScanResultStore(load: { nil }, save: { _ in saves.bump() })
+        let model = CleanerModel(
+            exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
+            scanCache: cache,
+            homeDirectory: "/Users/me"
+        )
+        model.startScan(using: SlowEnumerator(makeCacheFixture()))
+        model.cancelScan()
+        await waitUntil { !model.isScanning }
+        XCTAssertEqual(saves.value, 0, "取消的扫描不落盘")
+    }
+
     func testCacheStalenessHintWhenExclusionsChangedAfterScan() async {
         final class Box: @unchecked Sendable {
             private let lock = NSLock()

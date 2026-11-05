@@ -151,6 +151,30 @@ final class SpaceScanCacheTests: XCTestCase {
         XCTAssertNil(SpaceScanCache.decode(trailing))
     }
 
+    /// 计数字段被篡改成负数 / 天文数字:必须 nil,不许 Range 崩溃或预留爆内存
+    /// (cleaner-hardening/04)。空树载荷的末字节恰是树计数 varint。
+    func testCorruptedCountFieldReturnsNilInsteadOfCrashing() {
+        let payload = SpaceScanCachePayload(
+            meta: SpaceScanMeta(
+                startedAt: Date(timeIntervalSince1970: 0),
+                finishedAt: Date(timeIntervalSince1970: 1),
+                roots: [],
+                excludedPathPrefixes: []
+            ),
+            result: SpaceScanResult(trees: [], ledger: [], stats: ScanStats(), cancelled: false)
+        )
+        let full = SpaceScanCache.encode(payload)
+        XCTAssertEqual(full.last, 0x00, "夹具前提:末字节 = 树计数 0")
+
+        var negative = full
+        negative[negative.count - 1] = 0x01 // zigzag → -1
+        XCTAssertNil(SpaceScanCache.decode(negative), "负计数")
+
+        var huge = full.dropLast()
+        huge.append(contentsOf: [0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x10]) // zigzag → 2^42
+        XCTAssertNil(SpaceScanCache.decode(Data(huge)), "超出剩余字节的计数")
+    }
+
     func testEmptyResultRoundtrips() {
         let payload = SpaceScanCachePayload(
             meta: SpaceScanMeta(

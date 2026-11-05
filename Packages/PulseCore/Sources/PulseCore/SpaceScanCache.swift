@@ -172,9 +172,9 @@ public enum SpaceScanCache {
         stats.doubleVisitSkips = Int(doubleVisitSkips)
         stats.accountedBytes = accounted
 
-        guard let ledgerCount = r.varint() else { return nil }
+        guard let ledgerCount = r.count() else { return nil }
         var ledger: [CleanEnumerateError] = []
-        ledger.reserveCapacity(Int(ledgerCount))
+        ledger.reserveCapacity(ledgerCount)
         for _ in 0 ..< ledgerCount {
             guard let path = r.string(), let tag = r.u8() else { return nil }
             let reason: CleanEnumerateFailure
@@ -192,9 +192,9 @@ public enum SpaceScanCache {
             ledger.append(CleanEnumerateError(path: path, reason: reason))
         }
 
-        guard let treeCount = r.varint() else { return nil }
+        guard let treeCount = r.count() else { return nil }
         var trees: [SpaceNode] = []
-        trees.reserveCapacity(Int(treeCount))
+        trees.reserveCapacity(treeCount)
         for _ in 0 ..< treeCount {
             guard let tree = decodeNode(parentPath: nil, into: &r) else { return nil }
             trees.append(tree)
@@ -248,7 +248,7 @@ public enum SpaceScanCache {
             let directoryCount = r.varint(),
             let symlinkCount = r.varint(),
             let datalessCount = r.varint(),
-            let childCount = r.varint()
+            let childCount = r.count()
         else { return nil }
 
         let path: String = if let parentPath {
@@ -272,7 +272,7 @@ public enum SpaceScanCache {
             isPartial: flags & 0b0001 != 0,
             newestChangeEpoch: newest
         )
-        node.children.reserveCapacity(Int(childCount))
+        node.children.reserveCapacity(childCount)
         for _ in 0 ..< childCount {
             guard let child = decodeNode(parentPath: path, into: &r) else { return nil }
             node.children.append(child)
@@ -407,15 +407,23 @@ private struct Reader {
         return Int64(bitPattern: sign == 0 ? magnitude : ~magnitude)
     }
 
+    /// 元素计数:非负,且不超过剩余字节数(每个元素至少占 1 字节)——损坏的
+    /// 计数在这里拦成 nil,不让 `0 ..< 负数` 崩溃、也不让天文数字 reserveCapacity
+    /// 吃爆内存(cleaner-hardening/04)。
+    mutating func count() -> Int? {
+        guard let value = varint(), value >= 0, value <= Int64(data.count - offset) else { return nil }
+        return Int(value)
+    }
+
     mutating func string() -> String? {
         guard let length = varint(), length >= 0, let raw = rawBytes(count: Int(length)) else { return nil }
         return String(bytes: raw, encoding: .utf8)
     }
 
     mutating func strings() -> [String]? {
-        guard let count = varint(), count >= 0 else { return nil }
+        guard let count = count() else { return nil }
         var out: [String] = []
-        out.reserveCapacity(Int(count))
+        out.reserveCapacity(count)
         for _ in 0 ..< count {
             guard let value = string() else { return nil }
             out.append(value)
