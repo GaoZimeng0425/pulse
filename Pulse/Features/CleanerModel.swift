@@ -444,6 +444,11 @@ final class CleanerModel {
 
     @ObservationIgnored private var candidatesMemo: (key: CandidatesKey, value: [JunkCandidate])?
 
+    /// 上榜下限:<1MB 的候选不列(2026-11-05 用户实报「0 MB 产物」——清它无收益,
+    /// 纯列表噪音;格式化对 <1GB 只显整 MB,几百 KB 全显示成「0 MB」更误导)。
+    /// 单一闸口在候选装配处:清单 / 头部合计 / 地图「这块能清」/ 计划同源,数字不打架。
+    static let minimumListedBytes: Int64 = 1_000_000
+
     private func computeCandidates(in result: SpaceScanResult, key: CandidatesKey) -> [JunkCandidate] {
         let excluded = key.excluded
         let global = JunkMatcher.candidates(
@@ -460,6 +465,7 @@ final class CleanerModel {
 
         return (global + artifacts)
             .filter { !key.recycled.contains($0.path) }
+            .filter { $0.bytes >= Self.minimumListedBytes }
     }
 
     /// 配置了项目扫描根没有(设置页引导文案与项目产物空态的判据)。

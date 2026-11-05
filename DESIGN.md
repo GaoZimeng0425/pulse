@@ -274,6 +274,14 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   组头 14.5 bold + 总量 12;子页 tab 药丸 = `PillTabBar.comfortable`;**动作按钮与
   「大小|新旧」segmented 一律 B 档**(按钮 `.controlSize(.large)`、seg 默认 regular
   不再 mini);项目子组行 = 14.5 bold、上下距 10、**无背景**(权重靠字号与内距)。
+  **勾选框 = 自绘 `CleanerCheckBox`**(2026-11-05 用户实报系统大号 checkbox 不好看,
+  且此前垃圾页系统框 / 应用页 SF 方块两套并存):20×20 圆角 5、描边 1.5——
+  off = 三级墨色描边空心,on = tint 填充 + 白 checkmark,半选(项目行)= tint
+  填充 + 白 minus,禁用 40% 透明;destructive 场景(彻底删除)tint 取
+  `{colors.state-negative}`。纯显示件,点击语义在宿主行:整行可点即勾,
+  项目行点行 = 全选/全清该项目安全产物,收起/展开只归箭头按钮。
+  **候选 <1MB 不列**(单一闸口 `CleanerModel.minimumListedBytes`,清单/合计/
+  地图/计划同源;格式化对 <1GB 只显整 MB,亚兆条目会显示成「0 MB」)。
 - **清理清单行**(p4-cleaner/04,`CleanerJunkViews.swift`):**舒适密度档**(上行)
   之下的既有配方:行首系统 checkbox(large);行选中底 =
   `{colors.surface-card-high}` 70% + `{rounded.inner}` 10。**安全档 chip**(`TierChip`)=

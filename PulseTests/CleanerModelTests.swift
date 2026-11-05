@@ -88,9 +88,9 @@ final class CleanerModelTests: XCTestCase {
 
     private func makeHomeEnumerator(extra: [String: Int64] = [:]) -> FakeCleanDirectoryEnumerator {
         var dirs: [String: Int64] = [
-            "Library/Developer/Xcode/DerivedData": 28000,
-            "Library/Caches/Homebrew": 3100,
-            "Documents/DerivedData": 9999, // 似是而非:不在白名单
+            "Library/Developer/Xcode/DerivedData": 28_000_000,
+            "Library/Caches/Homebrew": 3_100_000,
+            "Documents/DerivedData": 9_999_000, // 似是而非:不在白名单
         ]
         dirs.merge(extra) { _, new in new }
         return FakeCleanDirectoryEnumerator(listings: CleanFixture.homeListings(home: home, directories: dirs))
@@ -147,7 +147,7 @@ final class CleanerModelTests: XCTestCase {
             return
         }
         XCTAssertTrue(historyRecorded)
-        XCTAssertEqual(report.freedBytes, 28000)
+        XCTAssertEqual(report.freedBytes, 28_000_000)
         XCTAssertTrue(report.failed.isEmpty)
         let calls = await spy.recycleCalls
         XCTAssertEqual(calls, [[derivedPath]], "spy 收到恰好选中的那一条,绝不多")
@@ -157,7 +157,7 @@ final class CleanerModelTests: XCTestCase {
 
         let runs = try await history.runs()
         XCTAssertEqual(runs.count, 1)
-        XCTAssertEqual(runs[0].freedBytes, 28000)
+        XCTAssertEqual(runs[0].freedBytes, 28_000_000)
         let items = try await history.items(runID: runs[0].id)
         XCTAssertEqual(items.map(\.path), [derivedPath], "历史写入与清单内容一致")
         XCTAssertEqual(items[0].outcome, .recycled(destination: home + "/.Trash/DerivedData"))
@@ -264,7 +264,7 @@ final class CleanerModelTests: XCTestCase {
     func testGroupToggleSelectsOnlySafeTierAndCyclesBack() async {
         let model = CleanerModel(trash: FakeCleanTrashExecutor(), homeDirectory: home)
         model.startScan(
-            using: makeHomeEnumerator(extra: ["Library/Caches/JetBrains": 5400]),
+            using: makeHomeEnumerator(extra: ["Library/Caches/JetBrains": 5_400_000]),
             roots: [home]
         )
         await waitUntil { !model.isScanning }
@@ -357,10 +357,10 @@ final class CleanerModelTests: XCTestCase {
         let fake = FakeCleanDirectoryEnumerator(listings: CleanFixture.homeListings(
             home: "/Users/dev",
             directories: [
-                "code/old-app/node_modules": 800,
+                "code/old-app/node_modules": 8_000_000,
                 "code/old-app/src": 10,
-                "code/old-app/target": 300,
-                "code/new-tool/node_modules": 100,
+                "code/old-app/target": 3_000_000,
+                "code/new-tool/node_modules": 1_500_000,
                 "code/new-tool/src": 5,
             ],
             modifiedByDir: [
@@ -398,8 +398,8 @@ final class CleanerModelTests: XCTestCase {
         let fake = FakeCleanDirectoryEnumerator(listings: CleanFixture.homeListings(
             home: "/Users/dev",
             directories: [
-                "code/old-app/node_modules": 800,
-                "code/new-app/node_modules": 400,
+                "code/old-app/node_modules": 8_000_000,
+                "code/new-app/node_modules": 4_000_000,
             ]
         ))
         let oldPath = "/Users/dev/code/old-app/node_modules"
@@ -464,7 +464,7 @@ final class CleanerModelTests: XCTestCase {
         )
         let fake = FakeCleanDirectoryEnumerator(listings: CleanFixture.homeListings(
             home: "/Users/dev",
-            directories: ["code/a/node_modules": 800, "code/b/node_modules": 400]
+            directories: ["code/a/node_modules": 8_000_000, "code/b/node_modules": 4_000_000]
         ))
         model.startScan(using: fake, roots: ["/Users/dev"])
         await waitUntil { !model.isScanning }
@@ -532,7 +532,7 @@ final class CleanerModelTests: XCTestCase {
                 CleanFixture.directory("Homebrew", fileID: 703),
             ]),
             "/System/Volumes/Data/Users/me/Library/Caches/Homebrew": .entries([
-                CleanFixture.file("b.bin", allocated: 512, reclaimable: 512),
+                CleanFixture.file("b.bin", allocated: 1_500_000, reclaimable: 1_500_000),
             ]),
         ])
         let model = CleanerModel(homeDirectory: "/Users/me")
@@ -541,6 +541,27 @@ final class CleanerModelTests: XCTestCase {
 
         XCTAssertEqual(model.candidates.map(\.ruleID), ["homebrew.cache"], "规范域树 + 规范家目录:清单不再为空")
         XCTAssertEqual(model.candidates.first?.path, "/Users/me/Library/Caches/Homebrew")
+    }
+
+    /// <1MB 候选不列(2026-11-05 用户实报「0 MB 产物」):单一闸口在候选装配,
+    /// 头部合计/地图/计划同源。
+    func testSubMegabyteCandidatesNotListed() async {
+        let fake = FakeCleanDirectoryEnumerator(listings: CleanFixture.homeListings(
+            home: home,
+            directories: [
+                "Library/Developer/Xcode/DerivedData": 28_000_000,
+                "Library/Caches/Homebrew": 400_000, // <1MB:不列
+            ]
+        ))
+        let model = CleanerModel(trash: FakeCleanTrashExecutor(), homeDirectory: home)
+        model.startScan(using: fake, roots: [home])
+        await waitUntil { !model.isScanning }
+
+        XCTAssertEqual(
+            model.candidates.map(\.ruleID),
+            ["xcode.derivedData"],
+            "亚兆条目不上榜(清它无收益,纯噪音;显示成「0 MB」更误导)"
+        )
     }
 
     // MARK: 扫描结果落盘缓存(p4-cleaner/11)
@@ -564,7 +585,7 @@ final class CleanerModelTests: XCTestCase {
                 CleanFixture.directory("Homebrew", fileID: 804),
             ]),
             "/System/Volumes/Data/Users/me/Library/Caches/Homebrew": .entries([
-                CleanFixture.file("b.bin", allocated: 512, reclaimable: 512),
+                CleanFixture.file("b.bin", allocated: 1_500_000, reclaimable: 1_500_000),
             ]),
         ])
     }

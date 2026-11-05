@@ -45,6 +45,43 @@ enum CleanerListMetrics {
 
     /// 应用行的数值列(valueWidth + 「部分」附标留量;垃圾行不带附标用 valueWidth)。
     static let valueWidthWithMark: CGFloat = valueWidth + 30
+
+    /// 自绘勾选框边长(DESIGN.md §清理页舒适密度档)。
+    static let checkBoxSize: CGFloat = 20
+}
+
+/// 清理页统一勾选框(2026-11-05 用户实报系统大号 checkbox 不好看,自绘替换;
+/// 此前垃圾页用系统框、应用页用 SF 方块,两套并存也不齐):20×20 圆角 5、
+/// 描边 1.5——off = 三级墨色描边空心;on/半选(mixed,项目行)= tint 填充 +
+/// 白勾/白横线;disabled 40% 透明。纯显示件:点击语义在宿主行(整行可点,
+/// 不逼用户点 20pt 小方块)。
+struct CleanerCheckBox: View {
+    enum CheckState {
+        case off
+        case on
+        case mixed
+    }
+
+    let state: CheckState
+    var tint: Color = Metric.disk.accentColor
+    var disabled = false
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(state == .off ? Color.clear : tint)
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .strokeBorder(state == .off ? Surface.inkTertiary : tint, lineWidth: 1.5)
+            Image(systemName: state == .mixed ? "minus" : "checkmark")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+                .opacity(state == .off ? 0 : 1)
+        }
+        .frame(width: CleanerListMetrics.checkBoxSize, height: CleanerListMetrics.checkBoxSize)
+        .opacity(disabled ? 0.4 : 1)
+        .accessibilityLabel(state == .on ? "已勾选" : state == .mixed ? "部分勾选" : "未勾选")
+        .accessibilityHidden(true) // 装饰件:可勾语义由宿主行宣布,避免双朗读
+    }
 }
 
 /// 清单子页(换掉 03 票的占位卡):未扫描给 CTA,扫描中给提示,完成给清单卡。
@@ -219,15 +256,29 @@ private struct JunkListCard: View {
                         let projectSafe = projectGroup.items
                             .filter { $0.tier == .safe && model.inUseReasons(for: $0, entries: activity) == nil }
                         let isCollapsed = collapsedProjects.contains(projectGroup.projectName)
-                        projectHeader(projectGroup, safeItems: projectSafe, isCollapsed: isCollapsed)
-                            .contentShape(.rect)
-                            .onTapGesture {
+                        // 点行语义(2026-11-05 用户实报修正):点项目行 = 全选/全清
+                        // 本项目安全产物(与产物行「点行即勾」同语义);收起/展开
+                        // 只归箭头按钮,不再霸占整行点击。
+                        projectHeader(
+                            projectGroup,
+                            safeItems: projectSafe,
+                            isCollapsed: isCollapsed,
+                            onToggleCollapse: {
                                 if collapsedProjects.contains(projectGroup.projectName) {
                                     collapsedProjects.remove(projectGroup.projectName)
                                 } else {
                                     collapsedProjects.insert(projectGroup.projectName)
                                 }
                             }
+                        )
+                        .contentShape(.rect)
+                        .onTapGesture {
+                            guard !isBusy, !projectSafe.isEmpty else { return }
+                            model.toggleGroup(projectSafe)
+                        }
+                        .help(projectSafe.isEmpty
+                            ? "本项目没有可自动勾选的安全产物(先检查/在用项须逐个手勾);点箭头收起"
+                            : "点行全选/全清本项目的安全产物(先检查与在用项不参与);点箭头收起")
                         if !isCollapsed {
                             ForEach(projectGroup.items) { candidate in
                                 JunkRow(
@@ -336,24 +387,30 @@ private struct JunkListCard: View {
         .padding(.horizontal, CleanerListMetrics.rowInset)
     }
 
-    /// 项目子组行(08):项目名 + 项数/总量/最近活动;子组勾选 = 该项目全部安全产物。
+    /// 项目子组行(08):项目名 + 项数/总量/最近活动;点行 = 全选/全清该项目全部
+    /// 安全产物(勾选框现三态:全选/半选/空),收起/展开只归箭头按钮。
     private func projectHeader(
         _ projectGroup: ProjectJunkGroup,
         safeItems: [JunkCandidate],
-        isCollapsed: Bool
+        isCollapsed: Bool,
+        onToggleCollapse: @escaping () -> Void
     ) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.tertiary)
-                .rotationEffect(.degrees(isCollapsed ? 0 : 90))
-            Toggle("", isOn: .constant(!safeItems.isEmpty && safeItems.allSatisfy { model.isSelected($0) }))
-                .toggleStyle(.checkbox)
-                .controlSize(.large)
-                .labelsHidden()
-                .disabled(safeItems.isEmpty || isBusy)
-                .onTapGesture { model.toggleGroup(safeItems) }
-                .help("勾选本项目全部「可安全清理」且不在用的产物")
+        let selectedCount = safeItems.filter { model.isSelected($0) }.count
+        let checkState: CleanerCheckBox.CheckState = safeItems.isEmpty || selectedCount == 0
+            ? .off
+            : (selectedCount == safeItems.count ? .on : .mixed)
+        return HStack(spacing: 8) {
+            Button(action: onToggleCollapse) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                    .rotationEffect(.degrees(isCollapsed ? 0 : 90))
+                    .frame(width: 18, height: 18)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .help(isCollapsed ? "展开产物清单" : "收起产物清单")
+            CleanerCheckBox(state: checkState, disabled: isBusy || safeItems.isEmpty)
             // 项目行视觉权重 ≥ 产物行(用户实报两次:高度比产物行小 / 不要背景色)——
             // 权重只靠字号 14.5 bold + 上下距 10,无底色。
             Text(projectGroup.projectName)
@@ -501,11 +558,7 @@ private struct JunkRow: View {
                     .foregroundStyle(.tertiary)
                     .help("在用保护:该项目有进程活动,不参与本次清理")
             } else {
-                Toggle("", isOn: Binding(get: { isSelected }, set: { _ in onToggle() }))
-                    .toggleStyle(.checkbox)
-                    .controlSize(.large)
-                    .labelsHidden()
-                    .disabled(disabled)
+                CleanerCheckBox(state: isSelected ? .on : .off, disabled: disabled)
             }
             CategoryIconTile(
                 symbolName: candidate.symbolName,
