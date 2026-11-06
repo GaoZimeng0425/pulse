@@ -29,6 +29,14 @@ final class PulseFormatTests: XCTestCase {
         XCTAssertEqual(PulseFormat.memory(512_000_000), "512 MB")
     }
 
+    func testMemoryBelowOneMBShowsWholeKilobytesRoundedUp() {
+        // 亚兆档(2026-11-06):数百 KB 不再显示成 "0 MB";向上取整,0 如实为 0。
+        XCTAssertEqual(PulseFormat.memory(400_000), "400 KB")
+        XCTAssertEqual(PulseFormat.memory(1000), "1 KB")
+        XCTAssertEqual(PulseFormat.memory(999), "1 KB", "过小但非零:向上取整,不圆整成 0")
+        XCTAssertEqual(PulseFormat.memory(0), "0 KB")
+    }
+
     func testMemoryAtOneGBOrAboveShowsSingleDecimalGB() {
         XCTAssertEqual(PulseFormat.memory(1_000_000_000), "1.0 GB")
         XCTAssertEqual(PulseFormat.memory(2_400_000_000), "2.4 GB")
@@ -47,11 +55,11 @@ final class PulseFormatTests: XCTestCase {
         XCTAssertEqual(mb.unit, "MB")
     }
 
-    func testMemoryFigureOfZeroSplitsIntoZeroAndMB() {
-        // 零内存:"0" + "MB"(空态由调用方先兜底,这里只钉不崩、可拆)。
+    func testMemoryFigureOfZeroSplitsIntoZeroAndKB() {
+        // 零内存:"0" + "KB"(空态由调用方先兜底,这里只钉不崩、可拆;亚兆档后零落 KB)。
         let zero = PulseFormat.memoryFigure(0)
         XCTAssertEqual(zero.value, "0")
-        XCTAssertEqual(zero.unit, "MB")
+        XCTAssertEqual(zero.unit, "KB")
     }
 
     // MARK: uptime(工单 06:启动时长,"已 25 分钟")

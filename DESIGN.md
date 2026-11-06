@@ -280,8 +280,11 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   填充 + 白 minus,禁用 40% 透明;destructive 场景(彻底删除)tint 取
   `{colors.state-negative}`。纯显示件,点击语义在宿主行:整行可点即勾,
   项目行点行 = 全选/全清该项目安全产物,收起/展开只归箭头按钮。
-  **候选 <1MB 不列**(单一闸口 `CleanerModel.minimumListedBytes`,清单/合计/
-  地图/计划同源;格式化对 <1GB 只显整 MB,亚兆条目会显示成「0 MB」)。
+  **候选不过滤亚兆条目**(2026-11-06 用户拍板:0 KB 的产物也是该清的东西,
+  照列;`memory()` 补 KB 档给真实读数,不再显示成「0 MB」)。**产物行副标一律
+  显示完整路径**(同名 node_modules/build 靠路径区分,中段省略;rationale 每行
+  同文案零信息量,降为行悬停 + TierChip 悬停自解释档位)。项目行无可自动勾选项时
+  给**可见**原因:全在用 = 锁图标、全为先检查 = 灰 chip「须逐个勾」。
 - **清理清单行**(p4-cleaner/04,`CleanerJunkViews.swift`):**舒适密度档**(上行)
   之下的既有配方:行首系统 checkbox(large);行选中底 =
   `{colors.surface-card-high}` 70% + `{rounded.inner}` 10。**安全档 chip**(`TierChip`)=

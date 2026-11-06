@@ -543,14 +543,14 @@ final class CleanerModelTests: XCTestCase {
         XCTAssertEqual(model.candidates.first?.path, "/Users/me/Library/Caches/Homebrew")
     }
 
-    /// <1MB 候选不列(2026-11-05 用户实报「0 MB 产物」):单一闸口在候选装配,
-    /// 头部合计/地图/计划同源。
-    func testSubMegabyteCandidatesNotListed() async {
+    /// 亚兆候选照列(2026-11-06 用户拍板:0 KB 的产物/缓存也是该清的东西;
+    /// 曾误加 <1MB 上榜下限,同日撤销——显示层走 memory() KB 档给真实读数)。
+    func testSubMegabyteCandidatesStillListed() async {
         let fake = FakeCleanDirectoryEnumerator(listings: CleanFixture.homeListings(
             home: home,
             directories: [
                 "Library/Developer/Xcode/DerivedData": 28_000_000,
-                "Library/Caches/Homebrew": 400_000, // <1MB:不列
+                "Library/Caches/Homebrew": 400_000, // 亚兆:照列
             ]
         ))
         let model = CleanerModel(trash: FakeCleanTrashExecutor(), homeDirectory: home)
@@ -559,8 +559,8 @@ final class CleanerModelTests: XCTestCase {
 
         XCTAssertEqual(
             model.candidates.map(\.ruleID),
-            ["xcode.derivedData"],
-            "亚兆条目不上榜(清它无收益,纯噪音;显示成「0 MB」更误导)"
+            ["xcode.derivedData", "homebrew.cache"],
+            "亚兆条目不上榜的旧下限不得回潮"
         )
     }
 

@@ -255,6 +255,15 @@ private struct JunkListCard: View {
                     ForEach(ProjectJunkGrouping.group(items)) { projectGroup in
                         let projectSafe = projectGroup.items
                             .filter { $0.tier == .safe && model.inUseReasons(for: $0, entries: activity) == nil }
+                        // 无可自动勾选项时把原因摆到脸上(2026-11-06 用户实报
+                        // 「点了项目没勾上」像个坏按钮):全在用 → 项目行换锁;
+                        // 全为先检查 → 项目行挂「须逐个勾」灰 chip。
+                        let allInUse = !projectGroup.items.isEmpty && projectGroup.items.allSatisfy {
+                            model.inUseReasons(for: $0, entries: activity) != nil
+                        }
+                        let selectionHint: ProjectSelectionHint = allInUse
+                            ? .inUse
+                            : (projectSafe.isEmpty ? .manualOnly : .normal)
                         let isCollapsed = collapsedProjects.contains(projectGroup.projectName)
                         // 点行语义(2026-11-05 用户实报修正):点项目行 = 全选/全清
                         // 本项目安全产物(与产物行「点行即勾」同语义);收起/展开
@@ -262,6 +271,7 @@ private struct JunkListCard: View {
                         projectHeader(
                             projectGroup,
                             safeItems: projectSafe,
+                            selectionHint: selectionHint,
                             isCollapsed: isCollapsed,
                             onToggleCollapse: {
                                 if collapsedProjects.contains(projectGroup.projectName) {
@@ -389,9 +399,11 @@ private struct JunkListCard: View {
 
     /// 项目子组行(08):项目名 + 项数/总量/最近活动;点行 = 全选/全清该项目全部
     /// 安全产物(勾选框现三态:全选/半选/空),收起/展开只归箭头按钮。
+    /// 无可自动勾选项时给出**可见**原因(2026-11-06):在用 → 锁;全为先检查 → 灰 chip。
     private func projectHeader(
         _ projectGroup: ProjectJunkGroup,
         safeItems: [JunkCandidate],
+        selectionHint: ProjectSelectionHint,
         isCollapsed: Bool,
         onToggleCollapse: @escaping () -> Void
     ) -> some View {
@@ -410,7 +422,14 @@ private struct JunkListCard: View {
             }
             .buttonStyle(.plain)
             .help(isCollapsed ? "展开产物清单" : "收起产物清单")
-            CleanerCheckBox(state: checkState, disabled: isBusy || safeItems.isEmpty)
+            if selectionHint == .inUse {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.tertiary)
+                    .help("在用保护:该项目此刻有进程活动(终端/构建),不参与本次清理")
+            } else {
+                CleanerCheckBox(state: checkState, disabled: isBusy || safeItems.isEmpty)
+            }
             // 项目行视觉权重 ≥ 产物行(用户实报两次:高度比产物行小 / 不要背景色)——
             // 权重只靠字号 14.5 bold + 上下距 10,无底色。
             Text(projectGroup.projectName)
@@ -420,10 +439,26 @@ private struct JunkListCard: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
+            if selectionHint == .manualOnly {
+                Text("须逐个勾")
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(Surface.inkTertiary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 3)
+                    .background(Surface.inkTertiary.opacity(0.15), in: .capsule)
+                    .help("本项目的产物都是「先检查」档(如 build 目录可能藏源码)——安全规则不许自动勾选,逐个看过再手勾")
+            }
             Spacer(minLength: 8)
         }
         .padding(.vertical, 10)
         .padding(.horizontal, CleanerListMetrics.rowInset)
+    }
+
+    /// 项目行的自动勾选可用性(可见原因,2026-11-06)。
+    private enum ProjectSelectionHint {
+        case normal
+        case inUse
+        case manualOnly
     }
 
     /// 「2 项 · 3.2 GB · 3 天前动过」;活动时间未知如实省略,不编。
@@ -570,7 +605,9 @@ private struct JunkRow: View {
                 Text(candidate.title)
                     .font(.system(size: CleanerListMetrics.titleFontSize, weight: .medium))
                     .lineLimit(1)
-                Text(indented ? candidate.rationale : subtitle)
+                // 副标一律显示路径(2026-11-06 用户实报:同名 node_modules/build 无法
+                // 区分"是不是同一个目录")——rationale 每行同文案零信息量,降为悬停。
+                Text(subtitle)
                     .font(.system(size: CleanerListMetrics.subFontSize))
                     .foregroundStyle(indented ? .tertiary : .secondary)
                     .lineLimit(1)
@@ -682,6 +719,11 @@ struct TierChip: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 3)
             .background(tint.opacity(0.15), in: .capsule)
+            // 档位人话(2026-11-06 用户实报「先检查是什么意思」):chip 自己解释自己,
+            // 不用翻 GLOSSARY;行悬停另有该条规则的具体 rationale。
+            .help(tier == .safe
+                ? "白名单担保过:重建即可或无个人数据,删了不影响使用"
+                : "大概率能删,但删前看一眼——这类目录可能藏着要保留的东西(如 build 下可能有源码、JetBrains 缓存含 Local History)。安全规则:永不进自动勾选,须逐个手勾")
     }
 }
 
