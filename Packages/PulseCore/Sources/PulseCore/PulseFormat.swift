@@ -16,7 +16,9 @@ public enum PulseFormat {
     }
 
     /// 字节 → 人类可读内存:十进制单位(与活动监视器一致)。
-    /// <1 GB 显示整 MB("512 MB");≥1 GB 保留一位小数("2.4 GB")。
+    /// ≥1 GB 一位小数("2.4 GB");≥1 MB 整 MB("512 MB");亚兆整 KB 向上取整
+    /// ("400 KB",2026-11-06 用户实报「0 MB 产物」——数百 KB 曾全显示成 "0 MB");
+    /// 0 = "0 KB"。
     public static func memory(_ bytes: UInt64) -> String {
         let gb = Double(bytes) / 1_000_000_000
         if gb >= 1 {
@@ -24,7 +26,11 @@ public enum PulseFormat {
             let tenths = Int((gb * 10).rounded())
             return "\(tenths / 10).\(tenths % 10) GB"
         }
-        return "\(bytes / 1_000_000) MB"
+        let mb = bytes / 1_000_000
+        if mb >= 1 {
+            return "\(mb) MB"
+        }
+        return "\((bytes + 999) / 1000) KB"
     }
 
     /// 内存大数字与单位分层(工单 P0.6-03,内存 tab 组卡):("2.4", "GB")——
