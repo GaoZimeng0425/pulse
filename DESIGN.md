@@ -96,6 +96,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{colors.state-positive}` | `Surface.positive` | ✓正常、充电中 |
 | `{colors.state-warning}` | `Surface.warning`(= Disk 指标色别名) | 压力偏高、优化充电介入、触发中告警横幅(琥珀语义) |
 | `{colors.state-caution}` | `Surface.caution` | 清理档位「先检查」chip(p4-uninstaller/08 立项:清理页 accent 即磁盘金,warning 别名与它全页撞色,故独立琥珀橙;不用于负载/告警) |
+| `{colors.accent-clean}` | `Surface.cleanAccent` | 清理页专属强调(2026-11-06 用户拍板 Teal;此前借磁盘金被评丑、指标色是 tab 身份色不跨页借):清理页主按钮 / 排序选中段 / 勾选框选中 / 选中条目卡底 / 子页药丸统一取此 |
 | `{colors.category-*}` | `GroupCategory.identityColor` | 非 App 组的图标瓦片底色;孤儿另作组行强调色(见下) |
 | `{colors.state-negative}` | `Surface.negative` | 高负载、紧张、结束进程等负面偏差 |
 | `{colors.state-inactive}` | `Surface.inactive` | 行首状态点的"停 / 未连接"态(容器未运行、蓝牙设备未连接);亮起态取所在页指标色(p2-review/03 入表) |
@@ -280,6 +281,11 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   填充 + 白 minus,禁用 40% 透明;destructive 场景(彻底删除)tint 取
   `{colors.state-negative}`。纯显示件,点击语义在宿主行:整行可点即勾,
   项目行点行 = 全选/全清该项目安全产物,收起/展开只归箭头按钮。
+  **2026-11-06 二次改版**:条目 = 小卡(`{colors.surface-card-high}` 底、
+  `{rounded.card-compact}` 12、卡间距 4;选中 = accent-clean 12% 染底);组头标题
+  16 bold + 总量在左,右侧 = 「全选安全项」+ 大小|新旧 seg(seg tint accent-clean);
+  组与组之间 18;项目产物 = **纯缩进层级**(产物卡整体右移 28,去三角箭头/去收起,
+  用户拍板「不要三角展开组件」);清理页强调色 = `{colors.accent-clean}`。
   **候选不过滤亚兆条目**(2026-11-06 用户拍板:0 KB 的产物也是该清的东西,
   照列;`memory()` 补 KB 档给真实读数,不再显示成「0 MB」)。**产物行副标一律
   显示完整路径**(同名 node_modules/build 靠路径区分,中段省略;rationale 每行

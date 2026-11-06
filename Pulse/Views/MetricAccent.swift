@@ -42,6 +42,11 @@ enum Surface {
     /// 「先检查」档位专用(DESIGN.md state-caution;p4-uninstaller/08):
     /// warning 是磁盘金别名,在清理页与 accent 全页撞色,档位语义需独立琥珀。
     static let caution = Color.dynamic(light: 0xD95926, dark: 0xEB6834)
+    /// 清理页专属强调色(`{colors.accent-clean}`,2026-11-06 用户拍板 Teal):
+    /// 此前借磁盘金被评「丑」,且指标色是各 tab 的身份色不宜跨页借——清理页的
+    /// 主按钮 / 排序选中段 / 勾选框选中 / 选中卡片底 / 子页药丸统一取此令牌。
+    /// 青 = 回收焕新语义;与十指标色拉得开(蓝牙青偏蓝、网络绿偏绿)。
+    static let cleanAccent = Color.dynamic(light: 0x0D9488, dark: 0x35C4B5)
     /// 状态点"停 / 未连接"(`{colors.state-inactive}`,p2-review/03 入表):系统 secondary
     /// 降到 40%——与亮起态的指标色点成对,不是文字层级,所以单立令牌而非用 `.tertiary`。
     /// 容器行(未运行)与蓝牙设备行(未连接)共用。
