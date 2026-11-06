@@ -30,8 +30,11 @@ enum CleanerListMetrics {
     static let meterWidth: CGFloat = 130
     static let rowVerticalPadding: CGFloat = 14
     static let chipFontSize: CGFloat = 11.5
-    /// 项目产物卡的缩进量(2026-11-06 纯缩进式层级,去箭头后靠缩进表达归属)。
+    /// 项目产物子项在项目大卡**内部**的缩进量(2026-11-06 三次拍板:大卡包含子项,
+    /// 子项只缩进不套小卡)。
     static let indentLeading: CGFloat = 28
+    /// 卡内裸行(项目产物子项)的上下内距——比独立小卡收一档,卡内更紧凑。
+    static let bareRowVerticalPadding: CGFloat = 10
 
     /// 数值**定宽列**(排行同法:按最宽现实读数以实际绘制字体量宽 + 2;
     /// 清理读数上限 "999.9 GB")。同卡各行同一竖线,不许按内容撑宽。
@@ -255,19 +258,23 @@ private struct JunkListCard: View {
                             flashGroup == group ? accent.opacity(0.12) : Color.clear
                         )
                     if group == .projectArtifacts {
-                        // 按项目分子组(同 projectName 聚合):项目卡(点卡片展开/收起,
-                        // 点勾选框全选)+ 缩进的产物卡(2026-11-06 二次拍板)。
+                        // 按项目分子组(同 projectName 聚合):一张大卡装头排 + 缩进的
+                        // 裸行子项(2026-11-06 三次拍板)。
                         ForEach(ProjectJunkGrouping.group(items)) { projectGroup in
-                            // 项目级勾选口径(2026-11-06 用户修订拍板):吃该项目全部
-                            // **非在用**子项(含「先检查」——父级状态如实反映子项;
-                            // 组头「全选安全项」仍只吃安全档,两层口径各司其职)。
-                            let selectable = projectGroup.items
+                            // 项目级勾选两层口径(2026-11-06 用户连续拍板):
+                            // 状态 = 反映全部非在用子项(手勾的「先检查」也算数,父级
+                            // 如实显示半选/全选);动作 = 只全选/全清**安全档**子项
+                            // ——没有安全项可勾(纯先检查/纯在用)时 checkbox 置灰
+                            // 不给假按钮。
+                            let nonInUse = projectGroup.items
                                 .filter { model.inUseReasons(for: $0, entries: activity) == nil }
-                            let allInUse = !projectGroup.items.isEmpty && selectable.isEmpty
+                            let autoSelectable = nonInUse.filter { $0.tier == .safe }
+                            let allInUse = !projectGroup.items.isEmpty && nonInUse.isEmpty
                             let isCollapsed = collapsedProjects.contains(projectGroup.projectName)
                             projectCard(
                                 projectGroup,
-                                selectable: selectable,
+                                stateItems: nonInUse,
+                                autoSelectable: autoSelectable,
                                 allInUse: allInUse,
                                 isCollapsed: isCollapsed,
                                 onToggleCollapse: {
@@ -277,8 +284,7 @@ private struct JunkListCard: View {
                                         collapsedProjects.insert(projectGroup.projectName)
                                     }
                                 }
-                            )
-                            if !isCollapsed {
+                            ) {
                                 ForEach(projectGroup.items) { candidate in
                                     JunkRow(
                                         candidate: candidate,
@@ -388,59 +394,73 @@ private struct JunkListCard: View {
         .padding(.horizontal, CleanerListMetrics.rowInset)
     }
 
-    /// 项目子组卡(2026-11-06 二次拍板):与条目同款卡片,点卡片 = 展开/收起缩进的
-    /// 产物;点勾选框 = 全选/全清该项目全部**非在用**子项(含「先检查」,用户修订
-    /// 拍板——父级勾选态如实反映子项;全选态整卡染强调色)。全在用 → 勾选位换锁。
+    /// 项目大卡(2026-11-06 三次拍板:「项目产物应该是一个大卡片,包含住子项!
+    /// 子项只有缩进!」):一张 card-hi 大卡装头排 + 全部产物子项——子项是卡内
+    /// 裸行(JunkRow indented),只缩进不套小卡。点头排 = 展开/收起。
+    /// 勾选两层口径(同日连续拍板):**状态** = 反映全部非在用子项(手勾的
+    /// 「先检查」也算数,父级如实显示半选/全选);**动作** = 只全选/全清安全档
+    /// 子项——没有安全项可勾(纯先检查)时 checkbox 置灰,不给假按钮。全在用 → 换锁。
     private func projectCard(
         _ projectGroup: ProjectJunkGroup,
-        selectable: [JunkCandidate],
+        stateItems: [JunkCandidate],
+        autoSelectable: [JunkCandidate],
         allInUse: Bool,
         isCollapsed: Bool,
-        onToggleCollapse: @escaping () -> Void
+        onToggleCollapse: @escaping () -> Void,
+        @ViewBuilder children: () -> some View
     ) -> some View {
-        let selectedCount = selectable.filter { model.isSelected($0) }.count
-        let checkState: CleanerCheckBox.CheckState = selectable.isEmpty || selectedCount == 0
+        let selectedCount = stateItems.filter { model.isSelected($0) }.count
+        let checkState: CleanerCheckBox.CheckState = stateItems.isEmpty || selectedCount == 0
             ? .off
-            : (selectedCount == selectable.count ? .on : .mixed)
-        return HStack(spacing: 8) {
-            if allInUse {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.tertiary)
-                    .help("在用保护:该项目此刻有进程活动(终端/构建),不参与本次清理")
-            } else {
-                Button {
-                    guard !isBusy, !selectable.isEmpty else { return }
-                    model.toggleGroup(selectable)
-                } label: {
-                    CleanerCheckBox(state: checkState, disabled: isBusy || selectable.isEmpty)
+            : (selectedCount == stateItems.count ? .on : .mixed)
+        return VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 8) {
+                if allInUse {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.tertiary)
+                        .help("在用保护:该项目此刻有进程活动(终端/构建),不参与本次清理")
+                } else {
+                    Button {
+                        guard !isBusy, !autoSelectable.isEmpty else { return }
+                        model.toggleGroup(autoSelectable)
+                    } label: {
+                        // 置灰判据 = 没有安全档可自动勾(纯先检查);状态照常显示
+                        // (手勾先检查后父级仍如实半选/全选,只是不可点)。
+                        CleanerCheckBox(state: checkState, disabled: isBusy || autoSelectable.isEmpty)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isBusy || autoSelectable.isEmpty)
+                    .help(autoSelectable.isEmpty
+                        ? "本项目没有「可安全清理」产物——「先检查」项不进自动勾选,逐个手勾(手动勾选后这里会如实显示)"
+                        : "全选/全清本项目「可安全清理」产物;「先检查」项不进自动勾选,须逐个手勾(手勾后父级如实显示)")
                 }
-                .buttonStyle(.plain)
-                .help("全选/全清本项目可清产物(含「先检查」项,删前确认单会再列一遍)")
+                Text(projectGroup.projectName)
+                    .font(.system(size: 14.5, weight: .bold))
+                    .lineLimit(1)
+                Text(projectMeta(projectGroup))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                    .rotationEffect(.degrees(isCollapsed ? 0 : 90))
             }
-            Text(projectGroup.projectName)
-                .font(.system(size: 14.5, weight: .bold))
-                .lineLimit(1)
-            Text(projectMeta(projectGroup))
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-            Spacer(minLength: 8)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.tertiary)
-                .rotationEffect(.degrees(isCollapsed ? 0 : 90))
+            .padding(.leading, CleanerListMetrics.rowInset)
+            .padding(.trailing, CleanerListMetrics.rowInset)
+            .padding(.top, CleanerListMetrics.rowVerticalPadding)
+            .padding(.bottom, isCollapsed ? CleanerListMetrics.rowVerticalPadding : 4)
+            .contentShape(.rect)
+            .onTapGesture(perform: onToggleCollapse)
+            .help(isCollapsed ? "点击展开产物清单" : "点击收起产物清单")
+            if !isCollapsed {
+                children()
+                    .padding(.bottom, 6)
+            }
         }
-        .padding(.leading, CleanerListMetrics.rowInset)
-        .padding(.trailing, CleanerListMetrics.rowInset)
-        .padding(.vertical, CleanerListMetrics.rowVerticalPadding)
-        .background(
-            checkState == .on ? accent.opacity(0.12) : Surface.cardHigh,
-            in: .rect(cornerRadius: 12)
-        )
-        .contentShape(.rect)
-        .onTapGesture(perform: onToggleCollapse)
-        .help(isCollapsed ? "点击展开产物清单" : "点击收起产物清单")
+        .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
     }
 
     /// 「2 项 · 3.2 GB · 3 天前动过」;活动时间未知如实省略,不编。
@@ -560,7 +580,9 @@ private struct JunkRow: View {
     let disabled: Bool
     let onToggle: () -> Void
     let onExclude: () -> Void
-    /// 项目产物行(08):挂在项目子组下,缩进 + 副标改 rationale 人话。
+    /// 项目产物行:住在项目大卡**内部**,只缩进不套小卡(2026-11-06 三次拍板:
+    /// 「项目产物应该是一个大卡片,包含住子项!子项只有缩进!」);工具缓存行
+    /// (`indented == false`)保持独立小卡。
     var indented: Bool = false
 
     private var isInUse: Bool {
@@ -568,6 +590,47 @@ private struct JunkRow: View {
     }
 
     var body: some View {
+        rowContent
+            .padding(.leading, indented ? CleanerListMetrics.indentLeading : CleanerListMetrics.rowInset)
+            .padding(.trailing, CleanerListMetrics.rowInset)
+            .padding(
+                .vertical,
+                indented ? CleanerListMetrics.bareRowVerticalPadding : CleanerListMetrics.rowVerticalPadding
+            )
+            .opacity(isInUse ? 0.55 : 1)
+            .background(rowBackground)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if !disabled, !isInUse {
+                    onToggle()
+                }
+            }
+            .contextMenu {
+                Button("排除此目录(不再扫描、不再出现)") {
+                    onExclude()
+                }
+                Button("在 Finder 中显示") {
+                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: candidate.path)])
+                }
+            }
+            .help(isInUse ? "在用保护 · \(inUseReasons?.title ?? "")正在此项目——判定不缓存,删除前会重查" : candidate.rationale)
+    }
+
+    @ViewBuilder private var rowBackground: some View {
+        if indented {
+            // 卡内裸行:无卡底,选中给一抹强调色行底(卡里挑得出来)。
+            if isSelected {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(accent.opacity(0.10))
+            }
+        } else {
+            // 独立小卡:常态 card-hi 抬升底,选中 = 强调色 12% 染底。
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(isSelected ? accent.opacity(0.12) : Surface.cardHigh)
+        }
+    }
+
+    private var rowContent: some View {
         HStack(spacing: CleanerListMetrics.spacing) {
             if isInUse {
                 Image(systemName: "lock.fill")
@@ -615,32 +678,6 @@ private struct JunkRow: View {
                 .foregroundStyle(.primary)
                 .frame(width: CleanerListMetrics.valueWidth, alignment: .trailing)
         }
-        // 2026-11-06 改版:每个条目一张小卡(拍板「每个 item 应该是一个卡片」)——
-        // 常态 = card-hi 抬升底,选中 = 强调色 12% 染底;缩进产物卡整体右移。
-        .padding(.leading, CleanerListMetrics.rowInset)
-        .padding(.trailing, CleanerListMetrics.rowInset)
-        .padding(.vertical, CleanerListMetrics.rowVerticalPadding)
-        .opacity(isInUse ? 0.55 : 1)
-        .background(
-            isSelected ? accent.opacity(0.12) : Surface.cardHigh,
-            in: .rect(cornerRadius: 12)
-        )
-        .padding(.leading, indented ? CleanerListMetrics.indentLeading : 0)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if !disabled, !isInUse {
-                onToggle()
-            }
-        }
-        .contextMenu {
-            Button("排除此目录(不再扫描、不再出现)") {
-                onExclude()
-            }
-            Button("在 Finder 中显示") {
-                NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: candidate.path)])
-            }
-        }
-        .help(isInUse ? "在用保护 · \(inUseReasons?.title ?? "")正在此项目——判定不缓存,删除前会重查" : candidate.rationale)
     }
 
     private var subtitle: String {
