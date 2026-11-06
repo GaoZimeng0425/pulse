@@ -20,7 +20,7 @@ import SwiftUI
 /// `RankingListMetrics` 是紧凑档,弹窗与排行页保持不动,两套不混用。
 enum CleanerListMetrics {
     /// 行内水平内距(组头/项目行/动作条与行对齐;拍板「左右 padding 增加一些」6→12)。
-    static let rowInset: CGFloat = 12
+    static let rowInset: CGFloat = 14
     static let spacing: CGFloat = 10
     static let iconSize: CGFloat = 28
     static let titleFontSize: CGFloat = 14.5
@@ -28,7 +28,7 @@ enum CleanerListMetrics {
     static let subFontSize: CGFloat = 12
     static let valueFontSize: CGFloat = 14.5
     static let meterWidth: CGFloat = 130
-    static let rowVerticalPadding: CGFloat = 10
+    static let rowVerticalPadding: CGFloat = 14
     static let chipFontSize: CGFloat = 11.5
     /// 项目产物卡的缩进量(2026-11-06 纯缩进式层级,去箭头后靠缩进表达归属)。
     static let indentLeading: CGFloat = 28
@@ -138,6 +138,8 @@ private struct JunkListCard: View {
     /// 轻桥落点(p4-uninstaller/05):待定位组;滚动+高亮后自清(同组再跳也能再闪)。
     var pendingGroup: Binding<JunkGroup?> = .constant(nil)
     @State private var flashGroup: JunkGroup?
+    /// 收起的项目产物子组(2026-11-06 二次拍板:项目卡可点击展开/收起;默认全展开)。
+    @State private var collapsedProjects: Set<String> = []
 
     /// 清理页专属强调色(2026-11-06 拍板 Teal):不再借磁盘指标金。
     private var accent: Color {
@@ -253,42 +255,43 @@ private struct JunkListCard: View {
                             flashGroup == group ? accent.opacity(0.12) : Color.clear
                         )
                     if group == .projectArtifacts {
-                        // 按项目分子组(同 projectName 聚合):项目行 + 缩进的产物卡。
+                        // 按项目分子组(同 projectName 聚合):项目卡(点卡片展开/收起,
+                        // 点勾选框全选)+ 缩进的产物卡(2026-11-06 二次拍板)。
                         ForEach(ProjectJunkGrouping.group(items)) { projectGroup in
-                            let projectSafe = projectGroup.items
-                                .filter { $0.tier == .safe && model.inUseReasons(for: $0, entries: activity) == nil }
-                            // 无可自动勾选项时把原因摆到脸上(2026-11-06 用户实报
-                            // 「点了项目没勾上」像个坏按钮):全在用 → 项目行换锁;
-                            // 全为先检查 → 项目行挂「须逐个勾」灰 chip。
-                            let allInUse = !projectGroup.items.isEmpty && projectGroup.items.allSatisfy {
-                                model.inUseReasons(for: $0, entries: activity) != nil
-                            }
-                            let selectionHint: ProjectSelectionHint = allInUse
-                                ? .inUse
-                                : (projectSafe.isEmpty ? .manualOnly : .normal)
-                            // 点行语义(2026-11-05 用户实报修正):点项目行 = 全选/全清
-                            // 本项目安全产物(与产物行「点行即勾」同语义)。
-                            projectHeader(projectGroup, safeItems: projectSafe, selectionHint: selectionHint)
-                                .contentShape(.rect)
-                                .onTapGesture {
-                                    guard !isBusy, !projectSafe.isEmpty else { return }
-                                    model.toggleGroup(projectSafe)
+                            // 项目级勾选口径(2026-11-06 用户修订拍板):吃该项目全部
+                            // **非在用**子项(含「先检查」——父级状态如实反映子项;
+                            // 组头「全选安全项」仍只吃安全档,两层口径各司其职)。
+                            let selectable = projectGroup.items
+                                .filter { model.inUseReasons(for: $0, entries: activity) == nil }
+                            let allInUse = !projectGroup.items.isEmpty && selectable.isEmpty
+                            let isCollapsed = collapsedProjects.contains(projectGroup.projectName)
+                            projectCard(
+                                projectGroup,
+                                selectable: selectable,
+                                allInUse: allInUse,
+                                isCollapsed: isCollapsed,
+                                onToggleCollapse: {
+                                    if collapsedProjects.contains(projectGroup.projectName) {
+                                        collapsedProjects.remove(projectGroup.projectName)
+                                    } else {
+                                        collapsedProjects.insert(projectGroup.projectName)
+                                    }
                                 }
-                                .help(projectSafe.isEmpty
-                                    ? "本项目没有可自动勾选的安全产物(先检查/在用项须逐个手勾)"
-                                    : "点行全选/全清本项目的安全产物(先检查与在用项不参与)")
-                            ForEach(projectGroup.items) { candidate in
-                                JunkRow(
-                                    candidate: candidate,
-                                    leader: candidates.map(\.bytes).max() ?? 0,
-                                    accent: accent,
-                                    isSelected: model.isSelected(candidate),
-                                    inUseReasons: model.inUseReasons(for: candidate, entries: activity),
-                                    disabled: isBusy,
-                                    onToggle: { model.toggle(candidate) },
-                                    onExclude: { model.exclude(candidate.path) },
-                                    indented: true
-                                )
+                            )
+                            if !isCollapsed {
+                                ForEach(projectGroup.items) { candidate in
+                                    JunkRow(
+                                        candidate: candidate,
+                                        leader: candidates.map(\.bytes).max() ?? 0,
+                                        accent: accent,
+                                        isSelected: model.isSelected(candidate),
+                                        inUseReasons: model.inUseReasons(for: candidate, entries: activity),
+                                        disabled: isBusy,
+                                        onToggle: { model.toggle(candidate) },
+                                        onExclude: { model.exclude(candidate.path) },
+                                        indented: true
+                                    )
+                                }
                             }
                         }
                     } else {
@@ -385,30 +388,36 @@ private struct JunkListCard: View {
         .padding(.horizontal, CleanerListMetrics.rowInset)
     }
 
-    /// 项目子组行(2026-11-06 改版:纯缩进式——去三角箭头/去收起,产物恒缩进展示):
-    /// 项目名 + 项数/总量/最近活动;点行 = 全选/全清该项目全部安全产物
-    /// (勾选框三态:全选/半选/空)。无可自动勾选项时给**可见**原因:
-    /// 全在用 → 锁;全为先检查 → 灰 chip「须逐个勾」。
-    private func projectHeader(
+    /// 项目子组卡(2026-11-06 二次拍板):与条目同款卡片,点卡片 = 展开/收起缩进的
+    /// 产物;点勾选框 = 全选/全清该项目全部**非在用**子项(含「先检查」,用户修订
+    /// 拍板——父级勾选态如实反映子项;全选态整卡染强调色)。全在用 → 勾选位换锁。
+    private func projectCard(
         _ projectGroup: ProjectJunkGroup,
-        safeItems: [JunkCandidate],
-        selectionHint: ProjectSelectionHint
+        selectable: [JunkCandidate],
+        allInUse: Bool,
+        isCollapsed: Bool,
+        onToggleCollapse: @escaping () -> Void
     ) -> some View {
-        let selectedCount = safeItems.filter { model.isSelected($0) }.count
-        let checkState: CleanerCheckBox.CheckState = safeItems.isEmpty || selectedCount == 0
+        let selectedCount = selectable.filter { model.isSelected($0) }.count
+        let checkState: CleanerCheckBox.CheckState = selectable.isEmpty || selectedCount == 0
             ? .off
-            : (selectedCount == safeItems.count ? .on : .mixed)
+            : (selectedCount == selectable.count ? .on : .mixed)
         return HStack(spacing: 8) {
-            if selectionHint == .inUse {
+            if allInUse {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 13))
                     .foregroundStyle(.tertiary)
                     .help("在用保护:该项目此刻有进程活动(终端/构建),不参与本次清理")
             } else {
-                CleanerCheckBox(state: checkState, disabled: isBusy || safeItems.isEmpty)
+                Button {
+                    guard !isBusy, !selectable.isEmpty else { return }
+                    model.toggleGroup(selectable)
+                } label: {
+                    CleanerCheckBox(state: checkState, disabled: isBusy || selectable.isEmpty)
+                }
+                .buttonStyle(.plain)
+                .help("全选/全清本项目可清产物(含「先检查」项,删前确认单会再列一遍)")
             }
-            // 项目行视觉权重 ≥ 产物行(用户实报两次:高度比产物行小 / 不要背景色)——
-            // 权重只靠字号 14.5 bold + 上下距 10,无底色。
             Text(projectGroup.projectName)
                 .font(.system(size: 14.5, weight: .bold))
                 .lineLimit(1)
@@ -416,26 +425,22 @@ private struct JunkListCard: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
-            if selectionHint == .manualOnly {
-                Text("须逐个勾")
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundStyle(Surface.inkTertiary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 3)
-                    .background(Surface.inkTertiary.opacity(0.15), in: .capsule)
-                    .help("本项目的产物都是「先检查」档(如 build 目录可能藏源码)——安全规则不许自动勾选,逐个看过再手勾")
-            }
             Spacer(minLength: 8)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.tertiary)
+                .rotationEffect(.degrees(isCollapsed ? 0 : 90))
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, CleanerListMetrics.rowInset)
-    }
-
-    /// 项目行的自动勾选可用性(可见原因,2026-11-06)。
-    private enum ProjectSelectionHint {
-        case normal
-        case inUse
-        case manualOnly
+        .padding(.leading, CleanerListMetrics.rowInset)
+        .padding(.trailing, CleanerListMetrics.rowInset)
+        .padding(.vertical, CleanerListMetrics.rowVerticalPadding)
+        .background(
+            checkState == .on ? accent.opacity(0.12) : Surface.cardHigh,
+            in: .rect(cornerRadius: 12)
+        )
+        .contentShape(.rect)
+        .onTapGesture(perform: onToggleCollapse)
+        .help(isCollapsed ? "点击展开产物清单" : "点击收起产物清单")
     }
 
     /// 「2 项 · 3.2 GB · 3 天前动过」;活动时间未知如实省略,不编。
