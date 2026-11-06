@@ -54,12 +54,12 @@ struct CleanerPageHeader: View {
                     Button("取消扫描") { model.cancelScan() }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.large)
-                        .tint(Metric.disk.accentColor)
+                        .tint(Surface.cleanAccent)
                 } else {
                     Button(model.result == nil ? "扫描整台 Mac" : "重新扫描") { model.startScan() }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.large)
-                        .tint(Metric.disk.accentColor)
+                        .tint(Surface.cleanAccent)
                 }
             }
         }
@@ -120,7 +120,7 @@ struct CleanerTabView: View {
     @State private var pendingJunkGroup: JunkGroup?
 
     private var accent: Color {
-        Metric.disk.accentColor
+        Surface.cleanAccent
     }
 
     var body: some View {

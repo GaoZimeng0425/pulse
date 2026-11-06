@@ -16,7 +16,7 @@ struct AppListSection: View {
     @State private var expanded: Set<String> = []
 
     private var accent: Color {
-        Metric.disk.accentColor
+        Surface.cleanAccent
     }
 
     var body: some View {
@@ -395,7 +395,7 @@ private struct AppRow: View {
         .padding(.vertical, CleanerListMetrics.rowVerticalPadding)
         .background(
             // 选中高亮(原型裁决):点行选中后行底染磁盘色族浅底。
-            isSelected ? Metric.disk.accentColor.opacity(0.1) : Color.clear
+            isSelected ? Surface.cleanAccent.opacity(0.1) : Color.clear
         )
         .opacity(isDimmed ? 0.75 : 1)
         .contentShape(.rect)
@@ -515,7 +515,7 @@ private struct LeftoverDisclosure: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .tint(model.isPermanentDeleteSelected(entry) ? Surface.negative : Metric.disk.accentColor)
+            .tint(model.isPermanentDeleteSelected(entry) ? Surface.negative : Surface.cleanAccent)
             .disabled(model.uninstallPhase == .running)
         }
         .padding(.horizontal, CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading)
@@ -527,7 +527,7 @@ private struct LeftoverDisclosure: View {
         return HStack {
             Text("残留 · \(rows.count) 项 · 共 \(PulseFormat.memory(UInt64(max(0, total)))) · 默认不勾")
                 .font(.system(size: 11.5, weight: .semibold))
-                .foregroundStyle(Metric.disk.accentColor)
+                .foregroundStyle(Surface.cleanAccent)
             Spacer()
             Button("全选残留") {
                 model.selectAllLeftovers(for: entry)
@@ -641,7 +641,7 @@ private struct AppUninstallConfirmSheet: View {
     let onCancel: () -> Void
 
     private var accent: Color {
-        Metric.disk.accentColor
+        Surface.cleanAccent
     }
 
     private struct Row: Identifiable {

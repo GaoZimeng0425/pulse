@@ -30,8 +30,8 @@ enum CleanerListMetrics {
     static let meterWidth: CGFloat = 130
     static let rowVerticalPadding: CGFloat = 10
     static let chipFontSize: CGFloat = 11.5
-    /// 项目产物缩进行 = 行内距 + 图标列(icon 28 + spacing 10)。
-    static let indentLeading: CGFloat = 38
+    /// 项目产物卡的缩进量(2026-11-06 纯缩进式层级,去箭头后靠缩进表达归属)。
+    static let indentLeading: CGFloat = 28
 
     /// 数值**定宽列**(排行同法:按最宽现实读数以实际绘制字体量宽 + 2;
     /// 清理读数上限 "999.9 GB")。同卡各行同一竖线,不许按内容撑宽。
@@ -63,7 +63,7 @@ struct CleanerCheckBox: View {
     }
 
     let state: CheckState
-    var tint: Color = Metric.disk.accentColor
+    var tint: Color = Surface.cleanAccent
     var disabled = false
 
     var body: some View {
@@ -138,11 +138,10 @@ private struct JunkListCard: View {
     /// 轻桥落点(p4-uninstaller/05):待定位组;滚动+高亮后自清(同组再跳也能再闪)。
     var pendingGroup: Binding<JunkGroup?> = .constant(nil)
     @State private var flashGroup: JunkGroup?
-    /// 收起的项目产物子组(用户实报:产物没法收起;默认全展开,点项目行切换)。
-    @State private var collapsedProjects: Set<String> = []
 
+    /// 清理页专属强调色(2026-11-06 拍板 Teal):不再借磁盘指标金。
     private var accent: Color {
-        Metric.disk.accentColor
+        Surface.cleanAccent
     }
 
     private var candidates: [JunkCandidate] {
@@ -237,59 +236,47 @@ private struct JunkListCard: View {
         let byGroup = Dictionary(grouping: candidates, by: \.group)
         // 活动条目每次渲染现查一次(判定永不缓存),行级原因复用同一份。
         let activity = model.currentActivityEntries()
-        return LazyVStack(alignment: .leading, spacing: 2) {
+        // 2026-11-06 改版:每个条目一张小卡(卡间距 4);组与组之间 18 拉开;
+        // 项目产物 = 纯缩进层级(去三角箭头/去收起,拍板「不要三角展开组件」)。
+        return LazyVStack(alignment: .leading, spacing: 18) {
             ForEach(JunkGroup.allCases.filter { byGroup[$0] != nil }, id: \.self) { group in
                 let items = (byGroup[group] ?? []).sortedForDisplay(by: sortMode(for: group))
                 // 组选只吃组内「可安全清理」且**非在用**的项(拍板 B + 在用保护):
                 // 先检查项、在用项都不参与组选,组里没有可勾项就不给按钮。
                 let safeItems = items
                     .filter { $0.tier == .safe && model.inUseReasons(for: $0, entries: activity) == nil }
-                groupHeader(group, items: items, safeItems: safeItems)
-                    .id(group)
-                    .background(
-                        // 轻桥定位高亮(p4-uninstaller/05):跳转落地闪一下,1.5s 自灭。
-                        flashGroup == group ? Metric.disk.accentColor.opacity(0.12) : Color.clear
-                    )
-                if group == .projectArtifacts {
-                    // 08 重设计:按项目分子组(同 projectName 聚合),产物行缩进挂项目下。
-                    ForEach(ProjectJunkGrouping.group(items)) { projectGroup in
-                        let projectSafe = projectGroup.items
-                            .filter { $0.tier == .safe && model.inUseReasons(for: $0, entries: activity) == nil }
-                        // 无可自动勾选项时把原因摆到脸上(2026-11-06 用户实报
-                        // 「点了项目没勾上」像个坏按钮):全在用 → 项目行换锁;
-                        // 全为先检查 → 项目行挂「须逐个勾」灰 chip。
-                        let allInUse = !projectGroup.items.isEmpty && projectGroup.items.allSatisfy {
-                            model.inUseReasons(for: $0, entries: activity) != nil
-                        }
-                        let selectionHint: ProjectSelectionHint = allInUse
-                            ? .inUse
-                            : (projectSafe.isEmpty ? .manualOnly : .normal)
-                        let isCollapsed = collapsedProjects.contains(projectGroup.projectName)
-                        // 点行语义(2026-11-05 用户实报修正):点项目行 = 全选/全清
-                        // 本项目安全产物(与产物行「点行即勾」同语义);收起/展开
-                        // 只归箭头按钮,不再霸占整行点击。
-                        projectHeader(
-                            projectGroup,
-                            safeItems: projectSafe,
-                            selectionHint: selectionHint,
-                            isCollapsed: isCollapsed,
-                            onToggleCollapse: {
-                                if collapsedProjects.contains(projectGroup.projectName) {
-                                    collapsedProjects.remove(projectGroup.projectName)
-                                } else {
-                                    collapsedProjects.insert(projectGroup.projectName)
-                                }
-                            }
+                VStack(alignment: .leading, spacing: 4) {
+                    groupHeader(group, items: items, safeItems: safeItems)
+                        .id(group)
+                        .background(
+                            // 轻桥定位高亮(p4-uninstaller/05):跳转落地闪一下,1.5s 自灭。
+                            flashGroup == group ? accent.opacity(0.12) : Color.clear
                         )
-                        .contentShape(.rect)
-                        .onTapGesture {
-                            guard !isBusy, !projectSafe.isEmpty else { return }
-                            model.toggleGroup(projectSafe)
-                        }
-                        .help(projectSafe.isEmpty
-                            ? "本项目没有可自动勾选的安全产物(先检查/在用项须逐个手勾);点箭头收起"
-                            : "点行全选/全清本项目的安全产物(先检查与在用项不参与);点箭头收起")
-                        if !isCollapsed {
+                    if group == .projectArtifacts {
+                        // 按项目分子组(同 projectName 聚合):项目行 + 缩进的产物卡。
+                        ForEach(ProjectJunkGrouping.group(items)) { projectGroup in
+                            let projectSafe = projectGroup.items
+                                .filter { $0.tier == .safe && model.inUseReasons(for: $0, entries: activity) == nil }
+                            // 无可自动勾选项时把原因摆到脸上(2026-11-06 用户实报
+                            // 「点了项目没勾上」像个坏按钮):全在用 → 项目行换锁;
+                            // 全为先检查 → 项目行挂「须逐个勾」灰 chip。
+                            let allInUse = !projectGroup.items.isEmpty && projectGroup.items.allSatisfy {
+                                model.inUseReasons(for: $0, entries: activity) != nil
+                            }
+                            let selectionHint: ProjectSelectionHint = allInUse
+                                ? .inUse
+                                : (projectSafe.isEmpty ? .manualOnly : .normal)
+                            // 点行语义(2026-11-05 用户实报修正):点项目行 = 全选/全清
+                            // 本项目安全产物(与产物行「点行即勾」同语义)。
+                            projectHeader(projectGroup, safeItems: projectSafe, selectionHint: selectionHint)
+                                .contentShape(.rect)
+                                .onTapGesture {
+                                    guard !isBusy, !projectSafe.isEmpty else { return }
+                                    model.toggleGroup(projectSafe)
+                                }
+                                .help(projectSafe.isEmpty
+                                    ? "本项目没有可自动勾选的安全产物(先检查/在用项须逐个手勾)"
+                                    : "点行全选/全清本项目的安全产物(先检查与在用项不参与)")
                             ForEach(projectGroup.items) { candidate in
                                 JunkRow(
                                     candidate: candidate,
@@ -304,19 +291,19 @@ private struct JunkListCard: View {
                                 )
                             }
                         }
-                    }
-                } else {
-                    ForEach(items) { candidate in
-                        JunkRow(
-                            candidate: candidate,
-                            leader: candidates.map(\.bytes).max() ?? 0,
-                            accent: accent,
-                            isSelected: model.isSelected(candidate),
-                            inUseReasons: model.inUseReasons(for: candidate, entries: activity),
-                            disabled: isBusy,
-                            onToggle: { model.toggle(candidate) },
-                            onExclude: { model.exclude(candidate.path) }
-                        )
+                    } else {
+                        ForEach(items) { candidate in
+                            JunkRow(
+                                candidate: candidate,
+                                leader: candidates.map(\.bytes).max() ?? 0,
+                                accent: accent,
+                                isSelected: model.isSelected(candidate),
+                                inUseReasons: model.inUseReasons(for: candidate, entries: activity),
+                                disabled: isBusy,
+                                onToggle: { model.toggle(candidate) },
+                                onExclude: { model.exclude(candidate.path) }
+                            )
+                        }
                     }
                 }
             }
@@ -342,8 +329,8 @@ private struct JunkListCard: View {
         group == .projectArtifacts ? model.artifactSort : model.toolCacheSort
     }
 
-    /// 组头(08 重设计):组名中性加粗 + 总量 + 排序 seg + 「全选安全项」文字按钮
-    /// (替代突兀的 NSButton 三态 checkbox;语义钉死 = 只勾安全且非在用项)。
+    /// 组头(2026-11-06 改版):组名 16 bold + 总量在左;右侧 = 「全选安全项」+
+    /// 大小|新旧 seg(seg 挪右、tint 清理页强调色与主按钮统一,拍板)。
     private func groupHeader(
         _ group: JunkGroup,
         items: [JunkCandidate],
@@ -352,15 +339,26 @@ private struct JunkListCard: View {
         let sum = items.reduce(Int64(0)) { $0 + $1.bytes }
         return HStack(spacing: 8) {
             Text(group.title)
-                .font(.system(size: 14.5, weight: .bold))
+                .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(.primary)
             Text(PulseFormat.memory(UInt64(max(0, sum))))
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
+            Spacer(minLength: 12)
+            if !safeItems.isEmpty {
+                Button("全选安全项") {
+                    model.toggleGroup(safeItems)
+                }
+                .font(.system(size: 12, weight: .semibold))
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .disabled(isBusy)
+                .help("只勾「可安全清理」且不在用的项;「先检查」与在用保护项永远要你亲手勾")
+            }
             // 大小 ⇄ 新旧(05 拍板;08 扩到两组)。新旧 = 最久未动在前,未知排最后。
-            // seg 走默认 regular(2026-11-05 密度拍板 B 档,不再 mini;不定宽——
-            // 定宽曾把文字挤竖排,自然宽 + fixedSize 即可)。
+            // 2026-11-06 拍板:右侧 + tint 强调色与主按钮统一;默认 regular、
+            // 自然宽(fixedSize;定宽曾把文字挤竖排)。
             Picker(
                 "排序",
                 selection: Binding(
@@ -378,50 +376,29 @@ private struct JunkListCard: View {
                 Text("新旧").tag(JunkSortOrder.age)
             }
             .pickerStyle(.segmented)
+            .tint(accent)
             .fixedSize()
             .labelsHidden()
-            Spacer()
-            if !safeItems.isEmpty {
-                Button("全选安全项") {
-                    model.toggleGroup(safeItems)
-                }
-                .font(.system(size: 12, weight: .semibold))
-                .buttonStyle(.borderless)
-                .foregroundStyle(.secondary)
-                .disabled(isBusy)
-                .help("只勾「可安全清理」且不在用的项;「先检查」与在用保护项永远要你亲手勾")
-            }
         }
         .padding(.top, 8)
         .padding(.bottom, 4)
         .padding(.horizontal, CleanerListMetrics.rowInset)
     }
 
-    /// 项目子组行(08):项目名 + 项数/总量/最近活动;点行 = 全选/全清该项目全部
-    /// 安全产物(勾选框现三态:全选/半选/空),收起/展开只归箭头按钮。
-    /// 无可自动勾选项时给出**可见**原因(2026-11-06):在用 → 锁;全为先检查 → 灰 chip。
+    /// 项目子组行(2026-11-06 改版:纯缩进式——去三角箭头/去收起,产物恒缩进展示):
+    /// 项目名 + 项数/总量/最近活动;点行 = 全选/全清该项目全部安全产物
+    /// (勾选框三态:全选/半选/空)。无可自动勾选项时给**可见**原因:
+    /// 全在用 → 锁;全为先检查 → 灰 chip「须逐个勾」。
     private func projectHeader(
         _ projectGroup: ProjectJunkGroup,
         safeItems: [JunkCandidate],
-        selectionHint: ProjectSelectionHint,
-        isCollapsed: Bool,
-        onToggleCollapse: @escaping () -> Void
+        selectionHint: ProjectSelectionHint
     ) -> some View {
         let selectedCount = safeItems.filter { model.isSelected($0) }.count
         let checkState: CleanerCheckBox.CheckState = safeItems.isEmpty || selectedCount == 0
             ? .off
             : (selectedCount == safeItems.count ? .on : .mixed)
         return HStack(spacing: 8) {
-            Button(action: onToggleCollapse) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-                    .rotationEffect(.degrees(isCollapsed ? 0 : 90))
-                    .frame(width: 18, height: 18)
-                    .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .help(isCollapsed ? "展开产物清单" : "收起产物清单")
             if selectionHint == .inUse {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 13))
@@ -494,7 +471,7 @@ private struct JunkListCard: View {
             .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
         case .idle, .finished, .confirming:
             // CTA 常驻(用户实报:空选时按钮消失 = 不知道下一步干嘛):
-            // 空选灰显 + 注脚;有选则清选 + 金色主按钮。按钮 B 档 .large(2026-11-05 密度拍板)。
+            // 空选灰显 + 注脚;有选则清选 + 强调色主按钮。按钮 B 档 .large(2026-11-05 密度拍板)。
             HStack(spacing: 12) {
                 if plan.isEmpty {
                     Text("默认全不勾 · 勾选后可清理,右键行可排除")
@@ -622,7 +599,7 @@ private struct JunkRow: View {
             }
             MeterBar(
                 fraction: MeterNormalization.fraction(Double(candidate.bytes), leader: Double(leader)),
-                // 08 色彩纪律:大小条中性,金只留给页脚主按钮与选中 tab。
+                // 08 色彩纪律:大小条中性,强调色只留给页脚主按钮与选中态。
                 tint: .secondary
             )
             .frame(width: CleanerListMetrics.meterWidth)
@@ -633,17 +610,17 @@ private struct JunkRow: View {
                 .foregroundStyle(.primary)
                 .frame(width: CleanerListMetrics.valueWidth, alignment: .trailing)
         }
-        .padding(
-            .leading,
-            indented ? CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading : CleanerListMetrics.rowInset
-        )
+        // 2026-11-06 改版:每个条目一张小卡(拍板「每个 item 应该是一个卡片」)——
+        // 常态 = card-hi 抬升底,选中 = 强调色 12% 染底;缩进产物卡整体右移。
+        .padding(.leading, CleanerListMetrics.rowInset)
         .padding(.trailing, CleanerListMetrics.rowInset)
         .padding(.vertical, CleanerListMetrics.rowVerticalPadding)
         .opacity(isInUse ? 0.55 : 1)
         .background(
-            isSelected ? Surface.cardHigh.opacity(0.7) : Color.clear,
-            in: .rect(cornerRadius: 10)
+            isSelected ? accent.opacity(0.12) : Surface.cardHigh,
+            in: .rect(cornerRadius: 12)
         )
+        .padding(.leading, indented ? CleanerListMetrics.indentLeading : 0)
         .contentShape(Rectangle())
         .onTapGesture {
             if !disabled, !isInUse {
@@ -737,7 +714,7 @@ private struct CleanConfirmSheet: View {
     let model: CleanerModel
     let plan: CleanPlan
     private var accent: Color {
-        Metric.disk.accentColor
+        Surface.cleanAccent
     }
 
     var body: some View {
@@ -865,7 +842,7 @@ struct CleanHistorySection: View {
     private var runsList: some View {
         // 主窗口行容器收编 LazyVStack(DESIGN.md 规则;历史随时间只增不减,懒加载最划算)。
         LazyVStack(alignment: .leading, spacing: 12) {
-            CardHeader(symbolName: "clock.arrow.circlepath", title: "清理历史", tint: Metric.disk.accentColor) {
+            CardHeader(symbolName: "clock.arrow.circlepath", title: "清理历史", tint: Surface.cleanAccent) {
                 Text("\(model.historyRuns?.count ?? 0) 次")
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)

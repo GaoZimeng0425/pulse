@@ -29,7 +29,7 @@ struct SpaceMapSection: View {
     @State private var hoveredRectIndex: Int?
 
     private var accent: Color {
-        Metric.disk.accentColor
+        Surface.cleanAccent
     }
 
     var body: some View {
@@ -142,7 +142,7 @@ struct SpaceMapSection: View {
                             let badge = CGRect(x: rect.maxX - 40, y: rect.minY + 3, width: 36, height: 13)
                             context.fill(
                                 Path(roundedRect: badge, cornerRadius: 6.5),
-                                with: .color(Metric.disk.accentColor.opacity(0.95))
+                                with: .color(Surface.cleanAccent.opacity(0.95))
                             )
                             context.draw(
                                 Text("可清理").font(.system(size: 8.5, weight: .semibold))
@@ -154,7 +154,7 @@ struct SpaceMapSection: View {
                             let dot = CGRect(x: rect.maxX - 9, y: rect.minY + 3, width: 5, height: 5)
                             context.fill(
                                 Path(ellipseIn: dot),
-                                with: .color(Metric.disk.accentColor.opacity(0.95))
+                                with: .color(Surface.cleanAccent.opacity(0.95))
                             )
                         }
                     }
@@ -248,7 +248,7 @@ struct SpaceMapSection: View {
                             .font(.system(size: 10.5, weight: .semibold))
                     }
                     .buttonStyle(.borderless)
-                    .foregroundStyle(Metric.disk.accentColor)
+                    .foregroundStyle(Surface.cleanAccent)
                     .help("能删的判定来自清理白名单(与开发者垃圾清单同源);地图本身只读——点击去开发者垃圾定位对应组")
                 }
             }
