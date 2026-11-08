@@ -39,28 +39,33 @@ struct AppListSection: View {
 
     // MARK: 头部
 
+    /// 组头式标题(清单子页统一语言,与「清理历史」/垃圾组头同款):17 bold + 汇总
+    /// secondary——不再用游离在卡外的 CardHeader(其他子页没有这种形态)。
     private var header: some View {
-        CardHeader(symbolName: "square.grid.2x2", title: "应用", tint: accent) {
-            HStack(spacing: 8) {
-                if let output = model.output {
-                    Text(summaryText(output))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
-                        .monospacedDigit()
-                        .lineLimit(2)
-                        .multilineTextAlignment(.trailing)
-                }
-                Button {
-                    model.refresh()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 12))
-                }
-                .buttonStyle(.plain)
-                .disabled(model.isBusy)
-                .help("重新收集(签名、brew 徽标、运行态都可能已变化)")
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("应用")
+                .font(.system(size: 17, weight: .bold))
+            if let output = model.output {
+                Text(summaryText(output))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
+            Spacer(minLength: 8)
+            Button {
+                model.refresh()
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 12))
+            }
+            .buttonStyle(.plain)
+            .disabled(model.isBusy)
+            .help("重新收集(签名、brew 徽标、运行态都可能已变化)")
         }
+        .padding(.top, 8)
+        .padding(.bottom, 4)
+        .padding(.horizontal, CleanerListMetrics.rowInset)
     }
 
     private func summaryText(_ output: AppCatalogOutput) -> String {
@@ -82,6 +87,9 @@ struct AppListSection: View {
             if entries.isEmpty {
                 emptyView
             } else {
+                // 清单子页统一语言(ui-unify 追改):banner / 控件条在页层,不再整页
+                // 套大卡;每个应用一张小卡(与垃圾条目同配方),展开残留 = 卡内缩进
+                // 裸行(与项目大卡子项同款)。
                 VStack(alignment: .leading, spacing: 8) {
                     uninstallBanner
                     if model.uninstallPhase == .running {
@@ -89,29 +97,16 @@ struct AppListSection: View {
                     }
                     controlsBar
                     ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 2) {
+                        LazyVStack(alignment: .leading, spacing: 4) {
                             ForEach(entries) { entry in
-                                AppRow(
-                                    entry: entry,
-                                    leader: entries.compactMap(\.sizeBytes).max() ?? 0,
-                                    isSelected: model.isSelected(entry),
-                                    isExpanded: expanded.contains(entry.path),
-                                    onToggleSelect: { model.toggleSelect(entry) },
-                                    onToggleExpand: { toggleExpand(entry) }
-                                )
-                                if expanded.contains(entry.path) {
-                                    LeftoverDisclosure(model: model, entry: entry)
-                                }
+                                appCard(entry, leader: entries.compactMap(\.sizeBytes).max() ?? 0)
                             }
                         }
-                        .padding(.vertical, 6)
                     }
                     // 2026-11-08 实报:清单短于视口时 ScrollView 默认把内容悬中——锚顶。
                     .defaultScrollAnchor(.top)
                     .frame(minHeight: 120, maxHeight: .infinity)
                 }
-                .padding(12)
-                .background(Surface.card, in: .rect(cornerRadius: 18))
             }
         }
         .sheet(isPresented: uninstallSheetPresented) {
@@ -131,6 +126,28 @@ struct AppListSection: View {
                 Text("建议让 Homebrew 卸载(\(cask))以保持安装记录一致——取消后此应用会带 brew 徽标,用 brew 卸载即可。")
             }
         }
+    }
+
+    /// 应用条目小卡:头排(AppRow)+ 展开的残留区同卡收拢(与项目大卡同构),
+    /// card-hi 抬升底、12 圆角,选中 = 强调色 12% 染底——垃圾条目同配方。
+    private func appCard(_ entry: UninstallAppEntry, leader: Int64) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            AppRow(
+                entry: entry,
+                leader: leader,
+                isSelected: model.isSelected(entry),
+                isExpanded: expanded.contains(entry.path),
+                onToggleSelect: { model.toggleSelect(entry) },
+                onToggleExpand: { toggleExpand(entry) }
+            )
+            if expanded.contains(entry.path) {
+                LeftoverDisclosure(model: model, entry: entry)
+            }
+        }
+        .background(
+            model.isSelected(entry) ? Surface.cleanAccent.opacity(0.12) : Surface.cardHigh,
+            in: .rect(cornerRadius: 12)
+        )
     }
 
     private var uninstallSheetPresented: Binding<Bool> {
@@ -302,16 +319,12 @@ struct AppListSection: View {
     }
 
     private var emptyView: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "square.grid.2x2")
-                .font(.system(size: 22))
-                .foregroundStyle(.tertiary)
-            Text(model.searchQuery.isEmpty ? "未发现可卸载的应用" : "没有匹配的应用")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 32)
+        // 空态统一走 CardEmptyState + 卡壳(DESIGN.md 卡片家族,不手写空态)。
+        CardEmptyState(
+            title: model.searchQuery.isEmpty ? "未发现可卸载的应用" : "没有匹配的应用",
+            detail: model.searchQuery.isEmpty ? "扫描完成后,可卸载的应用会列在这里" : "清空搜索或换个关键词"
+        )
+        .cardShell(compact: false)
     }
 
     private func loadingView(text: String) -> some View {
@@ -400,10 +413,7 @@ private struct AppRow: View {
         }
         .padding(.horizontal, CleanerListMetrics.rowInset)
         .padding(.vertical, CleanerListMetrics.rowVerticalPadding)
-        .background(
-            // 选中高亮(原型裁决):点行选中后行底染磁盘色族浅底。
-            isSelected ? Surface.cleanAccent.opacity(0.1) : Color.clear
-        )
+        // 选中染底由外层小卡统一给(appCard,垃圾条目同配方),行本体无底。
         .opacity(isDimmed ? 0.75 : 1)
         .contentShape(.rect)
         .onTapGesture {
@@ -445,14 +455,12 @@ private struct LeftoverDisclosure: View {
     }
 
     var body: some View {
+        // 卡内缩进裸行(与项目大卡子项同款):不再自套嵌套小卡,只随卡内距排布。
         VStack(alignment: .leading, spacing: 8) {
             leftoverContent
             actionRow
         }
         .padding(.top, 2)
-        .padding(.bottom, 4)
-        .background(Surface.cardHigh.opacity(0.6), in: .rect(cornerRadius: 10))
-        .padding(.horizontal, 8)
         .padding(.bottom, 4)
     }
 
@@ -463,7 +471,8 @@ private struct LeftoverDisclosure: View {
                 Text("未识别,不敢猜——这个应用读不到 bundle id,残留无法精确匹配,不列。")
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
-                    .padding(.horizontal, CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading)
+                    .padding(.leading, CleanerListMetrics.indentLeading)
+                    .padding(.trailing, CleanerListMetrics.rowInset)
                     .padding(.bottom, 6)
             } else if model.leftoverLoading.contains(entry.path) {
                 HStack(spacing: 6) {
@@ -473,7 +482,8 @@ private struct LeftoverDisclosure: View {
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading)
+                .padding(.leading, CleanerListMetrics.indentLeading)
+                .padding(.trailing, CleanerListMetrics.rowInset)
                 .padding(.bottom, 6)
             } else if let rows, !rows.isEmpty {
                 header(rows)
@@ -489,7 +499,8 @@ private struct LeftoverDisclosure: View {
                 Text("没有找到残留")
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
-                    .padding(.horizontal, CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading)
+                    .padding(.leading, CleanerListMetrics.indentLeading)
+                    .padding(.trailing, CleanerListMetrics.rowInset)
                     .padding(.bottom, 6)
             }
         }
@@ -525,7 +536,8 @@ private struct LeftoverDisclosure: View {
             .tint(model.isPermanentDeleteSelected(entry) ? Surface.negative : Surface.cleanAccent)
             .disabled(model.uninstallPhase == .running)
         }
-        .padding(.horizontal, CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading)
+        .padding(.leading, CleanerListMetrics.indentLeading)
+        .padding(.trailing, CleanerListMetrics.rowInset)
         .padding(.vertical, 4)
     }
 
@@ -543,14 +555,16 @@ private struct LeftoverDisclosure: View {
             .buttonStyle(.borderless)
             .help("只勾通用位置残留;「先检查」项恒不进全选,可单独勾")
         }
-        .padding(.horizontal, CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading)
+        .padding(.leading, CleanerListMetrics.indentLeading)
+        .padding(.trailing, CleanerListMetrics.rowInset)
     }
 
     private func footnote(_ rows: [AppLeftoverRow]) -> some View {
         Text(footnoteText(rows))
             .font(.system(size: 11))
             .foregroundStyle(.tertiary)
-            .padding(.horizontal, CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading)
+            .padding(.leading, CleanerListMetrics.indentLeading)
+            .padding(.trailing, CleanerListMetrics.rowInset)
             .padding(.bottom, 2)
     }
 
@@ -600,7 +614,8 @@ private struct LeftoverRowView: View {
                 .foregroundStyle(.secondary)
                 .frame(width: CleanerListMetrics.valueWidth, alignment: .trailing)
         }
-        .padding(.horizontal, CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading)
+        .padding(.leading, CleanerListMetrics.indentLeading)
+        .padding(.trailing, CleanerListMetrics.rowInset)
         .padding(.vertical, 6)
         .contentShape(.rect)
         .onTapGesture { onToggle() }
