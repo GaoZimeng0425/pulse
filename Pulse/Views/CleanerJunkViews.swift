@@ -908,9 +908,6 @@ private struct CleanRunDisclosureRow: View {
                 }
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: expanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.tertiary)
                     // 类型标记(Q15):卸载带应用图标、清理带垃圾桶,扫一眼可分;不做筛选分页。
                     Image(systemName: run.isUninstall ? "app.dashed" : "trash")
                         .font(.system(size: 13))
@@ -928,8 +925,16 @@ private struct CleanRunDisclosureRow: View {
                             .font(.system(size: 12))
                             .foregroundStyle(Surface.negative)
                     }
-                    Spacer()
+                    Spacer(minLength: 8)
+                    // 展开/收起统一样式(与项目大卡点头排同款):箭头在行右缘,
+                    // 右指、展开时旋转向下、整行可点——不再独一份行首三角。
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(expanded ? 90 : 0))
+                        .frame(width: 24, height: 24)
                 }
+                .contentShape(.rect)
             }
             .buttonStyle(.plain)
             if expanded {
@@ -937,7 +942,7 @@ private struct CleanRunDisclosureRow: View {
             }
         }
         .padding(.horizontal, CleanerListMetrics.rowInset)
-        .padding(.vertical, 8)
+        .padding(.vertical, CleanerListMetrics.rowVerticalPadding)
     }
 
     @ViewBuilder private var items: some View {

@@ -65,8 +65,12 @@ struct SpaceMapSection: View {
         }
         return VStack(alignment: .leading, spacing: 12) {
             CardHeader(symbolName: "square.grid.3x3.square", title: "空间地图", tint: accent) {
+                // 页内头部动作按钮统一配方(与垃圾页组头「全选安全项」同款):
+                // borderless + 12 semibold secondary,不再独一份 .small bordered。
                 Button("在 Finder 中显示") { reveal(root) }
-                    .controlSize(.small)
+                    .font(.system(size: 12, weight: .semibold))
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
             }
             if model.mapTrees.count > 1 {
                 rootPicker

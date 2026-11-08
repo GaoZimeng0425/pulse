@@ -310,7 +310,9 @@ struct CleanerTabView: View {
                     NSWorkspace.shared.open(url)
                 }
             }
-            .controlSize(.small)
+            // 横幅降级出口统一配方(与告警横幅「打开系统通知设置」同款):.link 文字按钮。
+            .buttonStyle(.link)
+            .font(.system(size: 11))
         }
         .padding(12)
         .background(Surface.warning.opacity(0.12), in: .rect(cornerRadius: 12))
