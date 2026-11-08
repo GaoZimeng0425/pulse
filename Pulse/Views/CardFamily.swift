@@ -57,7 +57,7 @@ extension EnvironmentValues {
     @Entry var rankingRowsInList = false
 }
 
-/// 主卡头:22pt 指标徽章 + 卡标题(12.5 semibold,指标色)+ 右侧附件(可选)。
+/// 主卡头:22pt 指标徽章 + 卡标题(12 semibold,指标色)+ 右侧附件(可选)。
 struct CardHeader<Accessory: View>: View {
     let symbolName: String
     let title: String
@@ -68,7 +68,7 @@ struct CardHeader<Accessory: View>: View {
         HStack(spacing: 7) {
             MetricBadge(symbolName: symbolName, tint: tint)
             Text(title)
-                .font(.system(size: 12.5, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(tint)
             Spacer(minLength: 8)
             accessory()
@@ -82,7 +82,7 @@ extension CardHeader where Accessory == EmptyView {
     }
 }
 
-/// 副卡头(明细类小卡 / 紧凑总览卡):10pt 指标色符号 + 11 medium 次级标题 + 右侧
+/// 副卡头(明细类小卡 / 紧凑总览卡):10.5pt 指标色符号 + 11 medium 次级标题 + 右侧
 /// 10.5 tertiary 等宽注记(可选,如「合计 …」)。
 struct CardSubHeader: View {
     let symbolName: String
@@ -93,7 +93,7 @@ struct CardSubHeader: View {
     var body: some View {
         HStack(spacing: 5) {
             Image(systemName: symbolName)
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: 10.5, weight: .semibold))
                 .foregroundStyle(tint)
             Text(title)
                 .font(.system(size: 11, weight: .medium))
@@ -178,7 +178,7 @@ struct StatValue: View {
     }
 }
 
-/// 卡内空态:安静的一句(12.5 medium secondary)+ 可选说明(10.5 tertiary),居中。
+/// 卡内空态:安静的一句(12 medium secondary)+ 可选说明(10.5 tertiary),居中。
 /// 没数据是常态,不报警不催促。可选一个 `.link` 动作(授权型能力卡的
 /// 开启 / 授权 / 去系统设置,与告警横幅的降级出口同款);没动作就是安静空态。
 struct CardEmptyState: View {
@@ -190,7 +190,7 @@ struct CardEmptyState: View {
     var body: some View {
         VStack(spacing: 2) {
             Text(title)
-                .font(.system(size: 12.5, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
             if let detail {
                 Text(detail)

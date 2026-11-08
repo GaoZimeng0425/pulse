@@ -224,7 +224,7 @@ struct MetricMainCardView: View {
                     MetricChipView(chip: chip)
                 }
                 Spacer(minLength: 12)
-                Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 8) {
+                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
                     ForEach(Array(stride(from: 0, to: model.stats.count, by: 2)), id: \.self) { index in
                         GridRow {
                             statCell(model.stats[index])
@@ -240,7 +240,7 @@ struct MetricMainCardView: View {
                 .frame(maxWidth: .infinity)
         }
         .frame(height: 176)
-        .padding(20)
+        .padding(16)
     }
 
     private var compactBody: some View {

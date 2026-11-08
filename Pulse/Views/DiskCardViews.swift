@@ -133,7 +133,7 @@ struct DiskSnapshotsCardView: View {
                     .monospacedDigit()
             }
             Text(snapshot.name)
-                .font(.system(size: 10))
+                .font(.system(size: 10.5))
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)
                 .truncationMode(.middle)

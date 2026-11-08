@@ -146,31 +146,19 @@ struct MetricBadge: View {
     }
 }
 
-/// 状态 chip(§3-6):全圆 pill,tint 14% 底 + 同色文字与图标。
-/// compact = 排行行内用的小号(字 10.5 / 图标 10 / 内距 6×2),卡面用常规号。
+/// 指标卡状态 chip:统一 `ChipView` 的薄封装(ui-unify/01 五种手写 chip 归一;
+/// 全尺寸 = regular,compact = inline 小号)。
 struct MetricChipView: View {
     let chip: MetricCardChip
     var compact = false
 
     var body: some View {
-        Label(chip.title, systemImage: chip.systemImage)
-            .labelStyle(ChipLabelStyle(iconSize: compact ? 10 : 10.5))
-            .font(.system(size: compact ? 10.5 : 11, weight: .semibold))
-            .foregroundStyle(chip.tint)
-            .padding(.horizontal, compact ? 6 : 8)
-            .padding(.vertical, compact ? 2 : 3)
-            .background(chip.tint.opacity(0.14), in: .capsule)
-    }
-
-    private struct ChipLabelStyle: LabelStyle {
-        let iconSize: CGFloat
-
-        func makeBody(configuration: Configuration) -> some View {
-            HStack(spacing: 2) {
-                configuration.icon.font(.system(size: iconSize))
-                configuration.title
-            }
-        }
+        ChipView(
+            text: chip.title,
+            tint: chip.tint,
+            profile: compact ? .inline : .regular,
+            systemImage: chip.systemImage
+        )
     }
 }
 

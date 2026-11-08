@@ -45,7 +45,7 @@ struct GeneralSettingsView: View {
                     }
                 if let notInstalledNotice {
                     Text(notInstalledNotice)
-                        .font(.caption)
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 } else if requiresApproval {
                     approvalHint
@@ -59,7 +59,7 @@ struct GeneralSettingsView: View {
                     set: { monitor.bluetooth.setEnabled($0) }
                 ))
                 Text("读取已配对设备的连接状态与电量。开启时请求一次蓝牙权限,只在你操作时弹出;关闭则完全不读取蓝牙。")
-                    .font(.caption)
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
             Section("特权助手") {
@@ -76,19 +76,19 @@ struct GeneralSettingsView: View {
                 switch helperStatus {
                 case .enabled:
                     Text("助手以 root 运行中:每分钟采集一次各 App 能耗影响,历史页可看全机合计。关闭即注销,一步干净。")
-                        .font(.caption)
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 case .requiresApproval:
                     VStack(alignment: .leading, spacing: 4) {
                         Text("已提交注册,等你批准:在 系统设置 → 通用 → 登录项与扩展 中允许 Pulse 的后台项(需 Touch ID/密码)。")
-                            .font(.caption)
+                            .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                         Button("打开系统设置") { openLoginItemsPane() }
                             .buttonStyle(.link)
                     }
                 case .notRegistered:
                     Text("开启将安装一个仅采集能耗影响的 root 后台助手(首次需系统授权一次);不开启则完全不存在。")
-                        .font(.caption)
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -97,13 +97,13 @@ struct GeneralSettingsView: View {
                     Button("打开日志文件夹") { openLogsFolder() }
                 }
                 Text("位于 ~/.Pulse/logs,最多保留 14 个文件自动轮转。")
-                    .font(.caption)
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 LabeledContent("诊断报告") {
                     Button(reportCopied ? "已复制" : "复制诊断报告") { copyDiagnosticReport() }
                 }
                 Text("版本 / 系统 / 机型 / 采样统计 / 最近日志尾部拼成纯文本,报 bug 时直接粘贴。")
-                    .font(.caption)
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
             Section("AI 助手查询(MCP)") {
@@ -113,7 +113,7 @@ struct GeneralSettingsView: View {
                 Text(
                     "AI 客户端(Claude / ZCode 等支持 MCP 的工具)指向 Pulse 内置服务后,可直接询问\"为什么 CPU 高\"、当前读数与 30 天内趋势;Pulse 不在运行也能回答(答案标注数据时间)。"
                 )
-                .font(.caption)
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             }
             Section("关于") {
@@ -133,7 +133,7 @@ struct GeneralSettingsView: View {
     private var approvalHint: some View {
         HStack {
             Text("系统需要你手动批准:在 系统设置 → 通用 → 登录项 中允许 Pulse 在后台运行。")
-                .font(.caption)
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             Button("打开系统设置") { openLoginItemsPane() }
                 .buttonStyle(.link)

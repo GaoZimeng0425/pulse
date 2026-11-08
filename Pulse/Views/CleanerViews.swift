@@ -190,7 +190,7 @@ struct CleanerTabView: View {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(Surface.positive)
                 Text(trashFinishedText(summary))
-                    .font(.system(size: 11.5, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                 Spacer()
                 dismissTrashButton
             }
@@ -202,7 +202,7 @@ struct CleanerTabView: View {
                     Image(systemName: "info.circle")
                         .foregroundStyle(.secondary)
                     Text(notice)
-                        .font(.system(size: 11.5))
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                     Spacer()
                     dismissTrashButton

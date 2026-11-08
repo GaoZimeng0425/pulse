@@ -181,10 +181,10 @@ struct HistoryTabView: View {
                 .font(.system(size: 26, weight: .light))
                 .foregroundStyle(.tertiary)
             Text("暂无数据")
-                .font(.title3)
+                .font(.system(size: 14.5))
                 .foregroundStyle(.tertiary)
             Text(emptyDetail)
-                .font(.caption)
+                .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity)

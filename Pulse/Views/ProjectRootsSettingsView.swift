@@ -20,7 +20,7 @@ struct ProjectRootsSettingsView: View {
                         "尚未添加项目根。添加后,rustc / node 等开发进程会按工作目录"
                             + "归到「项目名 @ worktree」组。"
                     )
-                    .font(.caption)
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 }
                 Button {
@@ -31,7 +31,7 @@ struct ProjectRootsSettingsView: View {
             }
             Section {
                 Text("项目根是项目归因的匹配锚点:开发进程的工作目录落在某个根之下即归入该项目;命中 .worktrees/<名> 时按 worktree 分组。改动在下一轮采样内生效。")
-                    .font(.caption)
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
         }
