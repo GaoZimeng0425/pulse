@@ -14,22 +14,20 @@ import SwiftUI
 // (胶囊、tint 14~16% 底 + 同色文字,DESIGN.md §状态 chip——此处映射的是
 // GLOSSARY「安全档」两态,不是负载警示)。
 
-/// 清理页「舒适密度档」尺寸表(DESIGN.md §清理页舒适密度档,2026-11-05 拍板):
-/// 清理页四子页(垃圾/应用/历史)共用的行控件尺寸——图标 28 / 名称 14.5 /
-/// 副文 12 / 数值 14.5 定宽列 / meter 130 / 行内距 12×10。排行的
-/// `RankingListMetrics` 是紧凑档,弹窗与排行页保持不动,两套不混用。
+/// 清理页行尺寸表:共享值(字号 / 图标 / meter / 内距)一律委托 `RowMetrics`
+/// 舒适档(ui-unify/01 全 app 行两档制;此前图标 28 / meter 130 / 上下距 14 与
+/// 排行两套并存),这里只留清理页专属参数(缩进 / 勾选框 / 数值列口径)。
 enum CleanerListMetrics {
-    /// 行内水平内距(组头/项目行/动作条与行对齐;拍板「左右 padding 增加一些」6→12)。
-    static let rowInset: CGFloat = 14
-    static let spacing: CGFloat = 10
-    static let iconSize: CGFloat = 28
-    static let titleFontSize: CGFloat = 14.5
+    /// 行内水平内距(组头/项目行/动作条与行对齐)。
+    static let rowInset: CGFloat = RowMetrics.rowInset(compact: false)
+    static let spacing: CGFloat = RowMetrics.spacing(compact: false)
+    static let iconSize: CGFloat = RowMetrics.iconSize(compact: false)
+    static let titleFontSize: CGFloat = RowMetrics.nameFontSize(compact: false)
     /// 副文/路径行字号。
-    static let subFontSize: CGFloat = 12
-    static let valueFontSize: CGFloat = 14.5
-    static let meterWidth: CGFloat = 130
-    static let rowVerticalPadding: CGFloat = 14
-    static let chipFontSize: CGFloat = 11.5
+    static let subFontSize: CGFloat = RowMetrics.subFontSize(compact: false)
+    static let valueFontSize: CGFloat = RowMetrics.valueFontSize(compact: false)
+    static let meterWidth: CGFloat = RowMetrics.meterWidth(compact: false)
+    static let rowVerticalPadding: CGFloat = RowMetrics.rowVerticalPadding(compact: false)
     /// 项目产物子项在项目大卡**内部**的缩进量(2026-11-06 三次拍板:大卡包含子项,
     /// 子项只缩进不套小卡)。
     static let indentLeading: CGFloat = 28
@@ -117,7 +115,7 @@ struct JunkListSection: View {
                 )
                 if !model.hasScanRoots {
                     Text("想清项目产物(node_modules 等)?先到 设置 → 清理 配置项目目录:工具栏齿轮打开设置,勾选建议目录或自添(如 ~/Documents/Learn/macos)。")
-                        .font(.system(size: 11.5))
+                        .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -336,7 +334,7 @@ private struct JunkListCard: View {
         Text(model.hasScanRoots
             ? "项目产物:配置的扫描根在本次扫描里没有找到产物目录。"
             : "项目产物:还没配置项目目录——设置 → 清理,勾选常见开发目录或自添(与归组的项目根互不影响)。")
-            .font(.system(size: 11.5))
+            .font(.system(size: 11))
             .foregroundStyle(.tertiary)
             .padding(.top, 6)
             .padding(.horizontal, CleanerListMetrics.rowInset)
@@ -346,7 +344,7 @@ private struct JunkListCard: View {
     /// 规则整组不出,前者必须说,否则用户以为这台机器没有卸载残留)。
     private func orphanUnavailableHint(_ reason: String) -> some View {
         Text("卸载残留未检测:\(reason)")
-            .font(.system(size: 11.5))
+            .font(.system(size: 11))
             .foregroundStyle(.tertiary)
             .padding(.top, 6)
             .padding(.horizontal, CleanerListMetrics.rowInset)
@@ -367,7 +365,7 @@ private struct JunkListCard: View {
         let sum = items.reduce(Int64(0)) { $0 + $1.bytes }
         return HStack(spacing: 8) {
             Text(group.title)
-                .font(.system(size: 16, weight: .bold))
+                .font(.system(size: 17, weight: .bold))
                 .foregroundStyle(.primary)
             Text(PulseFormat.memory(UInt64(max(0, sum))))
                 .font(.system(size: 12))
@@ -514,7 +512,7 @@ private struct JunkListCard: View {
                 ProgressView()
                     .controlSize(.small)
                 Text("正在移入废纸篓…(完成后才可退出 app)")
-                    .font(.system(size: 13))
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
@@ -526,11 +524,11 @@ private struct JunkListCard: View {
             HStack(spacing: 12) {
                 if plan.isEmpty {
                     Text("默认全不勾 · 勾选后可清理,右键行可排除")
-                        .font(.system(size: 11.5))
+                        .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
                 } else {
                     Text("已选 \(plan.items.count) 项 · \(PulseFormat.memory(UInt64(max(0, plan.totalBytes))))")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 14.5, weight: .bold))
                         .monospacedDigit()
                 }
                 Spacer()
@@ -566,7 +564,7 @@ private struct JunkListCard: View {
                         ? "已移入废纸篓 \(report.recycled.count) 项 · 释放 \(PulseFormat.memory(UInt64(max(0, report.freedBytes))))"
                         :
                         "已移入废纸篓 \(report.recycled.count) 项 · 释放 \(PulseFormat.memory(UInt64(max(0, report.freedBytes)))) · \(report.failed.count) 项失败")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .monospacedDigit()
                     Spacer()
                     Button("知道了") {
@@ -576,12 +574,12 @@ private struct JunkListCard: View {
                     .font(.system(size: 12))
                 }
                 Text(historyRecorded ? "已记入清理历史" : "清理历史不可用,本次未记录(历史库未打开)")
-                    .font(.system(size: 11.5))
+                    .font(.system(size: 11))
                     .foregroundStyle(historyRecorded ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Surface.warning))
                 ForEach(report.failed, id: \.path) { item in
                     if case let .failed(reason) = item.outcome {
                         Text("\(item.path) — \(reason)")
-                            .font(.system(size: 11.5))
+                            .font(.system(size: 11))
                             .foregroundStyle(Surface.negative)
                             .lineLimit(1)
                             .truncationMode(.middle)
@@ -755,13 +753,7 @@ struct InUseChip: View {
     let reasons: CleanActivityReason
 
     var body: some View {
-        Text("在用保护 · \(reasons.title)正在此项目")
-            .font(.system(size: CleanerListMetrics.chipFontSize, weight: .semibold))
-            .foregroundStyle(Surface.inkTertiary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 3)
-            .background(Surface.inkTertiary.opacity(0.15), in: .capsule)
-            .lineLimit(1)
+        ChipView(text: "在用保护 · \(reasons.title)正在此项目", tint: Surface.inkTertiary, profile: .regular)
     }
 }
 
@@ -777,17 +769,16 @@ struct TierChip: View {
     }
 
     var body: some View {
-        Text(tier.title)
-            .font(.system(size: CleanerListMetrics.chipFontSize, weight: .semibold))
-            .foregroundStyle(tint)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 3)
-            .background(tint.opacity(0.15), in: .capsule)
+        ChipView(
+            text: tier.title,
+            tint: tint,
+            profile: .regular,
             // 档位人话(2026-11-06 用户实报「先检查是什么意思」):chip 自己解释自己,
             // 不用翻 GLOSSARY;行悬停另有该条规则的具体 rationale。
-            .help(tier == .safe
+            help: tier == .safe
                 ? "白名单担保过:重建即可或无个人数据,删了不影响使用"
-                : "大概率能删,但删前看一眼——这类目录可能藏着要保留的东西(如 build 下可能有源码、JetBrains 缓存含 Local History)。安全规则:永不进自动勾选,须逐个手勾")
+                : "大概率能删,但删前看一眼——这类目录可能藏着要保留的东西(如 build 下可能有源码、JetBrains 缓存含 Local History)。安全规则:永不进自动勾选,须逐个手勾"
+        )
     }
 }
 
@@ -822,11 +813,11 @@ private struct CleanConfirmSheet: View {
             .frame(maxHeight: 220)
             .background(Surface.card, in: .rect(cornerRadius: 12))
             Text("共释放 \(PulseFormat.memory(UInt64(max(0, plan.totalBytes))))(实际占用口径:\(accountingNote))")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 14.5, weight: .semibold))
                 .monospacedDigit()
             HStack(spacing: 8) {
                 Text("大小按实际占用计:APFS 克隆与硬链接不重复计。唯一不可逆的操作是「清空废纸篓」,不在这里。")
-                    .font(.system(size: 11.5))
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button("取消") {
@@ -939,7 +930,7 @@ struct CleanHistorySection: View {
                 CleanRunDisclosureRow(model: model, run: run)
             }
             Text("清理历史永久保留在本地;大小按清理当时扫描的实际占用口径。")
-                .font(.system(size: 11.5))
+                .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
         }
         .cardShell(compact: false)
@@ -969,7 +960,7 @@ private struct CleanRunDisclosureRow: View {
                         .foregroundStyle(.tertiary)
                         .help(run.isUninstall ? "应用卸载" : "清理")
                     Text(run.startedAt.formatted(date: .abbreviated, time: .shortened))
-                        .font(.system(size: 13.5, weight: .medium))
+                        .font(.system(size: 14.5, weight: .medium))
                         .monospacedDigit()
                     Text("\(run.itemCount) 项 · 释放 \(PulseFormat.memory(UInt64(max(0, run.freedBytes))))")
                         .font(.system(size: 12))
@@ -1017,21 +1008,21 @@ private struct CleanHistoryItemRow: View {
             TierChip(tier: record.tier)
             VStack(alignment: .leading, spacing: 1) {
                 Text(record.title)
-                    .font(.system(size: 13.5, weight: .medium))
+                    .font(.system(size: 14.5, weight: .medium))
                     .lineLimit(1)
                 Text(record.path)
-                    .font(.system(size: 11.5))
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
             Spacer(minLength: 8)
             Text(PulseFormat.memory(UInt64(max(0, record.bytes))))
-                .font(.system(size: 13.5))
+                .font(.system(size: 14.5))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
             Text(outcomeText)
-                .font(.system(size: 11.5))
+                .font(.system(size: 11))
                 .monospacedDigit()
                 .lineLimit(1)
                 .truncationMode(.middle)

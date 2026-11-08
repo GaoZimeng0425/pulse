@@ -293,8 +293,8 @@ final class CleanerModel {
         LogService.info("缓存装载:开始读盘+解码", category: "Cleaner")
         // userInitiated:用户点开清理页正在等这个结果(真机实锤 2026-11-03:满载下
         // utility 解码被饿 21s,空态期被当成了「没缓存」;同文件常态 0.6s)。
-        Task.detached(priority: .userInitiated) {
-            [weak self, scanCache, volumeSummaries, installedAppInventory, homeDirectory] in
+        let collectApps = appInventoryCollector()
+        Task.detached(priority: .userInitiated) { [weak self, scanCache, volumeSummaries, collectApps] in
             guard let payload = scanCache.load() else {
                 LogService.warn("缓存装载:文件缺失或解码失败", category: "Cleaner")
                 await MainActor.run { self?.isRestoringCache = false }
@@ -306,7 +306,7 @@ final class CleanerModel {
             }
             // 已装全集现采(p5-cleaner/02):树是缓存快照,标准目录与运行中取此刻——
             // 比落盘一份扫描时的全集更保守(装机后新装的 app 立即受保护)。
-            let inventory = installedAppInventory(payload.result.trees, payload.result.cancelled, homeDirectory)
+            let inventory = collectApps(payload.result.trees, payload.result.cancelled)
             await MainActor.run { self?.applyCached(payload, mapTrees: mapTrees, inventory: inventory) }
         }
     }
@@ -387,8 +387,8 @@ final class CleanerModel {
             canonicalRoots: canonical
         )
 
-        scanTask = Task.detached(priority: .utility) {
-            [engine, volumeSummaries, scanCache, installedAppInventory, homeDirectory, weak self] in
+        let collectApps = appInventoryCollector()
+        scanTask = Task.detached(priority: .utility) { [engine, volumeSummaries, scanCache, collectApps, weak self] in
             let scanBegin = Date()
             let result = await engine.scan(
                 options,
@@ -412,7 +412,7 @@ final class CleanerModel {
             }
             // 已装全集(p5-cleaner/02):随结果一次采集,与 phase 同时落位;取消的扫描
             // 是半棵树 → fail-closed(卸载残留整组不出,采集器内判)。
-            let inventory = installedAppInventory(result.trees, result.cancelled, homeDirectory)
+            let inventory = collectApps(result.trees, result.cancelled)
             // 分段计时(诊断用,票 10):真机基准 Data+6worker ≈56s;偏离时看三段各占多少。
             LogService.info(
                 "扫描计时:walk \(Int(Date().timeIntervalSince(scanBegin)))s"
@@ -443,6 +443,13 @@ final class CleanerModel {
             }
             await MainActor.run { self?.finish(result, mapTrees: mapTrees, inventory: inventory) }
         }
+    }
+
+    /// 已装全集采集器绑上家目录(扫描 / 装载两条后台任务共用;与清单同一家目录口径)。
+    private func appInventoryCollector() -> @Sendable ([SpaceNode], Bool) -> InstalledAppInventory {
+        let collect = installedAppInventory
+        let home = homeDirectory
+        return { collect($0, $1, home) }
     }
 
     func cancelScan() {

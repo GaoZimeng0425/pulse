@@ -36,6 +36,8 @@ enum RankingValueColumn: CustomStringConvertible {
 }
 
 /// 行配方的度量(两档):卡、行、表头三处共用,改一处即全部对齐。
+/// 共享值(字号 / 图标 / meter / 内距)一律出自 `RowMetrics`(ui-unify/01 全 app
+/// 行两档制单一出处),这里只留排行专属参数(行尾列 / 数值列口径 / 弹窗收紧间距)。
 enum RankingListMetrics {
     /// 行尾列宽 = 结束按钮 + 间距 + 展开箭头 10;模块排行留同宽空列。
     /// 全尺寸 18 + 2 + 10;弹窗 14 + 0 + 10(2026-10-30 用户拍板:右侧图标收紧)。
@@ -53,10 +55,12 @@ enum RankingListMetrics {
     }
 
     /// 行内水平内距(表头与之对齐)。
-    static let rowInset: CGFloat = 6
+    static func rowInset(compact: Bool) -> CGFloat {
+        RowMetrics.rowInset(compact: compact)
+    }
 
     static func spacing(compact: Bool) -> CGFloat {
-        compact ? 8 : 10
+        RowMetrics.spacing(compact: compact)
     }
 
     /// 名称区 → meter 的最小间距:弹窗 4(2026-10-30 用户拍板 meter 左右收紧)。
@@ -71,21 +75,22 @@ enum RankingListMetrics {
     }
 
     static func iconSize(compact: Bool) -> CGFloat {
-        compact ? 18 : 22
+        RowMetrics.iconSize(compact: compact)
     }
 
     static func meterWidth(compact: Bool) -> CGFloat {
-        compact ? 52 : 110
+        RowMetrics.meterWidth(compact: compact)
     }
 
-    /// 名称字号(数值弹窗档已单独调小,名称不随)。
+    /// 名称字号:层级靠字重(名称 medium / 数值 semibold),不靠半号字
+    /// (ui-unify/01;弹窗 12.5→12、全尺寸 13→14.5 升舒适档)。
     static func nameFontSize(compact: Bool) -> CGFloat {
-        compact ? 12.5 : 13
+        RowMetrics.nameFontSize(compact: compact)
     }
 
-    /// 数值字号:弹窗 11.5(2026-10-30 用户拍板"数字改小一点",原与名称同 12.5)。
+    /// 数值字号(弹窗 11.5→12:紧凑档层级同样只靠字重;全尺寸 13→14.5)。
     static func valueFontSize(compact: Bool) -> CGFloat {
-        compact ? 11.5 : 13
+        RowMetrics.valueFontSize(compact: compact)
     }
 
     /// 数值列**定宽**:按该口径最宽现实读数以实际绘制字体量宽 + 2pt 余量。曾是最小宽度
@@ -200,7 +205,7 @@ struct RankingListHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.system(size: 12.5, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(accent)
                 .padding(.bottom, 6)
             if isEmpty {
@@ -220,10 +225,10 @@ struct RankingListHeader: View {
         }
         .font(.system(size: 10.5, weight: .medium))
         .foregroundStyle(.tertiary)
-        .padding(.leading, RankingListMetrics.rowInset)
+        .padding(.leading, RankingListMetrics.rowInset(compact: isCompact))
         .padding(
             .trailing,
-            RankingListMetrics.rowInset + RankingListMetrics.valueSpacing(compact: isCompact)
+            RankingListMetrics.rowInset(compact: isCompact) + RankingListMetrics.valueSpacing(compact: isCompact)
                 + RankingListMetrics.trailingWidth(compact: isCompact)
         )
         .padding(.bottom, 2)
@@ -319,8 +324,8 @@ struct RankingListRow<Badge: View, Trailing: View>: View {
                 valueColumnView
             }
         }
-        .padding(.horizontal, RankingListMetrics.rowInset)
-        .padding(.vertical, isCompact ? 5 : 7)
+        .padding(.horizontal, RankingListMetrics.rowInset(compact: isCompact))
+        .padding(.vertical, RowMetrics.rowVerticalPadding(compact: isCompact))
     }
 
     private var nameColumn: some View {
@@ -336,7 +341,7 @@ struct RankingListRow<Badge: View, Trailing: View>: View {
                 badge()
             }
             Text(subtitle)
-                .font(.system(size: 10.5))
+                .font(.system(size: RowMetrics.subFontSize(compact: isCompact)))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }

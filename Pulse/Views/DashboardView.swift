@@ -68,7 +68,7 @@ struct DashboardView: View {
             }
             footer
         }
-        .padding(14)
+        .padding(12)
         .frame(width: Self.width)
         // 撑满宿主:宿主比内容高时 NSHostingView 会把内容居中悬空(上下留白、底色不到边)。
         .frame(maxHeight: .infinity, alignment: .top)
@@ -350,7 +350,7 @@ struct DashboardView: View {
 struct FooterButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 12.5, weight: .medium))
+            .font(.system(size: 12, weight: .medium))
             .padding(.horizontal, 12)
             .frame(height: 30)
             .background(
