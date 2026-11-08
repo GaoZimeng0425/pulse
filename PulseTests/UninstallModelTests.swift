@@ -154,7 +154,11 @@ final class UninstallModelTests: XCTestCase {
             TrashRecycleOutcome(recycled: Dictionary(uniqueKeysWithValues: paths.map { ($0, "/Trash/\($0)") }))
         },
         brew: @escaping @Sendable (String, Bool) async -> BrewUninstallResult = { _, _ in .success },
-        crossCheck: @escaping @Sendable () async -> [String: String] = { [:] }
+        crossCheck: @escaping @Sendable () async -> [String: String] = { [:] },
+        prober: @escaping @Sendable ([LeftoverProbe]) async -> [AppLeftoverRow] = { _ in [] },
+        leftoverState: @escaping @Sendable (String) async -> PathSnapshot = { _ in
+            .present(modifiedEpoch: 100)
+        }
     ) -> UninstallModel {
         UninstallModel(
             collectFacts: {
@@ -172,13 +176,14 @@ final class UninstallModelTests: XCTestCase {
                 ["/Applications/Demo.app": (bytes: 1000, partial: false)].filter { paths.contains($0.key) }
             },
             activityBoard: nil,
-            prober: { _ in [] },
+            prober: prober,
             recycle: recycle,
             deletePermanently: { paths in
                 PermanentDeletionOutcome(deleted: Set(paths))
             },
             brewUninstall: brew,
-            crossCheckCasks: crossCheck
+            crossCheckCasks: crossCheck,
+            leftoverState: leftoverState
         )
     }
 
@@ -275,5 +280,64 @@ final class UninstallModelTests: XCTestCase {
         // Q6:每次展开重置,不记忆跨次。
         model.onExpand(bitwarden)
         XCTAssertFalse(model.isPermanentDeleteSelected(bitwarden))
+    }
+
+    // MARK: 删前复核接线(p5-cleaner/03:模型 → Runner 的探针注入与如实报)
+
+    func testChangedLeftoverSkippedButStillReported() async throws {
+        let home = NSHomeDirectory()
+        let stale = AppLeftoverRow(
+            path: home + "/Library/Caches/com.demo", site: .caches, matchKey: "k",
+            source: .generic, sizeBytes: 50, modifiedAtProbe: 100
+        )
+        let fresh = AppLeftoverRow(
+            path: home + "/Library/Logs/com.demo", site: .logs, matchKey: "k",
+            source: .generic, sizeBytes: 30, modifiedAtProbe: 100
+        )
+        let box = BatchBox()
+        let model = makeExecModel(
+            recycle: { paths in
+                await box.append(paths)
+                return TrashRecycleOutcome(recycled: Dictionary(uniqueKeysWithValues: paths.map {
+                    ($0, "/Trash/\($0)")
+                }))
+            },
+            prober: { _ in [stale, fresh] },
+            leftoverState: { path in
+                path == stale.path ? .present(modifiedEpoch: 999) : .present(modifiedEpoch: 100)
+            }
+        )
+        model.loadIfNeeded()
+        await waitForFinished(model)
+        let entry = try XCTUnwrap(model.displayedEntries.first)
+        model.onExpand(entry)
+        for _ in 0 ..< 100 where model.leftoverCache[entry.path] == nil {
+            await Task.yield()
+        }
+        model.selectAllLeftovers(for: entry)
+        model.requestUninstall(entry)
+        model.confirmUninstall()
+        await waitIdle(model)
+        guard case let .finished(report) = model.uninstallPhase else {
+            return XCTFail("应完成,得到 \(model.uninstallPhase)")
+        }
+        let batches = await box.batches
+        XCTAssertEqual(batches, [["/Applications/Demo.app", fresh.path]], "变动项不进执行器批次")
+        XCTAssertEqual(report.items.map(\.path), ["/Applications/Demo.app", stale.path, fresh.path], "战报保持确认序")
+        XCTAssertEqual(report.items[0].isRecycled, true, "app 本体豁免复核")
+        guard case let .failed(reason) = report.items[1].outcome else {
+            return XCTFail("变动残留应按失败如实报,得到 \(report.items[1].outcome)")
+        }
+        XCTAssertTrue(reason.contains("跳过"), "人话里说明已跳过:\(reason)")
+        XCTAssertEqual(report.items[2].isRecycled, true)
+    }
+}
+
+/// 跨 @Sendable 闭包记批次用。
+private actor BatchBox {
+    var batches: [[String]] = []
+
+    func append(_ batch: [String]) {
+        batches.append(batch)
     }
 }

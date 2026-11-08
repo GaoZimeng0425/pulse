@@ -145,7 +145,8 @@ struct LiveCleanDirectoryEnumerator: CleanDirectoryEnumerator {
         if returnedCommon & Self.cmnModTime != 0 {
             let seconds = readI64(b, cursor)
             let nanoseconds = readI64(b, cursor + 8)
-            modifiedEpoch = Double(seconds) + Double(max(0, nanoseconds)) * 1e-9
+            // 唯一换算(FsTimestamp):删前复核的 lstat 走同一公式,两边才能逐位相等。
+            modifiedEpoch = FsTimestamp.epoch(seconds: seconds, nanoseconds: nanoseconds)
             cursor += 16
         }
         var flags: UInt32 = 0

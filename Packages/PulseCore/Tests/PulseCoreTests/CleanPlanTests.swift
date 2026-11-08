@@ -9,7 +9,8 @@ final class CleanPlanTests: XCTestCase {
         _ path: String,
         bytes: Int64 = 100,
         tier: CleanSafetyTier = .safe,
-        reclaimable: Bool = true
+        reclaimable: Bool = true,
+        snapshot: Double? = CleanFixture.directoryModified
     ) -> JunkCandidate {
         JunkCandidate(
             ruleID: "rule." + (path as NSString).lastPathComponent,
@@ -22,7 +23,8 @@ final class CleanPlanTests: XCTestCase {
             isPartial: false,
             allReclaimableAccounting: reclaimable,
             rationale: "",
-            symbolName: "shippingbox"
+            symbolName: "shippingbox",
+            modifiedAtScan: snapshot
         )
     }
 
@@ -195,6 +197,66 @@ final class CleanPlanTests: XCTestCase {
         let calls = await spy.recycleCalls
         XCTAssertTrue(calls.isEmpty)
         XCTAssertTrue(report.items.isEmpty)
+    }
+
+    // MARK: 删前复核(p5-cleaner/03)
+
+    /// 四态混排:没动过的照删;动过 / 已不在 / 无快照的跳过如实报,且**不交给执行器**。
+    func testPreDeleteCheckSkipsChangedMissingAndSnapshotlessItems() async {
+        let unchanged = candidate("/Users/t/Library/Caches/Homebrew", bytes: 3100)
+        let changed = candidate("/Users/t/Library/Developer/Xcode/DerivedData", bytes: 28000)
+        let vanished = candidate("/Users/t/.npm/_cacache", bytes: 500)
+        let oldCache = candidate("/Users/t/.gradle/caches", bytes: 700, snapshot: nil)
+        let plan = CleanPlan(items: [unchanged, changed, vanished, oldCache])
+        let spy = FakeCleanTrashExecutor(
+            nextRecycleOutcome: TrashRecycleOutcome(recycled: [unchanged.path: "/Users/t/.Trash/Homebrew"]),
+            pathStates: [
+                changed.path: .present(modifiedEpoch: CleanFixture.directoryModified + 3600),
+                vanished.path: .missing,
+            ]
+        )
+
+        let report = await CleanRunner.run(plan, using: spy)
+
+        let calls = await spy.recycleCalls
+        XCTAssertEqual(calls, [[unchanged.path]], "只有复核通过的项进执行器批次")
+        let queried = await spy.stateQueries
+        XCTAssertEqual(queried, plan.items.map(\.path), "计划里每一项都现查一次,同序")
+        XCTAssertEqual(report.items.map(\.path), plan.items.map(\.path), "战报保持计划顺序")
+        XCTAssertEqual(report.items[0].outcome, .recycled(destination: "/Users/t/.Trash/Homebrew"))
+        XCTAssertEqual(
+            report.items[1].outcome,
+            .failed(reason: PreDeleteCheck.skipReason(.changed, origin: .scan) ?? "")
+        )
+        XCTAssertEqual(
+            report.items[2].outcome,
+            .failed(reason: PreDeleteCheck.skipReason(.missing, origin: .scan) ?? "")
+        )
+        XCTAssertEqual(
+            report.items[3].outcome,
+            .failed(reason: PreDeleteCheck.skipReason(.noSnapshot, origin: .scan) ?? "")
+        )
+        XCTAssertEqual(report.freedBytes, 3100, "跳过项不计释放量")
+        XCTAssertEqual(report.recycledPaths, [unchanged.path], "清单收敛只收真进了废纸篓的")
+    }
+
+    func testAllItemsSkippedNeverCallsRecycle() async {
+        let item = candidate("/Users/t/Library/Caches/Homebrew")
+        let spy = FakeCleanTrashExecutor(pathStates: [item.path: .unreadable])
+        let report = await CleanRunner.run(CleanPlan(items: [item]), using: spy)
+        let calls = await spy.recycleCalls
+        XCTAssertTrue(calls.isEmpty, "全部复核不过 = 执行器零调用")
+        XCTAssertEqual(report.failed.count, 1)
+        XCTAssertEqual(report.freedBytes, 0)
+    }
+
+    func testPlanCountsItemsWithoutSnapshotForConfirmSheet() {
+        let plan = CleanPlan(items: [
+            candidate("/a"),
+            candidate("/b", snapshot: nil),
+            candidate("/c", snapshot: nil),
+        ])
+        XCTAssertEqual(plan.itemsWithoutSnapshot.map(\.path), ["/b", "/c"], "确认单提前说明会被跳过的项")
     }
 }
 

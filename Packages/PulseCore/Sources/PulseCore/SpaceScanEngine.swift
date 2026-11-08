@@ -78,6 +78,11 @@ public struct SpaceNode: Sendable {
     /// (rm -rf node_modules 再装)会刷目录条目,而项目年龄不该被刷新(票面钉死)。
     /// 含 git 活动:.git 下的文件(FETCH_HEAD 等)也是直属文件,天然计入。
     public var newestChangeEpoch: Double?
+    /// **目录自身**的 mtime(扫描时刻;p5-cleaner/03 删前复核快照):目录里增删改名
+    /// 条目就会变。取自父目录列表里本条目的 `modifiedEpoch`(零额外 IO);扫描根没有
+    /// 父列表 = nil,文件节点不填。与 `newestChangeEpoch` 两个口径互不替代——那个管
+    /// 「多久没动」(年龄),这个管「扫描后动没动过」(复核)。
+    public var ownModifiedEpoch: Double?
     public var children: [SpaceNode]
 
     public init(
@@ -94,6 +99,7 @@ public struct SpaceNode: Sendable {
         datalessCount: Int = 0,
         isPartial: Bool = false,
         newestChangeEpoch: Double? = nil,
+        ownModifiedEpoch: Double? = nil,
         children: [SpaceNode] = []
     ) {
         self.name = name
@@ -109,6 +115,7 @@ public struct SpaceNode: Sendable {
         self.datalessCount = datalessCount
         self.isPartial = isPartial
         self.newestChangeEpoch = newestChangeEpoch
+        self.ownModifiedEpoch = ownModifiedEpoch
         self.children = children
     }
 }
@@ -271,6 +278,8 @@ private final class ScanCore: @unchecked Sendable {
         /// 规范路径(树上的路径域;无别名时与物理相同)。
         let displayPath: String
         let depth: Int
+        /// 本目录自身 mtime(父列表里的条目值;根 = nil)——落成 `SpaceNode.ownModifiedEpoch`。
+        var modifiedEpoch: Double?
     }
 
     /// 一份记录,等价于旧实现完成一个目录后的现场。
@@ -394,7 +403,7 @@ private final class ScanCore: @unchecked Sendable {
         do {
             entries = try await enumerator.entries(ofDirectory: job.path)
         } catch let error as CleanEnumerateError {
-            recordPlaceholder(error: error, display: job.displayPath)
+            recordPlaceholder(error: error, display: job.displayPath, ownModifiedEpoch: job.modifiedEpoch)
             settleOne()
             return
         } catch {
@@ -407,7 +416,8 @@ private final class ScanCore: @unchecked Sendable {
         var node = SpaceNode(
             name: SpaceScanEngine.lastName(of: job.displayPath),
             path: job.displayPath,
-            kind: .directory
+            kind: .directory,
+            ownModifiedEpoch: job.modifiedEpoch
         )
         var childDirs: [String] = []
         var childJobs: [PendingDir] = []
@@ -436,7 +446,12 @@ private final class ScanCore: @unchecked Sendable {
                 }
                 dirStats.directories += 1
                 childDirs.append(childDisplay)
-                childJobs.append(PendingDir(path: childPath, displayPath: childDisplay, depth: job.depth + 1))
+                childJobs.append(PendingDir(
+                    path: childPath,
+                    displayPath: childDisplay,
+                    depth: job.depth + 1,
+                    modifiedEpoch: entry.modifiedEpoch
+                ))
 
             case .file:
                 // 硬链接同 (dev, fileID) 只计首个(dust §2.3;先到先得,并行下由分片锁定序)。
@@ -534,15 +549,23 @@ private final class ScanCore: @unchecked Sendable {
         recordPlaceholder(
             physical: job.path,
             display: job.displayPath,
-            error: CleanEnumerateError(path: job.path, reason: reason)
+            error: CleanEnumerateError(path: job.path, reason: reason),
+            ownModifiedEpoch: job.modifiedEpoch
         )
     }
 
-    private func recordPlaceholder(error: CleanEnumerateError, display: String) {
-        recordPlaceholder(physical: error.path, display: display, error: error)
+    private func recordPlaceholder(error: CleanEnumerateError, display: String, ownModifiedEpoch: Double?) {
+        recordPlaceholder(physical: error.path, display: display, error: error, ownModifiedEpoch: ownModifiedEpoch)
     }
 
-    private func recordPlaceholder(physical: String, display: String, error: CleanEnumerateError) {
+    /// 占位节点(读不了 / 超深)同样带目录自身 mtime 快照:部分扫描项照列成候选,
+    /// 删前复核一视同仁(快照来自父列表,与本目录能否打开无关)。
+    private func recordPlaceholder(
+        physical: String,
+        display: String,
+        error: CleanEnumerateError,
+        ownModifiedEpoch: Double?
+    ) {
         stateLock.lock()
         ledger.append(error)
         records[display] = Record(
@@ -550,7 +573,8 @@ private final class ScanCore: @unchecked Sendable {
                 name: SpaceScanEngine.lastName(of: display),
                 path: display,
                 kind: .directory,
-                isPartial: true
+                isPartial: true,
+                ownModifiedEpoch: ownModifiedEpoch
             ),
             childDirPaths: []
         )

@@ -729,10 +729,11 @@ private struct AppUninstallConfirmSheet: View {
     }
 
     private var footnote: String {
+        // 删前复核注记(p5-cleaner/03):残留列出后动过的会被跳过并说明原因;app 本体豁免。
         if plan.isBrew {
-            return "Homebrew 卸载失败时本次零删除,不会绕过它直接删文件。"
+            return "Homebrew 卸载失败时本次零删除,不会绕过它直接删文件。残留动过或已不在的会跳过并说明原因。"
         }
-        return "大小按实际占用计;失败项会如实报告并跳过。"
+        return "大小按实际占用计;失败项与列出后有变动的残留会跳过并说明原因。"
     }
 
     private func confirmRow(_ row: Row) -> some View {

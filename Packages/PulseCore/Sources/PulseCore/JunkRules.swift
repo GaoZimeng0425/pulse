@@ -404,6 +404,9 @@ public struct JunkCandidate: Sendable, Identifiable, Equatable {
     /// 项目年龄(05:项目直属树内**非产物**文件的最后变动;全局缓存为 nil)。
     /// 界面换算成「N 天未动」;排序「按新旧」以它为准(nil 排最后)。
     public let newestChangeEpoch: Double?
+    /// 扫描时刻目录自身 mtime(p5-cleaner/03 删前复核快照,= 节点 `ownModifiedEpoch`)。
+    /// nil = 扫描没拿到(旧版缓存 / 文件系统没给)→ 删除时按「缺少扫描快照」跳过。
+    public let modifiedAtScan: Double?
 
     public init(
         ruleID: String,
@@ -418,7 +421,8 @@ public struct JunkCandidate: Sendable, Identifiable, Equatable {
         rationale: String,
         symbolName: String,
         projectName: String? = nil,
-        newestChangeEpoch: Double? = nil
+        newestChangeEpoch: Double? = nil,
+        modifiedAtScan: Double? = nil
     ) {
         self.ruleID = ruleID
         self.group = group
@@ -433,6 +437,7 @@ public struct JunkCandidate: Sendable, Identifiable, Equatable {
         self.symbolName = symbolName
         self.projectName = projectName
         self.newestChangeEpoch = newestChangeEpoch
+        self.modifiedAtScan = modifiedAtScan
     }
 
     init(rule: JunkRule, node: SpaceNode, pattern: JunkPathPattern) {
@@ -456,7 +461,8 @@ public struct JunkCandidate: Sendable, Identifiable, Equatable {
             // 08 票:目录内任何文件的最近变动(与项目年龄的 05 语义不同口径——
             // 那是「项目直属非产物文件的变动」,这个就是该缓存目录自己的动静;
             // 供「大小|新旧」排序,界面不直接展示)。
-            newestChangeEpoch: node.newestChangeEpoch
+            newestChangeEpoch: node.newestChangeEpoch,
+            modifiedAtScan: node.ownModifiedEpoch
         )
     }
 }

@@ -225,7 +225,8 @@ public enum ProjectArtifactMatcher {
                 rationale: rule.rationale,
                 symbolName: rule.symbolName,
                 projectName: node.name,
-                newestChangeEpoch: projectAge(of: node, rulesByName: rulesByName)
+                newestChangeEpoch: projectAge(of: node, rulesByName: rulesByName),
+                modifiedAtScan: child.ownModifiedEpoch
             ))
         }
     }

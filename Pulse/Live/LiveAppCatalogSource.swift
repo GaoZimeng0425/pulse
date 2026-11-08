@@ -178,19 +178,24 @@ extension LiveAppCatalogSource {
         for probe in probes {
             switch probe {
             case let .path(path, site, key, isFile, checkFirst, source):
-                var isDirectory: ObjCBool = false
-                guard fileManager.fileExists(atPath: path, isDirectory: &isDirectory) else { continue }
-                if isDirectory.boolValue {
+                // 一次 lstat 拿三样:存在性 / 块大小(文件) / 删前复核快照(p5-cleaner/03)。
+                // 读不到状态 = 不产行(残留清单只列真在盘上的东西,推测不算数)。
+                guard let snapshot = statEntry(atPath: path) else { continue }
+                if snapshot.isDirectory {
                     pendingDirectories.append(
-                        AppLeftoverRow(path: path, site: site, matchKey: key, source: source, isCheckFirst: checkFirst)
+                        AppLeftoverRow(
+                            path: path, site: site, matchKey: key, source: source,
+                            isCheckFirst: checkFirst, modifiedAtProbe: snapshot.modifiedEpoch
+                        )
                     )
                 } else {
-                    // 文件(.plist / .binarycookies):单 stat,block 口径;读不到 = nil
-                    // 穿透(大小未知但条目真实存在,照列)。
+                    // 文件(.plist / .binarycookies):block 口径;读不到 = nil 穿透
+                    // (大小未知但条目真实存在,照列)。
                     rows.append(
                         AppLeftoverRow(
                             path: path, site: site, matchKey: key, source: source,
-                            isCheckFirst: checkFirst, sizeBytes: fileSize(path)
+                            isCheckFirst: checkFirst, sizeBytes: snapshot.allocatedBytes,
+                            modifiedAtProbe: snapshot.modifiedEpoch
                         )
                     )
                     _ = isFile // 形状已由路径后缀体现,不再分支
@@ -225,9 +230,19 @@ extension LiveAppCatalogSource {
         return AppLeftovers.sortedRows(rows)
     }
 
-    private func fileSize(_ path: String) -> Int64? {
+    /// lstat 一次的投影(存在性 + 方向 + 块大小 + 自身 mtime)。
+    private func statEntry(atPath path: String)
+        -> (isDirectory: Bool, allocatedBytes: Int64?, modifiedEpoch: Double?)? {
         var st = stat()
-        guard stat(path, &st) == 0 else { return nil }
-        return Int64(st.st_blocks) * 512
+        guard lstat(path, &st) == 0 else { return nil }
+        let modified = FsTimestamp.epoch(
+            seconds: Int64(st.st_mtimespec.tv_sec),
+            nanoseconds: Int64(st.st_mtimespec.tv_nsec)
+        )
+        return (
+            st.st_mode & S_IFMT == S_IFDIR,
+            Int64(st.st_blocks) * 512,
+            modified
+        )
     }
 }

@@ -15,6 +15,10 @@ import Foundation
 //                       勾选中 zap 未覆盖的残留 → 我们直删(.direct)
 //   brew 内部删除不透明:exit 0 即按声明记 .brew(防御纪律的边界,注释如实);
 //   我们自己批次的回执逐项核对,执行器没报到的按失败记,不默认成功。
+// 删前复核(p5-cleaner/03,spec §15):我们自己动手的**残留**批次(废纸篓 / 直删)先过
+// `PreDeleteCheck`——列出后动过 / 已不在 / 无快照的跳过如实报;彻底删除不可恢复,这道闸
+// 最要紧。两处不过闸:app 本体(意图就是「删掉这个 app」,自动更新刷了 mtime 也不该拦;
+// 它有运行重查与收据交叉核对两道)、brew --zap 声明域(brew 内部删,我们拦不到,同上注)。
 
 /// 一次卸载的执行计划(确认弹窗与执行共用的单一事实源;Q6/Q9 的输入)。
 public struct AppUninstallPlan: Sendable, Equatable {
@@ -100,6 +104,7 @@ public enum AppUninstallRunner {
         brewUninstall: @Sendable (_ cask: String, _ zap: Bool) async -> BrewUninstallResult,
         isAppRunning: @Sendable (String) -> Bool,
         crossCheckCask: @Sendable (String) async -> String?,
+        leftoverState: @Sendable (String) async -> PathSnapshot,
         rerouteAcknowledged: Bool = false,
         now: @Sendable () -> Date = { Date() }
     ) async -> AppUninstallTermination {
@@ -112,7 +117,7 @@ public enum AppUninstallRunner {
         if let cask = plan.caskName {
             return await runBrew(
                 plan, cask: cask, recycle: recycle, deletePermanently: deletePermanently,
-                brewUninstall: brewUninstall, startedAt: startedAt, now: now
+                brewUninstall: brewUninstall, leftoverState: leftoverState, startedAt: startedAt, now: now
             )
         }
 
@@ -122,20 +127,49 @@ public enum AppUninstallRunner {
             return .needsReroute(cask: cask)
         }
 
+        // 删前复核只管残留(app 本体豁免,见文件头);跳过项不进批次,战报照原序如实记。
+        let check = await verifiedLeftovers(plan.leftoverItems, leftoverState: leftoverState)
         let paths = [plan.appPath] + plan.leftoverItems.map(\.path)
+        let batch = [plan.appPath] + check.cleared.map(\.path)
         // Swift 泛型不便在两个回执类型间条件分派,这里拆两支各自成行(防御逻辑同款)。
         if plan.permanent {
-            let outcome = await deletePermanently(paths)
+            let outcome = await deletePermanently(batch)
             let items = paths.enumerated().map { index, path in
-                item(for: path, at: index, in: plan, outcome: receipt(for: path, from: outcome))
+                item(
+                    for: path,
+                    at: index,
+                    in: plan,
+                    outcome: check.skipped[path].map { .failed(reason: $0) }
+                        ?? receipt(for: path, from: outcome)
+                )
             }
             return .completed(CleanRunReport(startedAt: startedAt, finishedAt: now(), items: items))
         }
-        let outcome = await recycle(paths)
+        let outcome = await recycle(batch)
         let items = paths.enumerated().map { index, path in
-            item(for: path, at: index, in: plan, outcome: receipt(for: path, from: outcome))
+            item(
+                for: path,
+                at: index,
+                in: plan,
+                outcome: check.skipped[path].map { .failed(reason: $0) }
+                    ?? receipt(for: path, from: outcome)
+            )
         }
         return .completed(CleanRunReport(startedAt: startedAt, finishedAt: now(), items: items))
+    }
+
+    /// 残留删前复核(快照 = 展开应用时的探测值)。
+    private static func verifiedLeftovers(
+        _ leftovers: [AppLeftoverRow],
+        leftoverState: @Sendable (String) async -> PathSnapshot
+    ) async -> (cleared: [AppLeftoverRow], skipped: [String: String]) {
+        await PreDeleteCheck.partition(
+            leftovers,
+            path: \.path,
+            snapshot: \.modifiedAtProbe,
+            origin: .leftoverProbe,
+            currentState: leftoverState
+        )
     }
 
     // MARK: brew 分支
@@ -146,6 +180,7 @@ public enum AppUninstallRunner {
         recycle: @Sendable ([String]) async -> TrashRecycleOutcome,
         deletePermanently: @Sendable ([String]) async -> PermanentDeletionOutcome,
         brewUninstall: @Sendable (String, Bool) async -> BrewUninstallResult,
+        leftoverState: @Sendable (String) async -> PathSnapshot,
         startedAt: Date,
         now: @Sendable () -> Date
     ) async -> AppUninstallTermination {
@@ -178,15 +213,26 @@ public enum AppUninstallRunner {
         if !ownPaths.isEmpty {
             // 回执按路径对账,批次结果不改变行的确认序(app 先、残留按勾选序)。
             let leftovers = plan.leftoverItems.filter { ownPaths.contains($0.path) }
+            // 删前复核:我们自己动手的这批先过闸(brew 已删完 app,这里拦下的只是残留)。
+            let check = await verifiedLeftovers(leftovers, leftoverState: leftoverState)
+            let batch = check.cleared.map(\.path)
             if plan.permanent {
-                let outcome = await deletePermanently(ownPaths)
+                let outcome = batch.isEmpty ? PermanentDeletionOutcome() : await deletePermanently(batch)
                 for leftover in leftovers {
-                    items.append(leftoverItem(leftover, outcome: receipt(for: leftover.path, from: outcome)))
+                    items.append(leftoverItem(
+                        leftover,
+                        outcome: check.skipped[leftover.path]
+                            .map { .failed(reason: $0) } ?? receipt(for: leftover.path, from: outcome)
+                    ))
                 }
             } else {
-                let outcome = await recycle(ownPaths)
+                let outcome = batch.isEmpty ? TrashRecycleOutcome() : await recycle(batch)
                 for leftover in leftovers {
-                    items.append(leftoverItem(leftover, outcome: receipt(for: leftover.path, from: outcome)))
+                    items.append(leftoverItem(
+                        leftover,
+                        outcome: check.skipped[leftover.path]
+                            .map { .failed(reason: $0) } ?? receipt(for: leftover.path, from: outcome)
+                    ))
                 }
             }
         }

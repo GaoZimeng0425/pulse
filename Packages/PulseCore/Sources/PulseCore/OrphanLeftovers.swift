@@ -132,7 +132,8 @@ public enum OrphanLeftoverDetector {
                         : "「\(bundleID)」已不在已装应用清单,但 30 天内还有文件变动——先确认没有别的程序在用再删",
                     symbolName: "app.dashed",
                     projectName: bundleID,
-                    newestChangeEpoch: newest
+                    newestChangeEpoch: newest,
+                    modifiedAtScan: child.ownModifiedEpoch
                 ))
             }
         }
