@@ -2,7 +2,7 @@ import AppKit
 import PulseCore
 import SwiftUI
 
-// MARK: - 开发者垃圾清单(p4-cleaner/04;形态 = 原型 B 变体,DESIGN.md 卡片家族)
+// MARK: - 可清理清单(旧名「开发者垃圾」,2026-11-08 改名;p4-cleaner/04;DESIGN.md 卡片家族)
 
 //
 // 本文件只做呈现与转发,状态全在 CleanerModel(PulseCore 纯值驱动):
@@ -192,7 +192,7 @@ private struct JunkListCard: View {
 
     private var header: some View {
         // 08 色彩纪律:卡头也中性(此前金色 sparkles 图标是「全页黄」的源头之一)。
-        CardHeader(symbolName: "trash", title: "开发者垃圾", tint: .primary) {
+        CardHeader(symbolName: "trash", title: "可清理", tint: .primary) {
             Text(summaryText)
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)

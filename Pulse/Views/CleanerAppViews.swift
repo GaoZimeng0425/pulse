@@ -332,7 +332,7 @@ struct AppListSection: View {
 
 private struct AppRow: View {
     let entry: UninstallAppEntry
-    /// 大小条的最大值(条形对照,与开发者垃圾行同款语言)。
+    /// 大小条的最大值(条形对照,与可清理行同款语言)。
     let leader: Int64
     let isSelected: Bool
     let isExpanded: Bool

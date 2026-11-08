@@ -17,4 +17,9 @@ final class CleanerAppSubTabTests: XCTestCase {
     func testAppsTitle() {
         XCTAssertEqual(CleanerSubTab.apps.title, "应用")
     }
+
+    func testJunkTitle() {
+        // 2026-11-08 用户拍板改名:装着卸载残留后「开发者垃圾」名不副实。
+        XCTAssertEqual(CleanerSubTab.junk.title, "可清理")
+    }
 }

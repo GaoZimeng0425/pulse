@@ -20,7 +20,7 @@ public struct SpaceScanOptions: Sendable, Equatable {
     /// 文件节点是否进树(`children`)。false = 文件只聚合进父目录的计数与字节,
     /// 树里只留目录节点。真机全卷 ≈340 万项、文件级节点约 278 B/个,全量驻留 ≈900 MB,
     /// 只留目录(≈10%)≈90 MB(p4-cleaner/04 合成探针 /tmp/p4-mem-probe.swift 实测)。
-    /// 开发者垃圾(规则只认目录)与空间地图(目录粒度)都不需要文件节点;默认 true
+    /// 可清理清单(规则只认目录)与空间地图(目录粒度)都不需要文件节点;默认 true
     /// 保持 02 票的树形状不变,按需关。
     public var retainFileNodes: Bool
     /// 规范根(方案 A 路径域修正):与 roots 一一对应;第 i 个非 nil 时,该根的
@@ -51,7 +51,7 @@ public struct SpaceScanOptions: Sendable, Equatable {
     }
 }
 
-/// 空间树节点。树 = 空间地图与开发者垃圾共用的数据源(spec:一次扫描喂两个子页)。
+/// 空间树节点。树 = 空间地图与可清理清单共用的数据源(spec:一次扫描喂两个子页)。
 public struct SpaceNode: Sendable {
     public var name: String
     public var path: String

@@ -4,7 +4,7 @@ import SwiftUI
 // MARK: - 清理页(p4-cleaner/03 扫描闭环 + 04 删除管线 + p4-uninstaller/01 四子药丸壳)
 
 //
-// 子页内容:开发者垃圾 = JunkListSection(04,CleanerJunkViews.swift)、空间地图 =
+// 子页内容:可清理清单(旧名「开发者垃圾」,2026-11-08 用户拍板改名——装着卸载残留后名不副实)= JunkListSection(04,CleanerJunkViews.swift)、空间地图 =
 // 03 的扫描状态卡 + 结果摘要卡(旭日图 07 票接入 `mapSection`)、清理历史 =
 // CleanHistorySection(04 列表 + 明细;「清空废纸篓」按钮 08 票)、应用 =
 // AppListSection(p4-uninstaller/01,清单只读;残留 / 卸载动作 02/03 票)。空态
@@ -19,7 +19,7 @@ enum CleanerSubTab: String, CaseIterable, Hashable {
 
     var title: String {
         switch self {
-        case .junk: "开发者垃圾"
+        case .junk: "可清理"
         case .map: "空间地图"
         case .apps: "应用"
         case .history: "清理历史"
