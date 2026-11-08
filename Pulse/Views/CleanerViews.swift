@@ -80,7 +80,12 @@ struct CleanerPageHeader: View {
             let age = model.loadedFromCache
                 ? " · \(Self.relativeAgeText(from: model.scanFinishedAt))前(缓存)"
                 : ""
-            return "上次扫描 \(result.cancelled ? "已取消(部分)" : "完成") · \(model.scanDurationText) · 实际占用口径" + age + cleaned
+            // 卸载残留注记(p5-cleaner/02):检测了说「含」,没检测(全集不完整)如实说「未检测」。
+            let orphanNote = model.orphanDetectionActive
+                ? " · 含卸载残留检测"
+                : (model.orphanDetectionUnavailableReason == nil ? "" : " · 卸载残留未检测")
+            return "上次扫描 \(result.cancelled ? "已取消(部分)" : "完成") · \(model.scanDurationText) · 实际占用口径"
+                + orphanNote + age + cleaned
         }
     }
 
@@ -345,7 +350,6 @@ struct CleanerTabView: View {
                     model: model,
                     drillPath: $mapDrillPath,
                     treeIndex: $mapTreeIndex,
-                    home: model.junkHome,
                     onGoToJunk: { group in
                         subTab = .junk
                         pendingJunkGroup = group

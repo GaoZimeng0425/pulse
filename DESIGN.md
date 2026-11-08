@@ -298,6 +298,14 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   显示完整路径**(同名 node_modules/build 靠路径区分,中段省略;rationale 每行
   同文案零信息量,降为行悬停 + TierChip 悬停自解释档位)。项目行无可自动勾选项时
   给**可见**原因:全在用 = 锁图标、全为先检查 = 灰 chip「须逐个勾」。
+  **卸载残留组**(p5-cleaner/02,殿后第三组)= 项目大卡同一配方原样复用(按
+  `JunkGroup.groupsByOwner` 走大卡,工具缓存独占小卡形态):分组键 = 完整 bundle id,
+  头排标题 = 尾段显示名(`com.tencent.qq` → `qq`),meta 前缀完整 id(同尾段的不同
+  app 靠它区分,中段省略);文案名词换「应用 / 残留」。大卡头排「N 天前动过」与行副标
+  「N 天未动」同档粒度(天 / 月 / 年)。全集不完整(某 Info.plist 读不了 / 扫描取消)
+  时不出组,组位给一行三级墨色说明「卸载残留未检测:原因」——**「没查」与「查了
+  没有」两态必须分开**(后者照空态规则不出组、不给说明)。页头副标注记「含卸载残留
+  检测」/「卸载残留未检测」。
 - **清理清单行**(p4-cleaner/04,`CleanerJunkViews.swift`):**舒适密度档**(上行)
   之下的既有配方:行首系统 checkbox(large);行选中底 =
   `{colors.surface-card-high}` 70% + `{rounded.inner}` 10。**安全档 chip**(`TierChip`)=

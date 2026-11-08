@@ -20,8 +20,6 @@ struct SpaceMapSection: View {
     let model: CleanerModel
     @Binding var drillPath: String?
     @Binding var treeIndex: Int
-    /// 轻桥(p4-uninstaller/05):白名单判定相对它展开(与开发者垃圾清单同源)。
-    let home: String
     /// 命中白名单的块「去清理清单」动作(壳层切子药丸 + 定位组)。
     let onGoToJunk: (JunkGroup) -> Void
 
@@ -59,9 +57,11 @@ struct SpaceMapSection: View {
         let rects = TreemapLayout.layout(root: root)
         // 角标判定预计算一次(与 rects 同源);Canvas 里只查表,hover 重绘零重算。
         // 只命中非密封非合并块——密封区不可删、「其他」是合成块,都零暗示(ADR-0008)。
+        // 判定 = 白名单规则表 ∪ 本次卸载残留候选(p5-cleaner/02;与清单同源同家目录)。
+        let resolve = model.mapCleanableResolver()
         let cleanable: [JunkGroup?] = rects.map { rect in
             guard !rect.node.isSealed, !rect.node.isAggregate else { return nil }
-            return JunkRuleTable.cleanableGroup(for: rect.node.path, home: home)
+            return resolve(rect.node.path)
         }
         return VStack(alignment: .leading, spacing: 12) {
             CardHeader(symbolName: "square.grid.3x3.square", title: "空间地图", tint: accent) {
@@ -249,7 +249,9 @@ struct SpaceMapSection: View {
                     }
                     .buttonStyle(.borderless)
                     .foregroundStyle(Surface.cleanAccent)
-                    .help("能删的判定来自清理白名单(与开发者垃圾清单同源);地图本身只读——点击去开发者垃圾定位对应组")
+                    .help(group == .uninstallLeftovers
+                        ? "这块是卸载残留:命名它的 app 已不在已装应用清单(与开发者垃圾清单同源);地图本身只读——点击去开发者垃圾定位对应组"
+                        : "能删的判定来自清理白名单(与开发者垃圾清单同源);地图本身只读——点击去开发者垃圾定位对应组")
                 }
             }
         }

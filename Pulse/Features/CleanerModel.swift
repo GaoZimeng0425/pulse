@@ -49,6 +49,11 @@ final class CleanerModel {
     /// 与 `result` 同时落位。重进 tab 沿用,重新扫描才刷新(与 03 缓存同寿命)。
     private(set) var mapTrees: [SpaceMapNode] = []
 
+    /// 已装 bundle id 全集(p5-cleaner/02,判卸载残留的权威源):扫描完成 / 缓存装载
+    /// 各采一次,**先于** phase 落位——清单备忘键的 phaseGeneration 天然覆盖,不另立键。
+    /// nil = 尚无结果;只有 `.complete` 判孤儿,失败态整组不出(fail-closed)并如实提示。
+    private(set) var installedApps: InstalledAppInventory?
+
     private(set) var cleanPhase: CleanPhase = .idle
     private(set) var selection = JunkSelection()
     /// 本会话已移入废纸篓的路径:树里还挂着(不重扫),清单里不再列。
@@ -102,17 +107,38 @@ final class CleanerModel {
     /// nil = 不落盘(预览 / 旧测试)。读 = 打开清理页一次(后台),写 = 扫完一次;
     /// 常驻稳态零——不挂调度,关窗照旧释放内存树。
     private let scanCache: CleanScanResultStore?
+    /// 已装全集采集器(p5-cleaner/02):生产 Live(树内 bundle ∪ 标准目录 ∪ 运行中);
+    /// 测试注入固定结果。同步重活,只在扫描 / 装载的后台任务里调。
+    private let installedAppInventory: @Sendable (
+        _ trees: [SpaceNode],
+        _ scanCancelled: Bool,
+        _ home: String
+    ) -> InstalledAppInventory
     private let homeDirectory: String
-
-    /// 只读暴露(轻桥 p4-uninstaller/05:地图角标判定与垃圾清单共用同一家目录口径)。
-    var junkHome: String {
-        homeDirectory
-    }
 
     /// 两组展示排序(08:统一 Core 的 JunkSortOrder;项目产物沿用 05 拍板
     /// 默认大小、可切新旧;工具缓存排序为 08 新增,两组互不影响)。
     var artifactSort: JunkSortOrder = .size
     var toolCacheSort: JunkSortOrder = .size
+    /// 卸载残留组排序(p5-cleaner/02:组头同款 seg,三组互不影响)。
+    var orphanSort: JunkSortOrder = .size
+
+    /// 组排序读写(穷举 switch:新增分组必须在这里表态,不会静默蹭别组的排序)。
+    func sortOrder(for group: JunkGroup) -> JunkSortOrder {
+        switch group {
+        case .globalToolCache: toolCacheSort
+        case .projectArtifacts: artifactSort
+        case .uninstallLeftovers: orphanSort
+        }
+    }
+
+    func setSortOrder(_ order: JunkSortOrder, for group: JunkGroup) {
+        switch group {
+        case .globalToolCache: toolCacheSort = order
+        case .projectArtifacts: artifactSort = order
+        case .uninstallLeftovers: orphanSort = order
+        }
+    }
 
     /// - Parameters:
     ///   - exclusions: 排除目录(设置页同一实例;默认不落盘的空表给预览 / 测试)。
@@ -124,6 +150,8 @@ final class CleanerModel {
     ///   - volumeSummaries: 只读系统卷卷级摘要源(生产 statfs;测试固定值)。
     ///   - homeDirectory: 规则表相对它展开;测试注入假家目录。
     ///   - markerExists: 项目产物标记探测(cleaner-hardening/02;生产查盘,测试注入假集合)。
+    ///   - installedAppInventory: 已装 bundle id 全集采集(p5-cleaner/02;默认 Live——
+    ///     装配点漏传即功能静默死亡的病(票 11 scanCache 实案)不再给机会)。
     init(
         exclusions: CleanExclusionsStore = CleanExclusionsStore(load: { [] }, persist: { _ in }),
         scanRoots: CleanScanRootsStore = CleanScanRootsStore(load: { [] }, persist: { _ in }),
@@ -134,6 +162,9 @@ final class CleanerModel {
         scanCache: CleanScanResultStore? = nil,
         homeDirectory: String = NSHomeDirectory(),
         markerExists: @escaping (String) -> Bool = { FileManager.default.fileExists(atPath: $0) },
+        installedAppInventory: @escaping @Sendable ([SpaceNode], Bool, String) -> InstalledAppInventory = {
+            LiveInstalledAppInventory.collect(trees: $0, scanCancelled: $1, home: $2)
+        },
         trashInventory: @escaping @Sendable () async -> TrashInventory = {
             await LiveCleanTrashExecutor().inventory()
         }
@@ -145,6 +176,7 @@ final class CleanerModel {
         self.activity = activity
         self.volumeSummaries = volumeSummaries
         self.scanCache = scanCache
+        self.installedAppInventory = installedAppInventory
         self.homeDirectory = PathNormalization.normalize(homeDirectory)
         self.markerExists = markerExists
         trashInventorySource = trashInventory
@@ -261,7 +293,8 @@ final class CleanerModel {
         LogService.info("缓存装载:开始读盘+解码", category: "Cleaner")
         // userInitiated:用户点开清理页正在等这个结果(真机实锤 2026-11-03:满载下
         // utility 解码被饿 21s,空态期被当成了「没缓存」;同文件常态 0.6s)。
-        Task.detached(priority: .userInitiated) { [weak self, scanCache, volumeSummaries] in
+        Task.detached(priority: .userInitiated) {
+            [weak self, scanCache, volumeSummaries, installedAppInventory, homeDirectory] in
             guard let payload = scanCache.load() else {
                 LogService.warn("缓存装载:文件缺失或解码失败", category: "Cleaner")
                 await MainActor.run { self?.isRestoringCache = false }
@@ -271,11 +304,18 @@ final class CleanerModel {
             let mapTrees = payload.result.trees.map {
                 SpaceMapTree.build(from: $0, sealedVolumes: sealedVolumes)
             }
-            await MainActor.run { self?.applyCached(payload, mapTrees: mapTrees) }
+            // 已装全集现采(p5-cleaner/02):树是缓存快照,标准目录与运行中取此刻——
+            // 比落盘一份扫描时的全集更保守(装机后新装的 app 立即受保护)。
+            let inventory = installedAppInventory(payload.result.trees, payload.result.cancelled, homeDirectory)
+            await MainActor.run { self?.applyCached(payload, mapTrees: mapTrees, inventory: inventory) }
         }
     }
 
-    private func applyCached(_ payload: SpaceScanCachePayload, mapTrees: [SpaceMapNode]) {
+    private func applyCached(
+        _ payload: SpaceScanCachePayload,
+        mapTrees: [SpaceMapNode],
+        inventory: InstalledAppInventory
+    ) {
         isRestoringCache = false
         guard case .idle = phase, scanTask == nil else {
             LogService.warn("缓存装载:解码完成但状态已变,放弃套用", category: "Cleaner")
@@ -295,6 +335,7 @@ final class CleanerModel {
             "缓存装载:已套用 · 项 \(payload.result.stats.entriesSeen) · 扫描于 \(payload.meta.finishedAt)",
             category: "Cleaner"
         )
+        installedApps = inventory // 先于 phase:清单首读即带全集
         phase = .finished(result)
         self.mapTrees = mapTrees
         scanStartedAt = payload.meta.startedAt
@@ -321,6 +362,7 @@ final class CleanerModel {
         scanFinishedAt = nil
         phase = .scanning(ScanStats())
         mapTrees = []
+        installedApps = nil
         // 重扫 = 新一轮真相:已回收集合清空(树会重新反映磁盘),勾选随清单收敛;
         // 缓存态一并复位(真实扫描覆盖装载态)。
         recycledPaths = []
@@ -345,7 +387,8 @@ final class CleanerModel {
             canonicalRoots: canonical
         )
 
-        scanTask = Task.detached(priority: .utility) { [engine, volumeSummaries, scanCache, weak self] in
+        scanTask = Task.detached(priority: .utility) {
+            [engine, volumeSummaries, scanCache, installedAppInventory, homeDirectory, weak self] in
             let scanBegin = Date()
             let result = await engine.scan(
                 options,
@@ -367,6 +410,9 @@ final class CleanerModel {
             let mapTrees = result.trees.map {
                 SpaceMapTree.build(from: $0, sealedVolumes: sealedVolumes)
             }
+            // 已装全集(p5-cleaner/02):随结果一次采集,与 phase 同时落位;取消的扫描
+            // 是半棵树 → fail-closed(卸载残留整组不出,采集器内判)。
+            let inventory = installedAppInventory(result.trees, result.cancelled, homeDirectory)
             // 分段计时(诊断用,票 10):真机基准 Data+6worker ≈56s;偏离时看三段各占多少。
             LogService.info(
                 "扫描计时:walk \(Int(Date().timeIntervalSince(scanBegin)))s"
@@ -395,7 +441,7 @@ final class CleanerModel {
                     category: "Cleaner"
                 )
             }
-            await MainActor.run { self?.finish(result, mapTrees: mapTrees) }
+            await MainActor.run { self?.finish(result, mapTrees: mapTrees, inventory: inventory) }
         }
     }
 
@@ -403,8 +449,9 @@ final class CleanerModel {
         scanTask?.cancel()
     }
 
-    private func finish(_ result: SpaceScanResult, mapTrees: [SpaceMapNode]) {
+    private func finish(_ result: SpaceScanResult, mapTrees: [SpaceMapNode], inventory: InstalledAppInventory) {
         scanFinishedAt = Date()
+        installedApps = inventory // 先于 phase:清单首读即带全集
         phase = .finished(result)
         self.mapTrees = mapTrees
         scanTask = nil
@@ -457,16 +504,67 @@ final class CleanerModel {
             excludedPathPrefixes: excluded,
             fileExists: markerExists
         )
+        // 卸载残留(p5-cleaner/02):全集完整才判;采集失败 / 扫描取消 = 整组不出
+        // (fail-closed,`orphanDetectionUnavailableReason` 如实说)。全集随 phase 落位,
+        // 备忘键不必另带。
+        let orphans = installedApps?.bundleIDs.map {
+            OrphanLeftoverDetector.detect(
+                in: result.trees,
+                home: homeDirectory,
+                installedBundleIDs: $0,
+                excludedPathPrefixes: excluded,
+                now: Date().timeIntervalSince1970
+            )
+        } ?? []
+        // 与规则表 / 项目产物重叠的孤儿让位(org.swift.swiftpm 真案:CLI 缓存无 .app)。
+        let claimed = global + artifacts
+        let leftovers = OrphanLeftoverDetector.excludingOverlaps(orphans, claimedBy: claimed)
 
         // 不过滤亚兆条目(2026-11-06 用户拍板:0 KB 产物也是该清的东西,照列;
         // 显示层由 memory() 的 KB 档给出真实读数)。
-        return (global + artifacts)
+        return (claimed + leftovers)
             .filter { !key.recycled.contains($0.path) }
     }
 
     /// 配置了项目扫描根没有(设置页引导文案与项目产物空态的判据)。
     var hasScanRoots: Bool {
         !scanRoots.paths.isEmpty
+    }
+
+    // MARK: 卸载残留(p5-cleaner/02)
+
+    /// 本次结果做了卸载残留检测(已装全集完整)——页头注记「含卸载残留检测」的判据。
+    var orphanDetectionActive: Bool {
+        result != nil && installedApps?.bundleIDs != nil
+    }
+
+    /// 卸载残留**没检测**的原因(全集采集失败 / 扫描取消;nil = 检测了或尚无结果)。
+    /// 「没查」与「查了没有」严格分开:前者如实说,后者按空态规则整组不出(spec §13)。
+    var orphanDetectionUnavailableReason: String? {
+        guard result != nil else { return nil }
+        return installedApps?.unavailableReason
+    }
+
+    /// 空间地图「这块能清」角标判定(p4-uninstaller/05 + p5-cleaner/02):白名单规则表 ∪
+    /// 本次卸载残留候选(孤儿目录本身及其内部)。返回判定闭包——孤儿路径集合每次渲染
+    /// 建一次,逐块只查表。与清单同源:清单里没有的孤儿(已回收 / 被排除 / 让位规则表)
+    /// 地图也不标。
+    func mapCleanableResolver() -> (String) -> JunkGroup? {
+        let home = homeDirectory
+        let orphanPaths = Set(candidates.filter { $0.group == .uninstallLeftovers }.map(\.path))
+        return { path in
+            if let group = JunkRuleTable.cleanableGroup(for: path, home: home) {
+                return group
+            }
+            var current = path
+            while !orphanPaths.isEmpty, current.count > 1 {
+                if orphanPaths.contains(current) {
+                    return .uninstallLeftovers
+                }
+                current = (current as NSString).deletingLastPathComponent
+            }
+            return nil
+        }
     }
 
     // MARK: 在用保护(05:判定永不缓存,删除前重查)

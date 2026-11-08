@@ -259,9 +259,10 @@ private struct JunkListCard: View {
                             // 轻桥定位高亮(p4-uninstaller/05):跳转落地闪一下,1.5s 自灭。
                             flashGroup == group ? accent.opacity(0.12) : Color.clear
                         )
-                    if group == .projectArtifacts {
-                        // 按项目分子组(同 projectName 聚合):一张大卡装头排 + 缩进的
-                        // 裸行子项(2026-11-06 三次拍板)。
+                    if group.groupsByOwner {
+                        // 按所有者分子组(同 projectName 聚合;项目产物 = 项目,卸载残留 =
+                        // app 全 bundle id):一张大卡装头排 + 缩进的裸行子项(2026-11-06
+                        // 三次拍板;p5-cleaner/02 复用到卸载残留)。
                         ForEach(ProjectJunkGrouping.group(items)) { projectGroup in
                             // 项目级勾选两层口径(2026-11-06 用户连续拍板):
                             // 状态 = 反映全部非在用子项(手勾的「先检查」也算数,父级
@@ -272,18 +273,21 @@ private struct JunkListCard: View {
                                 .filter { model.inUseReasons(for: $0, entries: activity) == nil }
                             let autoSelectable = nonInUse.filter { $0.tier == .safe }
                             let allInUse = !projectGroup.items.isEmpty && nonInUse.isEmpty
-                            let isCollapsed = collapsedProjects.contains(projectGroup.projectName)
+                            // 收起态按「组/键」记:项目名与 bundle id 同名也不串。
+                            let cardKey = group.rawValue + "/" + projectGroup.projectName
+                            let isCollapsed = collapsedProjects.contains(cardKey)
                             projectCard(
                                 projectGroup,
+                                group: group,
                                 stateItems: nonInUse,
                                 autoSelectable: autoSelectable,
                                 allInUse: allInUse,
                                 isCollapsed: isCollapsed,
                                 onToggleCollapse: {
-                                    if collapsedProjects.contains(projectGroup.projectName) {
-                                        collapsedProjects.remove(projectGroup.projectName)
+                                    if collapsedProjects.contains(cardKey) {
+                                        collapsedProjects.remove(cardKey)
                                     } else {
-                                        collapsedProjects.insert(projectGroup.projectName)
+                                        collapsedProjects.insert(cardKey)
                                     }
                                 }
                             ) {
@@ -321,6 +325,9 @@ private struct JunkListCard: View {
             if byGroup[.projectArtifacts] == nil {
                 scanRootsHint
             }
+            if let reason = model.orphanDetectionUnavailableReason {
+                orphanUnavailableHint(reason)
+            }
         }
     }
 
@@ -335,9 +342,19 @@ private struct JunkListCard: View {
             .padding(.horizontal, CleanerListMetrics.rowInset)
     }
 
-    /// 组排序(08:两组各自独立,互不影响)。
+    /// 卸载残留没检测时的如实说明(p5-cleaner/02:「没查」≠「查了没有」——后者按空态
+    /// 规则整组不出,前者必须说,否则用户以为这台机器没有卸载残留)。
+    private func orphanUnavailableHint(_ reason: String) -> some View {
+        Text("卸载残留未检测:\(reason)")
+            .font(.system(size: 11.5))
+            .foregroundStyle(.tertiary)
+            .padding(.top, 6)
+            .padding(.horizontal, CleanerListMetrics.rowInset)
+    }
+
+    /// 组排序(08 起各组独立;读写走模型的穷举 switch,新组必须表态)。
     private func sortMode(for group: JunkGroup) -> JunkSortOrder {
-        group == .projectArtifacts ? model.artifactSort : model.toolCacheSort
+        model.sortOrder(for: group)
     }
 
     /// 组头(2026-11-06 改版):组名 16 bold + 总量在左;右侧 = 「全选安全项」+
@@ -374,13 +391,7 @@ private struct JunkListCard: View {
                 "排序",
                 selection: Binding(
                     get: { sortMode(for: group) },
-                    set: {
-                        if group == .projectArtifacts {
-                            model.artifactSort = $0
-                        } else {
-                            model.toolCacheSort = $0
-                        }
-                    }
+                    set: { model.setSortOrder($0, for: group) }
                 )
             ) {
                 Text("大小").tag(JunkSortOrder.size)
@@ -404,6 +415,7 @@ private struct JunkListCard: View {
     /// 子项——没有安全项可勾(纯先检查)时 checkbox 置灰,不给假按钮。全在用 → 换锁。
     private func projectCard(
         _ projectGroup: ProjectJunkGroup,
+        group: JunkGroup,
         stateItems: [JunkCandidate],
         autoSelectable: [JunkCandidate],
         allInUse: Bool,
@@ -415,13 +427,16 @@ private struct JunkListCard: View {
         let checkState: CleanerCheckBox.CheckState = stateItems.isEmpty || selectedCount == 0
             ? .off
             : (selectedCount == stateItems.count ? .on : .mixed)
+        // 文案名词随组(项目产物 = 项目 / 产物;卸载残留 = 应用 / 残留)。
+        let owner = group == .uninstallLeftovers ? "应用" : "项目"
+        let item = group == .uninstallLeftovers ? "残留" : "产物"
         return VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 8) {
                 if allInUse {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 13))
                         .foregroundStyle(.tertiary)
-                        .help("在用保护:该项目此刻有进程活动(终端/构建),不参与本次清理")
+                        .help("在用保护:该\(owner)此刻有进程活动(终端/构建等),不参与本次清理")
                 } else {
                     Button {
                         guard !isBusy, !autoSelectable.isEmpty else { return }
@@ -434,16 +449,21 @@ private struct JunkListCard: View {
                     .buttonStyle(.plain)
                     .disabled(isBusy || autoSelectable.isEmpty)
                     .help(autoSelectable.isEmpty
-                        ? "本项目没有「可安全清理」产物——「先检查」项不进自动勾选,逐个手勾(手动勾选后这里会如实显示)"
-                        : "全选/全清本项目「可安全清理」产物;「先检查」项不进自动勾选,须逐个手勾(手勾后父级如实显示)")
+                        ? "本\(owner)没有「可安全清理」\(item)——「先检查」项不进自动勾选,逐个手勾(手动勾选后这里会如实显示)"
+                        : "全选/全清本\(owner)「可安全清理」\(item);「先检查」项不进自动勾选,须逐个手勾(手勾后父级如实显示)")
                 }
-                Text(projectGroup.projectName)
+                // 卸载残留:显示名 = bundle id 尾段(spec §11),全 id 进 meta 区分同尾段的 app。
+                Text(group == .uninstallLeftovers
+                    ? OrphanLeftoverDetector.displayName(ofBundleID: projectGroup.projectName)
+                    : projectGroup.projectName)
                     .font(.system(size: 14.5, weight: .bold))
                     .lineLimit(1)
-                Text(projectMeta(projectGroup))
+                Text(projectMeta(projectGroup, group: group))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .truncationMode(.middle)
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
@@ -456,7 +476,7 @@ private struct JunkListCard: View {
             .padding(.bottom, isCollapsed ? CleanerListMetrics.rowVerticalPadding : 4)
             .contentShape(.rect)
             .onTapGesture(perform: onToggleCollapse)
-            .help(isCollapsed ? "点击展开产物清单" : "点击收起产物清单")
+            .help(isCollapsed ? "点击展开\(item)清单" : "点击收起\(item)清单")
             if !isCollapsed {
                 children()
                     .padding(.bottom, 6)
@@ -465,14 +485,18 @@ private struct JunkListCard: View {
         .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
     }
 
-    /// 「2 项 · 3.2 GB · 3 天前动过」;活动时间未知如实省略,不编。
-    private func projectMeta(_ projectGroup: ProjectJunkGroup) -> String {
-        var text = "\(projectGroup.items.count) 项 · \(PulseFormat.memory(UInt64(max(0, projectGroup.totalBytes))))"
-        if let epoch = projectGroup.newestChangeEpoch {
-            let days = Int(Date(timeIntervalSince1970: epoch).timeIntervalSinceNow / 86400)
-            text += days <= 0 ? " · 今天动过" : " · \(days) 天前动过"
+    /// 「2 项 · 3.2 GB · 3 天前动过」(卸载残留前缀全 bundle id);活动时间未知如实省略,不编。
+    private func projectMeta(_ projectGroup: ProjectJunkGroup, group: JunkGroup) -> String {
+        var parts: [String] = []
+        if group == .uninstallLeftovers {
+            parts.append(projectGroup.projectName)
         }
-        return text
+        parts.append("\(projectGroup.items.count) 项")
+        parts.append(PulseFormat.memory(UInt64(max(0, projectGroup.totalBytes))))
+        if let epoch = projectGroup.newestChangeEpoch {
+            parts.append(JunkAgeText.ago(sinceEpoch: epoch, now: Date().timeIntervalSince1970))
+        }
+        return parts.joined(separator: " · ")
     }
 
     private var isBusy: Bool {
@@ -693,15 +717,34 @@ private struct JunkRow: View {
         return parts.joined(separator: " · ")
     }
 
-    /// 项目年龄的人话(05 口径:项目内非产物文件的最后变动,含 git 活动)。
+    /// 年龄人话(05 口径:项目内非产物文件的最后变动,含 git 活动;卸载残留 = 子树最新变动)。
     private func ageText(now: TimeInterval) -> String {
         guard let epoch = candidate.newestChangeEpoch else { return "年龄未知" }
+        return JunkAgeText.idle(sinceEpoch: epoch, now: now)
+    }
+}
+
+/// 清理清单「多久没动」的人话(行副标「N 天未动」/ 大卡头排「N 天前动过」,同档粒度:
+/// 天 / 月 / 年)。2026-11-08 修:大卡头排曾用 `timeIntervalSinceNow`——对过去时刻为负,
+/// 被 `<= 0` 分支全吞,恒显示「今天动过」。
+enum JunkAgeText {
+    static func idle(sinceEpoch epoch: Double, now: TimeInterval) -> String {
         let days = Int((now - epoch) / 86400)
         switch days {
         case ..<1: return "今天动过"
         case ..<30: return "\(days) 天未动"
         case ..<365: return "\(days / 30) 个月未动"
         default: return "\(days / 365) 年未动"
+        }
+    }
+
+    static func ago(sinceEpoch epoch: Double, now: TimeInterval) -> String {
+        let days = Int((now - epoch) / 86400)
+        switch days {
+        case ..<1: return "今天动过"
+        case ..<30: return "\(days) 天前动过"
+        case ..<365: return "\(days / 30) 个月前动过"
+        default: return "\(days / 365) 年前动过"
         }
     }
 }
