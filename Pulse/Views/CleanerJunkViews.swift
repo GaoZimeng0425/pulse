@@ -926,22 +926,31 @@ struct CleanHistorySection: View {
     }
 
     private var runsList: some View {
+        // 清单子页统一语言(ui-unify 追改,2026-11-08 用户实报「历史没有卡」):
+        // 组头式标题在页层,每条 run 一张小卡(与垃圾条目同配方:card-hi、12 圆角、
+        // 卡间距 4),展开明细 = 卡内缩进裸行(与项目大卡子项同款),脚注外置。
         // 主窗口行容器收编 LazyVStack(DESIGN.md 规则;历史随时间只增不减,懒加载最划算)。
-        LazyVStack(alignment: .leading, spacing: 12) {
-            CardHeader(symbolName: "clock.arrow.circlepath", title: "清理历史", tint: Surface.cleanAccent) {
+        LazyVStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Text("清理历史")
+                    .font(.system(size: 17, weight: .bold))
                 Text("\(model.historyRuns?.count ?? 0) 次")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+            .padding(.horizontal, CleanerListMetrics.rowInset)
             ForEach(model.historyRuns ?? []) { run in
                 CleanRunDisclosureRow(model: model, run: run)
             }
             Text("清理历史永久保留在本地;大小按清理当时扫描的实际占用口径。")
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
+                .padding(.horizontal, CleanerListMetrics.rowInset)
+                .padding(.top, 4)
         }
-        .cardShell(compact: false)
     }
 }
 
@@ -994,21 +1003,25 @@ private struct CleanRunDisclosureRow: View {
         }
         .padding(.horizontal, CleanerListMetrics.rowInset)
         .padding(.vertical, CleanerListMetrics.rowVerticalPadding)
+        // 每条 run 一张小卡(与垃圾条目同配方):card-hi 抬升底、12 圆角。
+        .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
     }
 
     @ViewBuilder private var items: some View {
+        // 卡内缩进裸行(与项目大卡产物子项同款):只缩进不套小卡。
         if let records = model.historyItems[run.id] {
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(records) { record in
                     CleanHistoryItemRow(record: record)
                 }
             }
-            .padding(.leading, 18)
+            .padding(.leading, CleanerListMetrics.indentLeading)
+            .padding(.trailing, CleanerListMetrics.rowInset)
             .padding(.bottom, 4)
         } else {
             ProgressView()
                 .controlSize(.small)
-                .padding(.leading, 18)
+                .padding(.leading, CleanerListMetrics.indentLeading)
         }
     }
 }

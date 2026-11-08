@@ -294,7 +294,7 @@ struct CleanerTabView: View {
             Spacer()
         }
         .padding(12)
-        .background(Surface.cardHigh.opacity(0.6), in: .rect(cornerRadius: 12))
+        .background(Surface.cardHigh.opacity(0.6), in: .rect(cornerRadius: 10))
     }
 
     // MARK: FDA 引导(spec:未授时受限如实标注 + 直达系统设置)
@@ -320,7 +320,7 @@ struct CleanerTabView: View {
             .font(.system(size: 11))
         }
         .padding(12)
-        .background(Surface.warning.opacity(0.12), in: .rect(cornerRadius: 12))
+        .background(Surface.warning.opacity(0.12), in: .rect(cornerRadius: 10))
     }
 
     private var subPillBar: some View {
