@@ -36,14 +36,17 @@ public enum CleanSafetyTier: String, Sendable, Codable, CaseIterable, Equatable 
 
 /// 规则域分组(清单按组分段)。全局工具缓存(04)+ 项目产物(05);
 /// AI 模型 / 孤儿 worktree 归 06 票,加 case 即扩组。
+/// CaseIterable 顺序即 UI 组序(卸载残留 p5-cleaner/01,grill 2026-11-08:殿后)。
 public enum JunkGroup: String, Sendable, CaseIterable, Equatable {
     case globalToolCache
     case projectArtifacts
+    case uninstallLeftovers
 
     public var title: String {
         switch self {
         case .globalToolCache: "全局工具缓存"
         case .projectArtifacts: "项目产物"
+        case .uninstallLeftovers: "卸载残留"
         }
     }
 }
