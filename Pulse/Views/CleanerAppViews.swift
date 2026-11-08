@@ -176,7 +176,7 @@ struct AppListSection: View {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(Surface.positive)
                 Text(finishedText(report))
-                    .font(.system(size: 11.5, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                 Spacer()
                 Button {
                     model.dismissUninstallBanner()
@@ -194,7 +194,7 @@ struct AppListSection: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(Surface.negative)
                 Text(reason)
-                    .font(.system(size: 11.5, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                     .lineLimit(3)
                 Spacer()
                 Button {
@@ -235,7 +235,7 @@ struct AppListSection: View {
             ProgressView()
                 .controlSize(.small)
             Text("正在卸载…")
-                .font(.system(size: 11.5))
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
             Spacer()
         }
@@ -254,7 +254,7 @@ struct AppListSection: View {
                     .foregroundStyle(.tertiary)
                 TextField("搜索应用", text: $model.searchQuery)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 13))
+                    .font(.system(size: 12))
                 if !model.searchQuery.isEmpty {
                     Button {
                         model.searchQuery = ""
@@ -282,7 +282,7 @@ struct AppListSection: View {
 
             Spacer(minLength: 8)
             Text("点行选中 · 箭头看残留")
-                .font(.system(size: 11.5))
+                .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
         }
     }
@@ -302,7 +302,7 @@ struct AppListSection: View {
                 .font(.system(size: 22))
                 .foregroundStyle(.tertiary)
             Text(model.searchQuery.isEmpty ? "未发现可卸载的应用" : "没有匹配的应用")
-                .font(.system(size: 13))
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -314,7 +314,7 @@ struct AppListSection: View {
             ProgressView()
                 .controlSize(.small)
             Text(text)
-                .font(.system(size: 13))
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
             Spacer()
         }
@@ -377,7 +377,7 @@ private struct AppRow: View {
                     .foregroundStyle(.primary)
                 if entry.isPartial {
                     Text("部分")
-                        .font(.system(size: 11.5))
+                        .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -456,7 +456,7 @@ private struct LeftoverDisclosure: View {
             if entry.bundleID == nil {
                 // Q4:只剩应用名一把键,~/Library 里按名字撞目录误中风险高于收益。
                 Text("未识别,不敢猜——这个应用读不到 bundle id,残留无法精确匹配,不列。")
-                    .font(.system(size: 11.5))
+                    .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
                     .padding(.horizontal, CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading)
                     .padding(.bottom, 6)
@@ -465,7 +465,7 @@ private struct LeftoverDisclosure: View {
                     ProgressView()
                         .controlSize(.mini)
                     Text("正在查找残留…")
-                        .font(.system(size: 11.5))
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading)
@@ -482,7 +482,7 @@ private struct LeftoverDisclosure: View {
                 footnote(rows)
             } else if rows != nil {
                 Text("没有找到残留")
-                    .font(.system(size: 11.5))
+                    .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
                     .padding(.horizontal, CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading)
                     .padding(.bottom, 6)
@@ -503,7 +503,7 @@ private struct LeftoverDisclosure: View {
                         tint: Surface.negative
                     )
                     Text("彻底删除:不进废纸篓,不可恢复")
-                        .font(.system(size: 11.5, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Surface.negative)
                 }
             }
@@ -513,7 +513,7 @@ private struct LeftoverDisclosure: View {
             Spacer()
             Button(action: { model.requestUninstall(entry) }) {
                 Text(model.isPermanentDeleteSelected(entry) ? "永久卸载 \(entry.name)…" : "卸载 \(entry.name)…")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
@@ -528,7 +528,7 @@ private struct LeftoverDisclosure: View {
         let total = rows.compactMap(\.sizeBytes).reduce(Int64(0), +)
         return HStack {
             Text("残留 · \(rows.count) 项 · 共 \(PulseFormat.memory(UInt64(max(0, total)))) · 默认不勾")
-                .font(.system(size: 11.5, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Surface.cleanAccent)
             Spacer()
             Button("全选残留") {
@@ -543,7 +543,7 @@ private struct LeftoverDisclosure: View {
 
     private func footnote(_ rows: [AppLeftoverRow]) -> some View {
         Text(footnoteText(rows))
-            .font(.system(size: 11.5))
+            .font(.system(size: 11))
             .foregroundStyle(.tertiary)
             .padding(.horizontal, CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading)
             .padding(.bottom, 2)
@@ -572,9 +572,9 @@ private struct LeftoverRowView: View {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
                     Text(row.site.plainTitle)
-                        .font(.system(size: 13.5, weight: .medium))
+                        .font(.system(size: 14.5, weight: .medium))
                     Text("· \(row.site.consequenceNote)")
-                        .font(.system(size: 11.5))
+                        .font(.system(size: 12))
                         .foregroundStyle(.tertiary)
                     if row.isCheckFirst {
                         StateChip(text: "先检查")
@@ -590,10 +590,10 @@ private struct LeftoverRowView: View {
             }
             Spacer(minLength: 8)
             Text(row.sizeBytes.map { PulseFormat.memory(UInt64(max(0, $0))) } ?? "—")
-                .font(.system(size: 13.5, weight: .semibold))
+                .font(.system(size: 14.5, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
-                .frame(width: 78, alignment: .trailing)
+                .frame(width: CleanerListMetrics.valueWidth, alignment: .trailing)
         }
         .padding(.horizontal, CleanerListMetrics.rowInset + CleanerListMetrics.indentLeading)
         .padding(.vertical, 6)
@@ -607,13 +607,7 @@ private struct StateChip: View {
     let text: String
 
     var body: some View {
-        Text(text)
-            .font(.system(size: CleanerListMetrics.chipFontSize, weight: .semibold))
-            .foregroundStyle(Surface.inkTertiary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 3)
-            .background(Surface.inkTertiary.opacity(0.15), in: .capsule)
-            .lineLimit(1)
+        ChipView(text: text, tint: Surface.inkTertiary, profile: .regular)
     }
 }
 
@@ -622,13 +616,7 @@ private struct BrewChip: View {
     let caskName: String
 
     var body: some View {
-        Text("brew")
-            .font(.system(size: CleanerListMetrics.chipFontSize, weight: .semibold))
-            .foregroundStyle(Surface.inkTertiary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 3)
-            .background(Surface.inkTertiary.opacity(0.15), in: .capsule)
-            .help("由 Homebrew 安装(卸载时将由它执行,票 03)")
+        ChipView(text: "brew", tint: Surface.inkTertiary, profile: .regular, help: "由 Homebrew 安装(卸载时将由它执行,票 03)")
     }
 }
 
@@ -694,12 +682,12 @@ private struct AppUninstallConfirmSheet: View {
             .frame(maxHeight: 220)
             .background(Surface.card, in: .rect(cornerRadius: 12))
             Text(footerText)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 14.5, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(plan.permanent ? Surface.negative : .primary)
             HStack(spacing: 8) {
                 Text(footnote)
-                    .font(.system(size: 11.5))
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button("取消", action: onCancel)
@@ -750,7 +738,7 @@ private struct AppUninstallConfirmSheet: View {
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 1) {
                 Text(row.title)
-                    .font(.system(size: 13.5, weight: .medium))
+                    .font(.system(size: 14.5, weight: .medium))
                     .lineLimit(1)
                 Text(row.path)
                     .font(.system(size: 11, design: .monospaced))
@@ -762,18 +750,18 @@ private struct AppUninstallConfirmSheet: View {
             Spacer(minLength: 8)
             if row.permanent {
                 Text(row.viaBrew ? "已卸载(brew,永久)" : "永久删除")
-                    .font(.system(size: 11.5, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Surface.negative)
             } else {
                 Text("废纸篓")
-                    .font(.system(size: 11.5))
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
             Text(row.bytes.map { PulseFormat.memory(UInt64(max(0, $0))) } ?? "—")
-                .font(.system(size: 13.5, weight: .semibold))
+                .font(.system(size: 14.5, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
-                .frame(width: 78, alignment: .trailing)
+                .frame(width: CleanerListMetrics.valueWidth, alignment: .trailing)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 7)

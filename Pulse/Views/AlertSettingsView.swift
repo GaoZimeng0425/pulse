@@ -14,7 +14,7 @@ struct AlertSettingsView: View {
             if center.authorizationDenied {
                 Section {
                     Text("系统通知已被拒绝——规则照常判定,告警降级为应用内提示。在系统设置里打开 Pulse 的通知即可恢复,无需重启。")
-                        .font(.caption)
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                     // 拒绝后系统不再弹授权窗:一键直达 系统设置 → 通知 → Pulse。
                     Button("打开系统通知设置…") {
@@ -25,7 +25,7 @@ struct AlertSettingsView: View {
             if center.authorizationRequestFailed {
                 Section {
                     Text("系统通知授权请求没有完成(弹窗可能被勿扰模式收起,或系统报错)——告警暂时仅在应用内提示。")
-                        .font(.caption)
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                     Button("重新请求授权") {
                         center.retryAuthorization()
@@ -40,7 +40,7 @@ struct AlertSettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("NemoNotch 卡片")
                         Text("资源类告警经本机 NemoNotch 在刘海下弹卡片,点名最耗资源的进程;NemoNotch 未运行时静默跳过。")
-                            .font(.caption)
+                            .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -48,14 +48,14 @@ struct AlertSettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("系统通知")
                         Text("macOS 通知横幅。未手动改过时与 NemoNotch 卡片互斥:开了卡片就不发横幅,一条告警只弹一处;两个都想要就都打开。")
-                            .font(.caption)
+                            .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
                 }
             }
             Section("说明") {
                 Text("触发条件:读数连续 3 次越阈(带持续时长的规则还要跨越该时长);恢复需连续 6 次回到阈值 ∓20% 之外(迟滞防抖,避免阈值附近抖动连环轰炸);同类告警触发后进入 10 分钟冷却期。")
-                    .font(.caption)
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
         }
@@ -71,7 +71,7 @@ struct AlertSettingsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(kind.title)
                     Text(subtitle(kind))
-                        .font(.caption)
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
             }

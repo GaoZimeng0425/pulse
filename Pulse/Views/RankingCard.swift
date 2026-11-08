@@ -232,23 +232,16 @@ struct RankingRowView: View {
     }
 }
 
-/// 组行最忙进程 chip:状态 chip 配方(胶囊、state-negative 14% 底 + 同色字),只写进程名
-/// 不带图标省行宽。上限由 `StatusBadgeRules.hotProcessNameMaxLength` 按字数封顶,
-/// chip 取理想宽度不被压缩——宽度框(maxWidth)会贪占到上限、把组名挤成几个字
-/// (2026-10-30 用户反馈),所以不用。
+/// 组行最忙进程 chip(统一 ChipView 的 inline 形态):只写进程名不带图标省行宽。
+/// 上限由 `StatusBadgeRules.hotProcessNameMaxLength` 按字数封顶,chip 取理想宽度
+/// 不被压缩——宽度框(maxWidth)会贪占到上限、把组名挤成几个字(2026-10-30 用户
+/// 反馈),所以不用。
 struct HotProcessChip: View {
     let name: String
     let compact: Bool
 
     var body: some View {
-        Text(name)
-            .font(.system(size: compact ? 10 : 10.5, weight: .semibold))
-            .lineLimit(1)
-            .foregroundStyle(Surface.negative)
-            .padding(.horizontal, compact ? 5 : 6)
-            .padding(.vertical, 1)
-            .background(Surface.negative.opacity(0.14), in: .capsule)
-            .fixedSize()
+        ChipView(text: name, tint: Surface.negative, profile: .inline)
     }
 }
 

@@ -14,7 +14,9 @@ final class RankingListMetricsTests: XCTestCase {
 
     func testEveryRealisticValueFitsItsFixedColumnInBothDensities() {
         for compact in [false, true] {
-            let font = NSFont.monospacedDigitSystemFont(ofSize: compact ? 11.5 : 13, weight: .semibold)
+            let font = NSFont.monospacedDigitSystemFont(
+                ofSize: RankingListMetrics.valueFontSize(compact: compact), weight: .semibold
+            )
             let cases: [(RankingValueColumn, [String])] = [(.standard, standardReadings), (.rate, rateReadings)]
             for (column, readings) in cases {
                 let width = RankingListMetrics.valueWidth(compact: compact, column: column)

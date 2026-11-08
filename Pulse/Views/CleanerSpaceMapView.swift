@@ -126,7 +126,7 @@ struct SpaceMapSection: View {
                         )
                         if rect.height > 32 {
                             context.draw(
-                                Text(pct).font(.system(size: 9, design: .monospaced))
+                                Text(pct).font(.system(size: 10.5, design: .monospaced))
                                     .foregroundColor(textColor.opacity(0.8)),
                                 at: CGPoint(x: rect.minX + 6, y: rect.maxY - 4),
                                 anchor: .bottomLeading
@@ -139,13 +139,13 @@ struct SpaceMapSection: View {
                     if cleanable.indices.contains(index), let group = cleanable[index] {
                         _ = group
                         if rect.width > 72, rect.height > 30 {
-                            let badge = CGRect(x: rect.maxX - 40, y: rect.minY + 3, width: 36, height: 13)
+                            let badge = CGRect(x: rect.maxX - 42, y: rect.minY + 2.5, width: 38, height: 14)
                             context.fill(
-                                Path(roundedRect: badge, cornerRadius: 6.5),
+                                Path(roundedRect: badge, cornerRadius: 7),
                                 with: .color(Surface.cleanAccent.opacity(0.95))
                             )
                             context.draw(
-                                Text("可清理").font(.system(size: 8.5, weight: .semibold))
+                                Text("可清理").font(.system(size: 10.5, weight: .semibold))
                                     .foregroundColor(.white),
                                 at: CGPoint(x: badge.midX, y: badge.midY),
                                 anchor: .center
@@ -230,7 +230,7 @@ struct SpaceMapSection: View {
             let node = rects[index].node
             HStack(spacing: 8) {
                 Text(node.path)
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(size: 10.5, design: .monospaced))
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
                     .truncationMode(.middle)

@@ -33,7 +33,7 @@ struct AlertBannerView: View {
                         }
                         .buttonStyle(.link)
                     }
-                    .font(.caption2)
+                    .font(.system(size: 11))
                 }
                 if center.authorizationRequestFailed {
                     HStack(spacing: 6) {
@@ -44,7 +44,7 @@ struct AlertBannerView: View {
                         }
                         .buttonStyle(.link)
                     }
-                    .font(.caption2)
+                    .font(.system(size: 11))
                 }
             }
             .padding(.horizontal, isCompact ? 10 : 12)
@@ -59,13 +59,13 @@ struct AlertBannerView: View {
     private func row(_ occurrence: AlertOccurrence) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: "bell.badge.fill")
-                .font(.system(size: isCompact ? 9 : 10, weight: .semibold))
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(Surface.warning)
             VStack(alignment: .leading, spacing: 1) {
                 Text(AlertNotificationContent.title(for: occurrence))
-                    .font(.system(size: isCompact ? 11 : 12.5, weight: .semibold))
+                    .font(.system(size: isCompact ? 11 : 12, weight: .semibold))
                 Text(AlertNotificationContent.body(for: occurrence))
-                    .font(.system(size: isCompact ? 10 : 11))
+                    .font(.system(size: isCompact ? 10.5 : 11))
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)

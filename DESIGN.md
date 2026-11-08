@@ -1,5 +1,5 @@
 ---
-version: 1.0
+version: 1.1
 name: Pulse
 omitted: []
 colors:
@@ -38,10 +38,13 @@ typography:
   page-title: "26pt bold"
   section-title: "17pt bold"
   figure-mini: "17pt semibold rounded, tabular"
-  card-title: "12.5pt semibold"
+  card-title: "12pt semibold"
   body: "12pt"
   caption: "11pt"
   micro: "10.5pt"
+  row-name: "14.5pt medium(舒适)/ 12pt(紧凑)——行名称与数值同号,层级靠字重"
+  row-value: "14.5pt semibold(舒适)/ 12pt semibold(紧凑)+ monospacedDigit"
+  row-sub: "12pt(舒适)/ 10.5pt(紧凑)"
 rounded:
   card: 18pt
   card-compact: 12pt
@@ -64,6 +67,8 @@ components:
   pill-tab: "药丸 tab,见 §Components"
   menubar-badge: "菜单栏徽标,见 §Components"
   page-header: "页头(主窗口 / 弹窗 / 清理页统一组件),见 §Components"
+  row-metrics: "列表行两档制单一出处(紧凑=弹窗 / 舒适=主窗口一切列表行),见 §Components"
+  chip: "统一状态 chip(ChipView,两形态),见 §Components"
 ---
 
 # Pulse DESIGN.md
@@ -128,12 +133,20 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{typography.page-title}` | 26pt bold | 主窗口页名 |
 | `{typography.section-title}` | 17pt bold | 节标题("此刻"/"当前最忙") |
 | `{typography.figure-mini}` | 17pt semibold `.rounded` + `monospacedDigit` | 历史页均值/峰值等次级数字 |
-| `{typography.card-title}` | 12.5pt semibold,指标色 | 卡片标题行 |
+| `{typography.card-title}` | 12pt semibold,指标色 | 卡片标题行 |
 | `{typography.body}` | 12pt | 统计数值(semibold + `monospacedDigit`)、正文 |
 | `{typography.caption}` | 11pt | 说明、表头、次级标签 |
 | `{typography.micro}` | 10.5pt | 统计列标签、最密排注 |
+| `{typography.row-name}` | 14.5pt medium(舒适)/ 12pt(紧凑) | 列表行名称(主窗口一切列表行 / 弹窗) |
+| `{typography.row-value}` | 14.5pt semibold(舒适)/ 12pt(紧凑) | 列表行数值(定宽列 + `monospacedDigit`) |
+| `{typography.row-sub}` | 12pt(舒适)/ 10.5pt(紧凑) | 列表行副文、路径 |
 
 规则:
+- **窗口 UI 文字只有五档**(ui-unify/01,2026-11-08 用户拍板"字号、组件都归一"):
+  10.5 / 11 / 12 / 14.5 / 17 + 大数字族(FigureSize)。此前 8.5~17 共 12 档
+  (11.5 / 12.5 / 13 / 13.5 / 14 / 16 已全量收编,映射见 §已知偏差)。新文字
+  不在五档内 = 先改本表再写码;列表行尺寸单一出处 `RowMetrics`(两档制,见
+  §Components 行两档制)。
 - **一切数字**读数(百分比、字节、速率、PID)必须 `monospacedDigit()`;
   大数字另加 `.rounded` 设计族与负字距(`FigureText` 是唯一实现,不要复刻;字号只取
   `FigureSize` 令牌)。统计值(标签 + 数字)不是大数字:`{typography.body}` 12 semibold
@@ -141,7 +154,9 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   是 `{typography.body}` 12 **常规** + `monospacedDigit`(`CardRowValue` 是唯一实现,
   p2-review/03)。
 - 不用整体等宽字形 `design: .monospaced`(SF Mono)——数字对齐只靠 `monospacedDigit`;
-  确需等宽字形的非数字内容(如十六进制键名)须先在此登记例外。目前无例外。
+  确需等宽字形的非数字内容须先在此登记例外。**登记例外(ui-unify/01)**:清理页
+  文件路径行(卸载残留 / 确认清单,11pt `.monospaced`)——同名 node_modules/build
+  靠路径区分,等宽有可辨识度价值;空间地图块内百分比小标(10.5pt `.monospaced`)。
 - 菜单栏徽标字号(11.5 / 7pt;网络上下行叠两行版式 9pt)是 NSStatusItem 尺寸约束下的特例,不外溢到窗口 UI。
 - 不引第三方字体;中英文混排依赖系统默认,不手动调字距。
 
@@ -213,6 +228,22 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   **新卡一律组装这些零件,
   不再手写卡壳 / 卡头 / 空态。**
 
+- **行两档制 RowMetrics**(ui-unify/01,2026-11-08 用户拍板"功能相似组件长一个样",
+  `Pulse/Views/RowMetrics.swift`):全 app **列表行**共享值的单一出处——紧凑档(弹窗)/
+  舒适档(主窗口一切列表行:排行 / 清理 / sheet 清单)。字号 = 名称与数值**同号**
+  (14.5 / 12,层级靠字重 medium vs semibold)、副文 12 / 10.5;图标 24 / 18;
+  meter 120 / 52;行内距 14×10(舒适)/ 6×5(紧凑)。`RankingListMetrics` 与
+  `CleanerListMetrics` 只留页面专属参数(行尾列 / 数值列口径 / 缩进 / 勾选框),
+  共享值一律委托此处,委托关系有防漂移单测钉死(UiUnifyRowMetricsTests)。
+  菜单栏位图不在两档制内(尺寸特例,见上)。
+
+- **统一状态 chip ChipView**(ui-unify/01,`Pulse/Views/ChipView.swift`):胶囊、
+  tint 15% 底 + 同色文字、semibold,全 app 唯一实现。两形态:`.regular`(11pt,
+  内距 10×3,行内独立元素)/ `.inline`(10.5pt,内距 5×1,定宽不换形,挤在名称后)。
+  此前六种手写(HotProcessChip / TierChip / InUseChip / StateChip / BrewChip /
+  MetricChipView)字号 10~11.5、内距 5×1~10×3 互相漂移,已全部收编为 ChipView
+  薄封装;语义 tint 由调用方给(positive / negative / caution / inkTertiary / 指标色)。
+
 - **MetricCardView(full)**:徽章 22×22 + 标题 + chevron / 34pt 大数字 + 状态 chip /
   三列统计 / 36pt 高 44 柱 strip 走势——五张卡同形态(用户拍板 2026-10-20:撤 CPU
   面积线特例,不再特殊化)。
@@ -229,8 +260,9 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   或行。卡 = 卡内标题 `{typography.card-title}`(12.5 semibold,**所在页指标色**)→ 表头
   「应用 | 指标名」(10.5 medium tertiary,右列对齐数值列)→ 行 → 可选注脚(10.5 tertiary,
   如"5 秒一档")→ 空态在卡内(12.5 medium secondary 一句 + 10.5 tertiary 说明)。
-  行 = 图标 22 / 名称 13 medium(可挂徽章)/ 副文 10.5 secondary / meter 110 榜首归一 /
-  数值 13 semibold `monospacedDigit` **定宽列**(按口径最宽现实读数量宽 + 2:组排行
+  行 = 图标 22→**24** / 名称 13→**14.5 medium**(可挂徽章)/ 副文 10.5→**12 secondary** /
+  meter 110→**120 榜首归一** / 数值 13→**14.5 semibold** `monospacedDigit` **定宽列**
+  (尺寸全走 `RowMetrics` 舒适档,ui-unify/01 排行升舒适档;按口径最宽现实读数量宽 + 2:组排行
   `.standard` = `9999%` / `99.9 GB` / `999 MB`,模块排行 `.rate` = `999.9 MB/s`;同卡各行同宽,
   不许按内容撑宽——速率文案会逐行撑出不同宽度。2026-10-30 用户反馈:组排行共用速率宽时
   CPU 读数右对齐、meter 与数字隔一大截且挤窄名称区,遂分两口径)/ **行尾恒留 30pt 列**(组排行放结束按钮 +
@@ -241,7 +273,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   semibold,按字数封顶 18(超出中间省略)、自身不压缩;组名吃剩余宽度尾部省略);仅 CPU 口径行,内存口径行不标(2026-10-30
   用户拍板 B:要一眼看出"哪个进程在吃";此前 2026-10-26 的"高负载"文字 chip 与
   数值圈红均已撤)。紧凑档(弹窗):
-  图标 18、名称 12.5、**数值 11.5**(数值列同法按 11.5pt 量宽)、meter 52 贴右、
+  图标 18、名称 12.5→**12**、**数值 11.5→12**(同号,层级靠字重;数值列同法按 12pt 量宽)、meter 52 贴右、
   **名称区→meter→数值→行尾列间距均 4**(名称区吃满剩余宽度)、**行尾列 24 = 结束按钮 14 + 0 + 箭头 10**
   (2026-10-30 用户拍板收紧;全尺寸档仍 10 / 30 = 18 + 2 + 10)、行内距 5;卡 `{rounded.card-compact}` 12
   + `{spacing.card-padding-compact}` 12;全尺寸卡 `{rounded.card}` 18 + `{spacing.card-padding}` 16。
@@ -265,13 +297,14 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   (真机触控板滚动 LazyVStack 36–43%,sample 一半在每帧重出绘制指令、四分之一在重布局)。
   卡外 8pt 间距 = 首尾段底色外各 4 透明边,不用 listRowInsets 的 bottom(macOS 上被忽略)。
 - **清理页舒适密度档**(2026-11-05 用户拍板,原型三档裁决:行 = A 档,按钮与
-  segmented = B 档,行左右内距加大;参考竞品 Purge 后全页从排行紧凑档升密度):
-  清理页四子页(垃圾/应用/历史/地图周边)的行与控件**不再借** `RankingListMetrics`
-  (那是排行页多轮拍板的紧凑档,弹窗/排行不动),尺寸单一出处
-  `CleanerListMetrics`(`CleanerJunkViews.swift`):行 = 图标 28 / 名称 14.5 medium
-  + 副文 12 secondary / meter 130 榜首归一 / 数值 14.5 semibold 等宽**定宽列**
-  (同法按 14.5pt 量最宽现实读数 "999.9 GB" + 2)/ 行内距 12(左右)×10(上下)
-  / 勾选框 `.controlSize(.large)`;安全档 chip 文字 11.5 semibold、内距 10×3;
+  segmented = B 档,行左右内距加大;参考竞品 Purge 后全页从排行紧凑档升密度;
+  **ui-unify/01 起共享值改由 `RowMetrics` 舒适档单一出处**,与排行页同档同源):
+  清理页四子页(垃圾/应用/历史/地图周边)的行与控件,页面专属尺寸出处仍是
+  `CleanerListMetrics`(`CleanerJunkViews.swift`,委托 RowMetrics):行 = 图标
+  28→**24** / 名称 14.5 medium + 副文 12 secondary / meter 130→**120 榜首归一** /
+  数值 14.5 semibold 等宽**定宽列**(同法按 14.5pt 量最宽现实读数 "999.9 GB" + 2)/
+  行内距 14(左右)×**10(上下)** / 勾选框 `.controlSize(.large)`;安全档 chip =
+  `ChipView.regular`(11 semibold、内距 10×3);
   组头 14.5 bold + 总量 12;子页 tab 药丸 = `PillTabBar.comfortable`;**动作按钮与
   「大小|新旧」segmented 一律 B 档**(按钮 `.controlSize(.large)`、seg 默认 regular
   不再 mini);项目子组行 = 14.5 bold、上下距 10、**无背景**(权重靠字号与内距)。
@@ -301,7 +334,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 - **清理清单行**(p4-cleaner/04,`CleanerJunkViews.swift`):**舒适密度档**(上行)
   之下的既有配方:行首系统 checkbox(large);行选中底 =
   `{colors.surface-card-high}` 70% + `{rounded.inner}` 10。**安全档 chip**(`TierChip`)=
-  状态 chip 配方(胶囊、tint 15% 底 + 同色文字、11.5 semibold),两态:可安全清理 =
+  统一 `ChipView.regular`(胶囊、tint 15% 底 + 同色文字、11 semibold),两态:可安全清理 =
   `{colors.state-positive}`、先检查 = `{colors.state-caution}`——映射的是
   GLOSSARY「安全档」(删除安全语义),不是负载警示,只在此组件出。勾选动作条 =
   `{colors.surface-card-high}` + `{rounded.card-compact}` 12,内距 8×12,右侧
@@ -349,7 +382,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   + 同色前景,未选中 = secondary 前景无底;药丸间距 4;
   切换动画 0.2s snappy(选中文字自图标侧展开、胶囊生长、其余药丸滑移让位)。
   两档尺寸:`.regular`(默认 = 现状:callout 12 medium + 内距 9×5,高≈24,
-  工具栏/历史页用)与 `.comfortable`(13.5 medium + 内距 14×8,高≈34;
+  工具栏/历史页用)与 `.comfortable`(13.5→**14.5 medium** + 内距 14×8,高≈34;
   2026-11-05 用户拍板清理页整体升「舒适密度」,唯清理页子页条用此档)。
   两种文字形态:`.selectedOnly`(未选中纯图标 / 选中图标+文字;图标-only 必带
   a11y label + help)与 `.always`(文字恒显)。四处用法同一组件:主窗口工具栏
@@ -399,10 +432,10 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   11 枚后 32pt 定宽槽超出 332pt 内容区、右端裁切;均分只收窄不溢出,与主窗口
   工具栏 720 预算同一哲学)。页头 = `PageHeader` 紧凑档(页名;本机一行只在总览)+ 右侧
   运行时长。
-- **状态 chip**:胶囊、tint 14~16% 底 + 同色文字,两态语言(✓正常 / 高负载),
-  阈值在 `StatusBadgeRules`(组 >100%、系统 <30% / >70%)。现役用法 = 指标卡大数字旁
-  (系统负载);排行行不挂"高负载"文字 chip,组高负载 = 数值红字 + 最忙进程名 chip
-  (见排行列表条,2026-10-30 用户拍板)。
+- **状态 chip**:统一 `ChipView`(见 §Components 统一状态 chip;胶囊、tint 15% 底 +
+  同色文字),两态语言(✓正常 / 高负载),阈值在 `StatusBadgeRules`(组 >100%、
+  系统 <30% / >70%)。现役用法 = 指标卡大数字旁(系统负载);排行行不挂"高负载"
+  文字 chip,组高负载 = 数值红字 + 最忙进程名 chip(见排行列表条,2026-10-30 用户拍板)。
 
 ## Do's and Don'ts
 
@@ -446,7 +479,32 @@ chip 图标 9.5pt → micro 10.5;排行行 chevron 9pt → 10。
   要换成语义令牌须先实机验证深浅两种外观。
 
 仍挂账(动到对应文件时顺带收编):
-- 指标主卡全尺寸内距 `.padding(20)`(MetricTabViews)与 2×2 统计 `horizontalSpacing: 18`
-  不在令牌表,18 也不在 4pt 网格上;弹窗外框 `.padding(14)`(DashboardView)同。
-  三者改动都可见,需与用户确认后再动。
+- ~~指标主卡全尺寸内距 `.padding(20)` 与 2×2 统计 `horizontalSpacing: 18`、弹窗外框
+  `.padding(14)`~~ —— 已收编(ui-unify/01,2026-11-08):20→`{spacing.card-padding}` 16、
+  18→16、14→`{spacing.card-padding-compact}` 12,全上 4pt 网格。
+
+2026-11-08 第三轮收编已完成(ui-unify/01,用户拍板"字号、组件都归一,功能相似组件
+长一个样",方案 A = 排行也升舒适档):
+
+- **字号 12 档 → 5 档**:`.caption/.caption2/.footnote/.title3` 语义字体一并换显式
+  字号。映射:8.5 / 9 / 10 → 10.5(空间地图角标/横幅图标/treemap 小标);11.5 按角色
+  → 11(说明)或 12(数值/按钮/横幅正文);12.5 → 12(卡题、空态、弹窗底排按钮、
+  弹窗排行名称);13 行级 → 14.5、杂项 → 12;13.5 → 14.5(sheet 清单行、PillTabBar
+  comfortable);14 → 14.5;16 bold 组头 → `{typography.section-title}` 17。
+- **行两档制**:`RowMetrics` 单一出处(上文);排行主窗口行升舒适档(图标 22→24、
+  名称/数值 13→14.5、副文 10.5→12、meter 110→120、行内距 6×7→14×10),弹窗紧凑档
+  名称 12.5→12 / 数值 11.5→12;清理行图标 28→24、meter 130→120、上下距 14→10;
+  sheet 清单行 13.5 档取消并入舒适档,残留/确认行定宽列 `frame(width: 78)` 改
+  `CleanerListMetrics.valueWidth`。
+- **chip 六合一**:`ChipView`(两形态)收编 HotProcessChip / TierChip / InUseChip /
+  StateChip / BrewChip / MetricChipView(后两处为薄封装),透明度统一 15%。
+- **防漂移**:`UiUnifyRowMetricsTests` 钉死两套 metrics 对 RowMetrics 的委托与五档
+  落档;`RankingListMetricsTests` 量宽改读 metrics 本身。
+- 例外(有意,不收):进程下钻组件簇(ProcessDrilldownView / SortableProcessTableView)
+  共用组件带 `.caption` 族,归一需跨文件结构迁移(加 compact 参数走两档制),留待
+  专项票;Image `.font` 的图标尺寸(7~26)不受文字五档约束。
+
+superseded 拍板记录(原值→新值,决议不删只标):2026-10-30 弹窗数值 11.5 → 12
+(ui-unify/01);2026-11-05 清理图标 28 / meter 130 / 上下距 14 → RowMetrics 舒适档
+(ui-unify/01);2026-11-05 comfortable 药丸 13.5 → 14.5(ui-unify/01)。
 
