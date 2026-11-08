@@ -175,6 +175,7 @@ final class AlertCenterTests: XCTestCase {
         let center = AlertCenter(
             store: AlertSettingsStore(defaults: makeDefaults()),
             sender: sender,
+            toastSender: InertNemoNotchToastSender(),
             clock: { clock.now }
         )
 
@@ -198,6 +199,7 @@ final class AlertCenterTests: XCTestCase {
         let center = AlertCenter(
             store: AlertSettingsStore(defaults: makeDefaults()),
             sender: sender,
+            toastSender: InertNemoNotchToastSender(),
             clock: { clock.now }
         )
 
@@ -222,6 +224,7 @@ final class AlertCenterTests: XCTestCase {
         let center = AlertCenter(
             store: AlertSettingsStore(defaults: makeDefaults()),
             sender: sender,
+            toastSender: InertNemoNotchToastSender(),
             clock: { Date() }
         )
         center.store.setEnabled(true, for: .diskAvailable) // 上次会话已开的规则
@@ -237,6 +240,7 @@ final class AlertCenterTests: XCTestCase {
         let center = AlertCenter(
             store: AlertSettingsStore(defaults: makeDefaults()),
             sender: sender,
+            toastSender: InertNemoNotchToastSender(),
             clock: { Date() }
         )
         await center.refreshAuthorization()
@@ -250,6 +254,7 @@ final class AlertCenterTests: XCTestCase {
         let center = AlertCenter(
             store: AlertSettingsStore(defaults: makeDefaults()),
             sender: sender,
+            toastSender: InertNemoNotchToastSender(),
             clock: { Date() }
         )
         center.store.setEnabled(true, for: .diskAvailable)
@@ -266,6 +271,7 @@ final class AlertCenterTests: XCTestCase {
         let center = AlertCenter(
             store: AlertSettingsStore(defaults: makeDefaults()),
             sender: sender,
+            toastSender: InertNemoNotchToastSender(),
             clock: { Date() }
         )
         center.store.setEnabled(true, for: .diskAvailable)
@@ -289,6 +295,7 @@ final class AlertCenterTests: XCTestCase {
         let center = AlertCenter(
             store: AlertSettingsStore(defaults: makeDefaults()),
             sender: sender,
+            toastSender: InertNemoNotchToastSender(),
             clock: { Date() }
         )
         center.store.setEnabled(true, for: .diskAvailable)
@@ -309,6 +316,7 @@ final class AlertCenterTests: XCTestCase {
         let center = AlertCenter(
             store: AlertSettingsStore(defaults: makeDefaults()),
             sender: sender,
+            toastSender: InertNemoNotchToastSender(),
             clock: { Date() }
         )
         center.store.setEnabled(true, for: .diskAvailable)
@@ -412,6 +420,7 @@ final class AlertCenterTests: XCTestCase {
         let center = AlertCenter(
             store: AlertSettingsStore(defaults: makeDefaults()),
             sender: sender,
+            toastSender: InertNemoNotchToastSender(),
             clock: { clock.now }
         )
         center.store.setEnabled(true, for: .groupCPU)
@@ -449,6 +458,7 @@ final class AlertCenterTests: XCTestCase {
         let center = AlertCenter(
             store: AlertSettingsStore(defaults: makeDefaults()),
             sender: sender,
+            toastSender: InertNemoNotchToastSender(),
             clock: { clock.now }
         )
         await center.refreshAuthorization()
@@ -480,6 +490,7 @@ final class AlertCenterTests: XCTestCase {
         let center = AlertCenter(
             store: AlertSettingsStore(defaults: makeDefaults()),
             sender: sender,
+            toastSender: InertNemoNotchToastSender(),
             clock: { clock.now }
         )
         await center.refreshAuthorization()
@@ -504,6 +515,7 @@ final class AlertCenterTests: XCTestCase {
         let center = AlertCenter(
             store: AlertSettingsStore(defaults: makeDefaults()),
             sender: sender,
+            toastSender: InertNemoNotchToastSender(),
             clock: { clock.now }
         )
         await center.refreshAuthorization()
@@ -530,6 +542,7 @@ final class AlertCenterTests: XCTestCase {
         let center = AlertCenter(
             store: AlertSettingsStore(defaults: makeDefaults()),
             sender: sender,
+            toastSender: InertNemoNotchToastSender(),
             clock: { clock.now }
         )
         await center.refreshAuthorization()

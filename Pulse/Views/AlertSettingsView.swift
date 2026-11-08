@@ -185,7 +185,8 @@ struct AlertSettingsView: View {
             },
             persist: { _ in }
         ),
-        sender: SettingsPreviewDeniedSender()
+        sender: SettingsPreviewDeniedSender(),
+        toastSender: InertNemoNotchToastSender()
     )
     return AlertSettingsView(center: center).frame(width: 480, height: 520)
 }
