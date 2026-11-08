@@ -244,40 +244,45 @@ struct AppListSection: View {
     }
 
     /// 搜索 + 排序 + 操作提示(Q5:默认占用降序,可切按名;子页内过滤)。
-    /// 舒适密度档(2026-11-05):搜索框/提示与行同档放大;seg 保持默认 regular(=B 档)。
+    /// 2026-11-08 归一:搜索换系统原生输入框(roundedBorder + 放大镜/清空内嵌),
+    /// 不再手绘灰底盒;排序 seg 与垃圾页「大小|新旧」同款(两字标签、regular、
+    /// tint 强调色、自然宽)。
     private var controlsBar: some View {
         @Bindable var model = model
         return HStack(spacing: 8) {
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.tertiary)
-                TextField("搜索应用", text: $model.searchQuery)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 12))
-                if !model.searchQuery.isEmpty {
-                    Button {
-                        model.searchQuery = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.tertiary)
-                    }
-                    .buttonStyle(.plain)
-                    .help("清空搜索")
+            TextField("搜索应用", text: $model.searchQuery)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 220)
+                .overlay(alignment: .leading) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                        .padding(.leading, 7)
+                        .allowsHitTesting(false)
                 }
-            }
-            .padding(.horizontal, 9)
-            .frame(width: 220, height: 30, alignment: .leading)
-            .background(Surface.cardHigh, in: .rect(cornerRadius: 8))
+                .overlay(alignment: .trailing) {
+                    if !model.searchQuery.isEmpty {
+                        Button {
+                            model.searchQuery = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.trailing, 6)
+                        .help("清空搜索")
+                    }
+                }
 
             Picker("排序", selection: $model.sortOrder) {
-                Text("占用 ↓").tag(AppSortOrder.sizeDescending)
-                Text("按名").tag(AppSortOrder.name)
+                Text("占用").tag(AppSortOrder.sizeDescending)
+                Text("名称").tag(AppSortOrder.name)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
             .fixedSize()
+            .tint(accent)
             .help("默认按 .app 实际占用降序(与空间地图同口径)")
 
             Spacer(minLength: 8)
@@ -463,7 +468,7 @@ private struct LeftoverDisclosure: View {
             } else if model.leftoverLoading.contains(entry.path) {
                 HStack(spacing: 6) {
                     ProgressView()
-                        .controlSize(.mini)
+                        .controlSize(.small)
                     Text("正在查找残留…")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
