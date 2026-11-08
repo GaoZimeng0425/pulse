@@ -8,7 +8,8 @@ import Foundation
 //   - CleanPlan:选中 ∩ 当前清单 ∩ 非排除——删除前**再判一次排除**(票面"两处生效"),
 //     用的是和扫描侧同一份 CleanExclusions 判定。
 //   - CleanRunner:把计划交给 CleanTrashExecutor(唯一删除出口),按路径逐项核对回执,
-//     执行器没报到的项按失败记——不默认成功(防御性数据纪律:不伪造结果)。
+//     执行器没报到的项按失败记——不默认成功(防御性数据纪律:不伪造结果)。交之前先过
+//     删前复核(p5-cleaner/03,`PreDeleteCheck`):扫描后动过 / 已不在 / 无快照的项跳过。
 
 /// 清单勾选态。只存路径;清单刷新后用 `retain(in:)` 收敛,消失的项自动脱勾。
 public struct JunkSelection: Sendable, Equatable {
@@ -107,6 +108,12 @@ public struct CleanPlan: Sendable, Equatable {
 
     public var hasPartialItems: Bool {
         items.contains(where: \.isPartial)
+    }
+
+    /// 没有删前复核快照的项(旧版缓存带来的结果):执行时必被跳过——确认单据此提前说明,
+    /// 不让用户点了「移入废纸篓」才发现一项没动。
+    public var itemsWithoutSnapshot: [JunkCandidate] {
+        items.filter { $0.modifiedAtScan == nil }
     }
 
     /// 由勾选态与当前清单产出计划。排除前缀在此**二次判定**:扫完后新加的排除、设置页里
@@ -226,7 +233,7 @@ public struct CleanRunReport: Sendable, Equatable {
     }
 }
 
-/// 执行计划:一次交给执行器,按路径逐项对回执。
+/// 执行计划:先删前复核,放行项一次交给执行器,按路径逐项对回执。
 public enum CleanRunner {
     public static func run(
         _ plan: CleanPlan,
@@ -237,9 +244,21 @@ public enum CleanRunner {
         guard !plan.isEmpty else {
             return CleanRunReport(startedAt: startedAt, finishedAt: startedAt, items: [])
         }
-        let outcome = await executor.recycleToTrash(plan.items.map(\.path))
+        // 删前复核(spec §15):逐项比对扫描快照;跳过项不进执行器批次,战报如实记原因。
+        let check = await PreDeleteCheck.partition(
+            plan.items,
+            path: \.path,
+            snapshot: \.modifiedAtScan,
+            origin: .scan,
+            currentState: { await executor.currentState(ofPath: $0) }
+        )
+        let outcome = check.cleared.isEmpty
+            ? TrashRecycleOutcome()
+            : await executor.recycleToTrash(check.cleared.map(\.path))
         let items = plan.items.map { candidate -> CleanRunItem in
-            let result: CleanItemOutcome = if let destination = outcome.recycled[candidate.path] {
+            let result: CleanItemOutcome = if let skipped = check.skipped[candidate.path] {
+                .failed(reason: skipped)
+            } else if let destination = outcome.recycled[candidate.path] {
                 .recycled(destination: destination)
             } else if let reason = outcome.failures[candidate.path] {
                 .failed(reason: reason)

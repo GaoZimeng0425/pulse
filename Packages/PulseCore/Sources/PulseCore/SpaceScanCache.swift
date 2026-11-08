@@ -56,7 +56,12 @@ public enum SpaceScanCache {
     /// 格式版本(魔数后 u32 小端)。不兼容变更:改魔数,不覆写旧文件语义。
     /// v2(2026-11-03):meta 增 cleanedPaths(清理后重开不再回列表);v1 文件弃用,
     /// 代价是升版后第一次要重扫一次。
-    static let formatVersion: UInt32 = 2
+    /// v3(2026-11-08,p5-cleaner/03):节点 flags 增 0b1000 = 带目录自身 mtime(删前复核
+    /// 快照)。v3 是 v2 的超集(v2 写入器从不置该位),故**解码兼容 v2**:旧缓存照常显示
+    /// 清单与地图,只是没有快照——删除时这些项按「缺少扫描快照」跳过(fail-closed),
+    /// 确认单提前说明。旧版本 app 读 v3 文件 = 版本号不认 → nil(回空态,不误读)。
+    static let formatVersion: UInt32 = 3
+    static let readableVersions: Set<UInt32> = [2, 3]
 
     // MARK: 编码
 
@@ -125,9 +130,13 @@ public enum SpaceScanCache {
         flags |= node.isPartial ? 0b0001 : 0
         flags |= node.allReclaimableAccounting ? 0 : 0b0010
         flags |= node.newestChangeEpoch == nil ? 0 : 0b0100
+        flags |= node.ownModifiedEpoch == nil ? 0 : 0b1000
         w.u8(flags)
         if let newest = node.newestChangeEpoch {
             w.f64(newest)
+        }
+        if let own = node.ownModifiedEpoch {
+            w.f64(own)
         }
         w.varint(Int64(node.fileCount))
         w.varint(Int64(node.directoryCount))
@@ -146,7 +155,8 @@ public enum SpaceScanCache {
 
     public static func decode(_ data: Data) -> SpaceScanCachePayload? {
         var r = Reader(data: data)
-        guard r.rawBytes(count: Self.magic.count) == Self.magic, r.u32() == Self.formatVersion,
+        guard r.rawBytes(count: Self.magic.count) == Self.magic,
+              let version = r.u32(), Self.readableVersions.contains(version),
               let started = r.f64(),
               let finished = r.f64(),
               let roots = r.strings(),
@@ -243,6 +253,11 @@ public enum SpaceScanCache {
             guard let value = r.f64() else { return nil }
             newest = value
         }
+        var own: Double?
+        if flags & 0b1000 != 0 {
+            guard let value = r.f64() else { return nil }
+            own = value
+        }
         guard
             let fileCount = r.varint(),
             let directoryCount = r.varint(),
@@ -270,7 +285,8 @@ public enum SpaceScanCache {
             symlinkCount: Int(symlinkCount),
             datalessCount: Int(datalessCount),
             isPartial: flags & 0b0001 != 0,
-            newestChangeEpoch: newest
+            newestChangeEpoch: newest,
+            ownModifiedEpoch: own
         )
         node.children.reserveCapacity(childCount)
         for _ in 0 ..< childCount {

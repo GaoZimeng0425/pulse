@@ -117,6 +117,9 @@ public struct AppLeftoverRow: Sendable, Equatable, Identifiable {
     public var isCheckFirst: Bool
     public var sizeBytes: Int64?
     public var isPartial: Bool
+    /// 探测时刻条目自身 mtime(p5-cleaner/03 删前复核快照;Live 探测时 lstat 一次)。
+    /// nil = 没拿到 → 卸载时该项按「缺少探测快照」跳过(fail-closed)。
+    public var modifiedAtProbe: Double?
 
     public init(
         path: String,
@@ -125,7 +128,8 @@ public struct AppLeftoverRow: Sendable, Equatable, Identifiable {
         source: LeftoverSource,
         isCheckFirst: Bool = false,
         sizeBytes: Int64? = nil,
-        isPartial: Bool = false
+        isPartial: Bool = false,
+        modifiedAtProbe: Double? = nil
     ) {
         self.path = path
         self.site = site
@@ -134,6 +138,7 @@ public struct AppLeftoverRow: Sendable, Equatable, Identifiable {
         self.isCheckFirst = isCheckFirst
         self.sizeBytes = sizeBytes
         self.isPartial = isPartial
+        self.modifiedAtProbe = modifiedAtProbe
     }
 }
 

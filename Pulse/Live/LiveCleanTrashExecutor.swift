@@ -15,6 +15,23 @@ import PulseCore
 // 本票只交付协议履约,不接按钮。
 
 struct LiveCleanTrashExecutor: CleanTrashExecutor {
+    /// 删前复核探针(p5-cleaner/03):lstat 一次,不跟随符号链接,零副作用。
+    /// 换算与扫描枚举器同一公式(`FsTimestamp.epoch` 同一 inode 字段)。
+    func currentState(ofPath path: String) async -> PathSnapshot {
+        Self.lstatSnapshot(ofPath: path)
+    }
+
+    static func lstatSnapshot(ofPath path: String) -> PathSnapshot {
+        var st = stat()
+        guard lstat(path, &st) == 0 else {
+            return errno == ENOENT ? .missing : .unreadable
+        }
+        return .present(modifiedEpoch: FsTimestamp.epoch(
+            seconds: Int64(st.st_mtimespec.tv_sec),
+            nanoseconds: Int64(st.st_mtimespec.tv_nsec)
+        ))
+    }
+
     func recycleToTrash(_ paths: [String]) async -> TrashRecycleOutcome {
         var outcome = TrashRecycleOutcome()
         for path in paths {

@@ -46,15 +46,31 @@ public actor FakeCleanDirectoryEnumerator: CleanDirectoryEnumerator {
 public actor FakeCleanTrashExecutor: CleanTrashExecutor {
     public private(set) var recycleCalls: [[String]] = []
     public private(set) var emptyCalls = 0
+    /// 删前复核探针被问过的路径(按序)。
+    public private(set) var stateQueries: [String] = []
     public var nextRecycleOutcome: TrashRecycleOutcome
     public var nextEmptySummary: TrashEmptySummary
+    /// 删前复核探针的逐路径改写;未登记 = `.present(CleanFixture.directoryModified)`,
+    /// 即与夹具目录的扫描快照一致(「扫描后没动过」)——既有清理流程测试零改动。
+    public var pathStates: [String: PathSnapshot]
 
     public init(
         nextRecycleOutcome: TrashRecycleOutcome = TrashRecycleOutcome(),
-        nextEmptySummary: TrashEmptySummary = TrashEmptySummary(volumes: [])
+        nextEmptySummary: TrashEmptySummary = TrashEmptySummary(volumes: []),
+        pathStates: [String: PathSnapshot] = [:]
     ) {
         self.nextRecycleOutcome = nextRecycleOutcome
         self.nextEmptySummary = nextEmptySummary
+        self.pathStates = pathStates
+    }
+
+    public func currentState(ofPath path: String) async -> PathSnapshot {
+        stateQueries.append(path)
+        return pathStates[path] ?? .present(modifiedEpoch: CleanFixture.directoryModified)
+    }
+
+    public func setPathState(_ state: PathSnapshot, for path: String) {
+        pathStates[path] = state
     }
 
     public func recycleToTrash(_ paths: [String]) async -> TrashRecycleOutcome {
@@ -100,6 +116,10 @@ public final class FakeCleanActivitySource: CleanActivitySource, @unchecked Send
 // MARK: - 夹具速搭
 
 public enum CleanFixture {
+    /// 夹具目录条目的默认自身 mtime(p5-cleaner/03 删前复核快照)。`FakeCleanTrashExecutor`
+    /// 的探针默认报同值——扫描快照与删前状态一致,流程测试不必逐个造快照。
+    public static let directoryModified: Double = 1_600_000_000
+
     /// 造文件条目。deviceID 默认同一台「盘」;fileID 用递减全局计数避免无意同键。
     /// `modified` = mtime epoch 秒(05 票项目年龄口径;默认 nil = 不参与年龄聚合)。
     public static func file(
@@ -128,9 +148,10 @@ public enum CleanFixture {
     public static func directory(
         _ name: String,
         device: UInt32 = 16_777_229,
-        fileID: UInt64
+        fileID: UInt64,
+        modified: Double? = directoryModified
     ) -> FsEntrySnapshot {
-        FsEntrySnapshot(name: name, kind: .directory, deviceID: device, fileID: fileID)
+        FsEntrySnapshot(name: name, kind: .directory, deviceID: device, fileID: fileID, modifiedEpoch: modified)
     }
 
     public static func symlink(_ name: String) -> FsEntrySnapshot {

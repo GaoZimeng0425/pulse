@@ -815,10 +815,18 @@ private struct CleanConfirmSheet: View {
             Text("共释放 \(PulseFormat.memory(UInt64(max(0, plan.totalBytes))))(实际占用口径:\(accountingNote))")
                 .font(.system(size: 14.5, weight: .semibold))
                 .monospacedDigit()
-            HStack(spacing: 8) {
-                Text("大小按实际占用计:APFS 克隆与硬链接不重复计。唯一不可逆的操作是「清空废纸篓」,不在这里。")
+            // 删前复核注记(p5-cleaner/03):预期管理——动过的项会被跳过,完成后逐项说原因。
+            VStack(alignment: .leading, spacing: 4) {
+                Text("大小按实际占用计:APFS 克隆与硬链接不重复计。移入前逐项复核「扫描后未变动」:扫描后有变动或已不在原处的项会自动跳过并说明原因。")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
+                if !plan.itemsWithoutSnapshot.isEmpty {
+                    Text("\(plan.itemsWithoutSnapshot.count) 项来自旧版扫描、缺少快照,会被跳过——重新扫描后再清即可。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Surface.warning)
+                }
+            }
+            HStack(spacing: 8) {
                 Spacer()
                 Button("取消") {
                     model.cancelClean()

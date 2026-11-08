@@ -21,11 +21,18 @@ final class AppUninstallRunnerTests: XCTestCase {
             leftoverItems: leftovers.map {
                 AppLeftoverRow(
                     path: $0.path, site: .caches, matchKey: "k",
-                    source: .generic, isCheckFirst: $0.checkFirst, sizeBytes: $0.bytes
+                    source: .generic, isCheckFirst: $0.checkFirst, sizeBytes: $0.bytes,
+                    modifiedAtProbe: Self.probedModified
                 )
             },
             receiptZapPaths: zap
         )
+    }
+
+    /// 残留探测快照与删前探针默认一致(「列出后没动过」);复核用例逐路径改写。
+    private static let probedModified: Double = 1_600_000_000
+    private static let unchangedState: @Sendable (String) async -> PathSnapshot = { _ in
+        .present(modifiedEpoch: probedModified)
     }
 
     private struct Spies {
@@ -105,7 +112,8 @@ final class AppUninstallRunnerTests: XCTestCase {
             plan(),
             recycle: runner.recycle, deletePermanently: runner.delete, brewUninstall: runner.brew,
             isAppRunning: { _ in true },
-            crossCheckCask: { _ in nil }
+            crossCheckCask: { _ in nil },
+            leftoverState: Self.unchangedState
         )
         guard case .rejectedRunning = termination else {
             return XCTFail("应被运行重查拒绝,得到 \(termination)")
@@ -186,7 +194,8 @@ final class AppUninstallRunnerTests: XCTestCase {
             plan(permanent: permanent, leftovers: [(path: paths[1], checkFirst: false, bytes: 50)]),
             recycle: runner.recycle, deletePermanently: runner.delete, brewUninstall: runner.brew,
             isAppRunning: { _ in false },
-            crossCheckCask: { _ in nil }
+            crossCheckCask: { _ in nil },
+            leftoverState: Self.unchangedState
         )
     }
 
@@ -200,7 +209,8 @@ final class AppUninstallRunnerTests: XCTestCase {
             p,
             recycle: runner.recycle, deletePermanently: runner.delete, brewUninstall: runner.brew,
             isAppRunning: { _ in false },
-            crossCheckCask: { _ in "demo-cask" }
+            crossCheckCask: { _ in "demo-cask" },
+            leftoverState: Self.unchangedState
         )
         guard case let .needsReroute(cask) = first else {
             return XCTFail("应触发改道,得到 \(first)")
@@ -216,6 +226,7 @@ final class AppUninstallRunnerTests: XCTestCase {
             recycle: okRunner.recycle, deletePermanently: okRunner.delete, brewUninstall: okRunner.brew,
             isAppRunning: { _ in false },
             crossCheckCask: { _ in "demo-cask" }, // 核对仍会命中,但 acknowledged 跳过
+            leftoverState: Self.unchangedState,
             rerouteAcknowledged: true
         )
         guard case .completed = second else {
@@ -244,7 +255,8 @@ final class AppUninstallRunnerTests: XCTestCase {
             ], zap: zap),
             recycle: runner.recycle, deletePermanently: runner.delete, brewUninstall: runner.brew,
             isAppRunning: { _ in false },
-            crossCheckCask: { _ in nil }
+            crossCheckCask: { _ in nil },
+            leftoverState: Self.unchangedState
         )
     }
 

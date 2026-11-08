@@ -35,7 +35,9 @@ public struct FsEntrySnapshot: Sendable, Equatable {
     public var isDataless: Bool
     /// ATTR_CMN_MODTIME(秒,含小数纳秒;05 票项目年龄口径)。nil = 文件系统没给,
     /// 不参与年龄聚合(不伪造)。**目录自身的 mtime 不进年龄**(重装依赖会刷它)——
-    /// 引擎只聚合文件条目的 mtime,见 `SpaceNode.newestChangeEpoch`。
+    /// 引擎只聚合文件条目的 mtime,见 `SpaceNode.newestChangeEpoch`;目录条目的 mtime
+    /// 另作删前复核快照(`SpaceNode.ownModifiedEpoch`,p5-cleaner/03)。
+    /// 换算一律走 `FsTimestamp.epoch`(扫描与删前探针同一公式,见那里)。
     public var modifiedEpoch: Double?
 
     public init(
@@ -102,6 +104,30 @@ public protocol CleanTrashExecutor: Sendable {
     func recycleToTrash(_ paths: [String]) async -> TrashRecycleOutcome
     /// 清空用户可写的所有废纸篓;无权限项跳过并如实计数(08 票;探针 12:本机仅 ~/.Trash)。
     func emptyTrash() async -> TrashEmptySummary
+    /// 删前复核探针(p5-cleaner/03):路径此刻的状态(不跟随符号链接)。只读、无副作用;
+    /// 判定在 PulseCore `PreDeleteCheck`,执行器只报事实。**必填、无默认实现**——
+    /// 安全闸的探针漏实现应当编译失败,而不是静默放行。
+    func currentState(ofPath path: String) async -> PathSnapshot
+}
+
+/// 一条路径此刻的状态(删前复核探针的产出)。
+public enum PathSnapshot: Sendable, Equatable {
+    /// 路径不存在(ENOENT)。
+    case missing
+    /// 读不到状态(权限等;不是「不存在」,也不能当「没变」)。
+    case unreadable
+    /// 存在;`modifiedEpoch` = 条目自身 mtime(`FsTimestamp.epoch` 换算)。
+    case present(modifiedEpoch: Double)
+}
+
+/// 文件系统时间戳 → epoch 秒的**唯一换算**(p5-cleaner/03)。扫描枚举器
+/// (getattrlistbulk ATTR_CMN_MODTIME)与删前探针(lstat st_mtimespec)读的是同一个
+/// inode 字段,同一公式换算才能逐位相等——两处各写一遍,迟早有一处改成别的写法,
+/// 删前复核就会把没动过的目录全判成「有变动」。
+public enum FsTimestamp {
+    public static func epoch(seconds: Int64, nanoseconds: Int64) -> Double {
+        Double(seconds) + Double(max(0, nanoseconds)) * 1e-9
+    }
 }
 
 /// 单次「移入废纸篓」的结果。

@@ -75,6 +75,7 @@ final class UninstallModel {
     @ObservationIgnored private let brewUninstall: @Sendable (String, Bool) async -> BrewUninstallResult
     /// 动作时刻收据交叉核对(Q11:重新读一次收据索引,不吃清单快照)。
     @ObservationIgnored private let crossCheckCasks: @Sendable () async -> [String: String]
+    @ObservationIgnored private let leftoverState: @Sendable (String) async -> PathSnapshot
     @ObservationIgnored private let recordHistory: @Sendable (CleanRunReport) async -> Void
 
     init(
@@ -107,6 +108,10 @@ final class UninstallModel {
         crossCheckCasks: @escaping @Sendable () async -> [String: String] = {
             await LiveAppCatalogSource().collectFacts().brewAppNames
         },
+        // 删前复核探针(p5-cleaner/03):与 CleanRunner 的执行器探针同款 lstat(零副作用)。
+        leftoverState: @escaping @Sendable (String) async -> PathSnapshot = { path in
+            await LiveCleanTrashExecutor().currentState(ofPath: path)
+        },
         recordHistory: @escaping @Sendable (CleanRunReport) async -> Void = { _ in
             // 正式装配在 MainWindowView 注入历史库;默认 no-op 供预览与单测。
         }
@@ -119,6 +124,7 @@ final class UninstallModel {
         self.deletePermanently = deletePermanently
         self.brewUninstall = brewUninstall
         self.crossCheckCasks = crossCheckCasks
+        self.leftoverState = leftoverState
         self.recordHistory = recordHistory
     }
 
@@ -317,6 +323,7 @@ final class UninstallModel {
             deletePermanently,
             brewUninstall,
             crossCheckCasks,
+            leftoverState,
             recordHistory
         ] in
             let termination = await AppUninstallRunner.run(
@@ -332,6 +339,7 @@ final class UninstallModel {
                     // 动作时刻重读收据(rerouteAcknowledged 时 Core 不会调用)。
                     await crossCheckCasks()[directoryName]
                 },
+                leftoverState: leftoverState,
                 rerouteAcknowledged: rerouteAcknowledged
             )
             await MainActor.run { self?.apply(termination, plan: plan, recordHistory: recordHistory) }
