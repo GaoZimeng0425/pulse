@@ -69,9 +69,9 @@ final class OrphanLeftoversTests: XCTestCase {
 
     // MARK: 主路径:命中 + 档位两态 + 跨域聚合
 
-    func testQuietOrphanAcrossDomainsListedSafeWithTailDisplayName() {
+    func testQuietOrphanAcrossDomainsListedSafeGroupedByFullBundleID() {
         let out = detect(in: tree())
-        let qq = out.filter { $0.projectName == "orphan" }
+        let qq = out.filter { $0.projectName == "com.qq.orphan" }
         XCTAssertEqual(Set(qq.map(\.path)), [
             home + "/Library/Caches/com.qq.orphan",
             home + "/Library/Logs/com.qq.orphan",
@@ -111,7 +111,64 @@ final class OrphanLeftoversTests: XCTestCase {
 
     func testInstalledBundleIDIsNeverOrphan() {
         let out = detect(in: tree(), installed: ["com.qq.orphan"])
-        XCTAssertFalse(out.contains { $0.projectName == "orphan" }, "闸 3:在已装全集 = 主人还在")
+        XCTAssertFalse(out.contains { $0.projectName == "com.qq.orphan" }, "闸 3:在已装全集 = 主人还在")
+    }
+
+    func testOverlapWithRuleTableYieldsToCuratedRule() {
+        // 真案:规则表 Library/Caches/org.swift.swiftpm 是 CLI 缓存(无 .app),孤儿检测也会报。
+        let swiftpm = dir("org.swift.swiftpm", under: home + "/Library/Caches", bytes: 700, newest: now - 90 * 86400)
+        let gone = dir("com.gone.app", under: home + "/Library/Caches", bytes: 300, newest: now - 90 * 86400)
+        let library = dir("Library", under: home, children: [
+            dir("Caches", under: home + "/Library", children: [swiftpm, gone]),
+        ])
+        let tree = dir("Users", under: "/", children: [dir("me", under: "/Users", children: [library])])
+        let orphans = detect(in: tree)
+        XCTAssertEqual(Set(orphans.map(\.path)), [swiftpm.path, gone.path], "前提:两者都被判孤儿")
+        let claimed = JunkMatcher.candidates(in: [tree], home: home, excludedPathPrefixes: [])
+        XCTAssertEqual(claimed.map(\.path), [swiftpm.path], "前提:规则表也认领 swiftpm")
+        XCTAssertEqual(
+            OrphanLeftoverDetector.excludingOverlaps(orphans, claimedBy: claimed).map(\.path),
+            [gone.path],
+            "同路径只留规则表那张卡"
+        )
+    }
+
+    func testOverlapCoversAncestorAndDescendant() {
+        func candidate(_ path: String) -> JunkCandidate {
+            JunkCandidate(
+                ruleID: "x", group: .globalToolCache, title: "x", path: path, tier: .safe,
+                bytes: 1, fileCount: 1, isPartial: false, allReclaimableAccounting: true,
+                rationale: "", symbolName: "x"
+            )
+        }
+        let orphans = [candidate("/h/C/com.a"), candidate("/h/C/com.b"), candidate("/h/C/com.c")]
+        let claimed = [candidate("/h/C/com.a/inner"), candidate("/h/C"), candidate("/h/C/com.cc")]
+        // /h/C 是三者祖先 → 全部让位;仅前缀相同的兄弟(com.c vs com.cc)不算重叠。
+        XCTAssertTrue(OrphanLeftoverDetector.excludingOverlaps(orphans, claimedBy: claimed).isEmpty)
+        let siblingsOnly = [candidate("/h/C/com.cc"), candidate("/h/C/com.a/inner")]
+        XCTAssertEqual(
+            OrphanLeftoverDetector.excludingOverlaps(orphans, claimedBy: siblingsOnly).map(\.path),
+            ["/h/C/com.b", "/h/C/com.c"],
+            "祖孙重叠让位,字符串前缀相同的兄弟不误伤"
+        )
+    }
+
+    func testSameTailDifferentAppsStayInSeparateCards() {
+        // 分组键 = 全 id(票 02 修正):同尾段「Desktop」的两个 app 不得并进一张卡。
+        let library = dir("Library", under: home, children: [
+            dir("Caches", under: home + "/Library", children: [
+                dir("com.figma.Desktop", under: home + "/Library/Caches", bytes: 500, newest: now - 90 * 86400),
+                dir("com.foo.Desktop", under: home + "/Library/Caches", bytes: 400, newest: now - 90 * 86400),
+            ]),
+        ])
+        let tree = dir("Users", under: "/", children: [dir("me", under: "/Users", children: [library])])
+        let groups = ProjectJunkGrouping.group(detect(in: tree))
+        XCTAssertEqual(groups.map(\.projectName), ["com.figma.Desktop", "com.foo.Desktop"])
+        XCTAssertEqual(
+            Set(groups.map { OrphanLeftoverDetector.displayName(ofBundleID: $0.projectName) }),
+            ["Desktop"],
+            "显示名可以相同,分组不能并"
+        )
     }
 
     func testRunningOnlyAppCountsAsInstalled() {
@@ -239,7 +296,17 @@ final class OrphanLeftoversTests: XCTestCase {
     }
 
     func testGroupRegisteredAfterProjectArtifacts() {
-        XCTAssertEqual(JunkGroup.allCases.last, .uninstallLeftovers, "组序:卸载残留殿后")
-        XCTAssertEqual(JunkGroup.uninstallLeftovers.title, "卸载残留")
+        // 防漂移(票 02):CaseIterable 顺序即 UI 组序;组名与「按所有者分大卡」登记面全量入册。
+        XCTAssertEqual(
+            JunkGroup.allCases,
+            [.globalToolCache, .projectArtifacts, .uninstallLeftovers],
+            "组序:工具缓存 → 项目产物 → 卸载残留殿后"
+        )
+        XCTAssertEqual(JunkGroup.allCases.map(\.title), ["全局工具缓存", "项目产物", "卸载残留"])
+        XCTAssertEqual(
+            JunkGroup.allCases.filter(\.groupsByOwner),
+            [.projectArtifacts, .uninstallLeftovers],
+            "按所有者分大卡的组(工具缓存保持独立小卡)"
+        )
     }
 }

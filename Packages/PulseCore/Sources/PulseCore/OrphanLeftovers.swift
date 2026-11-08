@@ -63,7 +63,10 @@ public enum OrphanRedlines {
 }
 
 /// 孤儿检测器:纯值、无 IO,跑在扫描树上。产出语义与另两个规则域同构
-/// (每目录一个 `JunkCandidate`,`projectName` 携带大卡分组键 = bundle id 尾段)。
+/// (每目录一个 `JunkCandidate`,`projectName` 携带大卡分组键 = **完整 bundle id**
+/// (savedState 剥尾后);显示名由 `displayName(ofBundleID:)` 取尾段——分组用全 id,
+/// 同尾段的不同 app(`com.figma.Desktop` / `com.foo.Desktop`)才不会并进一张卡,
+/// p5-cleaner/02 修正票 01 的尾段分组)。
 public enum OrphanLeftoverDetector {
     /// 时间闸阈值(秒)。
     public static let quietThresholdSeconds: TimeInterval = 30 * 86400
@@ -128,7 +131,7 @@ public enum OrphanLeftoverDetector {
                         ? "「\(bundleID)」已不在已装应用清单,这是它留下的数据;30 天内没有文件变动"
                         : "「\(bundleID)」已不在已装应用清单,但 30 天内还有文件变动——先确认没有别的程序在用再删",
                     symbolName: "app.dashed",
-                    projectName: displayName(ofBundleID: bundleID),
+                    projectName: bundleID,
                     newestChangeEpoch: newest
                 ))
             }
@@ -139,9 +142,26 @@ public enum OrphanLeftoverDetector {
         }
     }
 
+    /// 与另两个规则域的候选去重(p5-cleaner/02 真案:规则表 `Library/Caches/org.swift.swiftpm`
+    /// 是 CLI 工具缓存,没有 .app,孤儿检测会再报一遍——同路径两张卡、勾一联动二、
+    /// 确认清单重复)。路径相等或互为祖孙 = 重叠,孤儿让位:规则表的说明与档位是逐条
+    /// 担保过的,比「不在已装清单」的推断更准。
+    public static func excludingOverlaps(
+        _ orphans: [JunkCandidate],
+        claimedBy claimed: [JunkCandidate]
+    ) -> [JunkCandidate] {
+        guard !claimed.isEmpty else { return orphans }
+        let claimedPaths = claimed.map(\.path)
+        return orphans.filter { orphan in
+            !claimedPaths.contains { other in
+                other == orphan.path || orphan.path.hasPrefix(other + "/") || other.hasPrefix(orphan.path + "/")
+            }
+        }
+    }
+
     /// 大卡显示名:bundle id 尾段(`com.tencent.qq` → `qq`);没有点或尾段为空
-    /// 用完整 id(不编名字)。
-    static func displayName(ofBundleID bundleID: String) -> String {
+    /// 用完整 id(不编名字)。分组键是全 id(`projectName`),这里只管显示。
+    public static func displayName(ofBundleID bundleID: String) -> String {
         guard let lastDot = bundleID.lastIndex(of: "."),
               lastDot < bundleID.index(before: bundleID.endIndex)
         else { return bundleID }

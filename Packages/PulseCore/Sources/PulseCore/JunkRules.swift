@@ -49,6 +49,15 @@ public enum JunkGroup: String, Sendable, CaseIterable, Equatable {
         case .uninstallLeftovers: "卸载残留"
         }
     }
+
+    /// 组内是否按所有者聚合成大卡(项目产物按项目、卸载残留按 app;条目的
+    /// `projectName` 即分组键)。穷举 switch:新增分组必须表态。
+    public var groupsByOwner: Bool {
+        switch self {
+        case .globalToolCache: false
+        case .projectArtifacts, .uninstallLeftovers: true
+        }
+    }
 }
 
 /// 路径模式:相对家目录的分量序列。分量可为字面名或后缀匹配(如 " DeviceSupport"
