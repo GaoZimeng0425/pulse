@@ -218,6 +218,8 @@ private struct JunkListCard: View {
             ScrollView {
                 groupsBody
             }
+            // 2026-11-08 实报:清单短于视口时 ScrollView 默认把内容悬中——锚顶。
+            .defaultScrollAnchor(.top)
             // 弹性:列表吃卡内剩余空间(清理页不进外层滚动后卡片撑满窗口,
             // .infinity 即「到 actionBar 为止」);最小 160 防短窗挤没。
             .frame(minHeight: 160, maxHeight: .infinity)

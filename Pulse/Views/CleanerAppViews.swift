@@ -106,6 +106,8 @@ struct AppListSection: View {
                         }
                         .padding(.vertical, 6)
                     }
+                    // 2026-11-08 实报:清单短于视口时 ScrollView 默认把内容悬中——锚顶。
+                    .defaultScrollAnchor(.top)
                     .frame(minHeight: 120, maxHeight: .infinity)
                 }
                 .padding(12)
