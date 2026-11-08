@@ -139,10 +139,12 @@ struct CleanerTabView: View {
                     .frame(maxHeight: .infinity)
             case .map:
                 mapSection
-                    .frame(maxHeight: .infinity)
+                    // 2026-11-08 实报:flex 层不带对齐,空态/扫描卡(抱内容)悬中——补 .top。
+                    .frame(maxHeight: .infinity, alignment: .top)
             case .apps:
                 AppListSection(model: uninstallModel)
-                    .frame(maxHeight: .infinity)
+                    // 同 map:装载中/空态卡贴顶,不悬中。
+                    .frame(maxHeight: .infinity, alignment: .top)
             case .history:
                 CleanHistorySection(model: model)
             }
