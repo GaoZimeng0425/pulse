@@ -82,6 +82,7 @@ struct AlertBannerView: View {
             persist: { _ in }
         ),
         sender: PreviewDeniedAlertSender(),
+        toastSender: InertNemoNotchToastSender(),
         clock: { Date() }
     )
     center.activeAlerts = [

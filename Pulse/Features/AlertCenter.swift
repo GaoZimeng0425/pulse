@@ -43,10 +43,13 @@ final class AlertCenter {
     private var latestGroups: [ProcessGroup] = []
     private var latestCPUPercentByPID: [pid_t: Double] = [:]
 
+    /// 两个发送器不给默认值,装配处必须写明(生产 = MonitorAssembly 传 Live)。
+    /// 2026-11-08 实案:默认真发时,单测漏传 toastSender,每跑一次测试就往用户
+    /// 的 NemoNotch 真发 5 张告警卡;无默认值后漏传 = 编译不过。
     init(
         store: AlertSettingsStore = AlertSettingsStore(),
-        sender: any AlertNotificationSending = LiveAlertNotificationSender(),
-        toastSender: any NemoNotchToastSending = LiveNemoNotchToastSender(),
+        sender: any AlertNotificationSending,
+        toastSender: any NemoNotchToastSending,
         clock: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.store = store
