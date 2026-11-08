@@ -1,7 +1,7 @@
 @testable import PulseCore
 import XCTest
 
-/// 轻桥判定(p4-uninstaller/05):白名单命中/子孙域/域外零暗示 + 与开发者垃圾
+/// 轻桥判定(p4-uninstaller/05):白名单命中/子孙域/域外零暗示 + 与可清理清单
 /// 清单**同源**(同一规则表同一套组件语义,checklist 明令不许两套口径漂移)。
 final class CleanableGroupTests: XCTestCase {
     private let home = "/Users/tester"
@@ -74,7 +74,7 @@ final class CleanableGroupTests: XCTestCase {
         )
     }
 
-    // MARK: 同源(与开发者垃圾清单)
+    // MARK: 同源(与可清理清单清单)
 
     func testMatcherCandidatesAllCarryCleanableGroupSameOrigin() {
         let trees = [fakeHome]

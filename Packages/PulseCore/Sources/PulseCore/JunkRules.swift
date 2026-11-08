@@ -360,7 +360,7 @@ public enum JunkRuleTable {
     ]
 
     /// 轻桥判定(p4-uninstaller/05):路径命中内置白名单 → 对应组;不命中 → nil。
-    /// 与开发者垃圾清单**同源**(同一个规则表、同一套 JunkPathPattern 语义),
+    /// 与可清理清单**同源**(同一个规则表、同一套 JunkPathPattern 语义),
     /// 规则表变更两侧自动一致——checklist 明令不许两套口径漂移。
     public static func cleanableGroup(for path: String, home: String) -> JunkGroup? {
         for rule in builtin {
