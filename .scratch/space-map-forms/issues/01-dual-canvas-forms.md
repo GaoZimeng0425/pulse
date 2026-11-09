@@ -12,7 +12,7 @@
 不是形态;几何(`SunburstLayout`)与极坐标命中(v2,619533a)在 PulseCore / git
 历史里都是对的。本次以 Canvas 写法回归旭日,与 treemap 并存。
 
-**Status:** done(2026-11-09,待合 develop)
+**Status:** done(2026-11-09,develop@3e06448)
 
 - [x] 两形态各自渲染正确;切形态不丢下钻位置(drillPath 保留)
 - [x] 旭日命中可靠(极坐标反算,含跨 0 弧;中心圈 = 返回上级)
