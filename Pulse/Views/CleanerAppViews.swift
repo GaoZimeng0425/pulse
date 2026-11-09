@@ -39,33 +39,30 @@ struct AppListSection: View {
 
     // MARK: 头部
 
-    /// 组头式标题(清单子页统一语言,与「清理历史」/垃圾组头同款):17 bold + 汇总
-    /// secondary——不再用游离在卡外的 CardHeader(其他子页没有这种形态)。
+    /// 卡头(四子页统一形态,2026-11-09 用户实报收编:可清理/空间地图 = 大卡 +
+    /// CardHeader,应用/历史跟齐):清理页强调色 + 右侧汇总与刷新。
     private var header: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("应用")
-                .font(.system(size: 17, weight: .bold))
-            if let output = model.output {
-                Text(summaryText(output))
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+        CardHeader(symbolName: "square.grid.2x2", title: "应用", tint: accent) {
+            HStack(spacing: 8) {
+                if let output = model.output {
+                    Text(summaryText(output))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                        .monospacedDigit()
+                        .lineLimit(2)
+                        .multilineTextAlignment(.trailing)
+                }
+                Button {
+                    model.refresh()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 12))
+                }
+                .buttonStyle(.plain)
+                .disabled(model.isBusy)
+                .help("重新收集(签名、brew 徽标、运行态都可能已变化)")
             }
-            Spacer(minLength: 8)
-            Button {
-                model.refresh()
-            } label: {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 12))
-            }
-            .buttonStyle(.plain)
-            .disabled(model.isBusy)
-            .help("重新收集(签名、brew 徽标、运行态都可能已变化)")
         }
-        .padding(.top, 8)
-        .padding(.bottom, 4)
-        .padding(.horizontal, CleanerListMetrics.rowInset)
     }
 
     private func summaryText(_ output: AppCatalogOutput) -> String {
@@ -87,10 +84,10 @@ struct AppListSection: View {
             if entries.isEmpty {
                 emptyView
             } else {
-                // 清单子页统一语言(ui-unify 追改):banner / 控件条在页层,不再整页
-                // 套大卡;每个应用一张小卡(与垃圾条目同配方),展开残留 = 卡内缩进
-                // 裸行(与项目大卡子项同款)。
+                // 四子页统一形态(2026-11-09):一张大卡 + CardHeader,banner / 控件条 /
+                // 条目小卡全部进卡(垃圾页同构);条目小卡与展开=卡内裸行保留。
                 VStack(alignment: .leading, spacing: 8) {
+                    header
                     uninstallBanner
                     if model.uninstallPhase == .running {
                         runningBanner
@@ -107,6 +104,8 @@ struct AppListSection: View {
                     .defaultScrollAnchor(.top)
                     .frame(minHeight: 120, maxHeight: .infinity)
                 }
+                .frame(maxHeight: .infinity, alignment: .top)
+                .cardShell(compact: false)
             }
         }
         .sheet(isPresented: uninstallSheetPresented) {
@@ -328,16 +327,9 @@ struct AppListSection: View {
     }
 
     private func loadingView(text: String) -> some View {
-        HStack(spacing: 8) {
-            ProgressView()
-                .controlSize(.small)
-            Text(text)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-            Spacer()
-        }
-        .padding(16)
-        .background(Surface.card, in: .rect(cornerRadius: 18))
+        // 装载态与垃圾/地图的扫描态同款:CardEmptyState + 卡壳,不再自绘横条卡。
+        CardEmptyState(title: text)
+            .cardShell(compact: false)
     }
 }
 

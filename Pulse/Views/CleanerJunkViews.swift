@@ -191,8 +191,9 @@ private struct JunkListCard: View {
     }
 
     private var header: some View {
-        // 08 色彩纪律:卡头也中性(此前金色 sparkles 图标是「全页黄」的源头之一)。
-        CardHeader(symbolName: "trash", title: "可清理", tint: .primary) {
+        // 四子页卡头统一清理页强调色(2026-11-09);08 的「卡头中性」拍板 superseded
+        // ——当年变中性是为了躲磁盘金(「全页黄」源头),强调色已是 Teal,不再撞色。
+        CardHeader(symbolName: "trash", title: "可清理", tint: Surface.cleanAccent) {
             Text(summaryText)
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
@@ -926,31 +927,27 @@ struct CleanHistorySection: View {
     }
 
     private var runsList: some View {
-        // 清单子页统一语言(ui-unify 追改,2026-11-08 用户实报「历史没有卡」):
-        // 组头式标题在页层,每条 run 一张小卡(与垃圾条目同配方:card-hi、12 圆角、
-        // 卡间距 4),展开明细 = 卡内缩进裸行(与项目大卡子项同款),脚注外置。
+        // 四子页统一形态(2026-11-09 用户实报收编):一张大卡 + CardHeader
+        // (垃圾/地图同构);卡内每条 run 一张小卡(2026-11-08 引入,保留),
+        // 展开明细 = 卡内缩进裸行,脚注钉在卡底。
         // 主窗口行容器收编 LazyVStack(DESIGN.md 规则;历史随时间只增不减,懒加载最划算)。
-        LazyVStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Text("清理历史")
-                    .font(.system(size: 17, weight: .bold))
+        LazyVStack(alignment: .leading, spacing: 12) {
+            CardHeader(symbolName: "clock.arrow.circlepath", title: "清理历史", tint: Surface.cleanAccent) {
                 Text("\(model.historyRuns?.count ?? 0) 次")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
                     .monospacedDigit()
             }
-            .padding(.top, 8)
-            .padding(.bottom, 4)
-            .padding(.horizontal, CleanerListMetrics.rowInset)
-            ForEach(model.historyRuns ?? []) { run in
-                CleanRunDisclosureRow(model: model, run: run)
+            LazyVStack(alignment: .leading, spacing: 4) {
+                ForEach(model.historyRuns ?? []) { run in
+                    CleanRunDisclosureRow(model: model, run: run)
+                }
             }
             Text("清理历史永久保留在本地;大小按清理当时扫描的实际占用口径。")
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
-                .padding(.horizontal, CleanerListMetrics.rowInset)
-                .padding(.top, 4)
         }
+        .cardShell(compact: false)
     }
 }
 
