@@ -64,6 +64,8 @@ struct SpaceMapSection: View {
             return resolve(rect.node.path)
         }
         return VStack(alignment: .leading, spacing: 12) {
+            // 窗口高度紧张时,标题区 shrink-0(layoutPriority):挤只挤弹性地图区,
+            // 不再压缩/截断卡头(2026-11-09 用户实报)。
             CardHeader(symbolName: "square.grid.3x3.square", title: "空间地图", tint: accent) {
                 // 页内头部动作按钮统一配方(与垃圾页组头「全选安全项」同款):
                 // borderless + 12 semibold secondary,不再独一份 .small bordered。
@@ -72,14 +74,23 @@ struct SpaceMapSection: View {
                     .buttonStyle(.borderless)
                     .foregroundStyle(.secondary)
             }
+            .layoutPriority(1)
             if model.mapTrees.count > 1 {
                 rootPicker
+                    .layoutPriority(1)
             }
             breadcrumbRow(tree)
-            if let notice {
-                Text(notice)
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.secondary)
+                .layoutPriority(1)
+            // 通知行占位固定高:密封区/叶子提示出现/消失不再推动版面(同日实报)。
+            ZStack(alignment: .topLeading) {
+                Color.clear.frame(height: 14)
+                if let notice {
+                    Text(notice)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
             }
             if rects.isEmpty {
                 Text("此目录下没有子目录(文件已聚合进大小)。")
@@ -87,7 +98,6 @@ struct SpaceMapSection: View {
                     .foregroundStyle(.tertiary)
                     .padding(.horizontal, 12)
             } else {
-                hoverInfoRow(rects: rects, cleanable: cleanable)
                 treemapBody(rects: rects, tree: tree, cleanable: cleanable)
             }
         }
@@ -177,8 +187,11 @@ struct SpaceMapSection: View {
                     hoveredRectIndex = nil
                 }
             }
+            bridgeButton(rects: rects, cleanable: cleanable, in: geo.size)
         }
-        .frame(height: chartHeight)
+        // 弹性区(2026-11-09 用户实报):最小高 chartHeight、吃掉卡的剩余高度;
+        // 窗口矮时被压到最小高为止,标题区始终不动。
+        .frame(minHeight: chartHeight, maxHeight: .infinity)
     }
 
     // MARK: 命中
@@ -226,37 +239,36 @@ struct SpaceMapSection: View {
         return treemapColors[index % treemapColors.count]
     }
 
-    /// hover 信息行(轻桥):路径 + 大小;白名单命中块给「去清理清单」跳转。
-    /// 文案明示判定来源(清理白名单)与地图只读立场(checklist)。
+    /// 轻桥(p4-uninstaller/05):悬停命中白名单块时,「这块能清」浮在该块右上角。
+    /// 原形态是卡顶悬停信息行(路径 + 大小 + 按钮),出现/消失推动整卡重排
+    /// (2026-11-09 用户实报),改为地图内悬浮、零重排;路径与大小块内已有/悬停
+    /// tooltip 自解释,不再单列一行。
     @ViewBuilder
-    private func hoverInfoRow(rects: [TreemapRect], cleanable: [JunkGroup?]) -> some View {
-        if let index = hoveredRectIndex, rects.indices.contains(index) {
-            let node = rects[index].node
-            HStack(spacing: 8) {
-                Text(node.path)
-                    .font(.system(size: 10.5, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .help(node.path)
-                Spacer(minLength: 8)
-                Text("\(PulseFormat.memory(UInt64(max(0, node.bytes)))) · \(node.name)")
-                    .font(.system(size: 10.5))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                if cleanable.indices.contains(index), let group = cleanable[index] {
-                    Button {
-                        onGoToJunk(group)
-                    } label: {
-                        Label("这块能清", systemImage: "arrow.right.circle.fill")
-                            .font(.system(size: 10.5, weight: .semibold))
-                    }
-                    .buttonStyle(.borderless)
-                    .foregroundStyle(Surface.cleanAccent)
-                    .help(group == .uninstallLeftovers
-                        ? "这块是卸载残留:命名它的 app 已不在已装应用清单(与清理清单同源);地图本身只读——点击去可清理定位对应组"
-                        : "能删的判定来自清理白名单(与清理清单同源);地图本身只读——点击去可清理定位对应组")
+    private func bridgeButton(rects: [TreemapRect], cleanable: [JunkGroup?], in size: CGSize) -> some View {
+        if let index = hoveredRectIndex,
+           rects.indices.contains(index),
+           cleanable.indices.contains(index),
+           let group = cleanable[index] {
+            let tr = rects[index]
+            // 块太小时按钮会溢出到邻块,只在装得下的块上浮。
+            let width = tr.rect.width * size.width
+            let height = tr.rect.height * size.height
+            if width > 140, height > 48 {
+                Button {
+                    onGoToJunk(group)
+                } label: {
+                    Label("这块能清", systemImage: "arrow.right.circle.fill")
+                        .font(.system(size: 10.5, weight: .semibold))
                 }
+                .buttonStyle(.borderless)
+                .foregroundStyle(Surface.cleanAccent)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 2)
+                .background(Surface.cardHigh.opacity(0.9), in: .capsule)
+                .help(group == .uninstallLeftovers
+                    ? "这块是卸载残留:命名它的 app 已不在已装应用清单(与清理清单同源);地图本身只读——点击去可清理定位对应组"
+                    : "能删的判定来自清理白名单(与清理清单同源);地图本身只读——点击去可清理定位对应组")
+                .position(x: (tr.rect.maxX) * size.width - 44, y: tr.rect.minY * size.height + 16)
             }
         }
     }
