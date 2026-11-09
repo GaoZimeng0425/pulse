@@ -399,7 +399,9 @@ public struct JunkCandidate: Sendable, Identifiable, Equatable {
     public let allReclaimableAccounting: Bool
     public let rationale: String
     public let symbolName: String
-    /// 所属项目名(05 项目产物专用;全局缓存为 nil)。分组语义由它携带。
+    /// 大卡分组键(项目产物/卸载残留专用;全局缓存为 nil)。项目产物 = 产物
+    /// 直接父目录完整路径、卸载残留 = 完整 bundle id(cleaner-junk-card-fixes/02,
+    /// 两条语义均要求全量键:同名异路必异卡)。显示层取末段/尾段做大字,全量进元信息。
     public let projectName: String?
     /// 项目年龄(05:项目直属树内**非产物**文件的最后变动;全局缓存为 nil)。
     /// 界面换算成「N 天未动」;排序「按新旧」以它为准(nil 排最后)。

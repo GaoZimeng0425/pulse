@@ -114,10 +114,38 @@ final class ProjectArtifactTests: XCTestCase {
 
     func testGroupsByProjectAndSortsBySize() {
         let out = match(in: [tree()], roots: ["/Users/dev/code"])
-        XCTAssertEqual(out.map(\.projectName), ["old-app", "old-app", "new-tool"], "按项目归组语义")
+        XCTAssertEqual(out.map(\.projectName), [
+            "/Users/dev/code/old-app", "/Users/dev/code/old-app", "/Users/dev/code/new-tool",
+        ], "按产物父目录完整路径归组(cleaner-junk-card-fixes/02)")
         XCTAssertEqual(out.first?.path, "/Users/dev/code/old-app/node_modules", "组内大到小")
         XCTAssertEqual(out.first?.group, .projectArtifacts)
         XCTAssertTrue(out.allSatisfy { $0.tier == .safe }, "node_modules / target 都是无歧义产物")
+    }
+
+    func testSameNamedDirsInDifferentReposDoNotShareGroup() {
+        // cleaner-junk-card-fixes/02 实报:两个仓库各自的 desktop 子目录,末段同名
+        // 却是不同文件夹——完整路径键必须分属两组(旧键 node.name 会并成一张卡)。
+        // 同一路径的多个产物同卡由 testGroupsByProjectAndSortsBySize 钉住。
+        let repoA = dir("SwarmAgents", under: "/dev", children: [
+            dir("apps", under: "/dev/SwarmAgents", children: [
+                dir("desktop", under: "/dev/SwarmAgents/apps", children: [
+                    dir("build", under: "/dev/SwarmAgents/apps/desktop", bytes: 30),
+                ]),
+            ]),
+        ])
+        let repoB = dir("ZCode", under: "/dev", children: [
+            dir("packages", under: "/dev/ZCode", children: [
+                dir("desktop", under: "/dev/ZCode/packages", children: [
+                    dir("build", under: "/dev/ZCode/packages/desktop", bytes: 20),
+                ]),
+            ]),
+        ])
+        let root = dir("dev", under: "/", children: [repoA, repoB])
+
+        let out = match(in: [root], roots: ["/dev"])
+        XCTAssertEqual(Set(out.map(\.projectName)), [
+            "/dev/SwarmAgents/apps/desktop", "/dev/ZCode/packages/desktop",
+        ], "同名异路不并卡")
     }
 
     func testNestedArtifactsNotDoubleListed() {
@@ -151,7 +179,7 @@ final class ProjectArtifactTests: XCTestCase {
         ])
         let out = match(in: [root], roots: ["/dev"])
         XCTAssertEqual(Set(out.map(\.path)), ["/dev/node_modules", "/dev/child/target"])
-        XCTAssertEqual(out.first { $0.path == "/dev/node_modules" }?.projectName, "dev")
+        XCTAssertEqual(out.first { $0.path == "/dev/node_modules" }?.projectName, "/dev")
     }
 
     func testRootMissingFromTreeIsSkippedAndFullVolumeRootRefused() {
@@ -178,11 +206,11 @@ final class ProjectArtifactTests: XCTestCase {
 
     func testProjectAgeIgnoresArtifactMtimes() {
         let out = match(in: [tree()], roots: ["/Users/dev/code"])
-        let oldAppNode = out.first { $0.projectName == "old-app" }
+        let oldAppNode = out.first { $0.projectName == "/Users/dev/code/old-app" }
         // node_modules 里文件 mtime = 1_700_100_000(新),源码 = 40 天前——
         // 年龄必须是源码那个,产物自身 mtime 一点不算。
         XCTAssertEqual(oldAppNode?.newestChangeEpoch, 1_700_000_000 - 40 * 86400)
-        let newToolNode = out.first { $0.projectName == "new-tool" }
+        let newToolNode = out.first { $0.projectName == "/Users/dev/code/new-tool" }
         XCTAssertEqual(newToolNode?.newestChangeEpoch, 1_700_200_000, "项目直属文件的最新变动")
     }
 

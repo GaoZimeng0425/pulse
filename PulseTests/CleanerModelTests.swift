@@ -381,7 +381,7 @@ final class CleanerModelTests: XCTestCase {
             "/Users/dev/code/old-app/target",
             "/Users/dev/code/new-tool/node_modules",
         ], "默认按大小,组内大到小")
-        XCTAssertEqual(artifacts.first?.projectName, "old-app")
+        XCTAssertEqual(artifacts.first?.projectName, "/Users/dev/code/old-app")
         XCTAssertEqual(
             artifacts.first?.newestChangeEpoch.map { Int($0) },
             Int(oldAge),
@@ -390,8 +390,8 @@ final class CleanerModelTests: XCTestCase {
 
         model.artifactSort = .age
         let byAge = model.candidates.filter { $0.group == .projectArtifacts }
-        XCTAssertEqual(byAge.map(\.projectName).first, "old-app", "按新旧 = 最久未动在前")
-        XCTAssertEqual(byAge.map(\.projectName).last, "new-tool")
+        XCTAssertEqual(byAge.map(\.projectName).first, "/Users/dev/code/old-app", "按新旧 = 最久未动在前")
+        XCTAssertEqual(byAge.map(\.projectName).last, "/Users/dev/code/new-tool")
     }
 
     func testInUseProjectFilteredFromPlanWithFreshRecheck() async throws {
