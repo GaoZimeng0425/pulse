@@ -21,8 +21,10 @@ struct AppListSection: View {
 
     var body: some View {
         @Bindable var model = model
+        // 卡头只在 content(完成态大卡)里出一次;装载/空态不带卡头(与垃圾/地图的
+        // 扫描态/空态同款)。曾因页层 header 与卡内 header 并存出现双层标题
+        // (2026-11-09 用户实报),此为修复。
         return VStack(alignment: .leading, spacing: 12) {
-            header
             switch model.phase {
             case .idle, .collecting:
                 loadingView(text: "正在收集应用清单…")
