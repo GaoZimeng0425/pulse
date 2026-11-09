@@ -94,6 +94,7 @@ struct MetricTabStack<Ranking: View>: View {
                 reading: monitor.bluetooth.reading,
                 accessState: monitor.bluetooth.accessState,
                 isCompact: isCompact,
+                isAwaitingRead: monitor.bluetooth.isAwaitingRead,
                 onEnable: { monitor.bluetooth.setEnabled(true) },
                 onAuthorize: { monitor.bluetooth.requestAuthorization() }
             ))

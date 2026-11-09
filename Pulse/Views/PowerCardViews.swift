@@ -25,15 +25,15 @@ struct PowerDomainsCardView: View {
             if let reading {
                 let rows = Self.rows(for: reading)
                 let leader = rows.map(\.watts).max() ?? 0
-                VStack(spacing: 6) {
+                VStack(spacing: RowMetrics.cardRowSpacing(compact: isCompact)) {
                     ForEach(rows) { row in
-                        HStack(spacing: 8) {
-                            Text(row.title)
-                                .font(.system(size: 12, weight: .medium))
-                                .frame(width: CardRowWidth.shortLabel, alignment: .leading)
-                            MeterBar(fraction: MeterNormalization.fraction(row.watts, leader: leader), tint: row.tint)
-                            CardRowValue(text: PulseFormat.watts(row.watts), minWidth: CardRowWidth.quantityValue)
-                        }
+                        CardReadingRow(
+                            label: row.title,
+                            meter: (MeterNormalization.fraction(row.watts, leader: leader), row.tint),
+                            value: PulseFormat.watts(row.watts),
+                            valueMinWidth: CardRowWidth.quantityValue,
+                            compact: isCompact
+                        )
                     }
                 }
                 if rows.isEmpty {

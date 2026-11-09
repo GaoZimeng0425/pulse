@@ -178,4 +178,37 @@ final class BluetoothFeatureAccessTests: XCTestCase {
         XCTAssertTrue(feature.isCollecting)
         XCTAssertEqual(access.requestCount, 0, "刷新是静默读,不请求")
     }
+
+    // MARK: - 开闸沿立即读(ui-unify 追改 2026-11-09)
+
+    /// 用户实报:打开外设页后蓝牙卡空等最多 30s(30s 档下一 tick)且显示「蓝牙不可用」。
+    /// 本测试不起调度器——读数只可能来自开闸沿的补读,有读数即证明不必等 tick。
+    func testOpeningGateReadsImmediatelyWithoutWaitingForTick() async throws {
+        let feature = makeFeature(enabled: true, access: FakeAccess(.allowed))
+        XCTAssertNil(feature.reading)
+
+        feature.visibilityChanged(visible)
+        XCTAssertTrue(feature.isAwaitingRead, "开闸瞬间手上没读数 = 正在读取,不是不可用")
+
+        var attempts = 0
+        while feature.reading == nil, attempts < 200 {
+            attempts += 1
+            try await Task.sleep(nanoseconds: 5_000_000)
+        }
+        XCTAssertEqual(feature.reading?.devices.count, 3)
+        XCTAssertFalse(feature.isAwaitingRead)
+    }
+
+    func testClosingGateClearsAwaitingState() {
+        let feature = makeFeature(enabled: true, access: FakeAccess(.allowed))
+        feature.visibilityChanged(visible)
+        feature.visibilityChanged(hidden)
+        XCTAssertFalse(feature.isAwaitingRead, "离开外设页不留「正在读取」残影")
+    }
+
+    func testDisabledFeatureNeverAwaitsRead() {
+        let feature = makeFeature(enabled: false, access: FakeAccess(.allowed))
+        feature.visibilityChanged(visible)
+        XCTAssertFalse(feature.isAwaitingRead, "没开监控就不读,也就没有「正在读取」")
+    }
 }

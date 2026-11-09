@@ -28,7 +28,7 @@ struct DevServerCardView: View {
                     detail: "vite、next dev、vitest watch 等开发服务出现时,会在这里列出闲置时长与监听端口"
                 )
             } else {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: RowMetrics.cardRowSpacing(compact: isCompact)) {
                     ForEach(servers) { server in
                         row(server)
                     }
@@ -53,28 +53,27 @@ struct DevServerCardView: View {
         .cardShell(compact: isCompact)
     }
 
-    /// 一行 server:名(pid)/ 闲置 / 内存 / 端口。
+    /// 一行 server(实体行,ui-unify 追改):终端图标 + 名 + pid 副文;闲置 / 内存 /
+    /// 端口三列贴右,尺寸随行两档,内存为主数值(semibold)。
     private func row(_ server: DevServerStatus) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(server.displayName)
-                    .font(.system(size: 12, weight: .medium))
-                    .lineLimit(1)
-                Text("pid \(server.pid)")
-                    .font(.system(size: 10.5))
-                    .monospacedDigit()
-                    .foregroundStyle(.tertiary)
-            }
-            Spacer(minLength: 8)
+        let valueSize = RowMetrics.valueFontSize(compact: isCompact)
+        return CardEntityRow(
+            systemImage: "terminal",
+            tint: Metric.cpu.accentColor,
+            name: server.displayName,
+            sub: "pid \(server.pid)",
+            compact: isCompact
+        ) {
             idleLabel(server)
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: valueSize, weight: .medium))
+                .monospacedDigit()
                 .foregroundStyle(server.isIdle ? Metric.disk.accentColor : .secondary)
             Text(PulseFormat.memory(server.memoryBytes))
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: valueSize, weight: .semibold))
                 .monospacedDigit()
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
             portLabel(server.listeningPorts)
-                .font(.system(size: 11))
+                .font(.system(size: valueSize))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
         }

@@ -25,7 +25,8 @@ struct LiveBluetoothSource: BluetoothSource {
                 isConnected: device.isConnected(),
                 rawRSSI: Int(device.rssi()),
                 vendorID: nil, // vendorID/productID 选择子在 Swift 侧不可见(原语返回),级③匹配留给合成载荷单测
-                productID: nil
+                productID: nil,
+                classOfDevice: Int(device.classOfDevice)
             )
         }
     }
@@ -82,6 +83,51 @@ struct LiveBluetoothSource: BluetoothSource {
             )
         }
         .filter { $0.batteryPercent > 0 } // 0 = 缓存从未见过电量,不是读数
+    }
+
+    /// 设备类型回退源(ui-unify 追改 2026-11-09):IOHIDDevice 里蓝牙传输的接口,只读
+    /// 注册表属性、不打开设备(打开才需要输入监控权限;读属性与 ioreg 同权)。先单键读
+    /// Transport 过滤,只对蓝牙接口取全量属性——本机 HID 接口几十个,蓝牙的只几个。
+    /// 实探:BLE 键盘 Hack59-2 = DeviceAddress `ca-d2-…` + usagePage 1 / usage 6;
+    /// 妙控板 = SerialNumber `D4:57:…`(地址回退链与电量源同一个 `hidAddress`)。
+    func readHidUsages() -> [HidUsageEntry] {
+        var iterator: io_iterator_t = 0
+        let matching: CFMutableDictionary = IOServiceMatching("IOHIDDevice")
+        guard IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == kIOReturnSuccess else {
+            return []
+        }
+        defer { IOObjectRelease(iterator) }
+
+        var entries: [HidUsageEntry] = []
+        var service: io_object_t = IOIteratorNext(iterator)
+        while service != IO_OBJECT_NULL {
+            defer {
+                IOObjectRelease(service)
+                service = IOIteratorNext(iterator)
+            }
+            guard
+                let transport = IORegistryEntryCreateCFProperty(
+                    service, "Transport" as CFString, kCFAllocatorDefault, 0
+                )?.takeRetainedValue() as? String,
+                transport.lowercased().contains("bluetooth")
+            else { continue }
+            var propertiesRef: Unmanaged<CFMutableDictionary>?
+            guard
+                IORegistryEntryCreateCFProperties(service, &propertiesRef, kCFAllocatorDefault, 0) == KERN_SUCCESS,
+                let properties = propertiesRef?.takeRetainedValue() as? [String: Any],
+                let page = (properties["PrimaryUsagePage"] as? NSNumber)?.intValue,
+                let usage = (properties["PrimaryUsage"] as? NSNumber)?.intValue
+            else { continue }
+            entries.append(
+                HidUsageEntry(
+                    name: properties["Product"] as? String,
+                    address: Self.hidAddress(properties),
+                    usagePage: page,
+                    usage: usage
+                )
+            )
+        }
+        return entries
     }
 
     /// HID 地址回退链:DeviceAddress(串)→ SerialNumber(串)→ BD_ADDR(六字节
@@ -322,7 +368,8 @@ final class BluetoothSensorProvider: SensorProvider {
             paired: paired,
             hid: source.readHidBatteries(),
             cache: source.readCachedBatteries(),
-            gatt: drainGattBuffer()
+            gatt: drainGattBuffer(),
+            usages: source.readHidUsages()
         )
         slot.store(reading)
         // 按需 GATT:还有缺电量的已配对设备 → 起探针(设备在场才可能读到,

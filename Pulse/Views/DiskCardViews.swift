@@ -8,8 +8,9 @@ import SwiftUI
 // 手动验收(spec 测试决策)。
 
 /// 各卷已用明细(工单 05 ③):Data 卷在首,其后其余同容器卷与"其他卷"差额;
-/// 每行 = 标签 + 已用(十进制 GB)+ 占容器已用的比例条。合计行 = 容器已用,
-/// 与大数字同一出处(对账不变式由单测钉死,UI 不重算)。
+/// 每行 = 读数行(标签 + 占容器已用比例 meter + 已用十进制 GB;ui-unify 追改
+/// 2026-11-09 由"标签行下挂通栏细条"改为行内定宽 meter,与全 app 读数行同竖线)。
+/// 合计 = 容器已用,与大数字同一出处(对账不变式由单测钉死,UI 不重算)。
 struct DiskVolumeBreakdownView: View {
     let capacity: DiskCapacityReading?
     var isCompact = false
@@ -18,17 +19,23 @@ struct DiskVolumeBreakdownView: View {
         VStack(alignment: .leading, spacing: 8) {
             header
             if let capacity {
-                row(
-                    capacity.dataVolume.label,
-                    usedBytes: capacity.dataVolume.usedBytes,
-                    totalBytes: capacity.containerUsedBytes,
-                    prominent: true
-                )
-                ForEach(capacity.otherVolumes) { volume in
-                    row(volume.label, usedBytes: volume.usedBytes, totalBytes: capacity.containerUsedBytes)
-                }
-                if let unaccounted = capacity.unaccounted {
-                    row(unaccounted.label, usedBytes: unaccounted.usedBytes, totalBytes: capacity.containerUsedBytes)
+                VStack(spacing: RowMetrics.cardRowSpacing(compact: isCompact)) {
+                    row(
+                        capacity.dataVolume.label,
+                        usedBytes: capacity.dataVolume.usedBytes,
+                        totalBytes: capacity.containerUsedBytes,
+                        prominent: true
+                    )
+                    ForEach(capacity.otherVolumes) { volume in
+                        row(volume.label, usedBytes: volume.usedBytes, totalBytes: capacity.containerUsedBytes)
+                    }
+                    if let unaccounted = capacity.unaccounted {
+                        row(
+                            unaccounted.label,
+                            usedBytes: unaccounted.usedBytes,
+                            totalBytes: capacity.containerUsedBytes
+                        )
+                    }
                 }
             } else {
                 CardEmptyState(title: "容量对账暂不可用")
@@ -47,32 +54,19 @@ struct DiskVolumeBreakdownView: View {
         )
     }
 
+    /// 数据卷为主行(主色标签 + 实色 meter),其余卷次级(secondary 标签 + 半透明 meter)。
     private func row(_ label: String, usedBytes: UInt64, totalBytes: UInt64, prominent: Bool = false)
         -> some View {
-        // 标签行 → 比例条:{spacing.inline}(2 的最紧档视觉上贴死,2026-10-21 用户目验);
-        // 行间 8({spacing.gap})大于行内 6,层级保持。
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(label)
-                    .font(.system(size: 12, weight: prominent ? .medium : .regular))
-                    .foregroundStyle(prominent ? .primary : .secondary)
-                    .lineLimit(1)
-                Spacer(minLength: 8)
-                Text(PulseFormat.diskCapacity(usedBytes))
-                    .font(.system(size: 12, weight: .semibold))
-                    .monospacedDigit()
-            }
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Surface.cardHigh)
-                    let fraction = totalBytes > 0 ? Double(usedBytes) / Double(totalBytes) : 0
-                    Capsule()
-                        .fill(Metric.disk.accentColor.opacity(prominent ? 0.9 : 0.55))
-                        .frame(width: max(2, proxy.size.width * min(1, fraction)))
-                }
-            }
-            .frame(height: 4)
-        }
+        let fraction = totalBytes > 0 ? min(1, Double(usedBytes) / Double(totalBytes)) : 0
+        return CardReadingRow(
+            label: label,
+            labelStyle: prominent ? .primary : .secondary,
+            labelWeight: prominent ? .medium : .regular,
+            meter: (fraction, Metric.disk.accentColor.opacity(prominent ? 1 : 0.55)),
+            value: PulseFormat.diskCapacity(usedBytes),
+            valueMinWidth: CardRowWidth.quantityValue,
+            compact: isCompact
+        )
     }
 }
 
@@ -104,13 +98,16 @@ struct DiskSnapshotsCardView: View {
     private var content: some View {
         switch listing {
         case let .listing(snapshots) where !snapshots.isEmpty:
-            ForEach(snapshots.prefix(Self.visibleLimit)) { snapshot in
-                snapshotRow(snapshot)
-            }
-            if snapshots.count > Self.visibleLimit {
-                Text("…共 \(snapshots.count) 个")
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.tertiary)
+            VStack(alignment: .leading, spacing: RowMetrics.cardRowSpacing(compact: isCompact)) {
+                ForEach(snapshots.prefix(Self.visibleLimit)) { snapshot in
+                    snapshotRow(snapshot)
+                }
+                if snapshots.count > Self.visibleLimit {
+                    Text("…共 \(snapshots.count) 个")
+                        .font(.system(size: 10.5))
+                        .monospacedDigit()
+                        .foregroundStyle(.tertiary)
+                }
             }
         case .listing:
             CardEmptyState(title: "暂无本地快照")
@@ -120,23 +117,20 @@ struct DiskSnapshotsCardView: View {
         }
     }
 
+    /// 快照实体行(ui-unify 追改):Time Machine 快照取时钟图标 + 磁盘指标色,其余
+    /// (系统更新等)取磁盘图标 + 三级墨;快照全名进副文(中段省略),时间贴右。
     private func snapshotRow(_ snapshot: DiskSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(snapshot.kindTitle)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(snapshot.isTimeMachine ? Metric.disk.accentColor : .secondary)
-                Spacer(minLength: 8)
-                Text(Self.dateFormatter.string(from: snapshot.createdAt))
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-            }
-            Text(snapshot.name)
-                .font(.system(size: 10.5))
-                .foregroundStyle(.tertiary)
-                .lineLimit(1)
-                .truncationMode(.middle)
+        CardEntityRow(
+            systemImage: snapshot.isTimeMachine ? "clock.arrow.circlepath" : "externaldrive",
+            tint: snapshot.isTimeMachine ? Metric.disk.accentColor : Surface.inkTertiary,
+            name: snapshot.kindTitle,
+            sub: snapshot.name,
+            compact: isCompact
+        ) {
+            Text(Self.dateFormatter.string(from: snapshot.createdAt))
+                .font(.system(size: RowMetrics.subFontSize(compact: isCompact)))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
         }
     }
 }

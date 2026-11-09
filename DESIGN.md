@@ -181,9 +181,9 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.row-value-temperature}` | 52pt | 同上:温度 `99.9°C`(传感器派生卡) |
 | `{layout.row-value-quantity}` | 56pt | 同上:带单位量 `999 MB` / `99.9 W`(容器内存、五路功率) |
 | `{layout.row-value-rpm}` | 64pt | 同上:风扇转速 `9999 rpm` |
-| `{layout.row-value-rssi}` | 32pt | 同上:信号强度 `-99 dBm` / `—`(蓝牙设备行) |
-| `{layout.row-meter-compact}` | 44pt | 行内电量条宽(紧凑档,蓝牙设备行) |
-| `{layout.row-meter}` | 64pt | 行内电量条宽(全尺寸档,蓝牙设备行) |
+| `{layout.row-value-rssi}` | 32pt | ~~同上:信号强度 `-99 dBm` / `—`(蓝牙设备行)~~ **superseded**(ui-unify 追改 2026-11-09):RSSI 改走行副文,不再是数值列 |
+| `{layout.row-meter-compact}` | 44pt | ~~行内电量条宽(紧凑档,蓝牙设备行)~~ **superseded**(ui-unify 追改 2026-11-09)→ `RowMetrics.meterWidth` 52 |
+| `{layout.row-meter}` | 64pt | ~~行内电量条宽(全尺寸档,蓝牙设备行)~~ **superseded**(ui-unify 追改 2026-11-09)→ `RowMetrics.meterWidth` 120 |
 | `{layout.row-host-icon}` | 14pt | 下钻进程行宿主 App 徽标图标边长(project-visibility/02;徽标文字随行 `{typography.caption}` secondary,图标-文字间距 `{spacing.inline}`) |
 | `{layout.overview-card-min-width}` | 340pt | 总览卡自适应网格的单卡最小宽(主窗口列数 1–4 由它派生:列数 = 内容宽容纳的最多列,340 + 列距 16,上限 4) |
 | `{layout.ranking-limit}` | 20 行 | 各排行(弹窗与主窗口同规则)只列前 20 名,超出补末行:弹窗「查看全部(另 N 项)」跳主窗口并落地即展开,主窗口「显示全部(另 N 项)」原地展开 / 「收起」(ranking-limit/01,2026-11-02 用户拍板;原 11-01 `popover-ranking-limit` 只截弹窗)。主窗口搜索命中不截 |
@@ -220,13 +220,30 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 - **卡片家族零件**(arch-review-2026-10-18/02 中4,`Pulse/Views/CardFamily.swift`):卡壳
   `cardShell(compact:)`(底色 + 圆角 + 内距,两档;`padded: false` 只给内距随版式
   变化、自己排内距的卡用——总览卡 16/12、指标主卡 20/12)、主卡头 `CardHeader`(22pt 徽章 +
-  card-title 指标色)、副卡头 `CardSubHeader`(10pt 指标色符号 + 11 medium 次级标题 +
-  10.5 注记)、统计值 `StatValue`、卡内空态 `CardEmptyState`(12.5 medium secondary 一句 +
+  card-title 指标色)、副卡头 `CardSubHeader`(10.5pt 指标色符号 + **12 semibold 指标色标题** +
+  10.5 tertiary 等宽注记;标题升彩色 12 semibold = ui-unify 追改 2026-11-09——卡头即卡片身份,
+  灰标题让 P2 批次卡与排行卡不同族)、统计值 `StatValue`、卡内空态 `CardEmptyState`(12.5 medium secondary 一句 +
   10.5 tertiary 说明,居中;可带一个 11pt `.link` 动作——授权型能力卡的开启 / 授权 /
-  去系统设置,与告警横幅降级出口同款,其余空态不配按钮)、卡内明细行数值 `CardRowValue`(12 常规 `monospacedDigit` 右对齐,
-  最小宽取 `{layout.row-value-*}` 令牌即 `CardRowWidth`;标签列定宽取 `{layout.row-label*}`)。
+  去系统设置,与告警横幅降级出口同款,其余空态不配按钮)、卡内明细行数值 `CardRowValue`
+  (默认 12 常规 `monospacedDigit` 右对齐;**尺寸随所在行走 RowMetrics 两档**——舒适档行传
+  14.5 semibold,紧凑档 12;最小宽取 `{layout.row-value-*}` 令牌即 `CardRowWidth`;标签列定宽取
+  `{layout.row-label*}`)、**卡内实体行 `CardEntityRow`**(ui-unify 追改 2026-11-09:行首类型
+  图标 + 名称 + 可选副文 + 尾部自定义列,尺寸全走 RowMetrics 两档;图标色由调用方给——
+  活跃态取所在页指标色、非活跃 `{colors.state-inactive}`,代替 6pt 状态圆点)。
   **新卡一律组装这些零件,
   不再手写卡壳 / 卡头 / 空态。**
+
+- **卡内行两形态边界**(ui-unify 追改 2026-11-09,用户第二次问"到底有没有设计原则"后立规):
+  P2 批次明细卡(外设 / 容器 / 传感器 / 五路功率 / 磁盘明细 / 网络累计 / 开发服务)的行与
+  排行 / 清理的列表行**同一语言**,按内容分两形态:
+  **实体行**(行描述一台设备 / 一个对象:蓝牙设备、输出设备、容器、dev server)= `CardEntityRow`,
+  图标 + 名称 + 副文(RSSI、pid、路径等弱信号),尾部数值列 / meter;
+  **读数行**(行描述一个测量:派生温度、风扇、功率域、卷占用、流量累计)= 标签列(定宽
+  `{layout.row-label*}`)+ meter(`RowMetrics.meterWidth`)+ `CardRowValue` 数值。
+  两形态字号一律 RowMetrics 两档(舒适 14.5 / 紧凑 12),不再用 P2 时代的 12pt 全档小字。
+  **未知值安静原则**:逐行状态类未知(设备电量读不到)整块留空,不写"未知 / —"文案占位;
+  数值列里的未知读数(容器 CPU 无样本)仍写"—"——那是表格的诚实单元格,不是状态提示。
+  meter 条宽一律 `RowMetrics.meterWidth`(120 / 52),不随窗宽拉伸——弹窗与主窗口同一节奏。
 
 - **行两档制 RowMetrics**(ui-unify/01,2026-11-08 用户拍板"功能相似组件长一个样",
   `Pulse/Views/RowMetrics.swift`):全 app **列表行**共享值的单一出处——紧凑档(弹窗)/
@@ -518,5 +535,15 @@ chip 图标 9.5pt → micro 10.5;排行行 chevron 9pt → 10。
 
 superseded 拍板记录(原值→新值,决议不删只标):2026-10-30 弹窗数值 11.5 → 12
 (ui-unify/01);2026-11-05 清理图标 28 / meter 130 / 上下距 14 → RowMetrics 舒适档
-(ui-unify/01);2026-11-05 comfortable 药丸 13.5 → 14.5(ui-unify/01)。
+(ui-unify/01);2026-11-05 comfortable 药丸 13.5 → 14.5(ui-unify/01);
+2026-11-09 蓝牙行 meter 44/64 + RSSI 数值列 → RowMetrics meter + 副文
+(ui-unify 追改);2026-11-09 副卡头标题 11 medium 灰 → 12 semibold 指标色(ui-unify 追改)。
+
+2026-11-09 第四轮收编已完成(ui-unify 追改,用户拍板 B = 八张旧卡一轮全换):
+P2 批次八张明细卡(蓝牙 / 声音 / 容器 / 传感器三卡 / 五路功率 / 磁盘两卡 / 流量累计 /
+dev server 行)的行升 RowMetrics 两档、状态圆点换类型图标(CardEntityRow)、副卡头标题
+升彩色;两形态边界与未知值安静原则见 §Components「卡内行两形态边界」。蓝牙设备行新增
+设备类型(CoD 主类 + BLE 走 IOHIDDevice usage,`BluetoothDeviceKind`),蓝牙卡开页即读
+(等下一 tick 的最长 30s 空窗改为立即快照 + 「正在读取…」占位),弹窗截断 6 行补
+「…共 N 台」尾行(容器卡同款)。
 
