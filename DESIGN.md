@@ -189,7 +189,8 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.ranking-limit}` | 20 行 | 各排行(弹窗与主窗口同规则)只列前 20 名,超出补末行:弹窗「查看全部(另 N 项)」跳主窗口并落地即展开,主窗口「显示全部(另 N 项)」原地展开 / 「收起」(ranking-limit/01,2026-11-02 用户拍板;原 11-01 `popover-ranking-limit` 只截弹窗)。主窗口搜索命中不截 |
 | `{layout.sheet-width}` | 460pt | 确认清单 sheet 定宽(清理页「清理…」,p4-cleaner/04;原型 B 变体同值) |
 | `{layout.sheet-list-max-height}` | 220pt | 确认清单 sheet 内逐行列表的最大高(超出滚动,总量与按钮恒在视口内) |
-| `{layout.sunburst-diameter}` | 340pt | 空间地图两环旭日图定宽(卡内水平居中;几何/两环半径比在 PulseCore `SunburstLayout`,p4-cleaner/07) |
+| `{layout.spacemap-chart-min-height}` | 220pt | 空间地图图表区最小高(两形态共用):弹性区吃掉卡的剩余高度,220 = 主窗口最小高 560 下整页仍放得下的底线(ui-unify 追改 2026-11-09 用户实报:原定高 340 在矮窗口挤爆页头;space-map-forms/01 入表) |
+| `{layout.sunburst-diameter}` | 340pt | 旭日形态直径上限(卡内居中;弹性区更矮时随画布短边收缩)——几何在 PulseCore `SunburstLayout`(p4-cleaner/07 + space-map-forms/01) |
 | `{layout.popover-size}` | 360×648pt | 菜单栏弹窗面板**定尺寸**(`DashboardView.panelSize`;popover-header/01 用户拍板 A,2026-11-02):AppKit 面板直接按此开窗、不读内容 fittingSize;中间滚动区 `maxHeight: .infinity` 吃掉头尾之外的全部高度——tab 栏 / 页头钉顶、底排钉底,告警横幅出没只挤中间,切 tab 面板不动 |
 
 窗口:主窗口最小 **720×560**(spec 钉死),默认 880×620;弹窗面板 **360×648 定尺寸**
@@ -390,20 +391,42 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   目录图标 + 路径 + 减号删除,与排除行同款);**与「项目根目录」页的归组配置两套
   独立、零共享**(用户拍板)。页脚说明文案钉死两条口径:项目 = 扫描根直接子目录、
   在用项目永不进清理且每次清理前重查。
-- **空间地图卡**(p4-cleaner/07,`CleanerSunburstView.swift`):两环旭日
-  `{layout.sunburst-diameter}` 340 定宽卡内居中;内环 = 当前根的子辈、外环 = 孙辈,
-  叶子与密封块延伸占满外环。**内环配色 = 十个 `{colors.accent-*}` 令牌按序循环,
-  外环随父色**(零新色);「其他」合并块 = `{colors.surface-card-high}`(环形
-  "其他/空闲"段既有口径,悬浮标「含 N 项」)、**系统密封块 = `{colors.inkTertiary}`
-  不透明实心**(只读系统区,点击在卡内信息行解释、不可下钻)。弧间角向留缝、
-  弧与标签**不做任何动画**(meter 条同款纪律)。中心 = 当前根名 + 实际占用 +
-  「↩ 返回上级」(顶层则「点击色块下钻」提示);**悬浮提示 = 名字 + 路径 + 实际
-  占用 + 占整卷百分比**(分母 = 整卷树,不是环内归一化;锚在弧中角外侧并钳制
-  在图内)。面包屑逐级可点(`›` 分隔,末级加粗,末尾「回到整卷」);下钻状态由
-  CleanerTabView 持有(切子药丸不丢)。**v1 只读:卡上没有任何删除控件**,
-  唯一越界动作 = 头部「在 Finder 中显示」(ADR-0008 的 UI 边界)。树变换与弧几何
-  在 PulseCore `SpaceMap.swift`(firmlink 提升把 /System/Volumes/Data/* 拼回顶层、
-  System 余量折叠为密封块),视图只描边配色命中。
+- **空间地图卡**(p4-cleaner/07 + space-map-forms/01,`CleanerSpaceMapView.swift`):
+  **双形态、同一画法**(用户拍板 2026-11-09:两种都要 Canvas 绘制,不要两种
+  方案)——单个 SwiftUI Canvas 一次 draw call,命中一律坐标反算、不依赖形状
+  hit test(方块 = rect.contains;旭日 = atan2 角度 + sqrt 半径)。形态切换 =
+  卡头 segmented 双选「方块 / 旭日」,`settings.spaceMapForm` @AppStorage 记住
+  上次;切换不重置下钻位置(下钻 / 面包屑由 CleanerTabView 持有,切子药丸不丢)。
+  **版面纪律(ui-unify 追改,2026-11-09 用户实报三修,两形态同守)**:①图表区
+  弹性高(`{layout.spacemap-chart-min-height}` 起、吃掉卡的剩余高度),卡头 /
+  根选 / 面包屑 `layoutPriority(1)` 不被挤压;②**悬停零重排**——卡内不出现 /
+  消失任何占行元素(原卡顶悬停信息行已废),悬停信息与按钮一律浮在图表内;
+  ③密封 / 叶子 / 「其他」点击解释 = 图表左上角浮层胶囊(cardHigh 90%,单行截断,
+  不吃点击),不占卡内一行。
+  - **方块(treemap,默认形态)**:squarify(`TreemapLayout`),块内 名字 + 实际
+    占用(放得下时),高块底部百分比 10.5pt `.monospaced` 小标(等宽登记例外);
+    「可清理」大块药丸 / 小块圆点(p4-uninstaller/05);悬停白名单块(≥140×48)
+    时「这块能清」浮在该块右上角。
+  - **旭日(两环,v1 形态以正确写法回归)**:内环 = 当前根的子辈、外环 = 孙辈,
+    叶子与密封块延伸占满外环(`SunburstLayout`);直径 = 画布短边、上限
+    `{layout.sunburst-diameter}`,环形半径 0.36–0.68 / 0.68–0.99;弧间角向留缝;
+    弧内标签 10.5pt semibold 白(份额阈值内才显示、左半圆翻转 180° 外向可读、
+    按弧长量宽截断);「可清理」= 弧内小圆点(药丸弧里放不下)。**中心圈 0.34 =
+    悬停读数位**:悬停弧时显示该块名字 12 + 实际占用 14.5 + 「占当前 N%」(密封
+    「只读系统区」/ 合并块「含 N 项」);不悬停时显示当前根 + 「↩ 返回上级」
+    (顶层为「点击色块下钻」提示,点按中心圈 = 返回上级)。悬停白名单弧时
+    「这块能清」锚在该弧中角外缘、钳制在图内(弧带窄,块内右上角配方套不进)。
+  - **两形态共享**:配色十个 `{colors.accent-*}` 按序循环(旭日外环随父色)、
+    「其他」合并块 = `{colors.surface-card-high}`、系统密封块 =
+    `{colors.inkTertiary}`(不可下钻;不透明度同一套:常规 0.75 / 密封 0.5 /
+    hover 0.9);「这块能清」浮层按钮同一配方(borderless 10.5 semibold 青 +
+    cardHigh 90% 胶囊底,help 文案明示判定来源与地图只读);点块下钻 / 面包屑逐级
+    可跳(`›` 分隔,末级加粗,末尾「回到整卷」)/ 头部「在 Finder 中显示」。块与弧
+    **不做任何动画**(meter 条同款纪律)。**v1 只读:卡上没有任何删除控件**
+    (ADR-0008 的 UI 边界)。
+    树变换与两种几何全在 PulseCore `SpaceMap.swift` / `TreemapLayout.swift`
+    (firmlink 提升把 /System/Volumes/Data/* 拼回顶层、System 余量折叠为密封块),
+    视图只描边配色命中。
 - **AreaTrendChartView**:56 点、线 2px 指标色、线下渐变 32%→0、4 条 8% 网格线、
   2% 左垫底;**StripChartView**:44 柱、36pt 高。二者都是自绘 Canvas,不引 Charts。
 - **PillTabBar(通用药丸 tab 条,用户拍板 2026-10-22:tab 是通用组件样式)**:
