@@ -1,18 +1,21 @@
 import PulseCore
 import SwiftUI
 
-// MARK: - 容器页卡片(p2-sensors/07)
+// MARK: - 容器页卡片(p2-sensors/07;行样式 ui-unify 追改 2026-11-09)
 
 // HTTP 解析与 stats 折算在核心层 ContainerModel(纯逻辑,单测覆盖——含探针⑦
-// 四坑);本文件只做 SwiftUI 外观——容器表行(名称/状态/CPU/内存),弹窗
-// (紧凑)与主窗口共用,走预览 + 手动验收。
+// 四坑);本文件只做 SwiftUI 外观——容器实体行(CardEntityRow:图标 + 名称 + CPU% +
+// 内存),弹窗(紧凑)与主窗口共用,走预览 + 手动验收。
 
-/// 容器卡:每台一行(名称 + 状态点 + CPU% + 内存),运行中置顶(行序是
-/// `ContainersReading` 的不变量,本视图照序画,p2-review/03);引擎缺席
-/// (OrbStack 未跑)或无容器安静占位。
+/// 容器卡:每台一行,运行中置顶(行序是 `ContainersReading` 的不变量,本视图照序画,
+/// p2-review/03);图标亮 = 运行中、灰 = 未运行(代替旧状态圆点)。数值列的"—" =
+/// 该容器没有 stats 样本(未运行),是表格的诚实单元格(DESIGN.md 未知值安静原则的
+/// 数值列例外)。弹窗截 6 行补「…共 N 台」;引擎缺席(OrbStack 未跑)或无容器安静占位。
 struct ContainersCardView: View {
     let reading: ContainersReading?
     var isCompact = false
+
+    private static let compactLimit = 6
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -23,9 +26,17 @@ struct ContainersCardView: View {
                 note: note
             )
             if let containers = reading?.containers, !containers.isEmpty {
-                VStack(spacing: 6) {
-                    ForEach(containers.prefix(isCompact ? 6 : containers.count)) { container in
+                VStack(spacing: RowMetrics.cardRowSpacing(compact: isCompact)) {
+                    ForEach(containers.prefix(isCompact ? Self.compactLimit : containers.count)) { container in
                         row(container)
+                    }
+                    if isCompact, containers.count > Self.compactLimit {
+                        Text("…共 \(containers.count) 台")
+                            .font(.system(size: 10.5))
+                            .monospacedDigit()
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 2)
                     }
                 }
             } else {
@@ -51,22 +62,25 @@ struct ContainersCardView: View {
 
     private func row(_ container: ContainerRow) -> some View {
         let running = container.isRunning
-        return HStack(spacing: 8) {
-            Circle()
-                .fill(running ? Metric.containers.accentColor : Surface.inactive)
-                .frame(width: 6, height: 6)
-            Text(container.name)
-                .font(.system(size: 12, weight: .medium))
-                .lineLimit(1)
-            Spacer(minLength: 8)
+        let valueSize = RowMetrics.valueFontSize(compact: isCompact)
+        return CardEntityRow(
+            systemImage: running ? "cube.box.fill" : "cube.box",
+            tint: running ? Metric.containers.accentColor : Surface.inactive,
+            name: container.name,
+            compact: isCompact
+        ) {
             CardRowValue(
                 text: container.cpuPercent.map { String(format: "%.1f%%", $0) } ?? "—",
-                minWidth: CardRowWidth.decimalPercentValue
+                minWidth: CardRowWidth.decimalPercentValue,
+                style: .primary,
+                fontSize: valueSize,
+                weight: .semibold
             )
             CardRowValue(
                 text: container.memoryBytes.map { PulseFormat.memory($0) } ?? "—",
                 minWidth: CardRowWidth.quantityValue,
-                style: .tertiary
+                style: .secondary,
+                fontSize: valueSize
             )
         }
     }

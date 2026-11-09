@@ -247,6 +247,87 @@ final class BluetoothModelTests: XCTestCase {
         XCTAssertEqual(reading.devices.first { $0.name == "丙" }?.rssi, -64)
     }
 
+    // MARK: 设备类型(ui-unify 追改 2026-11-09:行首图标的数据底座)
+
+    func testClassOfDeviceDecodesProbedSamples() {
+        // 载荷 = 2026-11-09 本机 IOBluetooth 实探原值。
+        XCTAssertEqual(BluetoothDeviceKind.fromClassOfDevice(0x240404), .audio) // REDMI 头戴耳机
+        XCTAssertEqual(BluetoothDeviceKind.fromClassOfDevice(0x240418), .audio) // Bose QC35 II
+        XCTAssertEqual(BluetoothDeviceKind.fromClassOfDevice(0x7A020C), .phone) // 小米平板(自报手机)
+        XCTAssertEqual(BluetoothDeviceKind.fromClassOfDevice(0x2594), .trackpad) // 妙控板:外设·pointing
+        XCTAssertEqual(BluetoothDeviceKind.fromClassOfDevice(0x2540), .keyboard) // 外设·键盘位
+        XCTAssertEqual(BluetoothDeviceKind.fromClassOfDevice(0), .unknown) // BLE 常态
+        XCTAssertEqual(BluetoothDeviceKind.fromClassOfDevice(nil), .unknown)
+    }
+
+    func testHidUsagesPickByPriorityRegardlessOfOrder() {
+        XCTAssertEqual(BluetoothDeviceKind.fromHidUsages([(page: 1, usage: 6)]), .keyboard)
+        XCTAssertEqual(BluetoothDeviceKind.fromHidUsages([(page: 1, usage: 5)]), .gamepad)
+        XCTAssertEqual(BluetoothDeviceKind.fromHidUsages([(page: 0x0D, usage: 5)]), .trackpad)
+        // 组合设备(键盘 + 鼠标两份报告):报告顺序不影响结果。
+        XCTAssertEqual(BluetoothDeviceKind.fromHidUsages([(page: 1, usage: 2), (page: 1, usage: 6)]), .keyboard)
+        XCTAssertEqual(BluetoothDeviceKind.fromHidUsages([(page: 1, usage: 6), (page: 1, usage: 2)]), .keyboard)
+        // vendor 页(妙控板实探 0xFF00 报告)不认;空 = 未知。
+        XCTAssertEqual(BluetoothDeviceKind.fromHidUsages([(page: 0xFF00, usage: 18)]), .unknown)
+        XCTAssertEqual(BluetoothDeviceKind.fromHidUsages([]), .unknown)
+    }
+
+    func testMergeKindPrefersClassOfDeviceThenHidUsage() {
+        // 实探形状:妙控板 CoD pointing,HID 报告里却混着 mouse usage → 仍是触控板;
+        // Hack59-2(BLE)CoD 0 → 靠 IOHIDDevice usage 6 认出键盘(规整地址匹配,
+        // 串形 `D4:57:…` 与锚的 `d4-57-…` 同键)。
+        let reading = BluetoothMerge.merge(
+            paired: [
+                PairedDeviceStatus(name: "妙控板", address: "d4-57-63-5d-bf-6b", classOfDevice: 0x2594),
+                PairedDeviceStatus(name: "Hack59-2", address: "ca-d2-10-9d-83-1e", classOfDevice: 0),
+                PairedDeviceStatus(name: "手柄", address: "b2-2f-35-a4-75-f3"),
+            ],
+            hid: [],
+            cache: [],
+            gatt: [],
+            usages: [
+                HidUsageEntry(name: "妙控板", address: "D4:57:63:5D:BF:6B", usagePage: 1, usage: 2),
+                HidUsageEntry(name: "Hack59-2", address: "ca-d2-10-9d-83-1e", usagePage: 1, usage: 6),
+            ]
+        )
+        let kinds = Dictionary(uniqueKeysWithValues: reading.devices.map { ($0.name, $0.kind) })
+        XCTAssertEqual(kinds["妙控板"], .trackpad)
+        XCTAssertEqual(kinds["Hack59-2"], .keyboard)
+        XCTAssertEqual(kinds["手柄"], .unknown, "无 CoD 也无 usage 的设备不硬猜")
+    }
+
+    func testMergeKindNameFallbackRequiresUniqueAnchorName() {
+        // usage 条目无地址时退到名字匹配;锚侧同名两台 = 歧义,不给类型(电量级②同口径)。
+        let reading = BluetoothMerge.merge(
+            paired: [
+                PairedDeviceStatus(name: "Keyboard", address: "aa-aa-aa-aa-aa-01"),
+                PairedDeviceStatus(name: "Keyboard", address: "aa-aa-aa-aa-aa-02"),
+                PairedDeviceStatus(name: "Mouse", address: "aa-aa-aa-aa-aa-03"),
+            ],
+            hid: [],
+            cache: [],
+            gatt: [],
+            usages: [
+                HidUsageEntry(name: "Keyboard", usagePage: 1, usage: 6),
+                HidUsageEntry(name: "Mouse", usagePage: 1, usage: 2),
+            ]
+        )
+        XCTAssertTrue(reading.devices.filter { $0.name == "Keyboard" }.allSatisfy { $0.kind == .unknown })
+        XCTAssertEqual(reading.devices.first { $0.name == "Mouse" }?.kind, .mouse)
+    }
+
+    func testMergeKindAddressMismatchDoesNotFallBackToName() {
+        // 地址两侧都有却不等 = 不是同一台(同名不同设备),不退名字匹配。
+        let reading = BluetoothMerge.merge(
+            paired: [PairedDeviceStatus(name: "Keyboard", address: "aa-aa-aa-aa-aa-01")],
+            hid: [],
+            cache: [],
+            gatt: [],
+            usages: [HidUsageEntry(name: "Keyboard", address: "bb-bb-bb-bb-bb-02", usagePage: 1, usage: 6)]
+        )
+        XCTAssertEqual(reading.devices.first?.kind, .unknown)
+    }
+
     // MARK: 无锚行 / 空态 / 排序
 
     func testUnmatchedBatteryBecomesOwnRowDeduped() {

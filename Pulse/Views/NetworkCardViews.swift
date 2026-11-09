@@ -18,10 +18,12 @@ struct NetworkTotalsCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             header
             if let totals {
-                row("今日下行", bytes: totals.todayDownBytes, prominent: true)
-                row("今日上行", bytes: totals.todayUpBytes)
-                row("7 天下行", bytes: totals.weekDownBytes)
-                row("7 天上行", bytes: totals.weekUpBytes)
+                VStack(spacing: RowMetrics.cardRowSpacing(compact: isCompact)) {
+                    row("今日下行", bytes: totals.todayDownBytes, prominent: true)
+                    row("今日上行", bytes: totals.todayUpBytes)
+                    row("7 天下行", bytes: totals.weekDownBytes)
+                    row("7 天上行", bytes: totals.weekUpBytes)
+                }
             } else {
                 CardEmptyState(title: "累计暂不可用")
             }
@@ -39,17 +41,18 @@ struct NetworkTotalsCardView: View {
         )
     }
 
+    /// 读数行(ui-unify 追改,无 meter——累计量没有可比的满量程):今日下行为主行,
+    /// 其余标签与数值降 secondary。
     private func row(_ label: String, bytes: UInt64, prominent: Bool = false) -> some View {
-        HStack {
-            Text(label)
-                .font(.system(size: 12))
-                .foregroundStyle(prominent ? .primary : .secondary)
-            Spacer()
-            Text(PulseFormat.networkTotal(bytes))
-                .font(.system(size: 12, weight: prominent ? .semibold : .regular))
-                .monospacedDigit()
-        }
-        .padding(.vertical, 2)
+        CardReadingRow(
+            label: label,
+            labelStyle: prominent ? .primary : .secondary,
+            labelWeight: prominent ? .medium : .regular,
+            value: PulseFormat.networkTotal(bytes),
+            valueMinWidth: CardRowWidth.quantityValue,
+            valueStyle: prominent ? .primary : .secondary,
+            compact: isCompact
+        )
     }
 }
 

@@ -26,7 +26,7 @@ struct SmcDerivedCardView: View {
                 note: reading.map { "\(knownCount($0)) 个命名传感器在场" }
             )
             if let derived = reading?.derived {
-                VStack(spacing: 6) {
+                VStack(spacing: RowMetrics.cardRowSpacing(compact: isCompact)) {
                     row("CPU 均值", derived.cpuAverage)
                     row("CPU 最热", derived.cpuHottest)
                     row("GPU 均值", derived.gpuAverage)
@@ -64,15 +64,15 @@ struct SmcDerivedCardView: View {
         return row("最快风扇", fraction: fan?.speedFraction ?? 0, valueText: valueText)
     }
 
+    /// 读数行(ui-unify 追改):列宽按温度量("99.9°C"),最快风扇行的转速 / 扇名文案更宽时撑开。
     private func row(_ title: String, fraction: Double, valueText: String) -> some View {
-        HStack(spacing: 8) {
-            Text(title)
-                .font(.system(size: 12, weight: .medium))
-                .frame(width: CardRowWidth.label, alignment: .leading)
-            MeterBar(fraction: fraction, tint: Metric.sensors.accentColor)
-            // 列宽按温度量("99.9°C");最快风扇行的转速 / 扇名文案更宽时撑开。
-            CardRowValue(text: valueText, minWidth: CardRowWidth.temperatureValue)
-        }
+        CardReadingRow(
+            label: title,
+            meter: (fraction, Metric.sensors.accentColor),
+            value: valueText,
+            valueMinWidth: CardRowWidth.temperatureValue,
+            compact: isCompact
+        )
     }
 }
 
@@ -92,7 +92,7 @@ struct SmcFansCardView: View {
                 note: sharedLimitsNote
             )
             if let fans = reading?.fans, !fans.isEmpty {
-                VStack(spacing: 6) {
+                VStack(spacing: RowMetrics.cardRowSpacing(compact: isCompact)) {
                     ForEach(fans) { fan in
                         fanRow(fan, showsLimits: sharedLimitsNote == nil && fan.hasSpeedRange)
                     }
@@ -105,18 +105,19 @@ struct SmcFansCardView: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// 风扇读数行 + 可选上下限副文(副文档字号随行两档,ui-unify 追改)。
     private func fanRow(_ fan: SmcFanReading, showsLimits: Bool) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 8) {
-                Text(SmcFanText.title(fan))
-                    .font(.system(size: 12, weight: .medium))
-                    .lineLimit(1)
-                MeterBar(fraction: fan.speedFraction, tint: Metric.sensors.accentColor)
-                CardRowValue(text: SmcFanText.speed(fan), minWidth: CardRowWidth.rpmValue)
-            }
+            CardReadingRow(
+                label: SmcFanText.title(fan),
+                meter: (fan.speedFraction, Metric.sensors.accentColor),
+                value: SmcFanText.speed(fan),
+                valueMinWidth: CardRowWidth.rpmValue,
+                compact: isCompact
+            )
             if showsLimits {
                 Text(SmcFanText.limits(fan))
-                    .font(.system(size: 10.5))
+                    .font(.system(size: RowMetrics.subFontSize(compact: isCompact)))
                     .monospacedDigit()
                     .foregroundStyle(.tertiary)
             }
@@ -203,18 +204,19 @@ struct SmcTempsDetailCardView: View {
             get: { isOpen },
             set: { expanded[key] = $0 }
         )) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: RowMetrics.cardRowSpacing(compact: isCompact)) {
                 ForEach(rows.prefix(isCompact ? 6 : rows.count)) { row in
-                    HStack(spacing: 8) {
-                        Text(row.displayName)
-                            .font(.system(size: 12))
-                            .lineLimit(1)
-                        Spacer(minLength: 8)
-                        CardRowValue(text: String(format: "%.1f°C", row.value))
-                    }
+                    // 明细读数行:无 meter(逐键温度只读数值),标签常规字重区别于派生卡。
+                    CardReadingRow(
+                        label: row.displayName,
+                        labelWeight: .regular,
+                        value: String(format: "%.1f°C", row.value),
+                        valueMinWidth: CardRowWidth.temperatureValue,
+                        compact: isCompact
+                    )
                 }
             }
-            .padding(.top, 2)
+            .padding(.top, 6)
         } label: {
             Text("\(title)(\(rows.count))")
                 .font(.system(size: 12, weight: .semibold))

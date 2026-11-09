@@ -73,6 +73,24 @@ public struct GattBatteryEntry: Equatable, Sendable {
     }
 }
 
+/// HID usage 条目(IORegistry `IOHIDDevice` 里 Transport 含 Bluetooth 的接口,
+/// ui-unify 追改 2026-11-09):设备类型的回退源——BLE 外设 CoD 常为 0,类型只能从
+/// HID usage 读。地址 = DeviceAddress(BLE 实探 `ca-d2-10-9d-83-1e`)或 SerialNumber
+/// (妙控板实探 `D4:57:63:5D:BF:6B`),规整后与配对锚同键。
+public struct HidUsageEntry: Equatable, Sendable {
+    public var name: String?
+    public var address: String?
+    public var usagePage: Int
+    public var usage: Int
+
+    public init(name: String? = nil, address: String? = nil, usagePage: Int, usage: Int) {
+        self.name = name
+        self.address = address
+        self.usagePage = usagePage
+        self.usage = usage
+    }
+}
+
 /// 已配对设备锚(IOBluetooth 设备列表):合并的行骨架——连接态与 RSSI 只在
 /// 这里有;三条电量源经三级匹配挂到锚上。
 public struct PairedDeviceStatus: Equatable, Sendable {
@@ -84,6 +102,9 @@ public struct PairedDeviceStatus: Equatable, Sendable {
     public var rawRSSI: Int
     public var vendorID: Int?
     public var productID: Int?
+    /// 蓝牙 Class of Device 原始值(实探 2026-11-09:经典蓝牙设备有值,BLE 键盘
+    /// 常为 0——类型识别交 `BluetoothDeviceKind` 的 usage 回退路)。
+    public var classOfDevice: Int?
 
     public init(
         name: String? = nil,
@@ -91,7 +112,8 @@ public struct PairedDeviceStatus: Equatable, Sendable {
         isConnected: Bool = false,
         rawRSSI: Int = 0,
         vendorID: Int? = nil,
-        productID: Int? = nil
+        productID: Int? = nil,
+        classOfDevice: Int? = nil
     ) {
         self.name = name
         self.address = address
@@ -99,6 +121,64 @@ public struct PairedDeviceStatus: Equatable, Sendable {
         self.rawRSSI = rawRSSI
         self.vendorID = vendorID
         self.productID = productID
+        self.classOfDevice = classOfDevice
+    }
+}
+
+/// 设备类型(ui-unify 追改 2026-11-09,设备行图标的数据底座):经典蓝牙走
+/// Class of Device 主类解码,BLE 外设 CoD 常为 0 → 回退 IOHIDDevice 的 HID
+/// usage(实探:Hack59-2 CoD=0 但 usagePage 1 / usage 6 = 键盘)。Apple 妙控板
+/// CoD=0x2594 pointing → trackpad,优先于 HID usage 里的 mouse 报告(同设备
+/// 多 HID 报告,取 usage 只是误导)。枚举只收 UI 能稳定配图标的类,识别不了
+/// = .unknown(通用蓝牙图标),不硬猜。
+public enum BluetoothDeviceKind: Equatable, Sendable {
+    case keyboard
+    case mouse
+    case trackpad
+    case audio
+    case phone
+    case gamepad
+    case unknown
+
+    /// Class of Device 解码(Bluetooth Assigned Numbers:主类 = bit 8–12,
+    /// 外设子类 bit 2–7)。实探样本:REDMI 0x240404 / QC35 0x240418 → 音频,
+    /// 小米平板 0x7a020c → 手机,妙控板 0x2594 → 外设·pointing。
+    public static func fromClassOfDevice(_ cod: Int?) -> BluetoothDeviceKind {
+        guard let cod, cod > 0 else { return .unknown }
+        switch (cod >> 8) & 0x1F {
+        case 0x02: return .phone
+        case 0x04: return .audio
+        case 0x05:
+            let minor = (cod >> 2) & 0x3F
+            if minor & 0x10 != 0 {
+                return .keyboard
+            }
+            if minor & 0x20 != 0 {
+                return .trackpad
+            }
+            return .unknown
+        default: return .unknown
+        }
+    }
+
+    /// 单条 HID usage 解码(Generic Desktop 0x01 / Digitizers 0x0D 里能配图标的项)。
+    public static func fromHidUsage(page: Int, usage: Int) -> BluetoothDeviceKind {
+        switch (page, usage) {
+        case (0x01, 0x02): return .mouse
+        case (0x01, 0x04), (0x01, 0x05): return .gamepad
+        case (0x01, 0x06): return .keyboard
+        case (0x0D, 0x05): return .trackpad
+        default: return .unknown
+        }
+    }
+
+    /// 一台设备的全部 HID usage 报告 → 单一类型:按 触控板 > 键盘 > 手柄 > 鼠标
+    /// 定序取首个命中(同一 BLE 设备可注册多个报告——妙控板带 vendor 报告 + mouse
+    /// 报告,组合键盘键盘+鼠标各一份;定序保证结果不随报告顺序抖动)。
+    public static func fromHidUsages(_ pairs: [(page: Int, usage: Int)]) -> BluetoothDeviceKind {
+        let kinds = Set(pairs.map { fromHidUsage(page: $0.page, usage: $0.usage) })
+        let priority: [BluetoothDeviceKind] = [.trackpad, .keyboard, .gamepad, .mouse]
+        return priority.first(where: kinds.contains) ?? .unknown
     }
 }
 
@@ -123,8 +203,10 @@ public struct BluetoothDeviceRow: Equatable, Identifiable, Sendable {
     public let isConnected: Bool
     public let batteryPercent: Int?
     public let batterySource: BluetoothBatterySource?
-    /// 有效 RSSI(dBm,负值);0/127 哨兵归 nil(UI 显示 —)。
+    /// 有效 RSSI(dBm,负值);0/127 哨兵归 nil(UI 不写)。
     public let rssi: Int?
+    /// 设备类型(行首图标依据;无锚电量行恒 .unknown——GATT/缓存样本不带类型)。
+    public let kind: BluetoothDeviceKind
 
     public init(
         name: String,
@@ -133,7 +215,8 @@ public struct BluetoothDeviceRow: Equatable, Identifiable, Sendable {
         isConnected: Bool = false,
         batteryPercent: Int? = nil,
         batterySource: BluetoothBatterySource? = nil,
-        rssi: Int? = nil
+        rssi: Int? = nil,
+        kind: BluetoothDeviceKind = .unknown
     ) {
         // id 初值沿旧计算口径:规整地址优先,无地址按名字;撞车消歧在 merge 收尾。
         id = normalizedAddress ?? name
@@ -144,6 +227,7 @@ public struct BluetoothDeviceRow: Equatable, Identifiable, Sendable {
         self.batteryPercent = batteryPercent
         self.batterySource = batterySource
         self.rssi = rssi
+        self.kind = kind
     }
 }
 
@@ -188,11 +272,13 @@ public enum BluetoothMerge {
     }
 
     /// 合并一轮:paired 为空(蓝牙关/无配对)→ 只剩无锚电量行(通常也空)。
+    /// `usages` = HID usage 条目(设备类型回退源,ui-unify 追改;缺省空 = 只靠 CoD)。
     public static func merge(
         paired: [PairedDeviceStatus],
         hid: [HidBatteryEntry],
         cache: [CachedBatteryEntry],
-        gatt: [GattBatteryEntry]
+        gatt: [GattBatteryEntry],
+        usages: [HidUsageEntry] = []
     ) -> BluetoothReading {
         // 锚去重:同规整地址取首行,连接态 OR(IOBluetooth 同设备可能回报多次)。
         var anchors: [String: PairedDeviceStatus] = [:]
@@ -251,7 +337,7 @@ public enum BluetoothMerge {
         }
         let resolution = resolve(distinct, anchors: anchors)
 
-        // 锚行:电量挂上即带;RSSI 哨兵(≥0,含 127 与 0)归 nil。
+        // 锚行:电量挂上即带;RSSI 哨兵(≥0,含 127 与 0)归 nil;类型 CoD 优先、HID usage 回退。
         var rows = order.map { key -> BluetoothDeviceRow in
             let anchor = anchors[key]!
             let battery = resolution.attached[key]
@@ -262,7 +348,8 @@ public enum BluetoothMerge {
                 isConnected: anchor.isConnected,
                 batteryPercent: battery?.percent,
                 batterySource: battery?.source,
-                rssi: anchor.rawRSSI < 0 ? anchor.rawRSSI : nil
+                rssi: anchor.rawRSSI < 0 ? anchor.rawRSSI : nil,
+                kind: deviceKind(anchor, usages: usages, anchors: anchors)
             )
         }
         rows += unanchoredRows(resolution.unmatched)
@@ -392,6 +479,30 @@ public enum BluetoothMerge {
         }
     }
 
+    /// 锚的设备类型:CoD 认得出就用(经典蓝牙主类可信,妙控板 pointing 也走这路——
+    /// 它的 HID 报告里混着 mouse usage,先看 usage 会误判);CoD 认不出(BLE 常态 0)
+    /// 才看 HID usage,匹配口径与电量级①②同理:规整地址相等,或名字锚侧唯一且相等。
+    private static func deviceKind(
+        _ anchor: PairedDeviceStatus,
+        usages: [HidUsageEntry],
+        anchors: [String: PairedDeviceStatus]
+    ) -> BluetoothDeviceKind {
+        let byClass = BluetoothDeviceKind.fromClassOfDevice(anchor.classOfDevice)
+        guard byClass == .unknown else { return byClass }
+        let address = normalizeAddress(anchor.address ?? "")
+        let nameIsUnique = anchor.name.map { name in
+            anchors.values.filter { $0.name == name }.count == 1
+        } ?? false
+        let matched = usages.filter { entry in
+            if let address, let entryAddress = normalizeAddress(entry.address ?? "") {
+                return entryAddress == address
+            }
+            guard nameIsUnique, let name = anchor.name else { return false }
+            return entry.name == name
+        }
+        return BluetoothDeviceKind.fromHidUsages(matched.map { (page: $0.usagePage, usage: $0.usage) })
+    }
+
     /// 来源优先级:hid(内核活值)> cache(免权限快照)> gatt(需在场建连)。
     private static func rank(_ source: BluetoothBatterySource) -> Int {
         switch source {
@@ -414,4 +525,7 @@ public protocol BluetoothSource: Sendable {
     func readHidBatteries() -> [HidBatteryEntry]
     /// 源②:蓝牙偏好缓存电量条目(macOS 26 无 DeviceCache 键 = 空数组)。
     func readCachedBatteries() -> [CachedBatteryEntry]
+    /// 设备类型回退源:IOHIDDevice 里 Transport 含 Bluetooth 的 usage 条目
+    /// (只读注册表属性、不打开设备;ui-unify 追改 2026-11-09)。
+    func readHidUsages() -> [HidUsageEntry]
 }

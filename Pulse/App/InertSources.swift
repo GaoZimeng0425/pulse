@@ -87,7 +87,8 @@ struct InertContainerSource: ContainerSource {
     }
 }
 
-/// 蓝牙:预览合成载荷(两台带电量 + 一台未知,三级匹配/去重/排序都有形状可验)。
+/// 蓝牙:预览合成载荷(两台带电量 + 一台未知,三级匹配/去重/排序都有形状可验;
+/// 类型两路都有形状:妙控板/QC35 走 CoD,Hack59-2 CoD=0 走 HID usage——实探原值)。
 struct InertBluetoothSource: BluetoothSource {
     func readPaired() -> [PairedDeviceStatus]? {
         [
@@ -95,9 +96,16 @@ struct InertBluetoothSource: BluetoothSource {
                 name: "子蒙's Magic Trackpad",
                 address: "d4-57-63-5d-bf-6b",
                 isConnected: true,
-                rawRSSI: -58
+                rawRSSI: -58,
+                classOfDevice: 0x2594
             ),
-            PairedDeviceStatus(name: "Bose QC35 II", address: "2c-41-a1-c8-c5-01", isConnected: false, rawRSSI: 0),
+            PairedDeviceStatus(
+                name: "Bose QC35 II",
+                address: "2c-41-a1-c8-c5-01",
+                isConnected: false,
+                rawRSSI: 0,
+                classOfDevice: 0x240418
+            ),
             PairedDeviceStatus(name: "Hack59-2", address: "ca-d2-10-9d-83-1e", isConnected: true, rawRSSI: 127),
         ]
     }
@@ -108,6 +116,10 @@ struct InertBluetoothSource: BluetoothSource {
 
     func readCachedBatteries() -> [CachedBatteryEntry] {
         [CachedBatteryEntry(batteryPercent: 80, name: "Bose QC35 II", address: "2c:41:a1:c8:c5:01")]
+    }
+
+    func readHidUsages() -> [HidUsageEntry] {
+        [HidUsageEntry(name: "Hack59-2", address: "ca-d2-10-9d-83-1e", usagePage: 1, usage: 6)]
     }
 }
 

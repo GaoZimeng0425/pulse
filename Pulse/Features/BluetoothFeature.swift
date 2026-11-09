@@ -36,12 +36,17 @@ final class BluetoothFeature: MonitorFeature {
     private(set) var isEnabled: Bool
     /// 最近一次静默读到的系统授权态。
     private(set) var authorization: BluetoothAuthorization
+    /// 开闸后首轮快照在途、手上又没读数(ui-unify 追改 2026-11-09):卡片据此画
+    /// 「正在读取…」——此前这段空窗直接显示「蓝牙不可用或无设备」,用户实报误以为坏了。
+    private(set) var isAwaitingRead = false
 
     private let provider: BluetoothSensorProvider
     private let access: any BluetoothAccessControl
     private let persistEnabled: (Bool) -> Void
     /// 最近一次可见性折算(弹窗 ∨ 外设页)。
     private var isVisible = false
+    /// 开闸沿补读的在途任务(同时只一个;落地即清)。
+    private var kickTask: Task<Void, Never>?
 
     /// 注入构造(测试 / 预览):开关读写闭包 + 授权控制(AlertSettingsStore 同款注入口);
     /// 预览 / 测试宿主另注入惰性 GATT 探针(`BluetoothFeature.inert()`),不转蓝牙栈。
@@ -93,6 +98,7 @@ final class BluetoothFeature: MonitorFeature {
                 Task { @MainActor in
                     guard case let .fresh(reading) = delivery else { return }
                     self.reading = reading
+                    self.isAwaitingRead = false
                 }
             },
         ]
@@ -138,6 +144,33 @@ final class BluetoothFeature: MonitorFeature {
     /// 闸 = 可见 ∧ 已开启 ∧ 已授权;关闸时 provider 一个源都不碰,在途 GATT 探针
     /// 随之取消(p2-review/02;关开关 / 不可见 / 授权失效三路都经此)。
     private func applyGate() {
-        provider.setVisible(isVisible && accessState == .ready)
+        let open = isVisible && accessState == .ready
+        let opening = open && !provider.isCollecting
+        provider.setVisible(open)
+        if opening {
+            kickRead()
+        } else if !open {
+            isAwaitingRead = false
+        }
+    }
+
+    /// 开闸沿补一次快照(ui-unify 追改 2026-11-09):30s 档的下一 tick 最长要等 30s——
+    /// 用户实报"连着三台一台不显示"的根因。只在关→开沿上踢(开着时进场刷新授权
+    /// 不重踢);快照是 provider 的 nonisolated async,跑在通用执行器、不占主线程;
+    /// 途中关闸 = provider 返回 nil,不落数。蓝牙关(配对表 nil)同样收尾成「不可用」。
+    private func kickRead() {
+        if reading == nil {
+            isAwaitingRead = true
+        }
+        guard kickTask == nil else { return }
+        kickTask = Task { [weak self, provider] in
+            let fresh = await provider.snapshot()
+            guard let self else { return }
+            if let fresh {
+                reading = fresh
+            }
+            isAwaitingRead = false
+            kickTask = nil
+        }
     }
 }

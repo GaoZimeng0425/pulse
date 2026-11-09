@@ -82,8 +82,10 @@ extension CardHeader where Accessory == EmptyView {
     }
 }
 
-/// 副卡头(明细类小卡 / 紧凑总览卡):10.5pt 指标色符号 + 11 medium 次级标题 + 右侧
-/// 10.5 tertiary 等宽注记(可选,如「合计 …」)。
+/// 副卡头(明细类小卡 / 紧凑总览卡):10.5pt 指标色符号 + 12 semibold 指标色标题 +
+/// 右侧 10.5 tertiary 等宽注记(可选,如「合计 …」)。标题升彩色 = ui-unify 追改
+/// 2026-11-09:卡头是卡片身份,与排行卡内标题(12 semibold 指标色)同配方,P2 批次
+/// 卡不再是一族灰标题。
 struct CardSubHeader: View {
     let symbolName: String
     let title: String
@@ -96,8 +98,8 @@ struct CardSubHeader: View {
                 .font(.system(size: 10.5, weight: .semibold))
                 .foregroundStyle(tint)
             Text(title)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(tint)
             if let note {
                 Spacer(minLength: 4)
                 Text(note)
@@ -127,29 +129,118 @@ enum CardRowWidth {
     static let quantityValue: CGFloat = 56
     /// 数值列:风扇转速 "9999 rpm"。
     static let rpmValue: CGFloat = 64
-    /// 数值列:信号强度 "-99 dBm" / "—"(蓝牙设备行,2026-10-25 蓝牙令牌收编入表)。
+    /// 数值列:信号强度 `-99 dBm`(~~蓝牙设备行~~ RSSI 已改行副文,ui-unify 追改
+    /// 2026-11-09;保留给未来需要定宽 RSSI 列的卡)。
     static let rssiValue: CGFloat = 32
-    /// 行内电量条宽(紧凑档,蓝牙设备行)。
+    /// ~~行内电量条宽(蓝牙设备行)~~ superseded(同上):行内 meter 一律
+    /// `RowMetrics.meterWidth`(120 / 52)。
     static let meterCompact: CGFloat = 44
-    /// 行内电量条宽(全尺寸档,蓝牙设备行)。
+    /// 同上,superseded。
     static let meter: CGFloat = 64
+
+    /// 令牌全按 12pt 量宽;行升舒适档(14.5)时按字号等比放大(ui-unify 追改
+    /// 2026-11-09)——否则"—"行与真读数行列宽不等,同卡数值列 / 标签列错位。
+    static func scaled(_ width: CGFloat, fontSize: CGFloat) -> CGFloat {
+        ceil(width * fontSize / 12)
+    }
 }
 
-/// 卡内明细行数值:`{typography.body}` 12 常规 + `monospacedDigit`(DESIGN.md:一切数字
-/// 读数等宽数字,不用整体等宽字形 `.monospaced`),右对齐,`minWidth` 取 `CardRowWidth`
-/// 令牌(nil = 不定宽,如前置 Spacer 已把数值推到行尾)。层级色由调用方给(多为 secondary)。
+/// 卡内实体行(ui-unify 追改 2026-11-09,DESIGN.md §Components「卡内行两形态边界」):
+/// 行描述一台设备 / 一个对象(蓝牙设备、输出设备、容器、dev server)时用这形态——
+/// 行首类型图标 + 名称 + 可选副文(弱信号:RSSI / pid)+ 尾部自定义列(meter、数值列),
+/// 尺寸全走 `RowMetrics` 两档,与排行 / 清理列表行同语言。图标色由调用方给:
+/// 活跃态取所在页指标色,非活跃 `{colors.state-inactive}`(代替旧 6pt 状态圆点)。
+struct CardEntityRow<Trailing: View>: View {
+    let systemImage: String
+    let tint: Color
+    let name: String
+    var sub: String?
+    let compact: Bool
+    @ViewBuilder var trailing: () -> Trailing
+
+    var body: some View {
+        HStack(spacing: RowMetrics.spacing(compact: compact)) {
+            Image(systemName: systemImage)
+                .font(.system(size: compact ? 13 : 16, weight: .medium))
+                .frame(width: RowMetrics.iconSize(compact: compact))
+                .frame(maxHeight: .infinity, alignment: .center)
+                .foregroundStyle(tint)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name)
+                    .font(.system(size: RowMetrics.nameFontSize(compact: compact), weight: .medium))
+                    .lineLimit(1)
+                if let sub {
+                    Text(sub)
+                        .font(.system(size: RowMetrics.subFontSize(compact: compact)))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: RowMetrics.spacing(compact: compact))
+            trailing()
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// 卡内读数行(ui-unify 追改 2026-11-09,DESIGN.md「卡内行两形态边界」):行描述一个
+/// 测量(派生温度 / 风扇 / 功率域 / 卷占用 / 流量累计 / 温度明细)——标签吃满剩余宽度、
+/// meter(可选,`RowMetrics.meterWidth` 定宽)与数值列贴右,与排行行同一竖线结构;
+/// 无图标。字号全走 RowMetrics 两档。
+struct CardReadingRow: View {
+    let label: String
+    var labelStyle: HierarchicalShapeStyle = .primary
+    var labelWeight: Font.Weight = .medium
+    /// nil = 无 meter(温度明细 / 流量累计:读数本身就是全部信息)。
+    var meter: (fraction: Double, tint: Color)?
+    let value: String
+    var valueMinWidth: CGFloat?
+    var valueStyle: HierarchicalShapeStyle = .primary
+    let compact: Bool
+
+    var body: some View {
+        HStack(spacing: RowMetrics.spacing(compact: compact)) {
+            Text(label)
+                .font(.system(size: RowMetrics.nameFontSize(compact: compact), weight: labelWeight))
+                .foregroundStyle(labelStyle)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let meter {
+                MeterBar(fraction: meter.fraction, tint: meter.tint)
+                    .frame(width: RowMetrics.meterWidth(compact: compact))
+            }
+            CardRowValue(
+                text: value,
+                minWidth: valueMinWidth,
+                style: valueStyle,
+                fontSize: RowMetrics.valueFontSize(compact: compact),
+                weight: .semibold
+            )
+        }
+    }
+}
+
+/// 卡内明细行数值:`monospacedDigit` 右对齐,`minWidth` 取 `CardRowWidth` 令牌
+/// (nil = 不定宽;令牌按 12pt 量,这里随 fontSize 等比放大)。字号字重随所在行走
+/// RowMetrics 两档(ui-unify 追改 2026-11-09,默认 12 常规 = 旧口径;行内传
+/// `RowMetrics.valueFontSize` + semibold 与排行数值列同款)。
 struct CardRowValue: View {
     let text: String
     var minWidth: CGFloat?
     var style: HierarchicalShapeStyle = .secondary
+    var fontSize: CGFloat = 12
+    var weight: Font.Weight = .regular
 
     var body: some View {
         Text(text)
-            .font(.system(size: 12))
+            .font(.system(size: fontSize, weight: weight))
             .monospacedDigit()
             .lineLimit(1)
             .foregroundStyle(style)
-            .frame(minWidth: minWidth, alignment: .trailing)
+            .frame(minWidth: minWidth.map { CardRowWidth.scaled($0, fontSize: fontSize) }, alignment: .trailing)
     }
 }
 

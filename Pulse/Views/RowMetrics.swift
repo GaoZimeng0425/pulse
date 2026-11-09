@@ -47,4 +47,10 @@ enum RowMetrics {
     static func rowVerticalPadding(compact: Bool) -> CGFloat {
         compact ? 5 : 10
     }
+
+    /// 卡内行间距(ui-unify 追改 2026-11-09):卡内实体行 / 读数行无悬停底、不带行内距,
+    /// 用间距复刻排行行节奏——排行相邻两行内容之间 = 上下内距之和(舒适 20 / 紧凑 10)。
+    static func cardRowSpacing(compact: Bool) -> CGFloat {
+        rowVerticalPadding(compact: compact) * 2
+    }
 }
