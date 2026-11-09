@@ -33,10 +33,10 @@ struct PulseApp: App {
     @State private var rootsStore: ProjectRootsStore
     /// 清理页排除目录(p4-cleaner/04):UserDefaults 持久;主窗口清理页右键与设置窗
     /// 「清理」页共用这一实例(排除只收窄,两处同源才不会各看一份)。
-    @State private var cleanExclusions = CleanExclusionsStore()
+    @State private var cleanExclusions: CleanExclusionsStore
     /// 清理扫描根(p4-cleaner/05):UserDefaults 持久;主窗口清理页项目产物匹配与
     /// 设置窗「清理」页共用这一实例(与归组项目根两套配置,零共享——用户拍板)。
-    @State private var cleanScanRoots = CleanScanRootsStore()
+    @State private var cleanScanRoots: CleanScanRootsStore
     /// 采样管线持有者:app 生命周期内常驻(@State 在 App 中只创建一次)。
     /// 拉起即喂入已持久化的项目根——重启后项目归因即刻可用。
     @State private var monitor: SystemMonitor
@@ -49,6 +49,10 @@ struct PulseApp: App {
     /// NSPopover 承载弹窗与徽标;原常驻标签视图的四件事(采样启动 / 项目根
     /// 变更 / 告警开窗 / 回前台授权同步)全部迁居其内,全 app 常在挂点不缺失。
     @State private var menuBar: MenuBarController
+    /// AI 清理中枢(mcp-clean/01):app 常驻——影子模型列清单 + clean 请求桥接
+    /// 确认单;本机 IPC 服务(127.0.0.1 + 令牌)只服务 pulse-mcp。
+    @State private var mcpClean: McpCleanBridge
+    @State private var mcpCleanIPC: CleanIPCService?
     /// 常驻代理:拒绝「最后窗口关闭即终止」(见 MenuBarController.KeepAliveAppDelegate)。
     @NSApplicationDelegateAdaptor(KeepAliveAppDelegate.self) private var keepAlive
 
@@ -56,6 +60,12 @@ struct PulseApp: App {
         _ = LogService.shared // 拉起即建文件日志通道(~/.Pulse/logs,含退出留痕观察者)
         let store = ProjectRootsStore()
         _rootsStore = State(initialValue: store)
+        // 清理页双 store 先建局部再赋属性:下面的 AI 清理桥要用同一实例,struct init
+        // 里读属性必须等全部存量就位(直接读默认值会被并发检查卡"未初始化")。
+        let cleanExclusionsStore = CleanExclusionsStore()
+        let cleanScanRootsStore = CleanScanRootsStore()
+        _cleanExclusions = State(initialValue: cleanExclusionsStore)
+        _cleanScanRoots = State(initialValue: cleanScanRootsStore)
         let monitor = SystemMonitor.live(projectRoots: store.projectRoots)
         _monitor = State(initialValue: monitor)
         // 原始读数折叠与标签旧 body 同源同口径(CPU / 内存 / 磁盘容量 / 网络速率);
@@ -81,6 +91,33 @@ struct PulseApp: App {
             rootsStore: store,
             alertRouter: router
         ))
+        // AI 清理(mcp-clean/01):影子模型与主窗口清理页同装配同源(排除/扫描根/
+        // 历史/活动板/缓存 store),但只读缓存——永不扫描、不清删。拉起主窗口到
+        // 清理页复用告警路由的 activate 三合一(激活 + 落点 + 广播开窗)。
+        let mcpBridge = McpCleanBridge(
+            shadowModel: CleanerModel(
+                exclusions: cleanExclusionsStore,
+                scanRoots: cleanScanRootsStore,
+                history: monitor.history.cleanHistory,
+                activity: LiveCleanActivitySource(board: monitor.activityBoard),
+                volumeSummaries: { LiveCleanVolumeSummaries().internalSystemVolumes() },
+                scanCache: CleanScanResultStore()
+            ),
+            focusCleanerTab: { [weak router] in router?.activate(tab: .cleaner) }
+        )
+        _mcpClean = State(initialValue: mcpBridge)
+        // IPC 监听拉起即启动(失败 = 功能缺席,响亮记录,不拖累 app)。
+        let ipcDirectory = URL(
+            fileURLWithPath: NSString(string: "~/.Pulse").expandingTildeInPath,
+            isDirectory: true
+        )
+        let ipc = CleanIPCService(
+            directory: ipcDirectory,
+            handleCleanable: { await mcpBridge.cleanableList() },
+            handleClean: { paths in await mcpBridge.submit(paths: paths) }
+        )
+        _mcpCleanIPC = State(initialValue: ipc)
+        ipc?.start()
         // 主窗口可见即守卫一次(2026-10-16 验收走查:外接屏断电时窗口被系统恢复到
         // 幻影屏坐标,AppKit 层观察比 SwiftUI 视图钩子更早更稳);启动后延迟一拍
         // 兜底覆盖状态恢复创建的窗口。
@@ -117,7 +154,8 @@ struct PulseApp: App {
                 monitor: monitor,
                 alertRouter: alertRouter,
                 cleanExclusions: cleanExclusions,
-                cleanScanRoots: cleanScanRoots
+                cleanScanRoots: cleanScanRoots,
+                mcpClean: mcpClean
             )
             .background(MainWindowOpenWindowCapture())
             .background(LaunchHiddenWindow())
