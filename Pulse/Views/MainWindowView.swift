@@ -95,8 +95,13 @@ struct MainWindowView: View {
         // 不进外层页面滚动(嵌套滚动 = 按钮跟着内容滚走,用户实报);
         // 其余 tab 保持整页滚(卡片流)。
         let pageContent = VStack(alignment: .leading, spacing: 16) {
+            // 窗口矮时页头 shrink-0(layoutPriority):高度紧张只压缩 tabBody 的弹性区
+            // (清理页地图最小高兜底),页头「清理」标题不再被挤得上移/晃动
+            // (2026-11-09 用户实报两轮:第一轮只保了卡内标题,漏了页头)。
             pageHeader
+                .layoutPriority(1)
             AlertBannerView(center: monitor.alerts)
+                .layoutPriority(1)
             tabBody
         }
         .padding(.horizontal, 24)

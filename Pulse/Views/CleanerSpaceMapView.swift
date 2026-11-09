@@ -13,9 +13,6 @@ private let treemapColors: [Color] = [
     .sensors, .sound, .bluetooth, .containers, .disk,
 ].map(\.accentColor)
 
-/// treemap 高度。
-private let chartHeight: CGFloat = 340
-
 struct SpaceMapSection: View {
     let model: CleanerModel
     @Binding var drillPath: String?
@@ -81,17 +78,6 @@ struct SpaceMapSection: View {
             }
             breadcrumbRow(tree)
                 .layoutPriority(1)
-            // 通知行占位固定高:密封区/叶子提示出现/消失不再推动版面(同日实报)。
-            ZStack(alignment: .topLeading) {
-                Color.clear.frame(height: 14)
-                if let notice {
-                    Text(notice)
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-            }
             if rects.isEmpty {
                 Text("此目录下没有子目录(文件已聚合进大小)。")
                     .font(.system(size: 11))
@@ -188,10 +174,11 @@ struct SpaceMapSection: View {
                 }
             }
             bridgeButton(rects: rects, cleanable: cleanable, in: geo.size)
+            noticeOverlay
         }
-        // 弹性区(2026-11-09 用户实报):最小高 chartHeight、吃掉卡的剩余高度;
-        // 窗口矮时被压到最小高为止,标题区始终不动。
-        .frame(minHeight: chartHeight, maxHeight: .infinity)
+        // 弹性区(2026-11-09 用户实报):吃掉卡的剩余高度;最小高 220 = 主窗口最小高
+        // 560 下整页仍放得下的底线(原定高 340 在矮窗口挤爆页头——用户实报"标题上移")。
+        .frame(minHeight: 220, maxHeight: .infinity)
     }
 
     // MARK: 命中
@@ -237,6 +224,25 @@ struct SpaceMapSection: View {
             return Surface.cardHigh
         }
         return treemapColors[index % treemapColors.count]
+    }
+
+    /// 密封区/叶子提示(notice):浮在地图左上角,不占卡内一行——占位行曾让
+    /// 「整卷」面包屑与地图之间常年空一大截(2026-11-09 用户实报「删了路径没删距离」)。
+    @ViewBuilder
+    private var noticeOverlay: some View {
+        if let notice {
+            Text(notice)
+                .font(.system(size: 10.5))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Surface.cardHigh.opacity(0.9), in: .capsule)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .allowsHitTesting(false)
+                .padding(4)
+        }
     }
 
     /// 轻桥(p4-uninstaller/05):悬停命中白名单块时,「这块能清」浮在该块右上角。
