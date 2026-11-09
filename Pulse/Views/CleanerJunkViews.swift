@@ -451,31 +451,38 @@ private struct JunkListCard: View {
                         ? "本\(owner)没有「可安全清理」\(item)——「先检查」项不进自动勾选,逐个手勾(手动勾选后这里会如实显示)"
                         : "全选/全清本\(owner)「可安全清理」\(item);「先检查」项不进自动勾选,须逐个手勾(手勾后父级如实显示)")
                 }
-                // 卸载残留:显示名 = bundle id 尾段(spec §11),全 id 进 meta 区分同尾段的 app。
-                Text(group == .uninstallLeftovers
-                    ? OrphanLeftoverDetector.displayName(ofBundleID: projectGroup.projectName)
-                    : projectGroup.projectName)
-                    .font(.system(size: 14.5, weight: .bold))
-                    .lineLimit(1)
-                Text(projectMeta(projectGroup, group: group))
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-                    .rotationEffect(.degrees(isCollapsed ? 0 : 90))
+                // 收展点击区 = 标题/元信息/箭头这一块(cleaner-junk-card-fixes/01:
+                // 整行手势会劫持框上的点击——点框变成收展,勾选框必须独立响应)。
+                HStack(spacing: 8) {
+                    // 卸载残留:显示名 = bundle id 尾段(spec §11),全 id 进 meta 区分同尾段的 app。
+                    // 项目产物:显示名 = 父目录完整路径的末段,全路径进 meta 区分同名目录
+                    // (cleaner-junk-card-fixes/02)。
+                    Text(group == .uninstallLeftovers
+                        ? OrphanLeftoverDetector.displayName(ofBundleID: projectGroup.projectName)
+                        : (projectGroup.projectName as NSString).lastPathComponent)
+                        .font(.system(size: 14.5, weight: .bold))
+                        .lineLimit(1)
+                    Text(projectMeta(projectGroup))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(isCollapsed ? 0 : 90))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(.rect)
+                .onTapGesture(perform: onToggleCollapse)
+                .help(isCollapsed ? "点击展开\(item)清单" : "点击收起\(item)清单")
             }
             .padding(.leading, CleanerListMetrics.rowInset)
             .padding(.trailing, CleanerListMetrics.rowInset)
             .padding(.top, CleanerListMetrics.rowVerticalPadding)
             .padding(.bottom, isCollapsed ? CleanerListMetrics.rowVerticalPadding : 4)
-            .contentShape(.rect)
-            .onTapGesture(perform: onToggleCollapse)
-            .help(isCollapsed ? "点击展开\(item)清单" : "点击收起\(item)清单")
             if !isCollapsed {
                 children()
                     .padding(.bottom, 6)
@@ -484,12 +491,11 @@ private struct JunkListCard: View {
         .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
     }
 
-    /// 「2 项 · 3.2 GB · 3 天前动过」(卸载残留前缀全 bundle id);活动时间未知如实省略,不编。
-    private func projectMeta(_ projectGroup: ProjectJunkGroup, group: JunkGroup) -> String {
-        var parts: [String] = []
-        if group == .uninstallLeftovers {
-            parts.append(projectGroup.projectName)
-        }
+    /// 「/…/apps/desktop · 2 项 · 3.2 GB · 3 天前动过」。首段 = 大卡分组键全量
+    /// (卸载残留 = 完整 bundle id;项目产物 = 父目录完整路径,区分同名目录,
+    /// cleaner-junk-card-fixes/02);活动时间未知如实省略,不编。
+    private func projectMeta(_ projectGroup: ProjectJunkGroup) -> String {
+        var parts: [String] = [projectGroup.projectName]
         parts.append("\(projectGroup.items.count) 项")
         parts.append(PulseFormat.memory(UInt64(max(0, projectGroup.totalBytes))))
         if let epoch = projectGroup.newestChangeEpoch {

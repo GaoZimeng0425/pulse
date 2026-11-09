@@ -195,10 +195,11 @@ public enum ProjectArtifactMatcher {
 
     /// 一个目录的直接子项里命中规则的 → 候选;零字节非部分不列(与 04 同款噪音纪律)。
     ///
-    /// projectName 用 `node.name`(产物的**直接父目录**),不用 DFS 顶层项目名
-    /// (用户实报 2026-11-05:worktree 里的 node_modules 全标了主项目名,
-    /// 同组冒出三个同名行)。monorepo 场景同理:packages/app1/node_modules
-    /// 归 "app1" 不归 monorepo 顶层。年龄也按直接父目录算,口径一致。
+    /// projectName 携带产物**直接父目录的完整路径**(cleaner-junk-card-fixes/02):
+    /// 完整路径键两头都对——同一路径必同卡,不同路径(哪怕末段同名,如两个仓库
+    /// 各自的 apps/desktop)必异卡。历史:05 用 DFS 顶层项目名,worktree 产物冒名
+    /// (2026-11-05 实报);当天改成 `node.name`(末段名)修了冒名,又漏了同名
+    /// 异路并卡与同项目拆卡(2026-11-09 实报)。年龄按直接父目录算,口径不变。
     private static func appendArtifacts(
         ofDirectChildrenOf node: SpaceNode,
         rulesByName: [String: ProjectArtifactRule],
@@ -224,7 +225,7 @@ public enum ProjectArtifactMatcher {
                 allReclaimableAccounting: child.allReclaimableAccounting,
                 rationale: rule.rationale,
                 symbolName: rule.symbolName,
-                projectName: node.name,
+                projectName: node.path,
                 newestChangeEpoch: projectAge(of: node, rulesByName: rulesByName),
                 modifiedAtScan: child.ownModifiedEpoch
             ))
