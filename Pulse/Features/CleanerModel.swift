@@ -592,15 +592,10 @@ final class CleanerModel {
         for candidate: JunkCandidate,
         entries: [CleanActivityEntry]
     ) -> CleanActivityReason? {
-        CleanInUse.reasons(protectingPath: protectionPath(of: candidate), entries: entries)
-    }
-
-    /// 保护路径:项目产物按**项目目录**判(终端在项目根 = 保护整个项目的产物),
-    /// 其余按候选自身路径判(活动落在候选之内 = 在用)。
-    private func protectionPath(of candidate: JunkCandidate) -> String {
-        candidate.group == .projectArtifacts
-            ? (candidate.path as NSString).deletingLastPathComponent
-            : candidate.path
+        CleanInUse.reasons(
+            protectingPath: CleanInUse.protectionPath(for: candidate),
+            entries: entries
+        )
     }
 
     var excludedPathPrefixes: [String] {
@@ -642,7 +637,7 @@ final class CleanerModel {
         }
         let entries = activity.activeEntries()
         let usable = candidates.filter {
-            CleanInUse.reasons(protectingPath: protectionPath(of: $0), entries: entries) == nil
+            CleanInUse.reasons(protectingPath: CleanInUse.protectionPath(for: $0), entries: entries) == nil
         }
         return CleanPlan.make(selection: selection, candidates: usable, excludedPathPrefixes: exclusions.paths)
     }
@@ -651,6 +646,16 @@ final class CleanerModel {
     func exclude(_ path: String) {
         exclusions.add(path)
         selection.retain(in: candidates)
+    }
+
+    /// mcp-clean/01:AI 经 MCP 提交的外部勾选——**替换**全量勾选为求交后的
+    /// 安全档项(McpCleanMatching 已滤掉先检查/在用,这里不重复判);确认单
+    /// 展示的就是这份勾选,用户仍可逐项反悔。busy/为空拦截在 McpCleanBridge。
+    func applyExternalSelection(_ matched: [JunkCandidate]) {
+        selection.clear()
+        for candidate in matched {
+            selection.set(candidate, selected: true)
+        }
     }
 
     // MARK: 清理流程(04)

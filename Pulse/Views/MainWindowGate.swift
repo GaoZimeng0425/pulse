@@ -29,6 +29,9 @@ struct MainWindowGate: View {
     let cleanExclusions: CleanExclusionsStore
     /// 清理扫描根(p4-cleaner/05):app 级单实例,与设置页「清理」同源。
     let cleanScanRoots: CleanScanRootsStore
+    /// AI 清理桥(mcp-clean/01):窗口可见期把清理页模型挂给它(列清单活数据 /
+    /// clean 请求落确认单);关窗即摘。
+    let mcpClean: McpCleanBridge
 
     @Environment(\.openSettings) private var openSettings
 
@@ -39,7 +42,8 @@ struct MainWindowGate: View {
                     monitor: monitor,
                     alertRouter: alertRouter,
                     cleanExclusions: cleanExclusions,
-                    cleanScanRoots: cleanScanRoots
+                    cleanScanRoots: cleanScanRoots,
+                    mcpClean: mcpClean
                 )
             } else {
                 // 与 Window 场景 defaultSize 同尺寸:窗框在恢复 / 深链路径上不跳动。

@@ -84,6 +84,14 @@ public enum CleanActivityDerivation {
 
 /// 在用判定的消费面:给定候选的保护路径,活动条目里有没有落进来的。
 public enum CleanInUse {
+    /// 候选的保护路径(mcp-clean/01 提公共:界面组选与 MCP 求交同口径单出处)——
+    /// 项目产物按**项目目录**判(产物直接父目录),其余按候选自身路径判。
+    public static func protectionPath(for candidate: JunkCandidate) -> String {
+        candidate.group == .projectArtifacts
+            ? (candidate.path as NSString).deletingLastPathComponent
+            : candidate.path
+    }
+
     /// 项目产物传**项目目录**(活动在项目根 = 保护整个项目的全部产物);
     /// 其他候选传自身路径(活动落在候选之内 = 在用)。
     /// - Returns: 命中的原因并集;无活动覆盖返回 nil(不在用)。

@@ -41,15 +41,20 @@ struct MainWindowView: View {
     /// 无常驻采集,进子页才收集。
     @State private var uninstallModel: UninstallModel
 
+    /// AI 清理桥(mcp-clean/01):窗口存活期挂/摘清理页模型(仅接线,无视觉)。
+    let mcpClean: McpCleanBridge?
+
     init(
         monitor: SystemMonitor,
         initialTab: MetricTab = .overview,
         alertRouter: AlertNotificationRouter? = nil,
         cleanExclusions: CleanExclusionsStore = CleanExclusionsStore(load: { [] }, persist: { _ in }),
-        cleanScanRoots: CleanScanRootsStore = CleanScanRootsStore(load: { [] }, persist: { _ in })
+        cleanScanRoots: CleanScanRootsStore = CleanScanRootsStore(load: { [] }, persist: { _ in }),
+        mcpClean: McpCleanBridge? = nil
     ) {
         self.monitor = monitor
         self.alertRouter = alertRouter
+        self.mcpClean = mcpClean
         _model = State(initialValue: DashboardModel(monitor: monitor))
         _cleanerModel = State(initialValue: CleanerModel(
             exclusions: cleanExclusions,
@@ -146,6 +151,8 @@ struct MainWindowView: View {
             if let rankingID = alertRouter?.consumePendingRankingID() {
                 model.expandRanking(rankingID)
             }
+            // AI 清理桥挂接(mcp-clean/01):清理页模型归窗口存活期,关窗即摘。
+            mcpClean?.attachWindowModel(cleanerModel)
             // 进场即报当前 tab:覆盖深链落点(onChange 只管后续切换;引导值由
             // MainWindowGate.onAppear 先写,此处同值 no-op)。
             monitor.setMainWindowTab(tabSelection.current)
@@ -154,6 +161,9 @@ struct MainWindowView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                 MainWindowView.repositionIfOffscreen()
             }
+        }
+        .onDisappear {
+            mcpClean?.detachWindowModel()
         }
         // 外接屏断电后系统把窗口还回幻影屏坐标(AX/截屏/人眼都够不着),
         // 应用重新激活时再守一次——"打开主窗口像没反应"的根因之一。

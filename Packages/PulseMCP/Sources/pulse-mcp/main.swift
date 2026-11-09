@@ -1,6 +1,8 @@
-// pulse-mcp —— Pulse 的 MCP stdio server(p3-root-mcp/02)。
+// pulse-mcp —— Pulse 的 MCP stdio server(p3-root-mcp/02;mcp-clean/02 扩清理)。
 // 读 Pulse 历史库(WAL 只读)回答:谁在吃 CPU / 当前读数 / 历史趋势;
 // app 不在跑也能答(分钟级落库数据,年龄如实标注)。
+// mcp-clean:list_cleanable / clean 经本机回环 IPC 交给在跑的 app——只碰
+// 「可安全清理」档,执行前用户会在 Pulse 确认单上亲手点一次。
 // 分发:嵌 Pulse.app/Contents/MacOS/,AI 客户端以 stdio 方式拉起本可执行。
 import Foundation
 import MCP
@@ -8,10 +10,12 @@ import PulseCore
 
 let server = Server(
     name: "pulse",
-    version: "0.1.0",
+    version: "0.2.0",
     instructions: """
     Pulse 菜单栏系统监视器的数据查询。数据为分钟级采样落库(非实时流),\
-    每个答案都会标注数据年龄;Pulse app 未运行时仍可回答(回退最近落库)。
+    每个答案都会标注数据年龄;Pulse app 未运行时仍可回答(回退最近落库)。\
+    清理类工具(list_cleanable / clean)要求 Pulse app 正在运行:AI 只能碰\
+    「可安全清理」档,真正的删除由用户在 Pulse 确认单上确认后执行。
     """,
     capabilities: .init(tools: .init())
 )
@@ -168,6 +172,91 @@ private func historyQueryText(metricRaw: String, rangeRaw: String, breakdownID: 
     }
 }
 
+// MARK: - mcp-clean IPC 客户端(mcp-clean/02)
+
+//
+// 经 127.0.0.1 + 令牌找在跑的 Pulse app:端点文件 ~/.Pulse/mcp-clean.json
+// (0600)。app 没跑/接口未就绪 = 如实报,不降级不猜。文案单出处
+// PulseCore McpCleanText,这里只接线。
+
+private func cleanEndpoint() -> McpCleanEndpoint? {
+    let directory = URL(
+        fileURLWithPath: NSString(string: "~/.Pulse").expandingTildeInPath,
+        isDirectory: true
+    )
+    guard let endpoint = McpCleanEndpoint.load(at: McpCleanEndpoint.url(directory: directory)) else {
+        return nil
+    }
+    // pid 已死而端点文件还在(app 被强杀没走到退出清理)= app 不在。
+    if kill(endpoint.pid, 0) != 0, errno == ESRCH {
+        return nil
+    }
+    return endpoint
+}
+
+/// 同步 HTTP(工具处理器是同步闭包;clean 等用户确认最长 10 分钟,同步等)。
+private func cleanIPC(
+    path: String,
+    method: String,
+    body: Data? = nil,
+    timeoutSeconds: TimeInterval
+) -> (status: Int, data: Data)? {
+    guard let endpoint = cleanEndpoint(),
+          let url = URL(string: "http://127.0.0.1:\(endpoint.port)\(path)")
+    else { return nil }
+    var request = URLRequest(url: url)
+    request.httpMethod = method
+    request.timeoutInterval = timeoutSeconds
+    request.setValue(endpoint.token, forHTTPHeaderField: "X-Pulse-Token")
+    if let body {
+        request.httpBody = body
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    }
+    var result: (Int, Data)?
+    let semaphore = DispatchSemaphore(value: 0)
+    let task = URLSession.shared.dataTask(with: request) { data, response, _ in
+        if let http = response as? HTTPURLResponse {
+            result = (http.statusCode, data ?? Data())
+        }
+        semaphore.signal()
+    }
+    task.resume()
+    _ = semaphore.wait(timeout: .now() + timeoutSeconds + 5)
+    return result
+}
+
+private func listCleanableText() -> String {
+    guard let (status, data) = cleanIPC(path: "/cleanable", method: "GET", timeoutSeconds: 30) else {
+        return "Pulse app 未运行(或 AI 清理接口未就绪)——list_cleanable / clean 都需要 Pulse 在跑。"
+    }
+    guard status == 200,
+          let list = try? JSONDecoder().decode(McpCleanableListResponse.self, from: data)
+    else {
+        return "查询失败(HTTP \(status))。"
+    }
+    return McpCleanText.cleanableList(list)
+}
+
+private func cleanText(paths: [String]) -> String {
+    guard !paths.isEmpty else {
+        return "没有给要清理的路径——先用 list_cleanable 拿清单,把要清的 path 原样传进来。"
+    }
+    guard let body = try? JSONEncoder().encode(McpCleanRequest(paths: paths)) else {
+        return "请求编码失败。"
+    }
+    guard let (status, data) = cleanIPC(
+        path: "/clean", method: "POST", body: body, timeoutSeconds: 610
+    ) else {
+        return "Pulse app 未运行(或连接失败)——清理需要 Pulse 在跑。"
+    }
+    guard status == 200,
+          let response = try? JSONDecoder().decode(McpCleanRunResponse.self, from: data)
+    else {
+        return "清理请求失败(HTTP \(status))。"
+    }
+    return McpCleanText.cleanResult(response)
+}
+
 // MARK: - 工具注册
 
 await server.withMethodHandler(ListTools.self) { _ in
@@ -216,6 +305,26 @@ await server.withMethodHandler(ListTools.self) { _ in
                 "required": .array([.string("metric"), .string("range")]),
             ])
         ),
+        Tool(
+            name: "list_cleanable",
+            description: "列出当前「可安全清理」的项(路径/大小/多久未动/数据年龄)。只含安全档且此刻不在用的项;「先检查」档不出现,须用户在 app 里手勾。需要 Pulse app 正在运行。",
+            inputSchema: .object(["type": .string("object"), "properties": .object([:])])
+        ),
+        Tool(
+            name: "clean",
+            description: "把选中的可清理路径提交给 Pulse 执行:app 会弹出确认单,用户点「移入废纸篓」后才真删(全部进废纸篓可找回;10 分钟无人确认自动撤单),随后返回逐项结果。只接受安全档且非在用的路径——先用 list_cleanable 拿路径。",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "paths": .object([
+                        "type": .string("array"),
+                        "items": .object(["type": .string("string")]),
+                        "description": .string("要清理的完整路径列表(来自 list_cleanable 的输出)"),
+                    ]),
+                ]),
+                "required": .array([.string("paths")]),
+            ])
+        ),
     ])
 }
 
@@ -237,6 +346,20 @@ await server.withMethodHandler(CallTool.self) { params in
             rangeRaw: arguments["range"]?.stringValue ?? "",
             breakdownID: arguments["breakdown"]?.stringValue
         )
+    case "list_cleanable":
+        text = listCleanableText()
+    case "clean":
+        // paths 兼容数组与单字符串两种传法(客户端拼参数习惯不一)。
+        var paths: [String] = []
+        switch arguments["paths"] {
+        case let .array(values):
+            paths = values.compactMap(\.stringValue)
+        case let .string(single):
+            paths = [single]
+        default:
+            break
+        }
+        text = cleanText(paths: paths)
     default:
         return .init(content: [.text(text: "未知工具 \(params.name)")], isError: true)
     }
