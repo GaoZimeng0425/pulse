@@ -30,8 +30,12 @@ private let hoverBoost: Double = 0.08
 private let chartMinHeight: CGFloat = 220
 
 /// 旭日方形边长下限({layout.spacemap-sunburst-min-side},space-map-forms/05):
-/// 窄窗防过小;宽窗边长 = 卡宽(铺满,04 拍板)。宽度下限由主窗口最小宽 720 保障。
+/// 窄窗防过小。宽度下限由主窗口最小宽 720 保障。
 private let sunburstMinSide: CGFloat = 360
+
+/// 旭日方形边长在卡内容宽基础上每侧再留的白(space-map-forms/06,用户拍板
+/// 「跟外层卡片差不多,小一个 padding」;取 {spacing.card-padding-compact})。
+private let sunburstInsetPerSide: CGFloat = 12
 
 /// 展示形态(用户偏好;@AppStorage 记住上次,默认 treemap = v3 既定形态)。
 private enum SpaceMapForm: String, CaseIterable {
@@ -55,8 +59,8 @@ struct SpaceMapSection: View {
     let onGoToJunk: (JunkGroup) -> Void
 
     @AppStorage("settings.spaceMapForm") private var formRaw = SpaceMapForm.treemap.rawValue
-    /// 旭日方形边长(测宽回写;见 sunburstBody 尾部的布局注释)。
-    @State private var sunburstSide: CGFloat = sunburstMinSide
+    /// 卡内容宽(卡级探针回写,见 mapCard 尾部;与图表自身尺寸无关,零反馈回路)。
+    @State private var cardContentWidth: CGFloat = sunburstMinSide
     @State private var notice: String?
     /// 悬浮命中键(两形态各编各的:treemap "t<下标>";旭日 = SunburstArc.id)。
     @State private var hoveredKey: String?
@@ -124,6 +128,14 @@ struct SpaceMapSection: View {
             case .sunburst:
                 sunburstArea(root: root, tree: tree, isTopLevel: isTopLevel, resolve: resolve)
             }
+        }
+        // 卡内容宽探针:量卡片给这一节的宽(与图表自身尺寸无关)——旭日方形边长
+        // 由它派生,杜绝「量图表自身宽 → 撑宽 ScrollView 内容 → 再量到更大」的
+        // 正反馈(space-map-forms/06 用户实报「旭日比整个 app 面积还大」)。
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { _, width in
+            cardContentWidth = width
         }
         .cardShell(compact: false)
     }
@@ -467,16 +479,17 @@ struct SpaceMapSection: View {
             sunburstBridgeButton(arcs: arcs, resolve: resolve, in: geo.size)
             noticeOverlay
         }
-        // 方形边长 = max(卡宽, 下限),高随宽、卡内居中(space-map-forms/04 拍板
-        // 「放开铺满」;05 换手段:aspectRatio 套在 GeometryReader 上在 ScrollView
-        // 里既不铺满也不居中——用户实报;显式 onGeometryChange 测宽回写才确定)。
-        .frame(height: sunburstSide)
-        .onGeometryChange(for: CGFloat.self) { proxy in
-            max(proxy.size.width, sunburstMinSide)
-        } action: { _, side in
-            sunburstSide = side
-        }
+        // 方形边长 = 卡内容宽 − 两侧留白(≥ 下限),定宽定高、卡内居中。
+        // space-map-forms/06:05 把测宽挂在图表自身 frame 上,与 ScrollView 的
+        // 内容宽互相喂养正反馈,图表涨到比窗口还大(用户实报);宽改由 mapCard
+        // 尾部的卡级探针提供——量的是卡片给的宽,图表自身尺寸影响不到它。
+        .frame(width: sunburstSide, height: sunburstSide)
         .frame(maxWidth: .infinity)
+    }
+
+    /// 旭日方形边长(卡内容宽 − 两侧留白,下限 {layout.spacemap-sunburst-min-side})。
+    private var sunburstSide: CGFloat {
+        max(cardContentWidth - sunburstInsetPerSide * 2, sunburstMinSide)
     }
 
     /// 分区异色着色(space-map-forms/03):内环每支一色(按序循环 accent,柔和

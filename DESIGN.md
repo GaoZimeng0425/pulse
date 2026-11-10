@@ -202,7 +202,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.sheet-list-max-height}` | 220pt | 确认清单 sheet 内逐行列表的最大高(超出滚动,总量与按钮恒在视口内) |
 | `{layout.spacemap-chart-min-height}` | 220pt | 空间地图**方块形态**图表区最小高(≈滚动容器内实际高,见组件行注):220 = 主窗口最小高 560 下整页仍放得下的底线(ui-unify 追改 2026-11-09;space-map-forms/01 入表) |
 | `{layout.sunburst-diameter}` | ~~400pt~~ | **superseded**(space-map-forms/04):旭日改为方形铺满卡宽,直径 = 卡内容宽,无固定值——340(01)与 400(03)两代固定直径分别被 220 最小高压制 / 宽卡里只占中间一点,均废;几何在 PulseCore `SunburstLayout`(p4-cleaner/07) |
-| `{layout.spacemap-sunburst-min-side}` | 360pt | 旭日方形边长下限(space-map-forms/05):窄窗防过小;宽窗边长 = 卡宽铺满(高随宽、居中,onGeometryChange 测宽回写);宽度下限由主窗口最小宽 720 保障 |
+| `{layout.spacemap-sunburst-min-side}` | 360pt | 旭日方形边长下限(space-map-forms/05):窄窗防过小;实际边长 = 卡内容宽 − 2×`{spacing.card-padding-compact}`(06 拍板「小一个 padding」,卡级宽探针提供,不量图表自身);宽度下限由主窗口最小宽 720 保障 |
 | `{layout.popover-size}` | 360×648pt | 菜单栏弹窗面板**定尺寸**(`DashboardView.panelSize`;popover-header/01 用户拍板 A,2026-11-02):AppKit 面板直接按此开窗、不读内容 fittingSize;中间滚动区 `maxHeight: .infinity` 吃掉头尾之外的全部高度——tab 栏 / 页头钉顶、底排钉底,告警横幅出没只挤中间,切 tab 面板不动 |
 
 窗口:主窗口最小 **720×560**(spec 钉死),默认 880×620;弹窗面板 **360×648 定尺寸**
@@ -464,10 +464,11 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   弹性高、卡头 / 根选 / 面包屑 `layoutPriority(1)` 不被挤压——**注意清理页在
   ScrollView 里,弹性区拿到无限高度提案、塌到最小高,最小高 ≈ 实际高**;两形态
   各自处理:方块 `{layout.spacemap-chart-min-height}` 220 / 旭日 = **方形,边长 =
-  max(卡宽, `{layout.spacemap-sunburst-min-side}` 360),高随宽、卡内居中**
-  (onGeometryChange 测宽回写;04 用户拍板「放开铺满」+ 05 加下限与居中——
-  aspectRatio 套 GeometryReader 在 ScrollView 里既不铺满也不居中,已废;03 的
-  400 固定值在宽卡里只占中间一点,02 前的共用 220 曾把圆压小);②**悬停零重排**——卡内不出现 /
+  max(卡内容宽 − 2×`{spacing.card-padding-compact}`, `{layout.spacemap-sunburst-min-side}`
+  360),定宽定高、卡内居中**(06 用户拍板「跟外层卡片差不多,小一个 padding」;
+  宽由**卡级宽探针**提供——量卡片给的宽,绝不量图表自身:05 测自身宽与
+  ScrollView 内容宽正反馈,图表涨到比窗口还大;04 的 aspectRatio 在 ScrollView
+  里不可靠,均废);②**悬停零重排**——卡内不出现 /
   消失任何占行元素(原卡顶悬停信息行已废),悬停信息与按钮一律浮在图表内;
   ③密封 / 叶子 / 「其他」点击解释 = 图表左上角浮层胶囊(cardHigh 90%,单行截断,
   不吃点击),不占卡内一行。
@@ -476,9 +477,10 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
     「可清理」大块药丸 / 小块圆点(p4-uninstaller/05);悬停白名单块(≥140×48)
     时「这块能清」浮在该块右上角。
   - **旭日(两环,v1 形态以正确写法回归)**:内环 = 当前根的子辈、外环 = 孙辈,
-    叶子与密封块延伸占满外环(`SunburstLayout`);**直径 = 方形边长 = max(卡宽,
-    `{layout.spacemap-sunburst-min-side}` 360),高随宽、卡内居中**(04「放开铺满」
-    + 05 下限与居中;340/400 两代固定直径已废)。**命中 = atan2 标准极角直接
+    叶子与密封块延伸占满外环(`SunburstLayout`);**直径 = 方形边长 = 卡内容宽 −
+    2×12(≥ `{layout.spacemap-sunburst-min-side}` 360),卡内居中**(06 拍板
+    「跟外层卡片差不多,小一个 padding」;340/400 固定直径、04 aspectRatio、
+    05 自测宽均废)。**命中 = atan2 标准极角直接
     比对**(`SunburstArc.contains(angle:)`,纯值可测)——弧角本身就是标准极角,
     05 前视图层多加 π/2「换算」致悬停恒偏 90°(v1 起潜伏,回归测试钉死)。
     环形半径 0.28–0.65 /
