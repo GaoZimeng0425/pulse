@@ -36,6 +36,8 @@ final class AlertCenter {
 
     private let sender: any AlertNotificationSending
     private let toastSender: any NemoNotchToastSending
+    /// 告警历史落盘(mcp-eyes/02):nil = 历史库缺席,只发不记。
+    private let alertHistory: AlertEventStore?
     private let clock: @Sendable () -> Date
     private var engine = AlertEngine()
     /// 触发当轮的组上下文(归因原料):onRound 暂存、fired 事件消费——归因口径
@@ -50,11 +52,13 @@ final class AlertCenter {
         store: AlertSettingsStore = AlertSettingsStore(),
         sender: any AlertNotificationSending,
         toastSender: any NemoNotchToastSending,
+        alertHistory: AlertEventStore? = nil,
         clock: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.store = store
         self.sender = sender
         self.toastSender = toastSender
+        self.alertHistory = alertHistory
         self.clock = clock
     }
 
@@ -194,6 +198,10 @@ final class AlertCenter {
                     category: "Alert"
                 )
                 deliver(occurrence, into: &payloads)
+                // mcp-eyes/02:触发即留档(fire-and-forget;触发稀疏,乱序无害)。
+                if let alertHistory {
+                    Task { try? await alertHistory.record(occurrence) }
+                }
             case let .resolved(kind, subjectKey):
                 activeAlerts.removeAll {
                     $0.kind == kind && $0.subjectKey == subjectKey

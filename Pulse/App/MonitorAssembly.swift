@@ -90,6 +90,8 @@ extension SystemMonitor {
     /// 无历史,已记日志)+ 标准偏好里的告警设置。
     static func live(projectRoots: [String]) -> SystemMonitor {
         let relay = HeartbeatRusageRelay()
+        // 历史模块先建(mcp-eyes/02):告警历史 store 从它取,喂给 AlertCenter。
+        let history = HistoryFeature(engine: HistoryEngine.openDefault())
         return SystemMonitor(
             sources: .live(heartbeatRelay: relay),
             projectRoots: projectRoots,
@@ -98,11 +100,12 @@ extension SystemMonitor {
                 alerts: AlertCenter(
                     store: AlertSettingsStore(),
                     sender: LiveAlertNotificationSender(),
-                    toastSender: LiveNemoNotchToastSender()
+                    toastSender: LiveNemoNotchToastSender(),
+                    alertHistory: history.alertHistory
                 ),
                 devServers: DevServerFeature(portScanner: LiveDevServerPortScanner()),
                 rankings: RankingsFeature(nettopSource: LiveNettopCSVSource()),
-                history: HistoryFeature(engine: HistoryEngine.openDefault()),
+                history: history,
                 disk: DiskFeature(
                     capacitySource: LiveDiskCapacitySource(),
                     throughputSource: LiveDiskThroughputSource.adoptingBestPath(fallbackHeartbeat: relay)

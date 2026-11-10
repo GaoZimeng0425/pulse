@@ -299,6 +299,35 @@ public enum HistoryDatabase {
         migrator.registerMigration("p4-uninstaller-03-uninstall-history") { db in
             try db.execute(sql: "ALTER TABLE clean_item ADD COLUMN permanent_route TEXT")
         }
+        // mcp-eyes(mcp-eyes/02):告警历史 + dev server 状态。只加表不改旧表。
+        // alert_event:一条触发一行(同秒同主体 REPLACE,触发本就稀疏);读侧聚合
+        // 在 McpEyesQuery.recentAlerts。dev_server_state:pid 主键 upsert,退出进程
+        // 超 10 分钟由写侧清尸;读侧 McpEyesQuery.devServers。
+        migrator.registerMigration(eyesMigrationID) { db in
+            try db.execute(sql: """
+            CREATE TABLE alert_event (
+                ts           INTEGER NOT NULL,
+                kind         TEXT    NOT NULL,
+                subject_key  TEXT    NOT NULL,
+                subject_name TEXT,
+                value        REAL    NOT NULL,
+                PRIMARY KEY (ts, kind, subject_key)
+            )
+            """)
+            try db.execute(sql: "CREATE INDEX alert_event_subject ON alert_event(kind, subject_key, ts)")
+            try db.execute(sql: """
+            CREATE TABLE dev_server_state (
+                pid          INTEGER PRIMARY KEY,
+                kind         TEXT    NOT NULL,
+                name         TEXT    NOT NULL,
+                memory_bytes INTEGER NOT NULL,
+                idle_seconds REAL,
+                ports        TEXT    NOT NULL,
+                first_seen   INTEGER NOT NULL,
+                last_seen    INTEGER NOT NULL
+            )
+            """)
+        }
 
         return migrator
     }
@@ -306,11 +335,15 @@ public enum HistoryDatabase {
     /// 清理历史迁移标识(p4-cleaner/04)。
     static let cleanHistoryMigrationID = "p4-cleaner-04-clean-history"
 
+    /// mcp-eyes 两表迁移标识(mcp-eyes/02)。
+    static let eyesMigrationID = "mcp-eyes-v1"
+
     // MARK: 表名单(测试与自检共用)
 
     public static let tableNames = [
         "sample_min", "sample_hour", "system_min", "system_hour",
         "gauge_min", "gauge_hour", "lineage", "groups", "metadata",
         "clean_run", "clean_item",
+        "alert_event", "dev_server_state",
     ]
 }
