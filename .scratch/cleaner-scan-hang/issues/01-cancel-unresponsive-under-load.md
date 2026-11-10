@@ -17,7 +17,7 @@ Dashboard 按钮点击),20:59 有「系统负载 100%」告警。三件事叠在
 
 切 tab 不是根因,只是用户离开又回来看见了停滞。
 
-**Status:** done(2026-11-11,合并点见 Comments)
+**Status:** done(2026-11-11,develop@4716bb5)
 
 - [x] 扫描任务 `.utility` → `.userInitiated`(purge-app 同款定策:用户在等的扫描不被忙碌机器拖住)
 - [x] 取消硬兜底:`cancelScan` 后 5 秒未收尾,界面强制回空态(`scanCancelForceTimeout`,init 可注入)
