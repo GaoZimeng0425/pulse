@@ -1038,10 +1038,9 @@ final class CleanerModelTests: XCTestCase {
         await waitUntil { model.overviewTrashPhase == .failed }
 
         XCTAssertNil(model.overviewTrash, "读不到 = nil 穿透到占位")
-        XCTAssertNotEqual(
-            model.overviewTrashPhase,
-            .counted(TrashInventory(volumes: [])),
-            "读不到不许伪造成空清点(0 是真读数)"
+        XCTAssertNil(
+            model.overviewTrash?.totalBytes,
+            "Hero 图例「另有废纸篓 X」读的就是这个通道:nil → 「—」,不许变 0"
         )
     }
 
