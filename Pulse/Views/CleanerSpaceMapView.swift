@@ -13,21 +13,25 @@ import SwiftUI
 // 版面纪律(ui-unify 追改,2026-11-09 用户实报三修,两形态同守):图表区弹性高、
 // 卡头不被挤压;悬停零重排——不出现/消失任何占行元素,信息与按钮都浮在图表内。
 
-// 同色系深浅(space-map-forms/02,用户拍板 2026-11-10:十色循环嫌闹):整图只用
-// 卡强调色(cleanAccent)按不透明度 0.85→0.30 均分——大块深、小块浅;旭日内环按
-// 占比取阶、外环 = 父色 −0.15;hover 一律 +0.08(封顶 0.95)。密封 = inkTertiary
-// 0.5、「其他」= cardHigh 0.75 不变;块内/弧内文字色随深浅切换(≥0.55 白,其余墨)。
-private let rampHighest: Double = 0.85
-private let rampLowest: Double = 0.30
-private let rampOuterStep: Double = 0.15
+/// 分区完全异色·柔和版(space-map-forms/03,2026-11-10 二轮:02 同色系深浅上线即
+/// 被毙「为什么一个颜色了」,01 高饱和十色也曾被嫌闹——折中):顶层块按序循环十个
+/// accent 令牌,基色不透明度 0.60;旭日外环 = 父色 −0.13;hover +0.08 封顶 0.95;
+/// 文字色 ≥0.5 白、其余墨。密封 = inkTertiary 0.5、「其他」= cardHigh 0.75 不变。
+private let sectionColors: [Color] = [
+    Metric.cpu, .memory, .network, .battery, .gpu,
+    .sensors, .sound, .bluetooth, .containers, .disk,
+].map(\.accentColor)
+private let sectionBaseOpacity: Double = 0.60
+private let sectionChildStep: Double = 0.13
 private let hoverBoost: Double = 0.08
 
-/// 图表区最小高({layout.spacemap-chart-min-height}):弹性区吃掉卡的剩余高度;
-/// 220 = 主窗口最小高 560 下整页仍放得下的底线(原定高 340 在矮窗口挤爆页头)。
+/// 方块形态图表区最小高({layout.spacemap-chart-min-height})。注意:弹性区在
+/// ScrollView 里拿到无限高度提案、塌到最小高,所以这个值 ≈ 方块形态的实际高度。
 private let chartMinHeight: CGFloat = 220
 
-/// 旭日直径上限({layout.sunburst-diameter});弹性区更矮时随画布短边收缩。
-private let sunburstDiameter: CGFloat = 340
+/// 旭日形态直径 = 图表区最小高({layout.sunburst-diameter};space-map-forms/03:
+/// 01 版 340 定高在滚动容器里被 220 最小高压成小圆——旭日专用 400 下限)。
+private let sunburstDiameter: CGFloat = 400
 
 /// 展示形态(用户偏好;@AppStorage 记住上次,默认 treemap = v3 既定形态)。
 private enum SpaceMapForm: String, CaseIterable {
@@ -190,7 +194,6 @@ struct SpaceMapSection: View {
                     let fill = blockFill(
                         node: tr.node,
                         rank: index,
-                        count: rects.count,
                         isHovered: hoveredTreemapIndex == index
                     )
 
@@ -281,9 +284,9 @@ struct SpaceMapSection: View {
         return rects.firstIndex { $0.rect.contains(p) }
     }
 
-    /// 块填充(两形态同一套配色出口):正常块 = 色阶(rank 0 = 最大块最深),
-    /// 密封灰、「其他」浅灰;hover 一律 +0.08。文字色随深浅切换——浅块上白字
-    /// 看不清,换墨色;密封与「其他」本身就是浅面,恒用墨色。
+    /// 块填充(两形态同一套配色出口):正常块 = 分区异色(rank 按序循环 accent,
+    /// 柔和 0.60),密封灰、「其他」浅灰;hover 一律 +0.08。文字色随基色深浅——
+    /// 密封与「其他」是浅面恒用墨色,正常块基色 0.60 白字成立。
     private struct BlockFill {
         let color: Color
         let opacity: Double
@@ -293,20 +296,17 @@ struct SpaceMapSection: View {
     private func blockFill(
         node: SpaceMapNode,
         rank: Int,
-        count: Int,
         isHovered: Bool
     ) -> BlockFill {
-        let base: BlockFill
-        if node.isSealed {
-            base = BlockFill(color: Surface.inkTertiary, opacity: 0.5, textColor: .primary)
+        let base = if node.isSealed {
+            BlockFill(color: Surface.inkTertiary, opacity: 0.5, textColor: .primary)
         } else if node.isAggregate {
-            base = BlockFill(color: Surface.cardHigh, opacity: 0.75, textColor: .primary)
+            BlockFill(color: Surface.cardHigh, opacity: 0.75, textColor: .primary)
         } else {
-            let opacity = rampOpacity(rank: rank, count: count)
-            base = BlockFill(
-                color: accent,
-                opacity: opacity,
-                textColor: opacity >= 0.55 ? .white : .primary
+            BlockFill(
+                color: sectionColors[rank % sectionColors.count],
+                opacity: sectionBaseOpacity,
+                textColor: sectionBaseOpacity >= 0.5 ? .white : .primary
             )
         }
         guard isHovered else { return base }
@@ -315,13 +315,6 @@ struct SpaceMapSection: View {
             opacity: min(base.opacity + hoverBoost, 0.95),
             textColor: base.textColor
         )
-    }
-
-    /// 色阶不透明度:rank 0(最大块)最深 0.85,均分到最浅 0.30。
-    private func rampOpacity(rank: Int, count: Int) -> Double {
-        guard count > 1 else { return (rampHighest + rampLowest) / 2 }
-        let t = Double(rank) / Double(count - 1)
-        return rampHighest - t * (rampHighest - rampLowest)
     }
 
     /// 轻桥(p4-uninstaller/05):悬停命中白名单块时,「这块能清」浮在该块右上角。
@@ -350,7 +343,8 @@ struct SpaceMapSection: View {
 
     // MARK: 旭日形态(Canvas 单次 draw call;命中 = atan2 角度 + sqrt 半径)
 
-    /// 两环半径比与原型 B / v1 一致:中心圈 0–0.34、内环 0.36–0.68、外环 0.68–0.99。
+    /// 环形几何(space-map-forms/03 加宽):中心圈 0–0.26、内环 0.28–0.65、
+    /// 外环 0.65–0.99(01 版中心圈 34% 太大、环带偏窄)。
     private func sunburstArea(
         root: SpaceMapNode,
         tree: SpaceMapNode,
@@ -383,8 +377,8 @@ struct SpaceMapSection: View {
 
                 for item in colored {
                     let arc = item.arc
-                    let inner = arc.ring == 1 ? radius * 0.36 : radius * 0.68
-                    let outer = arc.ring == 1 ? radius * 0.68 : radius * 0.99
+                    let inner = arc.ring == 1 ? radius * 0.28 : radius * 0.65
+                    let outer = arc.ring == 1 ? radius * 0.65 : radius * 0.99
                     // 角向留缝让相邻弧可见分离;窄弧按比例缩缝,不把弧吞没(v1 同款)。
                     let pad = min(0.012, arc.span / 4)
                     var path = Path()
@@ -414,7 +408,7 @@ struct SpaceMapSection: View {
                     let arc = item.arc
                     guard !arc.node.isSealed, !arc.node.isAggregate,
                           resolve(arc.node.path) != nil else { continue }
-                    let dotRadius = arc.ring == 1 ? radius * 0.415 : radius * 0.94
+                    let dotRadius = arc.ring == 1 ? radius * 0.33 : radius * 0.94
                     guard dotRadius * CGFloat(arc.span) > 10 else { continue }
                     let dotCenter = polar(center, dotRadius, arc.midAngle)
                     let dot = CGRect(x: dotCenter.x - 2.5, y: dotCenter.y - 2.5, width: 5, height: 5)
@@ -429,7 +423,7 @@ struct SpaceMapSection: View {
                 for item in colored {
                     let arc = item.arc
                     guard arc.isLabelReadable, !arc.node.isSealed, !arc.node.isAggregate else { continue }
-                    let midRadius = arc.ring == 1 ? radius * 0.52 : radius * 0.835
+                    let midRadius = arc.ring == 1 ? radius * 0.47 : radius * 0.83
                     let point = polar(center, midRadius, arc.midAngle)
                     let label = arcLabel(arc.node, maxWidth: midRadius * CGFloat(arc.span) * 0.9)
                     guard !label.isEmpty else { continue }
@@ -439,7 +433,7 @@ struct SpaceMapSection: View {
                         layer.rotate(by: .radians(rotation))
                         layer.draw(
                             Text(label).font(.system(size: 10.5, weight: .semibold))
-                                .foregroundColor(item.opacity >= 0.55 ? Color.white : Color.primary),
+                                .foregroundColor(item.opacity >= 0.5 ? Color.white : Color.primary),
                             at: .zero,
                             anchor: .center
                         )
@@ -471,12 +465,13 @@ struct SpaceMapSection: View {
             sunburstBridgeButton(arcs: arcs, resolve: resolve, in: geo.size)
             noticeOverlay
         }
-        // 弹性区:与方块形态同一条版面纪律(矮窗口不挤爆页头)。
-        .frame(minHeight: chartMinHeight, maxHeight: .infinity)
+        // 旭日专用下限({layout.sunburst-diameter} 400):滚动容器里弹性区会塌到
+        // 最小高,共用 220 会把圆压小(space-map-forms/03 用户实报「旭日那么小」)。
+        .frame(minHeight: sunburstDiameter, maxHeight: .infinity)
     }
 
-    /// 同色系着色(space-map-forms/02):内环按占比取色阶(大弧深、小弧浅),
-    /// 外环 = 父色 −0.15;密封灰、「其他」浅灰(布局按父-子顺序产出)。
+    /// 分区异色着色(space-map-forms/03):内环每支一色(按序循环 accent,柔和
+    /// 0.60),外环 = 父色 −0.13;密封灰、「其他」浅灰(布局按父-子顺序产出)。
     private struct ColoredArc {
         let arc: SunburstArc
         let color: Color
@@ -484,10 +479,9 @@ struct SpaceMapSection: View {
     }
 
     private func coloredArcs(_ arcs: [SunburstArc]) -> [ColoredArc] {
-        let ring1Count = arcs.filter { $0.ring == 1 }.count
         var result: [ColoredArc] = []
         var ring1Rank = 0
-        var parentOpacity = rampHighest
+        var parentColor = sectionColors[0]
         for arc in arcs {
             if arc.node.isSealed {
                 result.append(ColoredArc(arc: arc, color: Surface.inkTertiary, opacity: 0.5))
@@ -498,14 +492,14 @@ struct SpaceMapSection: View {
                 continue
             }
             if arc.ring == 1 {
-                parentOpacity = rampOpacity(rank: ring1Rank, count: ring1Count)
+                parentColor = sectionColors[ring1Rank % sectionColors.count]
                 ring1Rank += 1
-                result.append(ColoredArc(arc: arc, color: accent, opacity: parentOpacity))
+                result.append(ColoredArc(arc: arc, color: parentColor, opacity: sectionBaseOpacity))
             } else {
                 result.append(ColoredArc(
                     arc: arc,
-                    color: accent,
-                    opacity: max(parentOpacity - rampOuterStep, 0.2)
+                    color: parentColor,
+                    opacity: max(sectionBaseOpacity - sectionChildStep, 0.2)
                 ))
             }
         }
@@ -523,7 +517,7 @@ struct SpaceMapSection: View {
         hovered: SunburstArc?,
         isTopLevel: Bool
     ) {
-        let r = radius * 0.34
+        let r = radius * 0.26
         context.fill(
             Path(ellipseIn: CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)),
             with: .color(Surface.cardHigh)
@@ -606,7 +600,7 @@ struct SpaceMapSection: View {
         let dy = point.y - center.y
         let distance = sqrt(dx * dx + dy * dy)
         // 中心圆区域 → 无弧(中心有自己的交互:返回上级);图外 → 无弧。
-        guard distance > radius * 0.34, distance <= radius * 0.995 else { return nil }
+        guard distance > radius * 0.26, distance <= radius * 0.995 else { return nil }
         // atan2 的 0 = 正右(3 点钟),布局的 0 = 正上;统一到布局角再归到 [0, 2π)。
         var angle = atan2(dy, dx)
         if angle < 0 {
@@ -616,7 +610,7 @@ struct SpaceMapSection: View {
         if layoutAngle >= 2 * .pi {
             layoutAngle -= 2 * .pi
         }
-        let ring = distance <= radius * 0.68 ? 1 : 2
+        let ring = distance <= radius * 0.65 ? 1 : 2
         for arc in arcs where arc.ring == ring {
             // 跨 0 弧(start > end)两头都覆盖。
             if arc.start <= arc.end {
@@ -647,7 +641,7 @@ struct SpaceMapSection: View {
         let center = sunburstCenter(in: size)
         let dx = point.x - center.x
         let dy = point.y - center.y
-        if sqrt(dx * dx + dy * dy) <= radius * 0.34 {
+        if sqrt(dx * dx + dy * dy) <= radius * 0.26 {
             goUp(in: tree)
         }
     }
