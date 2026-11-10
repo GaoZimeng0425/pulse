@@ -224,11 +224,14 @@ public enum SpaceMapTree {
     }
 
     /// 单节点变换:零字节非部分裁剪、密封折叠、递归、逐层排序。
+    /// 只认目录节点(地图目录粒度设计;retainedFilePrefixes 带进树的文件节点
+    /// 在这里显式让路——它们是记账输入,不是地图块,p6-cleaner/02)。
     private static func mapChild(
         _ node: SpaceNode,
         dataPrefix: String?,
         sealedPaths: [String]
     ) -> SpaceMapNode? {
+        guard node.kind == .directory else { return nil }
         if node.accountedBytes <= 0, !node.isPartial {
             return nil
         }

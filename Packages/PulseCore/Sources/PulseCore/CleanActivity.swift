@@ -34,12 +34,26 @@ public enum CleanActivityDerivation {
         "esbuild", "tsc", "webpack", "vite", "turbo",
     ]
     static let gitExecutables: Set<String> = ["git", "gh"]
+    /// AI 服务进程(可执行名,p6-cleaner/02 第四路):在场即 AI 组整组在用。
+    /// p_comm 不在三元组里,可执行路径基名是等价信号(proc_pidpath);受限时
+    /// argv[0] 基名兜底。子命令不区分(serve / run / pull 都在动模型库,都该保护)。
+    public static let aiServiceExecutables: Set<String> = ["ollama"]
 
+    /// - Parameters:
+    ///   - home: 用户家目录。AI 服务标记(第四路)需要它做锚——服务进程的
+    ///     cwd/argv 里通常没有任何用户路径(launchd 直起,cwd = /),路径前缀
+    ///     匹配表达不了「AI 组在用」;标记挂在 home 上,消费按组判定
+    ///     (见 `CleanInUse.reasons(for:entries:)`)。对前缀判定它是惰性条目:
+    ///     祖先方向本就不匹配,不会误伤其他组。nil = 不判第四路(卸载器等
+    ///     既有调用方行为不变)。
     /// - Returns: 去重合并后的活动条目(同路径多进程的原因取并集)。
     /// 只发两类:①已分类进程(终端 / 构建 / git)的 cwd;②argv 里指向用户域
     /// (/Users 下)的绝对路径引用。未分类进程的 cwd 不发——守护进程的家目录
     /// cwd 不该保护整个家目录下的项目。
-    public static func entries(from samples: [CleanActivitySample]) -> [CleanActivityEntry] {
+    public static func entries(
+        from samples: [CleanActivitySample],
+        home: String? = nil
+    ) -> [CleanActivityEntry] {
         var byPath: [String: CleanActivityReason] = [:]
 
         func add(_ path: String, _ reason: CleanActivityReason) {
@@ -66,10 +80,26 @@ public enum CleanActivityDerivation {
                 guard token.hasPrefix("/Users/"), token.count > "/Users".count else { continue }
                 add(token, .referenced)
             }
+            // 第四路(p6-cleaner/02):AI 服务进程在场 → home 锚上的组作用域标记。
+            if let home, isAIServiceProcess(sample) {
+                add(normalizedAbsolute(home) ?? home, .aiService)
+            }
         }
         return byPath
             .map { CleanActivityEntry(path: $0.key, reasons: $0.value) }
             .sorted { $0.path < $1.path }
+    }
+
+    /// 可执行路径基名命中,或(路径受限时)argv[0] 基名命中。
+    static func isAIServiceProcess(_ sample: CleanActivitySample) -> Bool {
+        if let base = sample.executablePath.map({ ($0 as NSString).lastPathComponent }),
+           aiServiceExecutables.contains(base) {
+            return true
+        }
+        if let first = sample.argv.first.map({ ($0 as NSString).lastPathComponent }) {
+            return aiServiceExecutables.contains(first)
+        }
+        return false
     }
 
     private static func normalizedAbsolute(_ path: String?) -> String? {
@@ -103,6 +133,23 @@ public enum CleanInUse {
             if target == base || target.hasPrefix(base + "/") {
                 merged.formUnion(entry.reasons)
             }
+        }
+        return merged.isEmpty ? nil : merged
+    }
+
+    /// 组感知判定(p6-cleaner/02 起清单侧走这里;MCP 侧沿用上面的路径版,
+    /// AI 候选恒「先检查」永不进 MCP,两版口径不漂移):路径前缀判定之上,
+    /// AI 组额外吃 `.aiService` 标记(条目挂在 home 锚上,路径不参与匹配——
+    /// ollama 服务进程的 cwd/argv 里没有任何用户路径,前缀匹配表达不了)。
+    /// - Returns: 命中的原因并集;无活动覆盖返回 nil(不在用)。
+    public static func reasons(
+        for candidate: JunkCandidate,
+        entries: [CleanActivityEntry]
+    ) -> CleanActivityReason? {
+        var merged = reasons(protectingPath: protectionPath(for: candidate), entries: entries) ?? []
+        if candidate.group == .aiModels,
+           entries.contains(where: { $0.reasons.contains(.aiService) }) {
+            merged.insert(.aiService)
         }
         return merged.isEmpty ? nil : merged
     }
