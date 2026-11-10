@@ -913,4 +913,86 @@ final class CleanerModelTests: XCTestCase {
         let emptyCalls = await spy.emptyCalls
         XCTAssertEqual(emptyCalls, 0, "取消零删除")
     }
+
+    // MARK: AI 模型域(p6-cleaner/02)——Ollama 内容寻址记账 + 服务进程在用第四路
+
+    /// 两模型共享一层:模型层端到端(扫描带文件保留前缀 → 匹配 → manifest 重算)
+    /// 数字 = 私有层之和 + 共享层一次 + 清单文件;ollama 服务在跑 → AI 候选灰行、
+    /// 计划剔除(删前重查语义与项目在用同一条管线)。
+    func testOllamaCandidateManifestAccountedAndServiceInUse() async {
+        let store = home + "/.ollama/models"
+        var listings = CleanFixture.homeListings(home: home, directories: [
+            ".ollama/models/blobs": 0,
+            ".ollama/models/manifests/registry.ollama.ai/library/llama3": 0,
+            ".ollama/models/manifests/registry.ollama.ai/library/mistral": 0,
+        ])
+        listings[store + "/blobs"] = .entries([
+            CleanFixture.file("sha256-a1", allocated: 1000, reclaimable: 1000),
+            CleanFixture.file("sha256-b1", allocated: 2000, reclaimable: 2000),
+            CleanFixture.file("sha256-shared", allocated: 4000, reclaimable: 4000),
+            CleanFixture.file("sha256-orphan", allocated: 999, reclaimable: 999),
+        ])
+        listings[store + "/manifests/registry.ollama.ai/library/llama3"] = .entries([
+            CleanFixture.file("latest", allocated: 100, reclaimable: 100),
+        ])
+        listings[store + "/manifests/registry.ollama.ai/library/mistral"] = .entries([
+            CleanFixture.file("latest", allocated: 100, reclaimable: 100),
+        ])
+        let manifests = [
+            store + "/manifests/registry.ollama.ai/library/llama3/latest":
+                #"{"config":{"digest":"sha256:a1"},"layers":[{"digest":"sha256:shared"},{"digest":"sha256:a1"}]}"#,
+            store + "/manifests/registry.ollama.ai/library/mistral/latest":
+                #"{"config":{"digest":"sha256:b1"},"layers":[{"digest":"sha256:shared"}]}"#,
+        ]
+        let activity = FakeCleanActivitySource(entries: [])
+        let model = CleanerModel(
+            activity: activity,
+            homeDirectory: home,
+            aiManifestReader: { manifests[$0] }
+        )
+        model.startScan(using: FakeCleanDirectoryEnumerator(listings: listings), roots: [home])
+        await waitUntil { !model.isScanning }
+
+        guard let ollama = model.candidates.first(where: { $0.ruleID == "ai.ollama" }) else {
+            XCTFail("ai.ollama 候选应在场")
+            return
+        }
+        XCTAssertEqual(ollama.bytes, 7200, "共享层只计一次,无主 blob 不计入")
+        XCTAssertEqual(ollama.tier, .checkFirst)
+        XCTAssertNil(ollama.accountingNote)
+        XCTAssertNil(model.inUseReasons(for: ollama), "服务不在场 = 不在用")
+
+        // 服务在跑(launchd 直起,cwd=/、argv 无用户路径):AI 候选灰行 + 计划剔除。
+        activity.entries = [CleanActivityEntry(path: home, reasons: [.aiService])]
+        XCTAssertEqual(model.inUseReasons(for: ollama), [.aiService])
+        model.toggle(ollama)
+        XCTAssertTrue(model.plan.isEmpty, "在用的 AI 候选绝不进删除计划")
+        XCTAssertEqual(
+            model.candidates.first { $0.ruleID == "ai.ollama" }?.bytes,
+            7200,
+            "清单仍展示(灰显),判定不缓存不重扫"
+        )
+    }
+
+    /// manifest 损坏 → 整目录口径兜底,候选带标注(行副标如实说)。
+    func testOllamaCorruptManifestFallsBackWithNote() async {
+        let store = home + "/.ollama/models"
+        var listings = CleanFixture.homeListings(home: home, directories: [
+            ".ollama/models/manifests/registry.ollama.ai/library/llama3": 0,
+        ])
+        listings[store + "/manifests/registry.ollama.ai/library/llama3"] = .entries([
+            CleanFixture.file("latest", allocated: 100, reclaimable: 100),
+            CleanFixture.file("blob-elsewhere", allocated: 5000, reclaimable: 5000),
+        ])
+        let model = CleanerModel(
+            homeDirectory: home,
+            aiManifestReader: { _ in #"{"broken"# }
+        )
+        model.startScan(using: FakeCleanDirectoryEnumerator(listings: listings), roots: [home])
+        await waitUntil { !model.isScanning }
+
+        let ollama = model.candidates.first { $0.ruleID == "ai.ollama" }
+        XCTAssertEqual(ollama?.bytes, 5100, "兜底 = 整目录字节")
+        XCTAssertEqual(ollama?.accountingNote, OllamaStoreAccounting.fallbackNote)
+    }
 }

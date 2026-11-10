@@ -162,6 +162,8 @@ final class CleanerModel {
     ///   - markerExists: 项目产物标记探测(cleaner-hardening/02;生产查盘,测试注入假集合)。
     ///   - installedAppInventory: 已装 bundle id 全集采集(p5-cleaner/02;默认 Live——
     ///     装配点漏传即功能静默死亡的病(票 11 scanCache 实案)不再给机会)。
+    ///   - aiManifestReader: 读一个 Ollama manifest 文件的 UTF-8 内容
+    ///     (p6-cleaner/02 内容寻址记账;生产 FileManager,测试注入字典)。
     init(
         exclusions: CleanExclusionsStore = CleanExclusionsStore(load: { [] }, persist: { _ in }),
         scanRoots: CleanScanRootsStore = CleanScanRootsStore(load: { [] }, persist: { _ in }),
@@ -177,6 +179,9 @@ final class CleanerModel {
         },
         trashInventory: @escaping @Sendable () async -> TrashInventory = {
             await LiveCleanTrashExecutor().inventory()
+        },
+        aiManifestReader: @escaping (String) -> String? = { path in
+            try? String(contentsOfFile: path, encoding: .utf8)
         }
     ) {
         self.exclusions = exclusions
@@ -189,11 +194,14 @@ final class CleanerModel {
         self.installedAppInventory = installedAppInventory
         self.homeDirectory = PathNormalization.normalize(homeDirectory)
         self.markerExists = markerExists
+        self.aiManifestReader = aiManifestReader
         trashInventorySource = trashInventory
     }
 
     @ObservationIgnored private let markerExists: (String) -> Bool
     @ObservationIgnored private let trashInventorySource: @Sendable () async -> TrashInventory
+    /// Ollama manifest 读取器(p6-cleaner/02 内容寻址记账的 IO 接缝,注入以便测试)。
+    @ObservationIgnored private let aiManifestReader: (String) -> String?
 
     /// 点「清空废纸篓」:先清点(数字进确认弹窗);空废纸篓给短提示不弹窗。
     func beginEmptyTrash() {
@@ -391,6 +399,9 @@ final class CleanerModel {
             roots: scanRoots,
             excludedPathPrefixes: exclusions.paths,
             retainFileNodes: false,
+            // p6-cleaner/02:Ollama 模型库定向保留文件节点(内容寻址记账要逐文件
+            // 字节;前缀出处单一 = OllamaStoreAccounting.retainedFilePrefixes)。
+            retainedFilePrefixes: OllamaStoreAccounting.retainedFilePrefixes(home: homeDirectory),
             // petal 式并行(性能票):真机 Data 卷 ≈500 万项,6 个长驻 worker
             // 吃共享目录栈;测试注入假枚举器时保持默认串行(请求序断言依赖确定性)。
             maxConcurrency: Self.productionScanConcurrency,
@@ -510,10 +521,17 @@ final class CleanerModel {
 
     private func computeCandidates(in result: SpaceScanResult, key: CandidatesKey) -> [JunkCandidate] {
         let excluded = key.excluded
-        let global = JunkMatcher.candidates(
+        // Ollama 内容寻址重算(p6-cleaner/02):manifest 只决定「哪些文件计入」,
+        // 字节仍取扫描树节点——实际占用口径不变;清单不可用 → 整目录兜底 + 标注。
+        // 纯值在 PulseCore,这里只是接线(reader 注入)。旧缓存(无文件节点)自动走兜底。
+        let global = OllamaStoreAccounting.applied(
+            to: JunkMatcher.candidates(
+                in: result.trees,
+                home: homeDirectory,
+                excludedPathPrefixes: excluded
+            ),
             in: result.trees,
-            home: homeDirectory,
-            excludedPathPrefixes: excluded
+            readManifest: aiManifestReader
         )
         let artifacts = ProjectArtifactMatcher.artifacts(
             in: result.trees,
@@ -598,14 +616,12 @@ final class CleanerModel {
     }
 
     /// 带现成活动条目的重载(同一次渲染里逐行复用,判定仍然来自当次现查)。
+    /// 组感知版(p6-cleaner/02):AI 组额外吃第四路 .aiService 标记。
     func inUseReasons(
         for candidate: JunkCandidate,
         entries: [CleanActivityEntry]
     ) -> CleanActivityReason? {
-        CleanInUse.reasons(
-            protectingPath: CleanInUse.protectionPath(for: candidate),
-            entries: entries
-        )
+        CleanInUse.reasons(for: candidate, entries: entries)
     }
 
     var excludedPathPrefixes: [String] {
@@ -647,7 +663,7 @@ final class CleanerModel {
         }
         let entries = activity.activeEntries()
         let usable = candidates.filter {
-            CleanInUse.reasons(protectingPath: CleanInUse.protectionPath(for: $0), entries: entries) == nil
+            CleanInUse.reasons(for: $0, entries: entries) == nil
         }
         return CleanPlan.make(selection: selection, candidates: usable, excludedPathPrefixes: exclusions.paths)
     }

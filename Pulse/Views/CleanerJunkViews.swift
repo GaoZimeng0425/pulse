@@ -716,6 +716,9 @@ private struct JunkRow: View {
         if candidate.isPartial {
             parts.append("部分扫描")
         }
+        if let accountingNote = candidate.accountingNote {
+            parts.append(accountingNote)
+        }
         if candidate.projectName != nil {
             parts.append(ageText(now: Date().timeIntervalSince1970))
         }

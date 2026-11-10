@@ -525,9 +525,58 @@ public enum JunkRuleTable {
         ),
     ]
 
-    /// 全量规则 = 开发工具 + 知识库目录规则 + 固定路径条目。孤儿域收窄
+    /// AI 模型四存储位(p6-cleaner/02,spec 定案 11;全「先检查」——删的是重新
+    /// 下载代价大的模型本体,不是可重建缓存)。存储位 = 各工具官方默认路径常识
+    /// (非 purge-app 移植);Ollama 目录布局另有官方 docs + 本仓探针
+    /// docs/probes/13 实测背书。Ollama 的「真实可回收」按内容寻址清单重算,
+    /// 见 `OllamaStoreAccounting`(本表只担保「这块属于 AI 模型域」)。
+    static let aiModelRules: [JunkRule] = [
+        JunkRule(
+            id: OllamaStoreAccounting.ruleID,
+            group: .aiModels,
+            title: "Ollama 模型",
+            patterns: [JunkPathPattern(homeRelative: ".ollama/models")],
+            tier: .checkFirst,
+            rationale: "Ollama 下载的全部模型(内容寻址存储,两个模型共享的层只计一次)。删除后要用得重新 pull,大模型一次几个 GB;Ollama 服务在跑时整组列在用保护。",
+            source: "Pulse 自定(存储位 = Ollama 官方默认路径 + docs/probes/13 实测布局)",
+            symbolName: "brain"
+        ),
+        JunkRule(
+            id: "ai.lmstudio",
+            group: .aiModels,
+            title: "LM Studio 模型",
+            patterns: [JunkPathPattern(homeRelative: ".lmstudio/models")],
+            tier: .checkFirst,
+            rationale: "LM Studio 下载的模型文件。删除后需要重新下载;正在下载或加载模型时清理会打断它。",
+            source: "Pulse 自定(存储位 = LM Studio 官方默认路径常识)",
+            symbolName: "shippingbox"
+        ),
+        JunkRule(
+            id: "ai.huggingface",
+            group: .aiModels,
+            title: "HuggingFace 缓存",
+            patterns: [JunkPathPattern(homeRelative: ".cache/huggingface")],
+            tier: .checkFirst,
+            rationale: "HuggingFace 命令行工具(pipelines / transformers 脚本)下载的模型缓存。删除后重新下载;相关脚本首次运行会明显变慢。",
+            source: "Pulse 自定(存储位 = HuggingFace hub 官方默认缓存路径常识)",
+            symbolName: "shippingbox"
+        ),
+        JunkRule(
+            id: "ai.gpt4all",
+            group: .aiModels,
+            title: "GPT4All 数据",
+            patterns: [JunkPathPattern(homeRelative: "Library/Application Support/GPT4All")],
+            tier: .checkFirst,
+            rationale: "GPT4All 的常用数据位。注意:除模型外还可能带着聊天记录与设置,确认不再需要再清。",
+            source: "Pulse 自定(存储位 = GPT4All 常用位常识,票面拍板路径)",
+            symbolName: "shippingbox"
+        ),
+    ]
+
+    /// 全量规则 = 开发工具 + 知识库目录规则 + 固定路径条目 + AI 模型。孤儿域收窄
     /// (`OrphanLeftovers.excludingOverlaps`)吃的就是这些候选,新规则自动生效。
-    public static let builtin: [JunkRule] = globalToolCacheRules + AppCacheCatalog.rules + appCacheFixedRules
+    public static let builtin: [JunkRule] =
+        globalToolCacheRules + AppCacheCatalog.rules + appCacheFixedRules + aiModelRules
 
     /// 轻桥判定(p4-uninstaller/05):路径命中内置白名单 → 对应组;不命中 → nil。
     /// 与可清理清单**同源**(同一个规则表、同一套 JunkPathPattern 语义),
@@ -579,6 +628,9 @@ public struct JunkCandidate: Sendable, Identifiable, Equatable {
     /// 扫描时刻目录自身 mtime(p5-cleaner/03 删前复核快照,= 节点 `ownModifiedEpoch`)。
     /// nil = 扫描没拿到(旧版缓存 / 文件系统没给)→ 删除时按「缺少扫描快照」跳过。
     public let modifiedAtScan: Double?
+    /// 计入口径标注(p6-cleaner/02):Ollama 内容寻址在清单不可用时按整目录兜底,
+    /// 行副标如实说明(nil = 无标注;沿用「部分扫描」附标惯例,不造新行形态)。
+    public let accountingNote: String?
 
     public init(
         ruleID: String,
@@ -594,7 +646,8 @@ public struct JunkCandidate: Sendable, Identifiable, Equatable {
         symbolName: String,
         projectName: String? = nil,
         newestChangeEpoch: Double? = nil,
-        modifiedAtScan: Double? = nil
+        modifiedAtScan: Double? = nil,
+        accountingNote: String? = nil
     ) {
         self.ruleID = ruleID
         self.group = group
@@ -610,6 +663,7 @@ public struct JunkCandidate: Sendable, Identifiable, Equatable {
         self.projectName = projectName
         self.newestChangeEpoch = newestChangeEpoch
         self.modifiedAtScan = modifiedAtScan
+        self.accountingNote = accountingNote
     }
 
     init(rule: JunkRule, node: SpaceNode, pattern: JunkPathPattern) {

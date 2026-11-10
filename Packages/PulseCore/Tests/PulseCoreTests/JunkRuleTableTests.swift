@@ -78,6 +78,11 @@ final class JunkRuleTableTests: XCTestCase {
         "appcache.doubaoIme": ("Library/Caches/com.bytedance.inputmethod.doubaoime", 200),
         "appcache.zcodeUpdater": ("Library/Caches/@zcodedesktop-updater", 560),
         "appcache.logs": ("Library/Logs", 100),
+        // p6-cleaner/02:AI 模型四存储位(全「先检查」)
+        "ai.ollama": (".ollama/models", 1100),
+        "ai.lmstudio": (".lmstudio/models", 900),
+        "ai.huggingface": (".cache/huggingface", 2700),
+        "ai.gpt4all": ("Library/Application Support/GPT4All", 400),
     ]
 
     /// 似是而非:名字像、位置像,但不是规则担保的那个目录。一个都不许出现。
@@ -96,6 +101,11 @@ final class JunkRuleTableTests: XCTestCase {
         "Library/Caches/arc",
         "Library/Caches/MyGo Music",
         "Library/Caches/Citro Labs",
+        // p6-cleaner/02:AI 存储位的似是而非(变体 / 邻居目录)
+        ".ollama/models-old",
+        ".lmstudio/models-archive",
+        "Library/Application Support/GPT4All-backup",
+        ".ollama/keys",
     ]
 
     private func scanHome(
@@ -230,8 +240,12 @@ final class JunkRuleTableTests: XCTestCase {
             ["开发工具", "浏览器", "应用缓存", "项目产物", "AI 模型", "卸载残留"]
         )
         XCTAssertEqual(JunkGroup.allCases.filter(\.groupsByOwner), [.projectArtifacts, .uninstallLeftovers])
-        // AI 模型组规则在 02 票落地——01 阶段该组必须无规则(空组不出段)。
-        XCTAssertTrue(JunkRuleTable.builtin.filter { $0.group == .aiModels }.isEmpty)
+        // p6-cleaner/02:AI 组四条存储位规则落地,恒「先检查」,组不按所有者聚卡。
+        let aiRules = JunkRuleTable.builtin.filter { $0.group == .aiModels }
+        XCTAssertEqual(Set(aiRules.map(\.id)), ["ai.ollama", "ai.lmstudio", "ai.huggingface", "ai.gpt4all"])
+        XCTAssertTrue(aiRules.allSatisfy { $0.tier == .checkFirst }, "AI 模型组恒「先检查」(重下载代价大)")
+        XCTAssertTrue(aiRules.allSatisfy { !$0.rationale.isEmpty }, "每条规则 rationale 非空")
+        XCTAssertTrue(aiRules.allSatisfy { $0.source.contains("Pulse 自定") }, "AI 规则来源 = Pulse 自定(存储位常识,非移植)")
     }
 
     // MARK: 空目录 / 部分扫描 / 口径

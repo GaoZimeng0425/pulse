@@ -23,6 +23,11 @@ public struct SpaceScanOptions: Sendable, Equatable {
     /// 可清理清单(规则只认目录)与空间地图(目录粒度)都不需要文件节点;默认 true
     /// 保持 02 票的树形状不变,按需关。
     public var retainFileNodes: Bool
+    /// retainFileNodes = false 时的定向例外:落在这批前缀下的文件仍然生成节点
+    /// (p6-cleaner/02:Ollama 内容寻址记账需要 blob / manifest 的逐文件字节,
+    /// 前缀由 `OllamaStoreAccounting.retainedFilePrefixes` 单一出处)。树形状对
+    /// 目录消费者不变;空间地图显式跳过文件节点(目录粒度设计)。
+    public var retainedFilePrefixes: [String]
     /// 规范根(方案 A 路径域修正):与 roots 一一对应;第 i 个非 nil 时,该根的
     /// **树路径**以它为前缀(如 "/" ),而**枚举仍走 roots[i] 物理路径**(如
     /// /System/Volumes/Data)。树上的路径因此与用户可见路径(/Users/…)同域,
@@ -39,6 +44,7 @@ public struct SpaceScanOptions: Sendable, Equatable {
         excludedPathPrefixes: [String] = [],
         maxDepth: Int = 256,
         retainFileNodes: Bool = true,
+        retainedFilePrefixes: [String] = [],
         maxConcurrency: Int = 1,
         canonicalRoots: [String?]? = nil
     ) {
@@ -46,6 +52,8 @@ public struct SpaceScanOptions: Sendable, Equatable {
         self.excludedPathPrefixes = excludedPathPrefixes
         self.maxDepth = maxDepth
         self.retainFileNodes = retainFileNodes
+        // 前缀归一(去尾斜杠):与 childDisplay 的规范域前缀比较,尾斜杠会让全部比较失配。
+        self.retainedFilePrefixes = retainedFilePrefixes.map { SpaceScanEngine.norm($0) }
         self.maxConcurrency = maxConcurrency
         self.canonicalRoots = canonicalRoots ?? [String?](repeating: nil, count: roots.count)
     }
@@ -483,8 +491,12 @@ private final class ScanCore: @unchecked Sendable {
                 if let modified = entry.modifiedEpoch {
                     node.newestChangeEpoch = max(node.newestChangeEpoch ?? modified, modified)
                 }
-                // 文件节点可选不进树(内存量级,见 SpaceScanOptions.retainFileNodes)。
-                if options.retainFileNodes {
+                // 文件节点可选不进树(内存量级,见 SpaceScanOptions.retainFileNodes);
+                // retainedFilePrefixes 是定向例外(见字段注释)。
+                let retainNode = options.retainFileNodes
+                    || (!options.retainedFilePrefixes.isEmpty
+                        && options.retainedFilePrefixes.contains { childDisplay.hasPrefix($0) })
+                if retainNode {
                     node.children.append(SpaceNode(
                         name: entry.name,
                         path: childDisplay,
