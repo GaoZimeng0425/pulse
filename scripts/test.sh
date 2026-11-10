@@ -79,21 +79,36 @@ log="$root/build/test.log"
 
 echo "🧪 xcodebuild test ${only_flag:-(全部)} — 完整日志: $log"
 
-# 输出整体重定向到日志而不是 tee:POSIX sh 拿不到管道里 xcodebuild 的退出码,
-# 而退出码正是要交付的证据。摘要与失败详情在结尾从日志中提取。
 # SPM 包克隆共享缓存:worktree 的 xcodebuild 是全新克隆,pinned revision 在代理网络下
 # 拉不动(2026-10-28 两个 worktree 连续复现,主仓 build/SourcePackages 已暖从不失败);
 # 全部 xcodebuild 指向同一缓存后,worktree 零网络解析。PULSE_SPM_CACHE 可覆盖。
 pkg_cache="${PULSE_SPM_CACHE:-$HOME/Library/Caches/pulse-swiftpm}"
-xcodebuild test \
-  -project Pulse.xcodeproj \
-  -scheme Pulse \
-  -destination 'platform=macOS' \
-  -derivedDataPath build \
+
+run_hosted() {
+  xcodebuild test \
+    -project Pulse.xcodeproj \
+    -scheme Pulse \
+    -destination 'platform=macOS' \
+    -derivedDataPath build \
  \
-  -clonedSourcePackagesDirPath "$pkg_cache"  $only_flag \
-  > "$log" 2>&1
+    -clonedSourcePackagesDirPath "$pkg_cache"  $only_flag \
+    > "$log" 2>&1
+}
+
+# 输出整体重定向到日志而不是 tee:POSIX sh 拿不到管道里 xcodebuild 的退出码,
+# 而退出码正是要交付的证据。摘要与失败详情在结尾从日志中提取。
+run_hosted
 status=$?
+
+# 宿主测试间歇挂起缓解(2026-11-10 取证定档):"hung before establishing
+# connection" = 测试宿主卡死在内核签名准入阶段,与代码无关、重试即新进程
+# 新评估,极大概率绿。**只对这一个特征重试一次**;有真实失败用例的运行绝
+# 不重试(防把真 bug 洗绿)。两次皆挂再走 /tmp 退路(AGENTS.md 记档的唯一回退)。
+if [ "$status" != 0 ] && grep -q "hung before establishing connection" "$log"; then
+  echo "⚠️  宿主测试挂起(环境级 flake,非代码问题)——原地重试一次"
+  run_hosted
+  status=$?
+fi
 
 echo "── 摘要 ──────────────────────────────"
 # Swift Testing 输出 "Test 'x()' passed on ...",XCTest 输出
@@ -113,6 +128,11 @@ if [ "$status" != 0 ]; then
   echo ""
   echo "   完整日志: $log"
   echo "   重跑单个: sh scripts/test.sh --only <TestClass>"
+  if grep -q "hung before establishing connection" "$log"; then
+    echo ""
+    echo "   ↩ 两次皆挂起(环境级 flake)。/tmp 退路(先提交代码!):"
+    echo "     git worktree add --detach /tmp/pulse-<slug> <branch> && cd /tmp/pulse-<slug> && sh scripts/check.sh"
+  fi
   exit $status
 fi
 # 零用例守卫:xcodebuild 对无匹配的 -only-testing 静默跑 0 个测试且返回 0
