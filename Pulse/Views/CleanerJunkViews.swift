@@ -86,11 +86,16 @@ struct CleanerCheckBox: View {
 }
 
 /// 清单子页(换掉 03 票的占位卡):未扫描给 CTA,扫描中给提示,完成给清单卡。
+/// `groupFilter` = 总览下钻品类(p6-cleaner/03,nil = 全量)。
 struct JunkListSection: View {
     let model: CleanerModel
     /// 轻桥落点(p4-uninstaller/05):地图「这块能清」切过来时待定位的组;
     /// 透传给清单卡(JunkListCard):滚动到组头并短暂高亮,消费后自清。
     var pendingGroup: Binding<JunkGroup?> = .constant(nil)
+    /// 总览下钻品类(p6-cleaner/03):非 nil = 只显示该品类 + 顶部「‹ 总览」返回行。
+    var groupFilter: Binding<JunkGroup?> = .constant(nil)
+    /// 返回行回调(下钻态才有):回总览并清过滤——切换由壳层做(它持有 subTab)。
+    var onBackToOverview: (() -> Void)?
 
     var body: some View {
         // flex:1 链路(section 层):壳层传下的 .infinity 在这接力,
@@ -127,7 +132,12 @@ struct JunkListSection: View {
             )
             .cardShell(compact: false)
         case .finished:
-            JunkListCard(model: model, pendingGroup: pendingGroup)
+            JunkListCard(
+                model: model,
+                pendingGroup: pendingGroup,
+                groupFilter: groupFilter,
+                onBackToOverview: onBackToOverview
+            )
         }
     }
 }
@@ -138,6 +148,10 @@ private struct JunkListCard: View {
     let model: CleanerModel
     /// 轻桥落点(p4-uninstaller/05):待定位组;滚动+高亮后自清(同组再跳也能再闪)。
     var pendingGroup: Binding<JunkGroup?> = .constant(nil)
+    /// 总览下钻品类(p6-cleaner/03):非 nil = 只显示该品类 + 「‹ 总览」返回行。
+    var groupFilter: Binding<JunkGroup?> = .constant(nil)
+    /// 返回行回调(下钻态才有)。
+    var onBackToOverview: (() -> Void)?
     @State private var flashGroup: JunkGroup?
     /// 收起的项目产物子组(2026-11-06 二次拍板:项目卡可点击展开/收起;默认全展开)。
     @State private var collapsedProjects: Set<String> = []
@@ -151,16 +165,31 @@ private struct JunkListCard: View {
         model.candidates
     }
 
+    /// 展示用的清单:下钻态只留该品类(过滤纯值单出处,顺序不重排);全量态 = 原清单。
+    private var displayedCandidates: [JunkCandidate] {
+        JunkOverviewAggregator.filtered(candidates, by: groupFilter.wrappedValue)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            header
+            if groupFilter.wrappedValue == nil {
+                header
+            }
             reportCard
-            if candidates.isEmpty {
-                CardEmptyState(
-                    title: "白名单没有识别出可回收项",
-                    detail: "只显示担保过的目录(ADR-0008);这台机器的开发工具与应用缓存已经干净"
-                )
-                Spacer(minLength: 0)
+            if displayedCandidates.isEmpty {
+                if let filter = groupFilter.wrappedValue {
+                    drillBackRow(group: filter, items: [], safeItems: [])
+                    Text("该品类在当前清单里没有条目——可能已排除、已移入废纸篓,或重新扫描后不再命中。")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                    Spacer(minLength: 0)
+                } else {
+                    CardEmptyState(
+                        title: "白名单没有识别出可回收项",
+                        detail: "只显示担保过的目录(ADR-0008);这台机器的开发工具与应用缓存已经干净"
+                    )
+                    Spacer(minLength: 0)
+                }
             } else {
                 groups
                 actionBar
@@ -193,7 +222,7 @@ private struct JunkListCard: View {
     private var header: some View {
         // 四子页卡头统一清理页强调色(2026-11-09);08 的「卡头中性」拍板 superseded
         // ——当年变中性是为了躲磁盘金(「全页黄」源头),强调色已是 Teal,不再撞色。
-        CardHeader(symbolName: "trash", title: "可清理", tint: Surface.cleanAccent) {
+        CardHeader(symbolName: "trash", title: "全部清单", tint: Surface.cleanAccent) {
             Text(summaryText)
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
@@ -239,95 +268,159 @@ private struct JunkListCard: View {
 
     /// 滚动体(拆分自 groups:单表达式过深触发 type-check 超时,2026-11-04 实锤)。
     private var groupsBody: some View {
-        let byGroup = Dictionary(grouping: candidates, by: \.group)
+        let filter = groupFilter.wrappedValue
+        let byGroup = Dictionary(grouping: displayedCandidates, by: \.group)
         // 活动条目每次渲染现查一次(判定永不缓存),行级原因复用同一份。
         let activity = model.currentActivityEntries()
         // 2026-11-06 改版:每个条目一张小卡(卡间距 4);组与组之间 18 拉开;
         // 项目产物 = 纯缩进层级(去三角箭头/去收起,拍板「不要三角展开组件」)。
         return LazyVStack(alignment: .leading, spacing: 18) {
-            ForEach(JunkGroup.allCases.filter { byGroup[$0] != nil }, id: \.self) { group in
-                let items = (byGroup[group] ?? []).sortedForDisplay(by: sortMode(for: group))
-                // 组选只吃组内「可安全清理」且**非在用**的项(拍板 B + 在用保护):
-                // 先检查项、在用项都不参与组选,组里没有可勾项就不给按钮。
+            if let filter {
+                // 下钻态(p6-cleaner/03):「‹ 总览」返回行(组头的标题/合计/全选安全项
+                // 并入返回行,原型同款,不重复组头)+ 该品类条目;排序沿用该组既有偏好。
+                let items = (byGroup[filter] ?? []).sortedForDisplay(by: sortMode(for: filter))
                 let safeItems = items
                     .filter { $0.tier == .safe && model.inUseReasons(for: $0, entries: activity) == nil }
                 VStack(alignment: .leading, spacing: 4) {
-                    groupHeader(group, items: items, safeItems: safeItems)
-                        .id(group)
-                        .background(
-                            // 轻桥定位高亮(p4-uninstaller/05):跳转落地闪一下,1.5s 自灭。
-                            flashGroup == group ? accent.opacity(0.12) : Color.clear
-                        )
-                    if group.groupsByOwner {
-                        // 按所有者分子组(同 projectName 聚合;项目产物 = 项目,卸载残留 =
-                        // app 全 bundle id):一张大卡装头排 + 缩进的裸行子项(2026-11-06
-                        // 三次拍板;p5-cleaner/02 复用到卸载残留)。
-                        ForEach(ProjectJunkGrouping.group(items)) { projectGroup in
-                            // 项目级勾选两层口径(2026-11-06 用户连续拍板):
-                            // 状态 = 反映全部非在用子项(手勾的「先检查」也算数,父级
-                            // 如实显示半选/全选);动作 = 只全选/全清**安全档**子项
-                            // ——没有安全项可勾(纯先检查/纯在用)时 checkbox 置灰
-                            // 不给假按钮。
-                            let nonInUse = projectGroup.items
-                                .filter { model.inUseReasons(for: $0, entries: activity) == nil }
-                            let autoSelectable = nonInUse.filter { $0.tier == .safe }
-                            let allInUse = !projectGroup.items.isEmpty && nonInUse.isEmpty
-                            // 收起态按「组/键」记:项目名与 bundle id 同名也不串。
-                            let cardKey = group.rawValue + "/" + projectGroup.projectName
-                            let isCollapsed = collapsedProjects.contains(cardKey)
-                            projectCard(
-                                projectGroup,
-                                group: group,
-                                stateItems: nonInUse,
-                                autoSelectable: autoSelectable,
-                                allInUse: allInUse,
-                                isCollapsed: isCollapsed,
-                                onToggleCollapse: {
-                                    if collapsedProjects.contains(cardKey) {
-                                        collapsedProjects.remove(cardKey)
-                                    } else {
-                                        collapsedProjects.insert(cardKey)
-                                    }
-                                }
-                            ) {
-                                ForEach(projectGroup.items) { candidate in
-                                    JunkRow(
-                                        candidate: candidate,
-                                        leader: candidates.map(\.bytes).max() ?? 0,
-                                        accent: accent,
-                                        isSelected: model.isSelected(candidate),
-                                        inUseReasons: model.inUseReasons(for: candidate, entries: activity),
-                                        disabled: isBusy,
-                                        onToggle: { model.toggle(candidate) },
-                                        onExclude: { model.exclude(candidate.path) },
-                                        indented: true
-                                    )
-                                }
-                            }
-                        }
-                    } else {
-                        ForEach(items) { candidate in
-                            JunkRow(
-                                candidate: candidate,
-                                leader: candidates.map(\.bytes).max() ?? 0,
-                                accent: accent,
-                                isSelected: model.isSelected(candidate),
-                                inUseReasons: model.inUseReasons(for: candidate, entries: activity),
-                                disabled: isBusy,
-                                onToggle: { model.toggle(candidate) },
-                                onExclude: { model.exclude(candidate.path) }
+                    drillBackRow(group: filter, items: items, safeItems: safeItems)
+                    groupRows(for: filter, items: items, activity: activity)
+                }
+            } else {
+                ForEach(JunkGroup.allCases.filter { byGroup[$0] != nil }, id: \.self) { group in
+                    let items = (byGroup[group] ?? []).sortedForDisplay(by: sortMode(for: group))
+                    // 组选只吃组内「可安全清理」且**非在用**的项(拍板 B + 在用保护):
+                    // 先检查项、在用项都不参与组选,组里没有可勾项就不给按钮。
+                    let safeItems = items
+                        .filter { $0.tier == .safe && model.inUseReasons(for: $0, entries: activity) == nil }
+                    VStack(alignment: .leading, spacing: 4) {
+                        groupHeader(group, items: items, safeItems: safeItems)
+                            .id(group)
+                            .background(
+                                // 轻桥定位高亮(p4-uninstaller/05):跳转落地闪一下,1.5s 自灭。
+                                flashGroup == group ? accent.opacity(0.12) : Color.clear
                             )
+                        groupRows(for: group, items: items, activity: activity)
+                    }
+                }
+                if byGroup[.projectArtifacts] == nil {
+                    scanRootsHint
+                }
+                if let reason = model.orphanDetectionUnavailableReason {
+                    orphanUnavailableHint(reason)
+                }
+            }
+        }
+    }
+
+    /// 一组的条目区(全量组段与下钻单组共用,行形态零新):按所有者聚合的组走项目大卡,
+    /// 其余走独立小卡行。meter 归一口径恒为**全量**榜首(下钻视图里条的长短与全量视图一致)。
+    @ViewBuilder private func groupRows(
+        for group: JunkGroup,
+        items: [JunkCandidate],
+        activity: [CleanActivityEntry]
+    ) -> some View {
+        if group.groupsByOwner {
+            // 按所有者分子组(同 projectName 聚合;项目产物 = 项目,卸载残留 =
+            // app 全 bundle id):一张大卡装头排 + 缩进的裸行子项(2026-11-06
+            // 三次拍板;p5-cleaner/02 复用到卸载残留)。
+            ForEach(ProjectJunkGrouping.group(items)) { projectGroup in
+                // 项目级勾选两层口径(2026-11-06 用户连续拍板):
+                // 状态 = 反映全部非在用子项(手勾的「先检查」也算数,父级
+                // 如实显示半选/全选);动作 = 只全选/全清**安全档**子项
+                // ——没有安全项可勾(纯先检查/纯在用)时 checkbox 置灰
+                // 不给假按钮。
+                let nonInUse = projectGroup.items
+                    .filter { model.inUseReasons(for: $0, entries: activity) == nil }
+                let autoSelectable = nonInUse.filter { $0.tier == .safe }
+                let allInUse = !projectGroup.items.isEmpty && nonInUse.isEmpty
+                // 收起态按「组/键」记:项目名与 bundle id 同名也不串。
+                let cardKey = group.rawValue + "/" + projectGroup.projectName
+                let isCollapsed = collapsedProjects.contains(cardKey)
+                projectCard(
+                    projectGroup,
+                    group: group,
+                    stateItems: nonInUse,
+                    autoSelectable: autoSelectable,
+                    allInUse: allInUse,
+                    isCollapsed: isCollapsed,
+                    onToggleCollapse: {
+                        if collapsedProjects.contains(cardKey) {
+                            collapsedProjects.remove(cardKey)
+                        } else {
+                            collapsedProjects.insert(cardKey)
                         }
+                    }
+                ) {
+                    ForEach(projectGroup.items) { candidate in
+                        JunkRow(
+                            candidate: candidate,
+                            leader: candidates.map(\.bytes).max() ?? 0,
+                            accent: accent,
+                            isSelected: model.isSelected(candidate),
+                            inUseReasons: model.inUseReasons(for: candidate, entries: activity),
+                            disabled: isBusy,
+                            onToggle: { model.toggle(candidate) },
+                            onExclude: { model.exclude(candidate.path) },
+                            indented: true
+                        )
                     }
                 }
             }
-            if byGroup[.projectArtifacts] == nil {
-                scanRootsHint
-            }
-            if let reason = model.orphanDetectionUnavailableReason {
-                orphanUnavailableHint(reason)
+        } else {
+            ForEach(items) { candidate in
+                JunkRow(
+                    candidate: candidate,
+                    leader: candidates.map(\.bytes).max() ?? 0,
+                    accent: accent,
+                    isSelected: model.isSelected(candidate),
+                    inUseReasons: model.inUseReasons(for: candidate, entries: activity),
+                    disabled: isBusy,
+                    onToggle: { model.toggle(candidate) },
+                    onExclude: { model.exclude(candidate.path) }
+                )
             }
         }
+    }
+
+    /// 下钻返回行(p6-cleaner/03,丙案 v2 原型 backrow):「‹ 总览」+ 品类标题 +
+    /// 「X · N 项」合计 + 「全选安全项」(与组头同口径:只吃 safe 非在用)。
+    /// 排序 seg 不进返回行(原型同款;全量视图里该组仍可调,偏好两组共用)。
+    private func drillBackRow(
+        group: JunkGroup,
+        items: [JunkCandidate],
+        safeItems: [JunkCandidate]
+    ) -> some View {
+        let total = items.reduce(Int64(0)) { $0 + $1.bytes }
+        return HStack(spacing: 10) {
+            Button {
+                onBackToOverview?()
+            } label: {
+                Text("‹ 总览")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(accent)
+            }
+            .buttonStyle(.borderless)
+            .help("回到总览(勾选保持,清单过滤解除)")
+            Text(group.title)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(.primary)
+            Text("\(PulseFormat.memory(UInt64(max(0, total)))) · \(items.count) 项")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+            Spacer(minLength: 12)
+            if !safeItems.isEmpty {
+                Button("全选安全项") {
+                    model.toggleGroup(safeItems)
+                }
+                .font(.system(size: 12, weight: .semibold))
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .disabled(isBusy)
+                .help("只勾「可安全清理」且不在用的项;「先检查」与在用保护项永远要你亲手勾")
+            }
+        }
+        .padding(.horizontal, CleanerListMetrics.rowInset)
     }
 
     /// 项目产物组的空态(05):没配扫描根时给一条去设置的引导,不硬造空组。

@@ -226,6 +226,8 @@ final class CleanerModel {
             await MainActor.run {
                 guard let self else { return }
                 self.trashPhase = .finished(summary)
+                // 总览废纸篓卡还挂着旧读数,清空后原地刷新(p6-cleaner/03)。
+                self.refreshOverviewTrash()
                 LogService.info(
                     "清空废纸篓:释放 \(PulseFormat.memory(UInt64(max(0, summary.totalFreedBytes)))) · 清空 \(summary.totalItems) 项 · 跳过 \(summary.totalSkipped) 项",
                     category: "Cleaner"
@@ -241,6 +243,30 @@ final class CleanerModel {
             return
         }
         trashNotice = nil
+    }
+
+    // MARK: 总览读数(p6-cleaner/03)
+
+    /// 总览页的废纸篓读数(Hero 图例「另有废纸篓 X」+ 废纸篓卡)。nil = 尚未清点
+    /// (进总览页 .task 现取;点「清空废纸篓…」走 `beginEmptyTrash` 自己的清点,不受它影响)。
+    private(set) var overviewTrash: TrashInventory?
+
+    /// 主动清点一次废纸篓,只为总览显示(现状只在点按钮时清点的补充路径)。
+    /// fire-and-forget:每次进总览页取一次,后写覆盖;清点本身只遍历废纸篓顶层,代价小。
+    func refreshOverviewTrash() {
+        Task.detached(priority: .utility) { [weak self, trashInventorySource] in
+            let inventory = await trashInventorySource()
+            await MainActor.run { self?.overviewTrash = inventory }
+        }
+    }
+
+    /// 总览聚合(Hero / 模块大卡数据面,纯值):在用判定每次现查活动源(永不缓存),
+    /// 与清单行 / 删除计划同一 `CleanInUse` 口径。
+    var junkOverview: JunkOverview {
+        JunkOverviewAggregator.overview(
+            candidates: candidates,
+            activityEntries: currentActivityEntries()
+        )
     }
 
     /// 生产扫描并发:6 个 worker(元数据密集型遍历,留核给 UI;引擎侧再按活动核数封顶)。
@@ -666,6 +692,21 @@ final class CleanerModel {
         for candidate in matched {
             selection.set(candidate, selected: true)
         }
+    }
+
+    /// 总览 Hero「一键清理 X 安全项…」(p6-cleaner/03,spec 定案 6):勾选**替换**为
+    /// 全部「可安全清理」且非在用的候选(纯值单出处 `safeAutoSelection`;「先检查」与
+    /// 在用项绝不在内),随即走既有 `requestClean` → 确认单——确认单里逐行可见、可取消,
+    /// 安全边界零变化。默认勾选仍全不勾:一键是显式按钮,不改默认态。
+    /// 落地页切清单(由视图做,同原型:选完跳「全部清单」直接弹确认单)。
+    func selectAllSafeAndRequestClean() {
+        let matched = JunkOverviewAggregator.safeAutoSelection(
+            candidates: candidates,
+            activityEntries: currentActivityEntries()
+        )
+        guard !matched.isEmpty else { return }
+        applyExternalSelection(matched)
+        requestClean()
     }
 
     // MARK: 清理流程(04)

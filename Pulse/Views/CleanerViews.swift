@@ -4,14 +4,17 @@ import SwiftUI
 // MARK: - 清理页(p4-cleaner/03 扫描闭环 + 04 删除管线 + p4-uninstaller/01 四子药丸壳)
 
 //
-// 子页内容:可清理清单(旧名「开发者垃圾」,2026-11-08 用户拍板改名——装着卸载残留后名不副实)= JunkListSection(04,CleanerJunkViews.swift)、空间地图 =
-// 03 的扫描状态卡 + 结果摘要卡(旭日图 07 票接入 `mapSection`)、清理历史 =
-// CleanHistorySection(04 列表 + 明细;「清空废纸篓」按钮 08 票)、应用 =
-// AppListSection(p4-uninstaller/01,清单只读;残留 / 卸载动作 02/03 票)。空态
-// 一律走 CardEmptyState(DESIGN.md 卡片家族,不手写空态)。
+// 子页内容:总览 = CleanerOverviewSection(p6-cleaner/03,Hero + 模块大卡 + 废纸篓卡)、
+// 全部清单(旧名「可清理」,更旧名「开发者垃圾」;2026-11-08 / p6-cleaner/03 两次改名,
+// 内部标识 `CleanerSubTab.junk` 不动)= JunkListSection(04,CleanerJunkViews.swift)、
+// 空间地图 = 03 的扫描状态卡 + 结果摘要卡(旭日图 07 票接入 `mapSection`)、清理历史 =
+// CleanHistorySection(04 列表 + 明细)、应用 = AppListSection(p4-uninstaller/01,清单只读;
+// 残留 / 卸载动作 02/03 票)。空态一律走 CardEmptyState(DESIGN.md 卡片家族,不手写空态)。
 
 enum CleanerSubTab: String, CaseIterable, Hashable {
-    // 顺序 = 2026-11-04 拍板 Q13:三个动手门在前、档案门殿后。
+    // 顺序 = 2026-11-04 拍板 Q13(三个动手门在前、档案门殿后)+ p6-cleaner/03 总览居首
+    // (丙案 v2:进清理页先看"能省多少",清单 / 地图 / 应用是动手门,历史殿后)。
+    case overview
     case junk
     case map
     case apps
@@ -19,7 +22,8 @@ enum CleanerSubTab: String, CaseIterable, Hashable {
 
     var title: String {
         switch self {
-        case .junk: "可清理"
+        case .overview: "总览"
+        case .junk: "全部清单"
         case .map: "空间地图"
         case .apps: "应用"
         case .history: "清理历史"
@@ -36,20 +40,9 @@ struct CleanerPageHeader: View {
 
     var body: some View {
         PageHeader(title: MetricTab.cleaner.title, subtitle: subtitle, style: .full) {
-            // 页头动作按钮 B 档 .large(2026-11-05 清理页密度拍板)。
+            // 页头动作按钮 B 档 .large(2026-11-05 清理页密度拍板)。「清空废纸篓」
+            // 已随 p6-cleaner/03 迁到总览废纸篓卡(页头按钮撤除,入口随读数走)。
             HStack(spacing: 8) {
-                Button {
-                    model.beginEmptyTrash()
-                } label: {
-                    if model.trashPhase == .running || model.trashPhase == .inventorying {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Text("清空废纸篓")
-                    }
-                }
-                .controlSize(.large)
-                .disabled(model.trashPhase != .idle)
-                .help("清空所有卷的废纸篓(永久删除,不可恢复)——腾出它占着的空间")
                 if model.isScanning {
                     Button("取消扫描") { model.cancelScan() }
                         .buttonStyle(.borderedProminent)
@@ -116,13 +109,17 @@ struct CleanerTabView: View {
     /// 应用卸载器模型(p4-uninstaller/01):无常驻采集,由 AppListSection 的
     /// task/onDisappear 驱动装载与取消;壳层只负责传递。
     let uninstallModel: UninstallModel
-    @State private var subTab: CleanerSubTab = .junk
+    /// 默认落在总览(丙案 v2:先看"能省多少"再动手)。
+    @State private var subTab: CleanerSubTab = .overview
     /// 空间地图的导航态放在壳层(07):切子药丸再回来不丢下钻位置。
     @State private var mapDrillPath: String?
     @State private var mapTreeIndex = 0
     /// 轻桥(p4-uninstaller/05):地图「这块能清」→ 切垃圾子页并定位的组;
     /// JunkListSection 消费后自清。切走再回来地图下钻位置不丢(壳层既有态)。
     @State private var pendingJunkGroup: JunkGroup?
+    /// 总览下钻(p6-cleaner/03):点模块大卡 → 全部清单按品类过滤(nil = 全量)。
+    /// 勾选存模型层,过滤切换天然不丢;返回 / 药丸直切清空(见 pillSelection)。
+    @State private var junkFilter: JunkGroup?
 
     private var accent: Color {
         Surface.cleanAccent
@@ -139,9 +136,33 @@ struct CleanerTabView: View {
             }
             subPillBar
             switch subTab {
+            case .overview:
+                CleanerOverviewSection(model: model) { group in
+                    // 下钻:切清单 + 过滤;轻桥定位不需要(过滤视图只此一组)。
+                    pendingJunkGroup = nil
+                    junkFilter = group
+                    subTab = .junk
+                } onOneClickClean: {
+                    // 一键清理(原型行为):选完跳「全部清单」——确认单挂在那张卡上,
+                    // 同一事务切页后 sheet 随 cleanPhase=.confirming 弹出。
+                    pendingJunkGroup = nil
+                    junkFilter = nil
+                    subTab = .junk
+                    model.selectAllSafeAndRequestClean()
+                }
+                // 同 map:空态/扫描卡贴顶,不悬中。
+                .frame(maxHeight: .infinity, alignment: .top)
             case .junk:
-                JunkListSection(model: model, pendingGroup: $pendingJunkGroup)
-                    .frame(maxHeight: .infinity)
+                JunkListSection(
+                    model: model,
+                    pendingGroup: $pendingJunkGroup,
+                    groupFilter: $junkFilter,
+                    onBackToOverview: {
+                        junkFilter = nil
+                        subTab = .overview
+                    }
+                )
+                .frame(maxHeight: .infinity)
             case .map:
                 mapSection
                     // 2026-11-08 实报:flex 层不带对齐,空态/扫描卡(抱内容)悬中——补 .top。
@@ -326,9 +347,26 @@ struct CleanerTabView: View {
     private var subPillBar: some View {
         // 舒适密度档(2026-11-05 拍板):清理页子页条用 comfortable,高≈34;
         // 主窗口工具栏/历史页维持 regular 不受影响。
-        PillTabBar(CleanerSubTab.allCases, selection: $subTab, isGlassContainer: true, size: .comfortable) { tab in
+        PillTabBar(
+            CleanerSubTab.allCases,
+            selection: pillSelection,
+            isGlassContainer: true,
+            size: .comfortable
+        ) { tab in
             PillTabItem(title: tab.title, symbol: nil, tint: accent)
         }
+    }
+
+    /// 药丸交互专用 selection(p6-cleaner/03):用户点药丸 = 无下钻态——清品类过滤
+    /// (下钻态里点「全部清单」看到的必须是全量;程序化切页不经过这里,过滤得以保留)。
+    private var pillSelection: Binding<CleanerSubTab> {
+        Binding(
+            get: { subTab },
+            set: { newValue in
+                subTab = newValue
+                junkFilter = nil
+            }
+        )
     }
 
     // MARK: 子页
@@ -354,6 +392,7 @@ struct CleanerTabView: View {
                     treeIndex: $mapTreeIndex,
                     onGoToJunk: { group in
                         subTab = .junk
+                        junkFilter = nil // 地图轻桥定位 = 全量清单里的组,不是总览下钻态。
                         pendingJunkGroup = group
                     }
                 )

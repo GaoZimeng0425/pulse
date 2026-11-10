@@ -660,8 +660,8 @@ struct SpaceMapSection: View {
         .padding(.vertical, 2)
         .background(Surface.cardHigh.opacity(0.9), in: .capsule)
         .help(group == .uninstallLeftovers
-            ? "这块是卸载残留:命名它的 app 已不在已装应用清单(与清理清单同源);地图本身只读——点击去可清理定位对应组"
-            : "能删的判定来自清理白名单(与清理清单同源);地图本身只读——点击去可清理定位对应组")
+            ? "这块是卸载残留:命名它的 app 已不在已装应用清单(与清理清单同源);地图本身只读——点击去全部清单定位对应组"
+            : "能删的判定来自清理白名单(与清理清单同源);地图本身只读——点击去全部清单定位对应组")
     }
 
     // MARK: 面包屑与多根选择(与形态无关)

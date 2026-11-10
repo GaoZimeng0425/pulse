@@ -27,11 +27,19 @@ colors:
   category-system: "#8e8e93 / #98989d"
   category-background-service: = {accent-network}
   category-orphan: "#ff9500 / #ff9f0a"
+  junk-dev: = {accent-cpu}
+  junk-browser: = {accent-gpu}
+  junk-app: = {category-app}
+  junk-project: = {accent-memory}
+  junk-ai: = {accent-bluetooth}
+  junk-leftover: = {accent-sensors}
+  junk-trash: = {accent-disk}
 typography:
   font: "SF Pro(系统默认,不引第三方字体)"
   figure-overview: "34pt bold rounded, tabular"
   figure-main: "44pt bold rounded, tabular"
   figure-main-compact: "30pt bold rounded, tabular"
+  figure-card: "24pt bold rounded, tabular"
   figure-overview-compact: "22pt bold rounded, tabular"
   figure-ring: "19pt bold rounded, tabular"
   figure-ring-compact: "16pt bold rounded, tabular"
@@ -103,6 +111,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{colors.state-caution}` | `Surface.caution` | 清理档位「先检查」chip(p4-uninstaller/08 立项:清理页 accent 即磁盘金,warning 别名与它全页撞色,故独立琥珀橙;不用于负载/告警) |
 | `{colors.accent-clean}` | `Surface.cleanAccent` | 清理页专属强调(2026-11-06 用户拍板 Teal;此前借磁盘金被评丑、指标色是 tab 身份色不跨页借):清理页主按钮 / 排序选中段 / 勾选框选中 / 选中条目卡底 / 子页药丸统一取此 |
 | `{colors.category-*}` | `GroupCategory.identityColor` | 非 App 组的图标瓦片底色;孤儿另作组行强调色(见下) |
+| `{colors.junk-*}` | `JunkGroup.identityColor`(MetricAccent.swift) | 清理品类身份色(p6-cleaner/03,丙案 v2 原型拍板映射):dev=CPU 蓝 / browser=GPU 粉 / app=App 棕 / project=内存紫 / ai=蓝牙青 / leftover=传感器橙红 / trash=磁盘金——清理总览模块大卡图标瓦与图例的类别底色。同空间地图按序循环 `accent-*` 的先例:指标色在此作**类别身份**借用,不作页面强调(清理页强调仍只有 accent-clean) |
 | `{colors.state-negative}` | `Surface.negative` | 高负载、紧张、结束进程等负面偏差 |
 | `{colors.state-inactive}` | `Surface.inactive` | 行首状态点的"停 / 未连接"态(容器未运行、蓝牙设备未连接);亮起态取所在页指标色(p2-review/03 入表) |
 
@@ -128,6 +137,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{typography.figure-main}` | 44pt bold `.rounded` + `monospacedDigit` | 指标 tab 主卡大数字 |
 | `{typography.figure-overview}` | 34pt bold `.rounded` + `monospacedDigit` | 总览卡大数字(单位半号 48%) |
 | `{typography.figure-main-compact}` | 30pt(同族) | 弹窗主卡大数字 |
+| `{typography.figure-card}` | 24pt(同族) | 清理总览模块大卡大数字(`FigureSize.card`,p6-cleaner/03;原型 24 原值入表) |
 | `{typography.figure-overview-compact}` | 22pt(同族) | 弹窗总览卡大数字 |
 | `{typography.figure-ring}` / `-compact` | 19 / 16pt(同族) | 环心数字(全尺寸 / 弹窗) |
 | `{typography.page-title}` | 26pt bold | 主窗口页名 |
@@ -186,6 +196,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.row-meter}` | 64pt | ~~行内电量条宽(全尺寸档,蓝牙设备行)~~ **superseded**(ui-unify 追改 2026-11-09)→ `RowMetrics.meterWidth` 120 |
 | `{layout.row-host-icon}` | 14pt | 下钻进程行宿主 App 徽标图标边长(project-visibility/02;徽标文字随行 `{typography.caption}` secondary,图标-文字间距 `{spacing.inline}`) |
 | `{layout.overview-card-min-width}` | 340pt | 总览卡自适应网格的单卡最小宽(主窗口列数 1–4 由它派生:列数 = 内容宽容纳的最多列,340 + 列距 16,上限 4) |
+| `{layout.module-card-min-width}` | 340pt | 清理总览模块大卡自适应网格的单卡最小宽(p6-cleaner/03):列数 = min(2, 内容宽容纳列数)——720 最小窗 1 列、默认窗 880 起 2 列、**上限 2 列**(品类只有六卡,不随 ultrawide 拉列);列距 `{spacing.group-gap}` 12 |
 | `{layout.ranking-limit}` | 20 行 | 各排行(弹窗与主窗口同规则)只列前 20 名,超出补末行:弹窗「查看全部(另 N 项)」跳主窗口并落地即展开,主窗口「显示全部(另 N 项)」原地展开 / 「收起」(ranking-limit/01,2026-11-02 用户拍板;原 11-01 `popover-ranking-limit` 只截弹窗)。主窗口搜索命中不截 |
 | `{layout.sheet-width}` | 460pt | 确认清单 sheet 定宽(清理页「清理…」,p4-cleaner/04;原型 B 变体同值) |
 | `{layout.sheet-list-max-height}` | 220pt | 确认清单 sheet 内逐行列表的最大高(超出滚动,总量与按钮恒在视口内) |
@@ -314,10 +325,41 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   环境值 `rankingRowsInList` 拆成卡头 / 每行 / 卡尾各一行,底色按段 `cardSlice` 切开拼回整卡
   (真机触控板滚动 LazyVStack 36–43%,sample 一半在每帧重出绘制指令、四分之一在重布局)。
   卡外 8pt 间距 = 首尾段底色外各 4 透明边,不用 listRowInsets 的 bottom(macOS 上被忽略)。
-- **清理页子页命名**:首个子页(清单)标题 = **「可清理」**(2026-11-08 用户拍板,旧名
-  「开发者垃圾」——装着卸载残留后名不副实;组名「全局工具缓存/项目产物/卸载残留」不变,
-  卡头与子药丸同名,地图轻桥文案说「去可清理定位对应组」;内部标识 `CleanerSubTab.junk`
-  不动,改名只是文案层)。
+- **清理页子页命名**:五个子药丸 = **「总览 | 全部清单 | 空间地图 | 应用 | 清理历史」**
+  (p6-cleaner/03,丙案 v2;总览居首且为默认落地子页)。清单子页标题 = **「全部清单」**
+  (2026-11-08 首改名「开发者垃圾」→「可清理」;p6-cleaner/03 再改「全部清单」——总览
+  已承担"能回收多少"的第一眼,清单页名回归"它是什么:一张全量清单";组名不变;内部标识
+  `CleanerSubTab.junk` 两次都不动,改名只是文案层,先例 p4-uninstaller/08)。
+- **清理总览页**(p6-cleaner/03,丙案 v2;原型 = `prototype/cleaner-reorg` 分支的
+  `cleaner-reorg-plan-c.html`,数值以本条为准——原型非 4pt 网格值在此收编):
+  Hero 卡 + 模块大卡 2 列自适应 + 废纸篓卡,页内整页滚动。
+  - **Hero 卡**:内距 24(上下)×28(左右)(原型 26×28 收 4pt 网格)、圆角
+    `{rounded.card}`;大数字 `{typography.figure-main}` 44(原型 52 收 FigureSize 族
+    既有最大档)+ caption 12「可回收 · 其中 X 可放心清」(X 染 `{colors.state-positive}`);
+    构成条高 8 圆角 4,三段 = safe `{colors.state-positive}` / check `{colors.state-caution}` /
+    inuse `{colors.ink-tertiary}`(段宽按三段合计归一,inuse 段最小可见宽 2%、为 0 不画);
+    图例 11(色块 8×8 圆角 2.5):可安全清理 / 先检查 / 在用保护 / **「另有废纸篓 X」**
+    (色块 `{colors.junk-trash}` 磁盘金);主按钮「一键清理 X 安全项…」(accent-clean、
+    `.large` borderedProminent;X = safe 合计;一键 = 全选全部 safe 且**非在用**候选 →
+    既有确认单,默认勾选仍全不勾,「先检查」与在用项永不在内)。
+  - **模块大卡**(六品类 + 废纸篓共七张):2 列自适应(`{layout.module-card-min-width}`
+    340、列距 12、上限 2 列);卡壳走 `cardShell` 全尺寸档(内距 16——原型 18×20 收编到
+    零件档,不另立卡壳);图标瓦 42pt(`CategoryIconTile` size 42、圆角随组件公式
+    size×0.24;类别身份色 `{colors.junk-*}` + 白符号);类名 `{typography.section-title}`
+    17 bold(原型 16 收五档)+ 一句人话 11 secondary(文案蓝本 = 原型);大数字
+    `{typography.figure-card}` 24;卡内构成条高 7 圆角 3.5(同三段色,空段不画、
+    inuse>0 最小可见宽 3%);图例 11:可安全清理 X / 先检查 X(>0 才显)/ 在用 X
+    (>0 才显)/ N 项;「最大一项:名称 · 大小」行(顶部分隔线 + 上距 10,11,
+    名称 semibold primary)+ 右缘 chevron;**整卡可点 = 下钻**全部清单按品类过滤。
+    空组不出卡(该品类候选为空自然缺位,不硬造)。
+  - **废纸篓卡**(变体,非白名单候选):无构成条;读数大数字同 24 档 + 「N 项」
+    (多卷才显「所有卷汇总」);独立「清空废纸篓…」按钮(普通 bordered、B 档;复用
+    `beginEmptyTrash` → 二次确认流,p6-cleaner/03 自页头迁来,页头原按钮撤除);
+    点卡不下钻。
+  - **下钻**:全部清单顶部「‹ 总览」返回行(12 accent 文字按钮 + 品类标题 17 bold +
+    「X · N 项」12 secondary + 「全选安全项」)+ 该品类条目(行形态零新,继续
+    RowMetrics / CleanerListMetrics 与项目大卡既有形态);总览↔清单切换不丢勾选
+    (勾选在 `CleanerModel.selection`,模型层天然保持);返回 / 药丸直切 = 回总览并清过滤。
 - **清理页舒适密度档**(2026-11-05 用户拍板,原型三档裁决:行 = A 档,按钮与
   segmented = B 档,行左右内距加大;参考竞品 Purge 后全页从排行紧凑档升密度;
   **ui-unify/01 起共享值改由 `RowMetrics` 舒适档单一出处**,与排行页同档同源):
