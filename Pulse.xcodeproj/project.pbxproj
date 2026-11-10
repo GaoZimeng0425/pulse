@@ -41,6 +41,7 @@
 		2C1C4AA05A53133216CF1E3B /* ProcArgsParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A311BFB8099AF93518F47C9B /* ProcArgsParser.swift */; };
 		2CCCA9B897A9A569F82F95BB /* LiveProcessSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06A4CAD37F3D2BE0A494F9DA /* LiveProcessSource.swift */; };
 		2D0E9BE7A0401A822DC62C47 /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD3B00277D6CF515AEA81E6C /* MenuBarController.swift */; };
+		2D7E31ADF593C5701C714200 /* LiveTrashInventoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 069E93667AAB8A93E43C7A26 /* LiveTrashInventoryTests.swift */; };
 		2F016FF68304A538C3FEF849 /* LiveCleanActivitySource.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD87D6AF9EFA784A9E84C641 /* LiveCleanActivitySource.swift */; };
 		2F681644821F7D9946A73E92 /* MetricTabModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9378B86940EBE30E057F718D /* MetricTabModelTests.swift */; };
 		31A4795EB7C03BA0FE9573D2 /* AppIconCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78EC09371E86E7408FA32ADC /* AppIconCacheTests.swift */; };
@@ -224,6 +225,7 @@
 		02DA72B605936ABAB68101E8 /* AlertNotificationSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertNotificationSmokeTests.swift; sourceTree = "<group>"; };
 		040DE88C5838AA75D0409310 /* McpCleanBridgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = McpCleanBridgeTests.swift; sourceTree = "<group>"; };
 		05102129BE186A01609E2D26 /* AlertNotification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertNotification.swift; sourceTree = "<group>"; };
+		069E93667AAB8A93E43C7A26 /* LiveTrashInventoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTrashInventoryTests.swift; sourceTree = "<group>"; };
 		06A4CAD37F3D2BE0A494F9DA /* LiveProcessSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveProcessSource.swift; sourceTree = "<group>"; };
 		073B425254E4BAF7B7E3744F /* MenuBarBadgeDisplayModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarBadgeDisplayModel.swift; sourceTree = "<group>"; };
 		07518FFB4B2568CB567FFA0C /* CleanScanRootsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanScanRootsStore.swift; sourceTree = "<group>"; };
@@ -680,6 +682,7 @@
 				23CC14BC245E753EAACD6E13 /* LiveCoreTickSourceSmokeTests.swift */,
 				9F27F7F4AB085BB21BC93D75 /* LiveDiskSourceSmokeTests.swift */,
 				3A992F5F503CAD7CB90DD838 /* LiveProcessSourceSmokeTests.swift */,
+				069E93667AAB8A93E43C7A26 /* LiveTrashInventoryTests.swift */,
 				D2A5BBAE60025E3EB318E411 /* LogServiceTests.swift */,
 				040DE88C5838AA75D0409310 /* McpCleanBridgeTests.swift */,
 				5D074B7F60170564351BEE7F /* MenuBarBadgeDisplayModelTests.swift */,
@@ -853,6 +856,7 @@
 				C3D5DEE96491A119F8648790 /* LiveCoreTickSourceSmokeTests.swift in Sources */,
 				04BFB76AC65777ABAFFF1897 /* LiveDiskSourceSmokeTests.swift in Sources */,
 				E559247BAA70D0A1868BD156 /* LiveProcessSourceSmokeTests.swift in Sources */,
+				2D7E31ADF593C5701C714200 /* LiveTrashInventoryTests.swift in Sources */,
 				F9A396D8A1532DCE83296553 /* LogServiceTests.swift in Sources */,
 				3A0A9F1947FFF2EA55EF9A87 /* McpCleanBridgeTests.swift in Sources */,
 				26CA5B5B1921FF464893439C /* MenuBarBadgeDisplayModelTests.swift in Sources */,

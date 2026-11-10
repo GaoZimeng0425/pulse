@@ -819,9 +819,10 @@ final class CleanerModelTests: XCTestCase {
         await waitUntil { !box.running } // 结束回落 false
     }
 
-    private func waitUntil(_ condition: @MainActor () -> Bool) async {
+    /// 等待条件成立(异步条件可 await,如读 actor 的调用计数);同步闭包照常可传。
+    private func waitUntil(_ condition: @MainActor () async -> Bool) async {
         for _ in 0 ..< 500 {
-            if condition() {
+            if await condition() {
                 return
             }
             try? await Task.sleep(nanoseconds: 20_000_000)
@@ -912,6 +913,157 @@ final class CleanerModelTests: XCTestCase {
         }
         let emptyCalls = await spy.emptyCalls
         XCTAssertEqual(emptyCalls, 0, "取消零删除")
+    }
+
+    // MARK: 总览废纸篓读数(p6-review-fixes)——读不到 ≠ 空 / 授权门卫 / 过期读数不覆盖
+
+    /// 废纸篓清点源的可控假件:按调用序交付预设结果并计数;`holdFirst` 让第一次
+    /// 调用挂起到 `releaseFirst()`,用来排出「旧任务晚到」的时序。actor 串行化全部状态。
+    private actor TrashSourceProbe {
+        private var results: [TrashInventory?]
+        private let holdFirst: Bool
+        private var calls = 0
+        private var held: CheckedContinuation<Void, Never>?
+
+        init(results: [TrashInventory?], holdFirst: Bool = false) {
+            self.results = results
+            self.holdFirst = holdFirst
+        }
+
+        var callCount: Int {
+            calls
+        }
+
+        func next() async -> TrashInventory? {
+            calls += 1
+            let result = results.isEmpty ? nil : results.removeFirst()
+            if holdFirst, calls == 1 {
+                await withCheckedContinuation { held = $0 }
+            }
+            return result
+        }
+
+        func releaseFirst() {
+            held?.resume()
+            held = nil
+        }
+    }
+
+    private func trashInventory(items: Int, bytes: Int64) -> TrashInventory {
+        TrashInventory(volumes: [.init(name: "启动卷", items: items, bytes: bytes)])
+    }
+
+    /// 读失败 → 占位,不是 0:清点源交 nil(权限被拒 / 宗卷不可用)时总览落 `.failed`,
+    /// 读数通道为 nil(视图走「—」)——绝不能变成一份「0 项 · 0 字节」的空清点。
+    func testOverviewTrashReadFailureIsPlaceholderNotZero() async {
+        let probe = TrashSourceProbe(results: [nil])
+        let model = CleanerModel(trash: FakeCleanTrashExecutor(), trashInventory: { await probe.next() })
+        XCTAssertEqual(model.overviewTrashPhase, .notCounted, "没查就是没查,不预置读数")
+        XCTAssertNil(model.overviewTrash)
+
+        model.refreshOverviewTrash()
+        await waitUntil { model.overviewTrashPhase == .failed }
+
+        XCTAssertNil(model.overviewTrash, "读不到 = nil 穿透到占位")
+        XCTAssertNotEqual(
+            model.overviewTrashPhase,
+            .counted(TrashInventory(volumes: [])),
+            "读不到不许伪造成空清点(0 是真读数)"
+        )
+    }
+
+    /// 点「清空废纸篓」时清点读不到:如实提示,不谎报「废纸篓是空的」,不进确认单、零删除。
+    func testEmptyTrashUnreadableInventoryIsNotReportedAsEmpty() async {
+        let spy = FakeCleanTrashExecutor()
+        let model = CleanerModel(trash: spy, trashInventory: { nil })
+        model.beginEmptyTrash()
+        await waitUntil { model.trashNotice != nil }
+
+        XCTAssertEqual(model.trashPhase, .idle, "读不到不进确认单")
+        XCTAssertNotEqual(model.trashNotice, "废纸篓是空的", "读不到 ≠ 空")
+        XCTAssertTrue(model.trashNotice?.contains("读不到") == true)
+        XCTAssertEqual(model.overviewTrashPhase, .failed, "总览同步落占位")
+        let emptyCalls = await spy.emptyCalls
+        XCTAssertEqual(emptyCalls, 0, "读不到零删除")
+    }
+
+    /// 授权门卫四条路径(CODING_STANDARDS 权限纪律):默认关——进总览的自动入口不碰
+    /// 清点源;用户动作处读一次;读成功后自动入口才放行;读失败回落,不自动重试。
+    func testOverviewTrashAutoRefreshGatedBehindSuccessfulUserCount() async {
+        let first = trashInventory(items: 3, bytes: 1000)
+        let second = trashInventory(items: 5, bytes: 2000)
+        let probe = TrashSourceProbe(results: [first, second, nil])
+        let model = CleanerModel(trash: FakeCleanTrashExecutor(), trashInventory: { await probe.next() })
+
+        // 默认关:可见性切换(自动入口)零读取,态不动。
+        model.refreshOverviewTrashIfUnlocked()
+        await settle()
+        var calls = await probe.callCount
+        XCTAssertEqual(calls, 0, "没有用户动作,自动入口不许碰清点源")
+        XCTAssertEqual(model.overviewTrashPhase, .notCounted)
+
+        // 用户动作(废纸篓卡「清点」):恰好读一次。
+        model.refreshOverviewTrash()
+        await waitUntil { model.overviewTrashPhase == .counted(first) }
+        calls = await probe.callCount
+        XCTAssertEqual(calls, 1)
+
+        // 读成功过:自动入口放行;刷新在飞期间继续交付上次读数,不闪占位。
+        model.refreshOverviewTrashIfUnlocked()
+        XCTAssertEqual(model.overviewTrash, first, "刷新期间显示上次读数")
+        await waitUntil { model.overviewTrashPhase == .counted(second) }
+        calls = await probe.callCount
+        XCTAssertEqual(calls, 2)
+
+        // 读失败(第三次交 nil):落占位、门卫回落——之后的自动入口不再重试。
+        model.refreshOverviewTrashIfUnlocked()
+        await waitUntil { model.overviewTrashPhase == .failed }
+        XCTAssertNil(model.overviewTrash, "失败后上次读数作废,不挂旧数字")
+        model.refreshOverviewTrashIfUnlocked()
+        await settle()
+        calls = await probe.callCount
+        XCTAssertEqual(calls, 3, "被拒不自动重试")
+        XCTAssertEqual(model.overviewTrashPhase, .failed)
+    }
+
+    /// 点「清空废纸篓」的清点也是用户动作:读成功即放行自动入口,并顺手落总览读数。
+    func testEmptyTrashInventoryUnlocksAutoRefreshAndFeedsOverview() async {
+        let inventory = trashInventory(items: 2, bytes: 5)
+        let probe = TrashSourceProbe(results: [inventory, inventory])
+        let model = CleanerModel(trash: FakeCleanTrashExecutor(), trashInventory: { await probe.next() })
+        model.beginEmptyTrash()
+        await waitUntil { model.trashPhase == .confirming(inventory) }
+        XCTAssertEqual(model.overviewTrashPhase, .counted(inventory), "同一次清点落总览,不多读一遍")
+        var calls = await probe.callCount
+        XCTAssertEqual(calls, 1)
+
+        model.refreshOverviewTrashIfUnlocked()
+        await waitUntil { await probe.callCount == 2 }
+        calls = await probe.callCount
+        XCTAssertEqual(calls, 2, "用户动作处读成功过,自动入口放行")
+    }
+
+    /// 不重复发起、过期读数不覆盖:第一次清点还挂着时再点一次,旧任务作废——它晚到的
+    /// 结果不许盖掉新读数(原实现双入口各写各的,后到者赢)。
+    func testOverviewTrashStaleCountDoesNotOverwriteNewerOne() async {
+        let stale = trashInventory(items: 9, bytes: 9000)
+        let fresh = trashInventory(items: 1, bytes: 100)
+        let probe = TrashSourceProbe(results: [stale, fresh], holdFirst: true)
+        let model = CleanerModel(trash: FakeCleanTrashExecutor(), trashInventory: { await probe.next() })
+
+        model.refreshOverviewTrash()
+        await waitUntil { await probe.callCount == 1 } // 第一次清点已发起并挂起
+        model.refreshOverviewTrash()
+        await waitUntil { model.overviewTrashPhase == .counted(fresh) }
+
+        await probe.releaseFirst() // 旧任务此刻才读完
+        await settle()
+        XCTAssertEqual(model.overviewTrashPhase, .counted(fresh), "被取代的任务读完也不写态")
+    }
+
+    /// 给后台任务与主 actor 回跳留出落定时间(用于「什么都不该发生」的断言)。
+    private func settle() async {
+        try? await Task.sleep(nanoseconds: 200_000_000)
     }
 
     // MARK: AI 模型域(p6-cleaner/02)——Ollama 内容寻址记账 + 服务进程在用第四路

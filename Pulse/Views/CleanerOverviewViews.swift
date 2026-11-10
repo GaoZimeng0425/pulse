@@ -60,10 +60,12 @@ struct CleanerOverviewSection: View {
     }
 
     var body: some View {
-        // 进总览即取废纸篓读数(只为显示;fire-and-forget,后写覆盖)。
+        // 进总览只走自动入口:门卫放行(清点读成功过)才刷新废纸篓读数。首次读数
+        // 归废纸篓卡的显式「清点」——枚举外置卷可能弹授权,弹窗不许出现在可见性
+        // 切换上(CODING_STANDARDS 权限纪律)。
         content
             .frame(maxHeight: .infinity, alignment: .top)
-            .task { model.refreshOverviewTrash() }
+            .task { model.refreshOverviewTrashIfUnlocked() }
     }
 
     @ViewBuilder private var content: some View {
@@ -107,11 +109,7 @@ struct CleanerOverviewSection: View {
                     )
                     .cardShell(compact: false)
                     // 空清单时废纸篓卡独占一行(网格里孤卡半宽反而失衡)。
-                    OverviewTrashCard(
-                        inventory: model.overviewTrash,
-                        busy: model.trashPhase != .idle,
-                        onEmpty: { model.beginEmptyTrash() }
-                    )
+                    trashCard
                 } else {
                     OverviewHeroCard(
                         overview: overview,
@@ -125,11 +123,7 @@ struct CleanerOverviewSection: View {
                                 onDrill(row.group)
                             }
                         }
-                        OverviewTrashCard(
-                            inventory: model.overviewTrash,
-                            busy: model.trashPhase != .idle,
-                            onEmpty: { model.beginEmptyTrash() }
-                        )
+                        trashCard
                     }
                 }
                 Text("点模块卡进入对应清单(与「全部清单」子页同源,勾选跨页保持);大小按实际占用口径,构成条 = 可安全清理 / 先检查 / 在用保护。")
@@ -148,6 +142,17 @@ struct CleanerOverviewSection: View {
         }
         return false
     }
+
+    /// 废纸篓卡(空清单独占一行 / 网格末位两处同一装配)。两个动作都是用户点击,
+    /// 清点与清空前的清点都只在这里发起。
+    private var trashCard: some View {
+        OverviewTrashCard(
+            phase: model.overviewTrashPhase,
+            busy: model.trashPhase != .idle,
+            onCount: { model.refreshOverviewTrash() },
+            onEmpty: { model.beginEmptyTrash() }
+        )
+    }
 }
 
 // MARK: - Hero 卡
@@ -155,7 +160,7 @@ struct CleanerOverviewSection: View {
 /// Hero 卡(丙案 v2):可回收总量大数字 + 三段构成条 + 图例(含废纸篓)+ 一键清理主按钮。
 private struct OverviewHeroCard: View {
     let overview: JunkOverview
-    /// 废纸篓读数(nil = 尚未清点,图例如实写「—」)。
+    /// 废纸篓读数(nil = 没查 / 读不到,图例如实写「—」,不写 0)。
     let trashBytes: Int64?
     let busy: Bool
     let onOneClickClean: () -> Void
@@ -354,10 +359,13 @@ private struct OverviewModuleCard: View {
 // MARK: - 废纸篓卡(变体:读数 + 独立按钮,点卡不下钻)
 
 private struct OverviewTrashCard: View {
-    /// nil = 尚未清点(进总览页现取,通常亚秒)。
-    let inventory: TrashInventory?
+    /// 读数状态:没查 / 清点中 / 读不到 / 查到了。「读不到」绝不是空或 0——
+    /// 没查与读不到都走占位,数字只在查到了(或刷新在飞时的上次读数)出现。
+    let phase: CleanerModel.OverviewTrashPhase
     /// inventorying / running 期间禁用(与原页头按钮同口径)。
     let busy: Bool
+    /// 显式清点(用户动作——授权弹窗只许出现在这一下点击)。
+    let onCount: () -> Void
     let onEmpty: () -> Void
 
     var body: some View {
@@ -388,14 +396,27 @@ private struct OverviewTrashCard: View {
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
-            if let inventory {
-                let figure = PulseFormat.memoryFigure(UInt64(max(0, inventory.totalBytes)))
-                FigureText(value: figure.value, unit: figure.unit, size: FigureSize.card)
-            } else {
-                ProgressView()
-                    .controlSize(.small)
-                    .help("正在清点废纸篓…")
-            }
+            readingSlot
+        }
+    }
+
+    /// 读数位:有读数给 24 档大数字;没读数时按状态给转圈或显式「清点」入口
+    /// (授权型能力动作 = CardEmptyState 同款 11pt `.link`,系统授权弹窗只出现在
+    /// 这一下点击;读不到不出数字,也不出 0)。
+    @ViewBuilder private var readingSlot: some View {
+        if let reading = phase.reading {
+            let figure = PulseFormat.memoryFigure(UInt64(max(0, reading.totalBytes)))
+            FigureText(value: figure.value, unit: figure.unit, size: FigureSize.card)
+        } else if case .counting = phase {
+            ProgressView()
+                .controlSize(.small)
+                .help("正在清点废纸篓…")
+        } else {
+            Button(phase == .failed ? "重试清点" : "清点废纸篓", action: onCount)
+                .buttonStyle(.link)
+                .font(.system(size: 11))
+                .disabled(busy)
+                .help("清点各卷废纸篓的占用(外置宗卷可能弹出访问授权)")
         }
     }
 
@@ -405,15 +426,26 @@ private struct OverviewTrashCard: View {
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
                     .fill(JunkTrashIdentity.color)
                     .frame(width: 7, height: 7)
-                Text(inventory.map { "\($0.totalItems) 项" } ?? "正在清点…")
+                Text(metaText)
             }
-            if let inventory, inventory.volumes.filter({ $0.items > 0 }).count > 1 {
+            if let reading = phase.reading,
+               reading.volumes.filter({ $0.items > 0 }).count > 1 {
                 Text("所有卷汇总")
             }
         }
         .font(.system(size: 11))
         .foregroundStyle(.secondary)
         .monospacedDigit()
+    }
+
+    /// 读数副文:查到了「N 项」;没查 / 清点中 / 读不到如实说,不编数字。
+    private var metaText: String {
+        switch phase {
+        case let .counted(inventory): "\(inventory.totalItems) 项"
+        case let .counting(lastGood): lastGood.map { "\($0.totalItems) 项" } ?? "正在清点…"
+        case .failed: "读不到(权限不足或宗卷不可用)"
+        case .notCounted: "尚未清点"
+        }
     }
 
     private var actionRow: some View {
