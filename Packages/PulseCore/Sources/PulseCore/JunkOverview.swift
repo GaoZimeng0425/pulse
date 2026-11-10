@@ -161,9 +161,8 @@ public enum JunkOverviewAggregator {
         _ candidate: JunkCandidate,
         entries: [CleanActivityEntry]
     ) -> Bool {
-        CleanInUse.reasons(
-            protectingPath: CleanInUse.protectionPath(for: candidate),
-            entries: entries
-        ) != nil
+        // 组感知版(同清单灰行/删除计划):AI 组吃 home 锚 .aiService 第四路
+        // (p6-cleaner/02),他组不越组——路径版看不见第四路,会让总览分段与清单灰行打架。
+        CleanInUse.reasons(for: candidate, entries: entries) != nil
     }
 }

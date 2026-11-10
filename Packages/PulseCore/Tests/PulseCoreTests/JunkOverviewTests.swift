@@ -255,13 +255,39 @@ final class JunkOverviewTests: XCTestCase {
             "safe 档但在用的 p3 不得进入一键"
         )
         XCTAssertFalse(selectionPaths.contains("\(home)/.ollama/models"), "先检查且在用的 m1 不得进入一键")
-        // 反向:每个 safe 且非在用的项都在。
+        // 反向:每个 safe 且非在用的项都在(与实现同用组感知口径,含第四路)。
         let expected = candidates.filter { candidate in
-            candidate.tier == .safe
-                && CleanInUse
-                .reasons(protectingPath: CleanInUse.protectionPath(for: candidate), entries: entries) == nil
+            candidate.tier == .safe && CleanInUse.reasons(for: candidate, entries: entries) == nil
         }.map(\.path)
         XCTAssertEqual(selectionPaths, Set(expected))
+    }
+
+    /// 第四路真实形状(p6-cleaner/02 合入后的接缝回归):ollama 服务进程 → home 锚
+    /// `.aiService` 条目(惰性,条目路径是 home 本身)。组感知聚合必须吃进去——AI 组
+    /// 全额进 inuse 段、check 段清零;且不越组(home 锚不得误伤任何他组候选)。
+    /// 若退回路径版 reasons(protectingPath:),home 祖先方向天然不命中,此测试即红
+    /// ——总览分段会与清单灰行(p6-cleaner/02 组感知)打架。
+    func testHomeAnchorAIServiceEntryGraysAIInOverviewOnly() {
+        let candidates = fixtureCandidates()
+        let entries = [CleanActivityEntry(path: home, reasons: [.aiService])]
+
+        let overview = JunkOverviewAggregator.overview(candidates: candidates, activityEntries: entries)
+
+        // AI 组:m1 + m2 全额 inuse,三段构成只剩灰段。
+        let ai = overview.row(for: .aiModels)
+        XCTAssertEqual(ai?.inUseBytes, gb(2.0))
+        XCTAssertEqual(ai?.checkBytes, 0)
+        XCTAssertEqual(ai?.safeBytes, 0)
+
+        // 不越组:其余五组零在用(夹具里没有别的活动)。
+        for group in JunkGroup.allCases where group != .aiModels {
+            XCTAssertEqual(overview.row(for: group)?.inUseBytes, 0, "home 锚 .aiService 不得越组:\(group.title)")
+        }
+
+        // 一键:AI 恒先检查本就不入;home 锚不得把任何 safe 项挡在一键外(18 个全选)。
+        let selection = JunkOverviewAggregator.safeAutoSelection(candidates: candidates, activityEntries: entries)
+        XCTAssertEqual(selection.count, 18)
+        XCTAssertTrue(selection.allSatisfy { $0.group != .aiModels })
     }
 
     /// 无活动源 / 无活动时:safe 档全可选(p3 不再被保护),先检查仍绝不入选。
