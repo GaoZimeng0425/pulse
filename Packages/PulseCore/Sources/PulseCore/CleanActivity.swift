@@ -153,4 +153,15 @@ public enum CleanInUse {
         }
         return merged.isEmpty ? nil : merged
     }
+
+    /// 自动勾选资格 =「可安全清理」档 ∧ 非在用(p6-review-fixes 提公共:此前
+    /// 总览 safe 段 / 一键清理 / 清单组选两分支 / 项目大卡组内勾选五处各写一遍
+    /// 这条合取,改口径要改五处、漏一处就打架)。「先检查」档与在用保护项永远
+    /// 不进任何自动勾选;在用判定走上面的组感知版(与清单灰行 / 删除计划同口径)。
+    public static func isSafeAutoSelectable(
+        _ candidate: JunkCandidate,
+        entries: [CleanActivityEntry]
+    ) -> Bool {
+        candidate.tier == .safe && reasons(for: candidate, entries: entries) == nil
+    }
 }

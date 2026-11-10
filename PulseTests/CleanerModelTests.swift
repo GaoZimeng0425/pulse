@@ -915,7 +915,80 @@ final class CleanerModelTests: XCTestCase {
         XCTAssertEqual(emptyCalls, 0, "取消零删除")
     }
 
-    // MARK: 总览废纸篓读数(p6-review-fixes)——读不到 ≠ 空 / 授权门卫 / 过期读数不覆盖
+    // MARK: 总览一键清理装配(p6-review-fixes 补口)
+
+    /// Hero「一键清理 X 安全项」:默认全不勾;一键后 selection **恰好等于**
+    /// safeAutoSelection 的输出(safe ∧ 非在用——先检查与在用项永不在内,手勾的
+    /// 先检查项被替换掉 = 既有替换语义),随即进确认态、计划与勾选一致。
+    func testSelectAllSafeAndRequestCleanReplacesSelectionWithSafeAutoSelection() async throws {
+        let activity = FakeCleanActivitySource(entries: [
+            CleanActivityEntry(path: "/Users/dev/code/busy-app", reasons: [.terminal]),
+        ])
+        let model = makeProjectsModel(activity: activity)
+        let fake = FakeCleanDirectoryEnumerator(listings: CleanFixture.homeListings(
+            home: "/Users/dev",
+            directories: [
+                "Library/Developer/Xcode/DerivedData": 28_000_000, // safe
+                "Library/Caches/JetBrains": 5_400_000, // 先检查
+                "code/idle-app/node_modules": 8_000_000, // safe 项目产物
+                "code/busy-app/node_modules": 4_000_000, // safe 但项目在用
+            ]
+        ))
+        model.startScan(using: fake, roots: ["/Users/dev"])
+        await waitUntil { !model.isScanning }
+
+        // 默认全不勾:一键是显式按钮,不改默认态。
+        XCTAssertTrue(model.selection.isEmpty)
+        XCTAssertEqual(model.cleanPhase, .idle)
+
+        // 夹具自检:手动勾一个「先检查」,一键的替换语义才有东西可替换。
+        let jetbrains = try XCTUnwrap(model.candidates.first { $0.ruleID == "jetbrains.caches" })
+        model.toggle(jetbrains)
+
+        model.selectAllSafeAndRequestClean()
+
+        let expected = JunkOverviewAggregator.safeAutoSelection(
+            candidates: model.candidates,
+            activityEntries: activity.entries
+        )
+        XCTAssertEqual(
+            Set(expected.map(\.path)),
+            [
+                "/Users/dev/Library/Developer/Xcode/DerivedData",
+                "/Users/dev/code/idle-app/node_modules",
+            ],
+            "夹具应给出恰好两个 safe 且非在用项(在用 busy-app 不选)"
+        )
+        XCTAssertEqual(model.selection.paths, Set(expected.map(\.path)), "勾选 = 一键输出,替换而非并集")
+        XCTAssertEqual(model.cleanPhase, .confirming, "一键直接进既有确认单")
+        XCTAssertEqual(Set(model.plan.items.map(\.path)), Set(expected.map(\.path)), "计划与勾选一致")
+
+        // 取消后勾选保持(换页 / 反悔不丢,确认单可再起)。
+        model.cancelClean()
+        XCTAssertEqual(model.cleanPhase, .idle)
+        XCTAssertEqual(model.selection.paths, Set(expected.map(\.path)))
+    }
+
+    /// 一键没有任何可自动勾选项(夹具只有先检查档):不动用户手勾,不起确认单。
+    func testSelectAllSafeWithoutCandidatesKeepsManualSelection() async {
+        let fake = FakeCleanDirectoryEnumerator(listings: CleanFixture.homeListings(
+            home: home,
+            directories: ["Library/Caches/JetBrains": 5_400_000] // 先检查档,夹具里唯一候选
+        ))
+        let model = CleanerModel(trash: FakeCleanTrashExecutor(), homeDirectory: home)
+        model.startScan(using: fake, roots: [home])
+        await waitUntil { !model.isScanning }
+        XCTAssertTrue(model.candidates.filter { $0.tier == .safe }.isEmpty, "夹具前提:没有任何 safe 项")
+        let checkOnly = model.candidates.filter { $0.tier == .checkFirst }
+        XCTAssertEqual(checkOnly.map(\.ruleID), ["jetbrains.caches"])
+
+        model.toggle(checkOnly[0])
+        let manual = model.selection.paths
+        model.selectAllSafeAndRequestClean()
+
+        XCTAssertEqual(model.selection.paths, manual, "空匹配不清用户手勾")
+        XCTAssertEqual(model.cleanPhase, .idle, "空匹配不起确认单")
+    }
 
     /// 废纸篓清点源的可控假件:按调用序交付预设结果并计数;`holdFirst` 让第一次
     /// 调用挂起到 `releaseFirst()`,用来排出「旧任务晚到」的时序。actor 串行化全部状态。

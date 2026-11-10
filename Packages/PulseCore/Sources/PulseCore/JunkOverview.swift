@@ -106,10 +106,14 @@ public enum JunkOverviewAggregator {
             var inUseBytes: Int64 = 0
             var largest = items[0]
             for item in items {
-                if isInUse(item, entries: activityEntries) {
-                    inUseBytes += item.bytes
-                } else if item.tier == .safe {
+                // safe 段 = 自动勾选资格(单出处 `CleanInUse.isSafeAutoSelectable`,与一键/
+                // 组选同谓词——「safe 合计天然 = 一键可勾量」由同一函数保证,不再靠约定)。
+                // 谓词与在用互斥,前置不改变三段划分:safe∧非在用进绿段、其余在用(任意档)
+                // 进灰段、非在用的先检查进黄段。
+                if CleanInUse.isSafeAutoSelectable(item, entries: activityEntries) {
                     safeBytes += item.bytes
+                } else if isInUse(item, entries: activityEntries) {
+                    inUseBytes += item.bytes
                 } else {
                     checkBytes += item.bytes
                 }
@@ -144,15 +148,14 @@ public enum JunkOverviewAggregator {
     }
 
     /// 一键清理安全项(spec 定案 6):全部「可安全清理」且**非在用**的候选——
-    /// 「先检查」档与在用保护项永不在内(与组头「全选安全项」、MCP 求交同一口径,
-    /// 删除侧另有 plan 二次判定兜底)。返回保持清单顺序。
+    /// 判据单出处 `CleanInUse.isSafeAutoSelectable`(「先检查」档与在用保护项永不在内,
+    /// 与组头「全选安全项」、总览 safe 段同一谓词;删除侧另有 plan 二次判定兜底)。
+    /// 返回保持清单顺序。
     public static func safeAutoSelection(
         candidates: [JunkCandidate],
         activityEntries: [CleanActivityEntry]
     ) -> [JunkCandidate] {
-        candidates.filter { candidate in
-            candidate.tier == .safe && !isInUse(candidate, entries: activityEntries)
-        }
+        candidates.filter { CleanInUse.isSafeAutoSelectable($0, entries: activityEntries) }
     }
 
     // MARK: - 内部

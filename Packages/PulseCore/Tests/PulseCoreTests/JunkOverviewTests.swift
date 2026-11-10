@@ -298,6 +298,40 @@ final class JunkOverviewTests: XCTestCase {
         XCTAssertEqual(selection.reduce(Int64(0)) { $0 + $1.bytes }, gb(19.62)) // 19.22 + 0.4
     }
 
+    /// 谓词单出处(p6-review-fixes)「safe ∧ 非在用」四象限真值;组感知第四路照吃
+    /// (AI 组若出现 safe 档候选,home 锚 .aiService 也要挡下——与清单灰行同判,
+    /// 走谓词不等于退回路径版)。
+    func testIsSafeAutoSelectableTruthTable() throws {
+        let entries = fixtureActivity() // 保护 p3(safe 在用);m1(check 在用)
+        let candidates = fixtureCandidates()
+        let p3 = try XCTUnwrap(candidates.first { $0.projectName == "pulse" })
+        let m1 = try XCTUnwrap(candidates.first { $0.title == "Ollama · 2 个模型" })
+        let anySafe = try XCTUnwrap(candidates.first { $0.group == .globalToolCache })
+        let anyCheck = try XCTUnwrap(candidates.first { $0.tier == .checkFirst && $0.group == .appCache })
+
+        XCTAssertTrue(CleanInUse.isSafeAutoSelectable(anySafe, entries: entries), "safe ∧ 非在用")
+        XCTAssertFalse(CleanInUse.isSafeAutoSelectable(p3, entries: entries), "safe ∧ 在用:挡下")
+        XCTAssertFalse(CleanInUse.isSafeAutoSelectable(anyCheck, entries: entries), "先检查 ∧ 非在用:挡下")
+        XCTAssertFalse(CleanInUse.isSafeAutoSelectable(m1, entries: entries), "先检查 ∧ 在用:挡下")
+
+        let aiSafe = cand("\(home)/.ollama/other-models", group: .aiModels, tier: .safe, bytes: 1)
+        XCTAssertFalse(
+            CleanInUse.isSafeAutoSelectable(aiSafe, entries: [CleanActivityEntry(path: home, reasons: [.aiService])]),
+            "第四路组感知:home 锚 .aiService 也要挡下 AI 组的 safe 档"
+        )
+        XCTAssertTrue(CleanInUse.isSafeAutoSelectable(aiSafe, entries: []))
+    }
+
+    /// 「safe 合计天然 = 一键可自动勾选的量」:总览 safe 段与一键自同谓词后,这不再
+    /// 是注释里的约定而是结构性事实——两处任何一处绕开谓词各自改判,此测即红。
+    func testOverviewSafeSegmentEqualsSafeAutoSelection() {
+        let candidates = fixtureCandidates()
+        let entries = fixtureActivity()
+        let overview = JunkOverviewAggregator.overview(candidates: candidates, activityEntries: entries)
+        let selection = JunkOverviewAggregator.safeAutoSelection(candidates: candidates, activityEntries: entries)
+        XCTAssertEqual(overview.safeBytes, selection.reduce(Int64(0)) { $0 + $1.bytes })
+    }
+
     // MARK: 全部清单过滤
 
     /// 过滤纯值:nil = 全量同序;按品类 = 只留该组(顺序不变)。
