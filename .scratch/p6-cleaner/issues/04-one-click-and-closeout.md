@@ -1,6 +1,6 @@
 # p6-cleaner/04:一键清理安全项 + 故事 4 supersede 落档 + 收口
 
-Status: ready-for-agent
+Status: done(2026-11-10 合 develop @67f6a81)
 Blocked by: 03
 
 ## 范围

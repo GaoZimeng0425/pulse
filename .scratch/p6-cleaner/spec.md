@@ -1,6 +1,6 @@
 # p6-cleaner:清理深化 · 二期(扫描范围扩充 + 总览重排)
 
-Status: ready-for-agent(2026-11-09/10 三轮 HTML 原型拍板;原型存档分支 `prototype/cleaner-reorg`)
+Status: done(2026-11-10 四票全合 develop:01 @bc6c64f · 02 @39d4377 · 03 @ec7b4d5 · 04 @67f6a81;三轮 HTML 原型拍板;原型存档分支 `prototype/cleaner-reorg`)
 
 ## Problem Statement
 
