@@ -10,12 +10,14 @@ import PulseCore
 
 let server = Server(
     name: "pulse",
-    version: "0.2.0",
+    version: "0.3.0",
     instructions: """
     Pulse 菜单栏系统监视器的数据查询。数据为分钟级采样落库(非实时流),\
     每个答案都会标注数据年龄;Pulse app 未运行时仍可回答(回退最近落库)。\
     清理类工具(list_cleanable / clean)要求 Pulse app 正在运行:AI 只能碰\
-    「可安全清理」档,真正的删除由用户在 Pulse 确认单上确认后执行。
+    「可安全清理」档,真正的删除由用户在 Pulse 确认单上确认后执行。\
+    诊断类工具(why_cpu_high / why_memory_high / top_disk_io / process_info /\
+    recent_alerts / list_dev_servers)答历史与档案,不含此刻实时值。
     """,
     capabilities: .init(tools: .init())
 )
@@ -257,6 +259,62 @@ private func cleanText(paths: [String]) -> String {
     return McpCleanText.cleanResult(response)
 }
 
+// MARK: - mcp-eyes 取数与文案(文案单出处 McpEyesText,这里只接线)
+
+private func whyMemoryHighText(topN: Int, lookbackMinutes: Int) -> String {
+    withDatabase { db, now in
+        let top = try InsightQuery.topMemoryGroups(
+            limit: topN, lookbackMinutes: lookbackMinutes, now: now, in: db
+        )
+        let snapshot = try InsightQuery.latestSnapshot(now: now, in: db)
+        return McpEyesText.memoryRanking(
+            top, systemMemory: snapshot.memoryBytes, lookbackMinutes: lookbackMinutes, now: now
+        )
+    }
+}
+
+private func topDiskIoText(topN: Int, lookbackMinutes: Int) -> String {
+    withDatabase { db, now in
+        let top = try InsightQuery.topDiskGroups(
+            limit: topN, lookbackMinutes: lookbackMinutes, now: now, in: db
+        )
+        return McpEyesText.diskRanking(top, lookbackMinutes: lookbackMinutes, now: now)
+    }
+}
+
+private func processInfoText(query rawQuery: String) -> String {
+    let trimmed = rawQuery.trimmingCharacters(in: .whitespaces)
+    guard !trimmed.isEmpty else {
+        return "没给查询词——传 pid(纯数字)或可执行路径/命令行/工作目录的子串。"
+    }
+    let pid = Int(trimmed)
+    let substring = pid == nil ? trimmed : nil
+    return withDatabase { db, now in
+        let rows = try InsightQuery.lineageMatches(pid: pid, substring: substring, in: db)
+        // 活性现探(出生登记 ≠ 存活):kill 探针,EPERM = 存在但非本用户可查。
+        var alive: [Int: Bool] = [:]
+        for row in rows where row.pid > 0 {
+            let result = kill(pid_t(row.pid), 0)
+            alive[row.pid] = result == 0 || (result != 0 && errno != ESRCH)
+        }
+        return McpEyesText.processProfiles(rows, alive: alive, now: now)
+    }
+}
+
+private func recentAlertsText(hours: Int) -> String {
+    withDatabase { db, now in
+        let rows = try McpEyesQuery.recentAlerts(hours: hours, now: now, in: db)
+        return McpEyesText.alertHistory(rows, now: now)
+    }
+}
+
+private func listDevServersText() -> String {
+    withDatabase { db, now in
+        let rows = try McpEyesQuery.devServers(in: db)
+        return McpEyesText.devServers(rows, now: now)
+    }
+}
+
 // MARK: - 工具注册
 
 await server.withMethodHandler(ListTools.self) { _ in
@@ -325,6 +383,72 @@ await server.withMethodHandler(ListTools.self) { _ in
                 "required": .array([.string("paths")]),
             ])
         ),
+        Tool(
+            name: "why_memory_high",
+            description: "回答\"为什么内存紧\":最近时间窗内内存最高的应用排行(当分钟峰值口径,均值+峰值,含项目归属),附全部应用内存合计与数据年龄。",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "top_n": .object([
+                        "type": .string("integer"),
+                        "description": .string("返回组数,默认 5"),
+                    ]),
+                    "lookback_minutes": .object([
+                        "type": .string("integer"),
+                        "description": .string("回看窗口(分钟),默认 10"),
+                    ]),
+                ]),
+            ])
+        ),
+        Tool(
+            name: "top_disk_io",
+            description: "最近时间窗内磁盘读写总量最高的应用排行(读/写分开列,含项目归属);部分分钟缺磁盘账时如实标注。",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "top_n": .object([
+                        "type": .string("integer"),
+                        "description": .string("返回组数,默认 5"),
+                    ]),
+                    "lookback_minutes": .object([
+                        "type": .string("integer"),
+                        "description": .string("回看窗口(分钟),默认 10"),
+                    ]),
+                ]),
+            ])
+        ),
+        Tool(
+            name: "process_info",
+            description: "查进程档案:按 pid(纯数字)或可执行路径/命令行/工作目录的子串查,返回父进程、可执行路径、工作目录、完整命令行、首见时刻,并对每个 pid 做存活探针。档案是出生登记(Pulse 运行期间见过即留),刚启动的进程查不到。",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "query": .object([
+                        "type": .string("string"),
+                        "description": .string("pid 或子串(路径/命令行/工作目录任一命中)"),
+                    ]),
+                ]),
+                "required": .array([.string("query")]),
+            ])
+        ),
+        Tool(
+            name: "recent_alerts",
+            description: "最近 N 小时的告警历史(同主体聚合:最近触发时刻/读数/次数)。涵盖 CPU 负载、组 CPU、新组内存、磁盘可用、dev server 闲置。落盘从 Pulse 装上本版本起累积,更早的没有留档。",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "hours": .object([
+                        "type": .string("integer"),
+                        "description": .string("回看小时数,默认 24"),
+                    ]),
+                ]),
+            ])
+        ),
+        Tool(
+            name: "list_dev_servers",
+            description: "本机 dev server(本地开发常驻服务,如 vite/next dev)盘点:种类/闲置时长/监听端口/内存/最后见到时刻;久未见到的如实标\"可能已退出\"。",
+            inputSchema: .object(["type": .string("object"), "properties": .object([:])])
+        ),
     ])
 }
 
@@ -360,6 +484,25 @@ await server.withMethodHandler(CallTool.self) { params in
             break
         }
         text = cleanText(paths: paths)
+    case "why_memory_high":
+        let topN = arguments["top_n"]?.intValue ?? 5
+        let lookback = arguments["lookback_minutes"]?.intValue ?? 10
+        text = whyMemoryHighText(
+            topN: max(1, min(20, topN)), lookbackMinutes: max(1, min(1440, lookback))
+        )
+    case "top_disk_io":
+        let topN = arguments["top_n"]?.intValue ?? 5
+        let lookback = arguments["lookback_minutes"]?.intValue ?? 10
+        text = topDiskIoText(
+            topN: max(1, min(20, topN)), lookbackMinutes: max(1, min(1440, lookback))
+        )
+    case "process_info":
+        text = processInfoText(query: arguments["query"]?.stringValue ?? "")
+    case "recent_alerts":
+        let hours = arguments["hours"]?.intValue ?? 24
+        text = recentAlertsText(hours: max(1, min(24 * 30, hours)))
+    case "list_dev_servers":
+        text = listDevServersText()
     default:
         return .init(content: [.text(text: "未知工具 \(params.name)")], isError: true)
     }

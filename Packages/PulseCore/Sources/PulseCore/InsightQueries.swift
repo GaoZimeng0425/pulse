@@ -218,4 +218,238 @@ public enum InsightQuery {
             newestSystemSeconds: newestSystemSeconds
         )
     }
+
+    // MARK: - mcp-eyes 查询(mcp-eyes/01:内存/磁盘排行 + 进程档案)
+
+    /// why_memory_high 的一行:时间窗内一个组的内存画像。
+    public struct GroupMemoryInsight: Equatable, Sendable {
+        public let groupID: String
+        /// 展示名(groups 缺行时以组 ID 兜底,同 GroupCpuInsight)。
+        public let name: String
+        public let category: String
+        public let projectRoot: String?
+        /// 窗口内该组 `mem_max`(当分钟峰值)的均值(字节)。
+        public let memoryAverageBytes: Int
+        /// 窗口内 `mem_max` 的最大(字节)。
+        public let memoryPeakBytes: Int
+        /// 窗口内最新一行的进程数。
+        public let processCount: Int
+
+        public init(
+            groupID: String,
+            name: String,
+            category: String,
+            projectRoot: String?,
+            memoryAverageBytes: Int,
+            memoryPeakBytes: Int,
+            processCount: Int
+        ) {
+            self.groupID = groupID
+            self.name = name
+            self.category = category
+            self.projectRoot = projectRoot
+            self.memoryAverageBytes = memoryAverageBytes
+            self.memoryPeakBytes = memoryPeakBytes
+            self.processCount = processCount
+        }
+    }
+
+    /// top_disk_io 的一行:窗口内一个组的磁盘读写总量。
+    public struct GroupDiskInsight: Equatable, Sendable {
+        public let groupID: String
+        public let name: String
+        public let projectRoot: String?
+        /// 窗口内读总量(字节)。
+        public let readBytes: Int
+        /// 窗口内写总量(字节)。
+        public let writtenBytes: Int
+        /// 窗口里有分钟行缺磁盘账(列 NULL)——总量偏小,调用方如实标注。
+        public let hasNullMinutes: Bool
+
+        public init(
+            groupID: String,
+            name: String,
+            projectRoot: String?,
+            readBytes: Int,
+            writtenBytes: Int,
+            hasNullMinutes: Bool
+        ) {
+            self.groupID = groupID
+            self.name = name
+            self.projectRoot = projectRoot
+            self.readBytes = readBytes
+            self.writtenBytes = writtenBytes
+            self.hasNullMinutes = hasNullMinutes
+        }
+    }
+
+    /// process_info 的一行:lineage 出生登记档案(首见时刻;**不表示此刻存活**
+    /// ——活性由调用方现探,McpEyesText.processProfiles 的 alive 入参)。
+    public struct ProcessProfile: Equatable, Sendable {
+        public let pid: Int
+        public let parentPID: Int
+        public let executablePath: String?
+        public let cwd: String?
+        /// 完整命令行(空格连接;登记时没拿到为 nil)。
+        public let argv: String?
+        /// 首见时刻(epoch 秒)。
+        public let firstSeenSeconds: Int
+
+        public init(
+            pid: Int,
+            parentPID: Int,
+            executablePath: String?,
+            cwd: String?,
+            argv: String?,
+            firstSeenSeconds: Int
+        ) {
+            self.pid = pid
+            self.parentPID = parentPID
+            self.executablePath = executablePath
+            self.cwd = cwd
+            self.argv = argv
+            self.firstSeenSeconds = firstSeenSeconds
+        }
+    }
+
+    /// 时间窗内 `mem_max` 均值最高的 `limit` 个组(why_memory_high;口径同
+    /// topCpuGroups,只是排序列换内存——mem_max 为当分钟峰值,全组求和可超
+    /// 物理内存,压缩态如实)。
+    public static func topMemoryGroups(
+        limit: Int = 5,
+        lookbackMinutes: Int = 10,
+        now: Date,
+        in db: Database
+    ) throws -> [GroupMemoryInsight] {
+        let end = HistoryWindows.epochSeconds(of: now)
+        let start = end - lookbackMinutes * 60
+        let rows = try Row.fetchAll(
+            db,
+            sql: """
+            SELECT s.group_id,
+                   COALESCE(g.name, s.group_id) AS name,
+                   COALESCE(g.category, 'unknown') AS category,
+                   g.project_root AS project_root,
+                   AVG(s.mem_max) AS mem_average,
+                   MAX(s.mem_max) AS mem_peak,
+                   (
+                       SELECT procs FROM sample_min AS latest
+                       WHERE latest.group_id = s.group_id
+                         AND latest.ts >= ? AND latest.ts < ?
+                       ORDER BY latest.ts DESC LIMIT 1
+                   ) AS process_count
+            FROM sample_min AS s
+            LEFT JOIN groups AS g ON g.group_id = s.group_id
+            WHERE s.ts >= ? AND s.ts < ?
+            GROUP BY s.group_id
+            ORDER BY mem_average DESC, s.group_id
+            LIMIT ?
+            """,
+            arguments: [start, end, start, end, limit]
+        )
+        return rows.map { row in
+            GroupMemoryInsight(
+                groupID: row["group_id"],
+                name: row["name"],
+                category: row["category"],
+                projectRoot: row["project_root"],
+                memoryAverageBytes: row["mem_average"] ?? 0,
+                memoryPeakBytes: row["mem_peak"] ?? 0,
+                processCount: row["process_count"] ?? 0
+            )
+        }
+    }
+
+    /// 时间窗内磁盘读写**总量**最高的 `limit` 个组(top_disk_io)。缺账分钟
+    /// (disk_r/disk_w 为 NULL)按 0 计,`hasNullMinutes` 如实标出。
+    public static func topDiskGroups(
+        limit: Int = 5,
+        lookbackMinutes: Int = 10,
+        now: Date,
+        in db: Database
+    ) throws -> [GroupDiskInsight] {
+        let end = HistoryWindows.epochSeconds(of: now)
+        let start = end - lookbackMinutes * 60
+        let rows = try Row.fetchAll(
+            db,
+            sql: """
+            SELECT s.group_id,
+                   COALESCE(g.name, s.group_id) AS name,
+                   g.project_root AS project_root,
+                   COALESCE(SUM(s.disk_r), 0) AS read_bytes,
+                   COALESCE(SUM(s.disk_w), 0) AS written_bytes,
+                   MAX(CASE WHEN s.disk_r IS NULL OR s.disk_w IS NULL THEN 1 ELSE 0 END) AS has_null
+            FROM sample_min AS s
+            LEFT JOIN groups AS g ON g.group_id = s.group_id
+            WHERE s.ts >= ? AND s.ts < ?
+            GROUP BY s.group_id
+            ORDER BY (COALESCE(SUM(s.disk_r), 0) + COALESCE(SUM(s.disk_w), 0)) DESC, s.group_id
+            LIMIT ?
+            """,
+            arguments: [start, end, limit]
+        )
+        return rows.map { row in
+            GroupDiskInsight(
+                groupID: row["group_id"],
+                name: row["name"],
+                projectRoot: row["project_root"],
+                readBytes: row["read_bytes"] ?? 0,
+                writtenBytes: row["written_bytes"] ?? 0,
+                hasNullMinutes: (row["has_null"] ?? 0) == 1
+            )
+        }
+    }
+
+    /// 进程档案查询(process_info):pid 精确命中,或子串命中可执行路径 /
+    /// 命令行 / 工作目录(三者任一)。lineage 是出生登记表(不表示存活);
+    /// 上限 `limit` 防子串过宽刷屏。
+    public static func lineageMatches(
+        pid: Int? = nil,
+        substring rawSubstring: String? = nil,
+        limit: Int = 20,
+        in db: Database
+    ) throws -> [ProcessProfile] {
+        let like = rawSubstring.map { "%" + Self.escapeLike($0) + "%" }
+        let rows = try Row.fetchAll(
+            db,
+            sql: """
+            SELECT pid, parent_pid, executable_path, cwd, argv, first_seen
+            FROM lineage
+            WHERE (:pid IS NOT NULL AND pid = :pid)
+               OR (:like IS NOT NULL AND (
+                   executable_path LIKE :like ESCAPE '\\'
+                   OR argv LIKE :like ESCAPE '\\'
+                   OR cwd LIKE :like ESCAPE '\\'
+               ))
+            ORDER BY pid
+            LIMIT :limit
+            """,
+            arguments: ["pid": pid, "like": like, "limit": limit]
+        )
+        return rows.map { row in
+            ProcessProfile(
+                pid: row["pid"],
+                parentPID: row["parent_pid"],
+                executablePath: row["executable_path"],
+                cwd: row["cwd"],
+                argv: row["argv"],
+                firstSeenSeconds: Int(row["first_seen"] ?? 0)
+            )
+        }
+    }
+
+    /// LIKE 子串转义(%/_/\ 三字符),用户输入原样当字面量。
+    private static func escapeLike(_ text: String) -> String {
+        var out = ""
+        for character in text {
+            switch character {
+            case "%", "_", "\\":
+                out.append("\\")
+                out.append(character)
+            default:
+                out.append(character)
+            }
+        }
+        return out
+    }
 }

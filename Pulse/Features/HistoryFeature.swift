@@ -29,12 +29,18 @@ final class HistoryFeature: MonitorFeature {
     /// 清理历史(p4-cleaner/04,GLOSSARY「清理历史」):与采样历史共用同一库文件与队列。
     /// 引擎缺席(库打开失败)→ nil:清理照常执行,只是不记历史,清理页如实说明。
     let cleanHistory: CleanHistoryStore?
+    /// 告警历史(mcp-eyes/02):AlertCenter 触发时 fire-and-forget 记一笔。
+    let alertHistory: AlertEventStore?
+    /// dev server 状态(mcp-eyes/02):本模块消费 `.devServers` 广播入写流,
+    /// store 内部分钟节流(DevServerFeature 零改动)。
+    let devServerHistory: DevServerStateStore?
     @ObservationIgnored private var feed = HistoryFeed()
     /// 串行写入流的一笔:轮次落库,或项目根对账(改根迁移组身份)——同一条流保证
     /// 对账与落库按发生次序生效。
     private enum HistoryWrite: Sendable {
         case ingest(HistoryIngest)
         case reconcileProjectRoots([String])
+        case devServers([DevServerStatus], at: Date)
     }
 
     /// 串行写入者的入口(start 之后、stop 之前非 nil)。
@@ -46,6 +52,8 @@ final class HistoryFeature: MonitorFeature {
         self.engine = engine
         self.clock = clock
         cleanHistory = engine?.database.map { CleanHistoryStore(database: $0) }
+        alertHistory = engine?.database.map { AlertEventStore(database: $0) }
+        devServerHistory = engine?.database.map { DevServerStateStore(database: $0) }
     }
 
     // MARK: - MonitorFeature
@@ -73,6 +81,11 @@ final class HistoryFeature: MonitorFeature {
                     self?.networkTotals = totals
                 case let .reconcileProjectRoots(roots):
                     await engine.reconcileProjectRoots(roots)
+                case let .devServers(servers, at):
+                    // mcp-eyes/02:分钟节流在 store 内部,这里每轮透传即可。
+                    if let devServerHistory = self?.devServerHistory {
+                        try? await devServerHistory.upsert(servers, now: at)
+                    }
                 }
             }
         }
@@ -104,7 +117,10 @@ final class HistoryFeature: MonitorFeature {
             // 传感器仪表(p2-sensors/08 起,p2-review/09 收成按键):feature 在
             // fresh 节流轮广播,时刻走注入钟(仪表过期判定用,审计⑤)。
             feed.recordGauges(values, at: clock())
-        case .diskCapacity, .devServers:
+        case let .devServers(servers):
+            // mcp-eyes/02:dev server 状态落盘(写流串行化,store 内分钟节流)。
+            writer?.yield(.devServers(servers, at: clock()))
+        case .diskCapacity:
             break
         }
     }
