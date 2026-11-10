@@ -294,7 +294,10 @@ public struct SunburstArc: Sendable, Equatable, Identifiable {
     /// 1 = 内环(子辈),2 = 外环(孙辈 / 叶子与密封块的延伸)。
     public var ring: Int
     public var node: SpaceMapNode
-    /// 弧度;0 弧度 = 正上,顺时针增大(与 SwiftUI y 向下坐标系一致)。
+    /// 弧度,**标准极角**(与 `atan2(dy, dx)` / `Path.addArc` 同一坐标系):0 = 正右
+    /// (3 点钟),SwiftUI y 向下故数值增大 = 视觉顺时针。布局默认从 -π/2(正上)
+    /// 起跑,所以区间落在 [-π/2, 3π/2)。此前注释写「0 = 正上」是错的——视图层
+    /// 据此多做了一次 +π/2 换算,命中恒偏 90°(space-map-forms/05 纠正)。
     public var start: Double
     public var end: Double
     /// 占「当前钻入根」整体的份额(= bytes / root.bytes;悬浮百分比口径)。
@@ -331,6 +334,19 @@ public extension SunburstArc {
     /// 左半圆的文字沿半径反着排会倒立——翻转 180° 保证外向可读。
     var flipsLabel: Bool {
         cos(midAngle) < 0
+    }
+
+    /// 给定标准极角(`atan2(dy, dx)` 的直接结果,任意 2π 周期表示均可)是否落在
+    /// 本弧内。弧的 start/end 就是标准极角,命中**直接比较、不做原点换算**;
+    /// 周期折叠用「相对起点的偏移 < 弧宽」,天然覆盖负角起点与跨 2π 表示
+    /// (space-map-forms/05:视图层旧命中多加 π/2,永远落到顺时针下一段)。
+    func contains(angle: Double) -> Bool {
+        let full = 2 * Double.pi
+        var offset = (angle - start).truncatingRemainder(dividingBy: full)
+        if offset < 0 {
+            offset += full
+        }
+        return offset < span
     }
 }
 
