@@ -16,7 +16,7 @@ ScrollView 里既不铺满也不居中。换显式手段:`onGeometryChange` 测�
 `{layout.spacemap-sunburst-min-side}`);宽度下限由主窗口最小宽 720 保障;方块
 形态维持 220 最小高。
 
-**Status:** done(2026-11-10,待合 develop)
+**Status:** done(2026-11-10,develop@7b0b55f)
 用户明示,数值入表)
 
 - [x] hover/点击命中与所画弧一致(含正上偏左的负角段)
