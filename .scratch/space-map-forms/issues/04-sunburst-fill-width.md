@@ -6,7 +6,7 @@
 .fit)`——ScrollView 的无限高度提案下按宽度成正方),直径 = 卡内容宽,废
 `{layout.sunburst-diameter}` 固定值;方块形态维持 220 不动。
 
-**Status:** done(2026-11-10,待合 develop)
+**Status:** done(2026-11-10,develop@cd1780f)
 令牌行标 superseded;几何半径全按 min(宽,高)/2 自适应,无需改)
 
 - [x] 旭日直径 = 图表区宽(方形铺满卡宽),宽窗不再中间一小块
