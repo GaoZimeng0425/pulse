@@ -117,7 +117,11 @@ struct CleanerOverviewSection: View {
                         busy: isBusy,
                         onOneClickClean: onOneClickClean
                     )
-                    OverviewCardGrid {
+                    AdaptiveCardGrid(
+                        minimumCardWidth: OverviewCardGridMetrics.minimumCardWidth,
+                        spacing: OverviewCardGridMetrics.spacing,
+                        maximumColumns: OverviewCardGridMetrics.maximumColumns
+                    ) {
                         ForEach(overview.rows) { row in
                             OverviewModuleCard(row: row) {
                                 onDrill(row.group)
@@ -536,33 +540,4 @@ private enum OverviewCardGridMetrics {
     /// 列距 = {spacing.group-gap}(原型 grid gap 12)。
     static let spacing: CGFloat = 12
     static let maximumColumns = 2
-}
-
-/// 模块大卡网格:列数 = min(2, 内容宽容纳列数)——720 最小窗 1 列、默认窗 2 列、
-/// 上限 2(品类只有六卡,不随 ultrawide 拉列)。宽度经 onGeometryChange 读取,
-/// 只在跨档时改状态(`AdaptiveCardGrid` 同法)。
-private struct OverviewCardGrid<Card: View>: View {
-    @State private var columnCount = 2
-    @ViewBuilder let cards: () -> Card
-
-    var body: some View {
-        LazyVGrid(
-            columns: Array(
-                repeating: GridItem(.flexible(), spacing: OverviewCardGridMetrics.spacing),
-                count: columnCount
-            ),
-            spacing: OverviewCardGridMetrics.spacing
-        ) {
-            cards()
-        }
-        .onGeometryChange(for: Int.self) { proxy in
-            let perColumn = OverviewCardGridMetrics.minimumCardWidth + OverviewCardGridMetrics.spacing
-            let fitted = Int((proxy.size.width + OverviewCardGridMetrics.spacing) / perColumn)
-            return min(OverviewCardGridMetrics.maximumColumns, max(1, fitted))
-        } action: { newValue in
-            if newValue != columnCount {
-                columnCount = newValue
-            }
-        }
-    }
 }
