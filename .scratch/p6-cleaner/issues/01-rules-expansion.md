@@ -1,6 +1,6 @@
 # p6-cleaner/01:规则域扩充(浏览器 / 应用缓存知识库 + 开发工具补行)
 
-Status: ready-for-agent
+Status: done(2026-11-10 合 develop @bc6c64f)
 
 ## 目标
 
@@ -25,3 +25,11 @@ JunkGroup 扩六组 + 新规则首批落地,全部走既有白名单机制——
 PulseCore `swift test` 全绿(合成夹具零真盘);合并前 `sh scripts/check.sh` 全绿。
 
 ## Comments
+
+- 2026-11-10 实施:新增 `AppCacheCatalog.swift`(33 条)+ `JunkRules` 六组 / 12 条补行 +
+  `CleanerModel` 三新组排序表态。门禁:核心 703 · 合计 1181 全绿(`/tmp` detach 复跑——
+  `.worktrees` 宿主 runner 挂起再次复现,既定退路有效)。
+- 实施中定案:「应用日志」规则认领整个 `Library/Logs`,Logs 域孤儿让位(同 swiftpm 先例,
+  规则表逐条担保强于「不在已装清单」推断),`CleanerOrphanWiringTests` 断言随改——
+  p5「同 app 两域同组」的 Logs 半边被整目录担保取代,空间仍可回收(日志卡为 safe 档)。
+- 知识库首版 33 条;com.apple 守护进程缓存与长尾 app 留待持续扩充(加条目即扩,无机制改动)。
