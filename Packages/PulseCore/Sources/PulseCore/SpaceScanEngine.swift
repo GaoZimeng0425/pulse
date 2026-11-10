@@ -365,7 +365,16 @@ private final class ScanCore: @unchecked Sendable {
             } else {
                 // 栈空但仍有 in-flight(别的 worker 枚举完会补目录):让出 + 小睡。
                 await Task.yield()
-                try? await Task.sleep(nanoseconds: 200_000)
+                do {
+                    try await Task.sleep(nanoseconds: 200_000)
+                } catch {
+                    // 小睡被取消打断 = 协作取消已到,本 worker 不必陪跑在途目录:
+                    // try? 吞错后小睡退化为立即返回,空闲 worker 满核自旋(探针实测
+                    // 0.4s 在途窗口 CPU 0.04s → 1.2s,cleaner-scan-hang)。退出安全——
+                    // 在途目录由其 worker 收尾,收工压回的子目录在入口取消分支排干,
+                    // group 仍等全部归位,不丢记录。
+                    return
+                }
             }
         }
     }
