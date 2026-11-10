@@ -1,6 +1,6 @@
 # p6-cleaner/02:AI 模型域(存储位 + 内容寻址真实可回收 + 在用第四路)
 
-Status: ready-for-agent
+Status: done(2026-11-10 合 develop @39d4377)
 Blocked by: 01
 
 ## 目标
