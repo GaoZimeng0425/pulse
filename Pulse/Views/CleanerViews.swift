@@ -374,22 +374,29 @@ struct CleanerTabView: View {
     /// 空间地图子页(07 = 旭日图 + 03 的结果摘要;两卡读同一次扫描)。
     /// 上下堆叠(space-map-forms/08,用户拍板「应该是上下布局,不是两列」——
     /// 07 两列版废);旭日直径 = min(卡内容宽, 图表区高),见 CleanerSpaceMapView。
-    @ViewBuilder private var mapSection: some View {
-        switch model.phase {
-        case .idle:
-            CardEmptyState(
-                title: "还没扫描过",
-                detail: "点右上「扫描整台 Mac」——约 1 分钟,随时可取消",
-                actionTitle: "开始扫描",
-                action: { model.startScan() }
-            )
-            .cardShell(compact: false)
-        case let .scanning(stats):
-            scanningCard(stats)
-        case let .finished(result):
-            VStack(spacing: 12) {
-                spaceMapCard
-                summaryCard(result)
+    /// 子页自带滚动(space-map-forms/10,用户实报「点开旭日文字都被顶上去,没加
+    /// scroll」):清理页是全 app 唯一不进主窗口外层 ScrollView 的 tab(f9bc5d5
+    /// 为可清理页 CTA 钉底剥的),旭日图表区钳死高度不可压缩,定高页放不下就把
+    /// 文字顶出去。本子页无底部 action bar、无内层滚动列表,自滚不踩当年嵌套
+    /// 滚动的坑(那是可清理列表页的约束)。
+    private var mapSection: some View {
+        ScrollView {
+            switch model.phase {
+            case .idle:
+                CardEmptyState(
+                    title: "还没扫描过",
+                    detail: "点右上「扫描整台 Mac」——约 1 分钟,随时可取消",
+                    actionTitle: "开始扫描",
+                    action: { model.startScan() }
+                )
+                .cardShell(compact: false)
+            case let .scanning(stats):
+                scanningCard(stats)
+            case let .finished(result):
+                VStack(spacing: 12) {
+                    spaceMapCard
+                    summaryCard(result)
+                }
             }
         }
     }

@@ -275,8 +275,12 @@ struct SpaceMapSection: View {
             treemapBridgeButton(rects: rects, cleanable: cleanable, in: geo.size)
             noticeOverlay
         }
-        // 弹性区(2026-11-09 用户实报):吃掉卡的剩余高度,矮窗口不挤爆页头。
-        .frame(minHeight: chartMinHeight, maxHeight: .infinity)
+        // 高度与旭日同式(space-map-forms/10:子页自带滚动后,弹性 maxHeight 在
+        // 无限提案下塌到最小高(矮成一条)——改钳制:视口 × 0.8,下限 220,
+        // 上限 520,与旭日共用 {viewport-share} / {max-side} 令牌)。
+        .containerRelativeFrame(.vertical) { length, _ in
+            min(max(length * sunburstViewportShare, chartMinHeight), sunburstMaxSide)
+        }
     }
 
     private static func treemapKey(_ index: Int) -> String {
