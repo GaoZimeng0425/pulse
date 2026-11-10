@@ -200,10 +200,10 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.ranking-limit}` | 20 行 | 各排行(弹窗与主窗口同规则)只列前 20 名,超出补末行:弹窗「查看全部(另 N 项)」跳主窗口并落地即展开,主窗口「显示全部(另 N 项)」原地展开 / 「收起」(ranking-limit/01,2026-11-02 用户拍板;原 11-01 `popover-ranking-limit` 只截弹窗)。主窗口搜索命中不截 |
 | `{layout.sheet-width}` | 460pt | 确认清单 sheet 定宽(清理页「清理…」,p4-cleaner/04;原型 B 变体同值) |
 | `{layout.sheet-list-max-height}` | 220pt | 确认清单 sheet 内逐行列表的最大高(超出滚动,总量与按钮恒在视口内) |
-| `{layout.spacemap-chart-min-height}` | 220pt | 空间地图**方块形态**图表区最小高(≈滚动容器内实际高,见组件行注):220 = 主窗口最小高 560 下整页仍放得下的底线(ui-unify 追改 2026-11-09;space-map-forms/01 入表) |
+| `{layout.spacemap-chart-min-height}` | 220pt | 空间地图**方块形态**图表区高下限(space-map-forms/10 起实际高 = clamp(子页视口 × 0.8, 220, 520),与旭日同式;01 入表,原语义「弹性区塌最小高」随子页滚动废弃) |
 | `{layout.sunburst-diameter}` | ~~400pt~~ | **superseded**(space-map-forms/04):旭日改为方形铺满卡宽,直径 = 卡内容宽,无固定值——340(01)与 400(03)两代固定直径分别被 220 最小高压制 / 宽卡里只占中间一点,均废;几何在 PulseCore `SunburstLayout`(p4-cleaner/07) |
 | `{layout.spacemap-sunburst-min-side}` | 360pt | 旭日直径下限(space-map-forms/05,08 起兼图表区高下限):窄窗防过小;实际直径 = min(卡内容宽, clamp(可视高 × `{layout.spacemap-sunburst-viewport-share}`, 360, `{layout.spacemap-sunburst-max-side}`));宽度下限由主窗口最小宽 720 保障 |
-| `{layout.spacemap-sunburst-viewport-share}` | 0.8 | 旭日图表区高占滚动视口高的份额(space-map-forms/08):扣的两成留给页头/卡头/面包屑与摘要卡露头 |
+| `{layout.spacemap-sunburst-viewport-share}` | 0.8 | 空间地图**两形态**图表区高占子页滚动视口高的份额(space-map-forms/08 立,10 起方块同用):扣的两成留给页头/卡头/面包屑与摘要卡露头 |
 | `{layout.spacemap-sunburst-max-side}` | 520pt | 旭日图表区高上限(= 直径上限,space-map-forms/09 用户实报「旭日时卡片那么大,有没有最大高度」):高/最大化窗口里卡片封顶不再随可视高整屏变长(卡总高 ≈ 图表区 + 头部 ~150) |
 | `{layout.popover-size}` | 360×648pt | 菜单栏弹窗面板**定尺寸**(`DashboardView.panelSize`;popover-header/01 用户拍板 A,2026-11-02):AppKit 面板直接按此开窗、不读内容 fittingSize;中间滚动区 `maxHeight: .infinity` 吃掉头尾之外的全部高度——tab 栏 / 页头钉顶、底排钉底,告警横幅出没只挤中间,切 tab 面板不动 |
 
@@ -462,20 +462,22 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   「旭日」chart.pie;space-map-forms/02——原 segmented 非标准件已废),
   `settings.spaceMapForm` @AppStorage 记住
   上次;切换不重置下钻位置(下钻 / 面包屑由 CleanerTabView 持有,切子药丸不丢)。
-  **版面纪律(ui-unify 追改,2026-11-09 用户实报三修,两形态同守)**:①图表区
-  弹性高、卡头 / 根选 / 面包屑 `layoutPriority(1)` 不被挤压——**注意清理页在
-  ScrollView 里,弹性区拿到无限高度提案、塌到最小高,最小高 ≈ 实际高**;两形态
-  各自处理:方块 `{layout.spacemap-chart-min-height}` 220 / 旭日 = **直径
-  min(卡内容宽, 图表区高)**、卡内居中——图表区高 = **clamp(可视高 ×
-  `{layout.spacemap-sunburst-viewport-share}` 0.8, 下限
-  `{layout.spacemap-sunburst-min-side}` 360, 上限
-  `{layout.spacemap-sunburst-max-side}` 520)**(`containerRelativeFrame` 量滚动
-  视口,space-map-forms/08 用户拍板「旭日跟随宽高中小的那个值画」+ 09 上限
-  「旭日时卡片那么大」:矮窗不顶天立地、宽窗不缩成一小块、随窗口伸缩、
-  高窗卡片封顶不整屏长;06 的卡级宽探针随 min(w,h) 退役)。
+  **版面纪律(ui-unify 追改,2026-11-09 用户实报三修,两形态同守)**:①**空间
+  地图子页自带 ScrollView**(space-map-forms/10,用户实报「点开旭日文字都被顶
+  上去,没加 scroll」)——清理页是全 app 唯一不进主窗口外层滚动的 tab(f9bc5d5
+  为可清理页 CTA 钉底剥的,那是列表页的约束;本子页无 action bar 无内层列表,
+  自滚不踩嵌套滚动的坑);两形态图表区高**同式** = **clamp(子页视口 ×
+  `{layout.spacemap-sunburst-viewport-share}` 0.8, 形态下限, 上限
+  `{layout.spacemap-sunburst-max-side}` 520)**(下限:方块
+  `{layout.spacemap-chart-min-height}` 220 / 旭日
+  `{layout.spacemap-sunburst-min-side}` 360;`containerRelativeFrame` 量子页
+  滚动视口),旭日直径 = min(卡内容宽, 图表区高)、卡内居中(08 拍板「跟随宽高
+  中小的那个值」+ 09 上限;弹性 maxHeight 在滚动里塌最小高、07 前清理页无滚动
+  靠弹性区吸收压缩两案皆废)。
   历代已废:03/04 固定直径 340/400(宽卡里太小)、04 aspectRatio(ScrollView
   里不可靠)、05 测图表自身宽(与内容宽正反馈撑爆)、06 边长 = 卡宽(= 窗口宽,
-  顶天立地)、07 两列(用户拍板「应该是上下布局」);②**悬停零重排**——卡内不出现 /
+  顶天立地)、07 两列(用户拍板「应该是上下布局」)、09 前无子页滚动(定高页
+  放不下,文字被顶出);②**悬停零重排**——卡内不出现 /
   消失任何占行元素(原卡顶悬停信息行已废),悬停信息与按钮一律浮在图表内;
   ③密封 / 叶子 / 「其他」点击解释 = 图表左上角浮层胶囊(cardHigh 90%,单行截断,
   不吃点击),不占卡内一行;④**子页上下堆叠**(地图卡在上、扫描摘要卡在下;
