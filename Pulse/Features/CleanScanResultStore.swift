@@ -7,7 +7,8 @@ import PulseCore
 /// 损坏/不识别 → load 返回 nil(界面回空态,绝不半解半猜);写失败只记日志,
 /// 不影响扫描流程本身。
 struct CleanScanResultStore: Sendable {
-    static let productionFileName = "scan-cache-v1.bin"
+    /// 名字单一出处(mcp-disk-usage/01):pulse-mcp 读同一文件。
+    static let productionFileName = SpaceScanCache.defaultFileName
 
     let load: @Sendable () -> SpaceScanCachePayload?
     let save: @Sendable (SpaceScanCachePayload) -> Void

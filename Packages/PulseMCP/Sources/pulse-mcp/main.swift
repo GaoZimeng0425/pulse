@@ -10,14 +10,15 @@ import PulseCore
 
 let server = Server(
     name: "pulse",
-    version: "0.3.0",
+    version: "0.4.0",
     instructions: """
     Pulse 菜单栏系统监视器的数据查询。数据为分钟级采样落库(非实时流),\
     每个答案都会标注数据年龄;Pulse app 未运行时仍可回答(回退最近落库)。\
     清理类工具(list_cleanable / clean)要求 Pulse app 正在运行:AI 只能碰\
     「可安全清理」档,真正的删除由用户在 Pulse 确认单上确认后执行。\
     诊断类工具(why_cpu_high / why_memory_high / top_disk_io / process_info /\
-    recent_alerts / list_dev_servers)答历史与档案,不含此刻实时值。
+    recent_alerts / list_dev_servers)答历史与档案,不含此刻实时值。\
+    disk_usage 答上次磁盘扫描快照的目录占用,刷新数据须用户在 app 里重扫。
     """,
     capabilities: .init(tools: .init())
 )
@@ -315,6 +316,51 @@ private func listDevServersText() -> String {
     }
 }
 
+// MARK: - mcp-disk-usage(上次扫描快照的目录占用;读缓存,绝不现场扫)
+
+private func diskUsageText(path: String?, topN: Int) -> String {
+    let fileURL = URL(
+        fileURLWithPath: NSString(string: "~/.Pulse").expandingTildeInPath,
+        isDirectory: true
+    ).appendingPathComponent(SpaceScanCache.defaultFileName)
+    guard let payload = loadScanCache(at: fileURL) else {
+        return "还没有扫描快照——请用户在 Pulse app 的「可清理」页点「扫描整台 Mac」,扫完即可查询(本工具只读快照,不现场扫)。"
+    }
+    let trees = payload.result.trees
+    let cleaned = payload.meta.cleanedPaths.count
+    let now = Date()
+    if let path, !path.trimmingCharacters(in: .whitespaces).isEmpty {
+        guard let subtree = DiskUsageQuery.subtree(path: path, in: trees) else {
+            return "该路径不在上次扫描范围内(扫描根:\(payload.meta.roots.joined(separator: "、")))——被排除或从未扫到,不猜。"
+        }
+        let children = subtree.node.map { DiskUsageQuery.topChildren(of: $0, limit: topN) } ?? []
+        return McpDiskUsageText.usage(
+            path: path,
+            subtree: subtree,
+            topChildren: children,
+            scanFinishedAt: payload.meta.finishedAt,
+            cancelled: payload.result.cancelled,
+            cleanedPathCount: cleaned,
+            now: now
+        )
+    }
+    return McpDiskUsageText.overview(
+        roots: payload.meta.roots,
+        totalBytes: DiskUsageQuery.totalBytes(in: trees),
+        top: DiskUsageQuery.topLevel(in: trees, limit: topN),
+        scanFinishedAt: payload.meta.finishedAt,
+        cancelled: payload.result.cancelled,
+        cleanedPathCount: cleaned,
+        now: now
+    )
+}
+
+/// 读扫描缓存(损坏/不识别 = nil,绝不半解;同 app 侧纪律)。
+private func loadScanCache(at url: URL) -> SpaceScanCachePayload? {
+    guard let data = try? Data(contentsOf: url) else { return nil }
+    return SpaceScanCache.decode(data)
+}
+
 // MARK: - 工具注册
 
 await server.withMethodHandler(ListTools.self) { _ in
@@ -449,6 +495,23 @@ await server.withMethodHandler(ListTools.self) { _ in
             description: "本机 dev server(本地开发常驻服务,如 vite/next dev)盘点:种类/闲置时长/监听端口/内存/最后见到时刻;久未见到的如实标\"可能已退出\"。",
             inputSchema: .object(["type": .string("object"), "properties": .object([:])])
         ),
+        Tool(
+            name: "disk_usage",
+            description: "上次磁盘扫描快照的目录占用:哪些目录占多少空间(实际占用口径)。不给 path = 各扫描根的一级子目录排行;给 path = 该目录总占用 + 直接子目录排行。数据来自最近一次清理扫描(不是实时,答案标注扫描时刻);想刷新数据需要用户在 Pulse app 里重新扫描。",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "path": .object([
+                        "type": .string("string"),
+                        "description": .string("要查的目录绝对路径(可选;不给则报顶层排行)"),
+                    ]),
+                    "top_n": .object([
+                        "type": .string("integer"),
+                        "description": .string("子目录排行条数,默认 10"),
+                    ]),
+                ]),
+            ])
+        ),
     ])
 }
 
@@ -503,6 +566,12 @@ await server.withMethodHandler(CallTool.self) { params in
         text = recentAlertsText(hours: max(1, min(24 * 30, hours)))
     case "list_dev_servers":
         text = listDevServersText()
+    case "disk_usage":
+        let topN = arguments["top_n"]?.intValue ?? 10
+        text = diskUsageText(
+            path: arguments["path"]?.stringValue,
+            topN: max(1, min(30, topN))
+        )
     default:
         return .init(content: [.text(text: "未知工具 \(params.name)")], isError: true)
     }
