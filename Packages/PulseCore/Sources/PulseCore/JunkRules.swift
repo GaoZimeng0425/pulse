@@ -1,13 +1,14 @@
 import Foundation
 
-// MARK: - 安全白名单规则表(p4-cleaner/04;ADR-0008)
+// MARK: - 安全白名单规则表(p4-cleaner/04;ADR-0008;p6-cleaner/01 扩六组)
 
 //
 // 「能删的地方」永远等于「白名单担保过的地方」:清单只收规则命中的目录,未命中不显示、
 // 不可删。规则 = 路径模式 + 安全档 + 说明文案 + 来源,纯值、无 IO;匹配跑在已扫出的
 // SpaceNode 树上(全卷扫描已经走过这些目录,不二次扫盘)。
 //
-// 首批规则域 = 全局工具缓存(票面)。路径与档位移植自 purge-app(jithin-sabu/purge-app,
+// 首批规则域 = 开发工具缓存(原「全局工具缓存」,p4 票面;p6-cleaner/01 随总览品类
+// 改名)。路径与档位移植自 purge-app(jithin-sabu/purge-app,
 // MIT License)`purge/Services/DevScanner.swift` `globalCacheDefinitions()` 与
 // `purge/Resources/explanations.json`;与上游的差异逐条标在规则旁:
 //   - purge-app 三档(safe / medium / AI 待定)收成 Pulse 两档(GLOSSARY「安全档」):
@@ -34,18 +35,25 @@ public enum CleanSafetyTier: String, Sendable, Codable, CaseIterable, Equatable 
     }
 }
 
-/// 规则域分组(清单按组分段)。全局工具缓存(04)+ 项目产物(05);
-/// AI 模型 / 孤儿 worktree 归 06 票,加 case 即扩组。
-/// CaseIterable 顺序即 UI 组序(卸载残留 p5-cleaner/01,grill 2026-11-08:殿后)。
+/// 规则域分组(清单按组分段)。开发工具 + 项目产物(p4)→ 浏览器 / 应用缓存 /
+/// AI 模型三组(p6-cleaner/01,spec 定案 8;AI 组规则在 02 票落地,空组不出段)。
+/// CaseIterable 顺序即 UI 组序(卸载残留 p5-cleaner/01,grill 2026-11-08:殿后;
+/// p6 总览品类序 = 开发工具 → 浏览器 → 应用缓存 → 项目产物 → AI 模型 → 卸载残留)。
 public enum JunkGroup: String, Sendable, CaseIterable, Equatable {
     case globalToolCache
+    case browserCache
+    case appCache
     case projectArtifacts
+    case aiModels
     case uninstallLeftovers
 
     public var title: String {
         switch self {
-        case .globalToolCache: "全局工具缓存"
+        case .globalToolCache: "开发工具"
+        case .browserCache: "浏览器"
+        case .appCache: "应用缓存"
         case .projectArtifacts: "项目产物"
+        case .aiModels: "AI 模型"
         case .uninstallLeftovers: "卸载残留"
         }
     }
@@ -54,7 +62,7 @@ public enum JunkGroup: String, Sendable, CaseIterable, Equatable {
     /// `projectName` 即分组键)。穷举 switch:新增分组必须表态。
     public var groupsByOwner: Bool {
         switch self {
-        case .globalToolCache: false
+        case .globalToolCache, .browserCache, .appCache, .aiModels: false
         case .projectArtifacts, .uninstallLeftovers: true
         }
     }
@@ -183,8 +191,12 @@ public struct JunkRule: Sendable, Identifiable, Equatable {
 /// 内置规则表。
 public enum JunkRuleTable {
     static let purgeApp = "purge-app (MIT) DevScanner.globalCacheDefinitions + explanations.json"
+    static let purgeAppExplanations = "purge-app (MIT) explanations.json"
+    static let pulseCustom = "Pulse 自定"
 
-    public static let builtin: [JunkRule] = [
+    /// 开发工具规则(p4 首批 + p6-cleaner/01 补行);浏览器 / 应用缓存目录规则由
+    /// `AppCacheCatalog` 生成,固定路径条目(日志)在 `appCacheFixedRules`。
+    static let globalToolCacheRules: [JunkRule] = [
         JunkRule(
             id: "xcode.derivedData",
             group: .globalToolCache,
@@ -357,7 +369,165 @@ public enum JunkRuleTable {
             source: purgeApp,
             symbolName: "square.stack.3d.up"
         ),
+        // ↓ p6-cleaner/01 补行(spec 定案 12):本机实测漏网的开发缓存 + 常用位。
+        // 上游 medium → 判 safe 的同 Gradle 先例:纯可重建,慢一次而已。
+        JunkRule(
+            id: "maven.repository",
+            group: .globalToolCache,
+            title: "Maven 本地仓库",
+            patterns: [JunkPathPattern(homeRelative: ".m2/repository")],
+            tier: .safe,
+            rationale: "Java 依赖的本地缓存;下次构建重新下载,量大时会等一阵。",
+            source: purgeApp,
+            symbolName: "shippingbox"
+        ),
+        JunkRule(
+            id: "cargo.registry",
+            group: .globalToolCache,
+            title: "Cargo 包缓存",
+            patterns: [
+                JunkPathPattern(homeRelative: ".cargo/registry"),
+                JunkPathPattern(homeRelative: ".cargo/git"),
+            ],
+            tier: .safe,
+            rationale: "Rust 依赖与源码缓存;下次构建重新下载。",
+            source: purgeApp,
+            symbolName: "shippingbox"
+        ),
+        JunkRule(
+            id: "uv.cache",
+            group: .globalToolCache,
+            title: "uv 缓存",
+            patterns: [JunkPathPattern(homeRelative: ".cache/uv")],
+            tier: .safe,
+            rationale: "Python uv 的包与编译缓存;下次安装重新下载。",
+            source: purgeApp,
+            symbolName: "shippingbox"
+        ),
+        JunkRule(
+            id: "go.caches",
+            group: .globalToolCache,
+            title: "Go 模块与构建缓存",
+            patterns: [
+                JunkPathPattern(homeRelative: "go/pkg/mod"),
+                JunkPathPattern(homeRelative: "Library/Caches/go-build"),
+            ],
+            tier: .safe,
+            rationale: "Go 依赖模块与编译缓存;下次构建重新拉取、重新编译。",
+            source: purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 2026-11-09 真案漏网:pnpm 的元数据缓存在 Library/Caches/pnpm,
+        // 与包仓(Library/pnpm/store,pnpm.store 规则)是两处。
+        JunkRule(
+            id: "pnpm.metadataCache",
+            group: .globalToolCache,
+            title: "pnpm 元数据缓存",
+            patterns: [JunkPathPattern(homeRelative: "Library/Caches/pnpm")],
+            tier: .safe,
+            rationale: "pnpm 的注册表元数据缓存(与包仓是两处);清了下次 install 重新拉取。",
+            source: purgeApp,
+            symbolName: "shippingbox"
+        ),
+        JunkRule(
+            id: "corepack.cache",
+            group: .globalToolCache,
+            title: "Corepack 缓存",
+            patterns: [JunkPathPattern(homeRelative: ".cache/node/corepack")],
+            tier: .safe,
+            rationale: "Node 包管理器版本缓存;下次使用时重新下载。",
+            source: purgeApp,
+            symbolName: "shippingbox"
+        ),
+        JunkRule(
+            id: "yarn.cache",
+            group: .globalToolCache,
+            title: "Yarn 缓存",
+            patterns: [
+                JunkPathPattern(homeRelative: "Library/Caches/Yarn"),
+                JunkPathPattern(homeRelative: ".yarn/berry/cache"),
+            ],
+            tier: .safe,
+            rationale: "Yarn 的包下载缓存;下次安装重新下载。",
+            source: purgeApp,
+            symbolName: "shippingbox"
+        ),
+        JunkRule(
+            id: "deno.cache",
+            group: .globalToolCache,
+            title: "Deno 缓存",
+            patterns: [JunkPathPattern(homeRelative: "Library/Caches/deno")],
+            tier: .safe,
+            rationale: "Deno 的依赖与编译缓存;下次运行重新下载。",
+            source: purgeApp,
+            symbolName: "shippingbox"
+        ),
+        JunkRule(
+            id: "bun.cache",
+            group: .globalToolCache,
+            title: "Bun 缓存",
+            patterns: [JunkPathPattern(homeRelative: ".bun/install/cache")],
+            tier: .safe,
+            rationale: "Bun 的包安装缓存;下次安装重新下载。",
+            source: purgeApp,
+            symbolName: "shippingbox"
+        ),
+        JunkRule(
+            id: "electron.toolingCaches",
+            group: .globalToolCache,
+            title: "Electron 工具链缓存",
+            patterns: [
+                JunkPathPattern(homeRelative: "Library/Caches/electron"),
+                JunkPathPattern(homeRelative: "Library/Caches/electron-builder"),
+                JunkPathPattern(homeRelative: "Library/Caches/node-gyp"),
+            ],
+            tier: .safe,
+            rationale: "Electron 预编译二进制 / 打包器 / node-gyp 头文件缓存;下次构建重新下载。",
+            source: purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 上游对 Archives 有「目录里没有 .xcarchive 时降 safe」的细分;我们整目录一个
+        // 单元,不细分——归档不可重建,恒「先检查」并在文案点明。
+        JunkRule(
+            id: "xcode.archives",
+            group: .globalToolCache,
+            title: "Xcode Archives",
+            patterns: [JunkPathPattern(homeRelative: "Library/Developer/Xcode/Archives")],
+            tier: .checkFirst,
+            rationale: "发布归档(.xcarchive)与 dSYM——删除后不可重建,上传 App Store、符号化崩溃都要用它;确认不再需要再清。",
+            source: purgeApp,
+            symbolName: "archivebox"
+        ),
+        JunkRule(
+            id: "xcode.testDevices",
+            group: .globalToolCache,
+            title: "Xcode 测试设备",
+            patterns: [JunkPathPattern(homeRelative: "Library/Developer/XCTestDevices")],
+            tier: .safe,
+            rationale: "UI 测试模拟设备的数据;删了下次跑测试自动重建。",
+            source: purgeApp,
+            symbolName: "iphone"
+        ),
     ]
+
+    /// 固定路径的应用缓存条目(不在 ~/Library/Caches 一级,进不了知识库)。
+    /// 日志规则含崩溃报告子目录——一条覆盖,不另开子规则(父子两张卡会重复计数)。
+    static let appCacheFixedRules: [JunkRule] = [
+        JunkRule(
+            id: "appcache.logs",
+            group: .appCache,
+            title: "应用日志",
+            patterns: [JunkPathPattern(homeRelative: "Library/Logs")],
+            tier: .safe,
+            rationale: "各 App 的运行日志与崩溃报告;排障时有用,平时可清,需要时自动重新生成。",
+            source: purgeAppExplanations,
+            symbolName: "doc.text"
+        ),
+    ]
+
+    /// 全量规则 = 开发工具 + 知识库目录规则 + 固定路径条目。孤儿域收窄
+    /// (`OrphanLeftovers.excludingOverlaps`)吃的就是这些候选,新规则自动生效。
+    public static let builtin: [JunkRule] = globalToolCacheRules + AppCacheCatalog.rules + appCacheFixedRules
 
     /// 轻桥判定(p4-uninstaller/05):路径命中内置白名单 → 对应组;不命中 → nil。
     /// 与可清理清单**同源**(同一个规则表、同一套 JunkPathPattern 语义),

@@ -64,10 +64,11 @@ final class CleanerOrphanWiringTests: XCTestCase {
     func testCompleteInventoryListsOrphansGroupedByFullBundleID() async {
         let log = CallLog()
         let model = await scannedModel(.complete(["com.still.here"]), log: log)
+        // p6-cleaner/01:「应用日志」规则认领整个 Library/Logs,Logs 域孤儿让位
+        // (同 swiftpm 让位先例——规则表逐条担保强于「不在已装清单」的推断)。
         XCTAssertEqual(Set(orphans(model).map(\.path)), [
             home + "/Library/Caches/com.gone.app",
-            home + "/Library/Logs/com.gone.app",
-        ], "已装的 com.still.here 不报;同 app 两域同组")
+        ], "已装的 com.still.here 不报;Logs 域被应用日志规则吃掉,只剩 Caches 孤儿")
         XCTAssertTrue(orphans(model).allSatisfy { $0.projectName == "com.gone.app" }, "大卡分组键 = 全 bundle id")
         XCTAssertTrue(model.orphanDetectionActive, "页头注记「含卸载残留检测」的判据")
         XCTAssertNil(model.orphanDetectionUnavailableReason)

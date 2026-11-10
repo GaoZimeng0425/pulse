@@ -116,18 +116,25 @@ final class CleanerModel {
     ) -> InstalledAppInventory
     private let homeDirectory: String
 
-    /// 两组展示排序(08:统一 Core 的 JunkSortOrder;项目产物沿用 05 拍板
-    /// 默认大小、可切新旧;工具缓存排序为 08 新增,两组互不影响)。
+    /// 各组展示排序(08:统一 Core 的 JunkSortOrder;项目产物沿用 05 拍板
+    /// 默认大小、可切新旧;组间互不影响)。p6-cleaner/01 新组各自表态,不蹭别组。
     var artifactSort: JunkSortOrder = .size
     var toolCacheSort: JunkSortOrder = .size
-    /// 卸载残留组排序(p5-cleaner/02:组头同款 seg,三组互不影响)。
+    /// 卸载残留组排序(p5-cleaner/02:组头同款 seg)。
     var orphanSort: JunkSortOrder = .size
+    /// 浏览器 / 应用缓存 / AI 模型(p6-cleaner/01;AI 组规则在 02 落地,状态先备好)。
+    var browserSort: JunkSortOrder = .size
+    var appCacheSort: JunkSortOrder = .size
+    var aiModelsSort: JunkSortOrder = .size
 
     /// 组排序读写(穷举 switch:新增分组必须在这里表态,不会静默蹭别组的排序)。
     func sortOrder(for group: JunkGroup) -> JunkSortOrder {
         switch group {
         case .globalToolCache: toolCacheSort
+        case .browserCache: browserSort
+        case .appCache: appCacheSort
         case .projectArtifacts: artifactSort
+        case .aiModels: aiModelsSort
         case .uninstallLeftovers: orphanSort
         }
     }
@@ -135,7 +142,10 @@ final class CleanerModel {
     func setSortOrder(_ order: JunkSortOrder, for group: JunkGroup) {
         switch group {
         case .globalToolCache: toolCacheSort = order
+        case .browserCache: browserSort = order
+        case .appCache: appCacheSort = order
         case .projectArtifacts: artifactSort = order
+        case .aiModels: aiModelsSort = order
         case .uninstallLeftovers: orphanSort = order
         }
     }
