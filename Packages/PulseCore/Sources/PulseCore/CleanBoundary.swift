@@ -200,7 +200,8 @@ public struct CleanActivityEntry: Sendable, Equatable {
     }
 }
 
-/// 在用原因(界面拼人话用):终端驻留 / 构建进程 / git 活动 / 路径被 argv 引用。
+/// 在用原因(界面拼人话用):终端驻留 / 构建进程 / git 活动 / 路径被 argv 引用 /
+/// AI 服务进程在场(p6-cleaner/02 第四路,组作用域——见 `CleanActivityDerivation`)。
 public struct CleanActivityReason: OptionSet, Sendable, Hashable, RawRepresentable {
     public let rawValue: UInt8
     public init(rawValue: UInt8) {
@@ -211,6 +212,7 @@ public struct CleanActivityReason: OptionSet, Sendable, Hashable, RawRepresentab
     public static let build = CleanActivityReason(rawValue: 1 << 1)
     public static let git = CleanActivityReason(rawValue: 1 << 2)
     public static let referenced = CleanActivityReason(rawValue: 1 << 3)
+    public static let aiService = CleanActivityReason(rawValue: 1 << 4)
 
     /// 人话(按固定顺序拼:「终端与构建正在此项目」的原料)。
     public var title: String {
@@ -226,6 +228,9 @@ public struct CleanActivityReason: OptionSet, Sendable, Hashable, RawRepresentab
         }
         if contains(.referenced) {
             parts.append("进程引用其路径")
+        }
+        if contains(.aiService) {
+            parts.append("AI 服务")
         }
         if parts.isEmpty {
             parts.append("进程")
