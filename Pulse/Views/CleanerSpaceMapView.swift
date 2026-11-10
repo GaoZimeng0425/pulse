@@ -29,10 +29,6 @@ private let hoverBoost: Double = 0.08
 /// ScrollView 里拿到无限高度提案、塌到最小高,所以这个值 ≈ 方块形态的实际高度。
 private let chartMinHeight: CGFloat = 220
 
-/// 旭日形态直径 = 图表区最小高({layout.sunburst-diameter};space-map-forms/03:
-/// 01 版 340 定高在滚动容器里被 220 最小高压成小圆——旭日专用 400 下限)。
-private let sunburstDiameter: CGFloat = 400
-
 /// 展示形态(用户偏好;@AppStorage 记住上次,默认 treemap = v3 既定形态)。
 private enum SpaceMapForm: String, CaseIterable {
     case treemap
@@ -465,9 +461,11 @@ struct SpaceMapSection: View {
             sunburstBridgeButton(arcs: arcs, resolve: resolve, in: geo.size)
             noticeOverlay
         }
-        // 旭日专用下限({layout.sunburst-diameter} 400):滚动容器里弹性区会塌到
-        // 最小高,共用 220 会把圆压小(space-map-forms/03 用户实报「旭日那么小」)。
-        .frame(minHeight: sunburstDiameter, maxHeight: .infinity)
+        // 铺满卡宽的方形(space-map-forms/04,用户拍板「放开铺满」):ScrollView 的
+        // 无限高度提案下 aspectRatio(1, .fit) 按宽度成正方——直径 = 卡内容宽,
+        // 无固定值(03 的 400 上限在宽卡里只占中间一点,用户实报「只有中间一点点」)。
+        // swiftlint:disable:next legacy_swiftui_aspect_ratio
+        .aspectRatio(1, contentMode: .fit)
     }
 
     /// 分区异色着色(space-map-forms/03):内环每支一色(按序循环 accent,柔和
@@ -585,7 +583,7 @@ struct SpaceMapSection: View {
     // MARK: 命中(极坐标反算,不依赖形状 hit test——p4-cleaner/07 v2 定谳写法)
 
     private func sunburstRadius(in size: CGSize) -> CGFloat {
-        min(min(size.width, size.height), sunburstDiameter) / 2
+        min(size.width, size.height) / 2
     }
 
     private func sunburstCenter(in size: CGSize) -> CGPoint {
