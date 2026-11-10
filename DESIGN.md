@@ -202,7 +202,8 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.sheet-list-max-height}` | 220pt | 确认清单 sheet 内逐行列表的最大高(超出滚动,总量与按钮恒在视口内) |
 | `{layout.spacemap-chart-min-height}` | 220pt | 空间地图**方块形态**图表区最小高(≈滚动容器内实际高,见组件行注):220 = 主窗口最小高 560 下整页仍放得下的底线(ui-unify 追改 2026-11-09;space-map-forms/01 入表) |
 | `{layout.sunburst-diameter}` | ~~400pt~~ | **superseded**(space-map-forms/04):旭日改为方形铺满卡宽,直径 = 卡内容宽,无固定值——340(01)与 400(03)两代固定直径分别被 220 最小高压制 / 宽卡里只占中间一点,均废;几何在 PulseCore `SunburstLayout`(p4-cleaner/07) |
-| `{layout.spacemap-sunburst-min-side}` | 360pt | 旭日方形边长下限(space-map-forms/05):窄窗防过小;实际边长 = 卡内容宽 − 2×`{spacing.card-padding-compact}`(06 拍板「小一个 padding」,卡级宽探针提供,不量图表自身);宽度下限由主窗口最小宽 720 保障 |
+| `{layout.spacemap-sunburst-min-side}` | 360pt | 旭日直径下限(space-map-forms/05,08 起兼图表区高下限):窄窗防过小;实际直径 = min(卡内容宽, 可视高 × 0.8);宽度下限由主窗口最小宽 720 保障 |
+| `{layout.spacemap-sunburst-viewport-share}` | 0.8 | 旭日图表区高占滚动视口高的份额(space-map-forms/08):扣的两成留给页头/卡头/面包屑与摘要卡露头 |
 | `{layout.popover-size}` | 360×648pt | 菜单栏弹窗面板**定尺寸**(`DashboardView.panelSize`;popover-header/01 用户拍板 A,2026-11-02):AppKit 面板直接按此开窗、不读内容 fittingSize;中间滚动区 `maxHeight: .infinity` 吃掉头尾之外的全部高度——tab 栏 / 页头钉顶、底排钉底,告警横幅出没只挤中间,切 tab 面板不动 |
 
 窗口:主窗口最小 **720×560**(spec 钉死),默认 880×620;弹窗面板 **360×648 定尺寸**
@@ -463,29 +464,29 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   **版面纪律(ui-unify 追改,2026-11-09 用户实报三修,两形态同守)**:①图表区
   弹性高、卡头 / 根选 / 面包屑 `layoutPriority(1)` 不被挤压——**注意清理页在
   ScrollView 里,弹性区拿到无限高度提案、塌到最小高,最小高 ≈ 实际高**;两形态
-  各自处理:方块 `{layout.spacemap-chart-min-height}` 220 / 旭日 = **方形,边长 =
-  max(卡内容宽 − 2×`{spacing.card-padding-compact}`, `{layout.spacemap-sunburst-min-side}`
-  360),定宽定高、卡内居中**(06 用户拍板「跟外层卡片差不多,小一个 padding」;
-  宽由**卡级宽探针**提供——量卡片给的宽,绝不量图表自身:05 测自身宽与
-  ScrollView 内容宽正反馈,图表涨到比窗口还大;04 的 aspectRatio 在 ScrollView
-  里不可靠,均废);②**悬停零重排**——卡内不出现 /
+  各自处理:方块 `{layout.spacemap-chart-min-height}` 220 / 旭日 = **直径
+  min(卡内容宽, 图表区高)**、卡内居中——图表区高 = 可视高 ×
+  `{layout.spacemap-sunburst-viewport-share}` 0.8、下限
+  `{layout.spacemap-sunburst-min-side}` 360(`containerRelativeFrame` 量滚动
+  视口,space-map-forms/08 用户拍板「旭日跟随宽高中小的那个值画」:矮窗不顶天
+  立地、宽窗不缩成一小块、随窗口伸缩;06 的卡级宽探针随 min(w,h) 退役)。
+  历代已废:03/04 固定直径 340/400(宽卡里太小)、04 aspectRatio(ScrollView
+  里不可靠)、05 测图表自身宽(与内容宽正反馈撑爆)、06 边长 = 卡宽(= 窗口宽,
+  顶天立地)、07 两列(用户拍板「应该是上下布局」);②**悬停零重排**——卡内不出现 /
   消失任何占行元素(原卡顶悬停信息行已废),悬停信息与按钮一律浮在图表内;
   ③密封 / 叶子 / 「其他」点击解释 = 图表左上角浮层胶囊(cardHigh 90%,单行截断,
-  不吃点击),不占卡内一行;④**子页两列**(space-map-forms/07,用户拍板「卡
-  收窄」——06 全宽卡时「圆 = 卡宽」= 圆 = 窗口宽,顶天立地):子页内容宽 ≥ 800
-  (= 2×(旭日边长下限 360 + 卡内距 32) + 卡距 16)时**地图卡与扫描摘要卡左右
-  两列**(各 `maxWidth: .infinity`、间距 `{spacing.card-gap}` 16、顶对齐),
-  旭日随半宽卡(≈ 500-600,头部 / 面包屑始终可见);窄窗回退上下堆叠(整行卡);
-  摘要卡统计行 `ViewThatFits` 半宽折行(4 项 → 2+2、3 项 → 2+1,全宽首选整行)。
+  不吃点击),不占卡内一行;④**子页上下堆叠**(地图卡在上、扫描摘要卡在下;
+  07 两列版废;摘要卡统计行 `ViewThatFits` 折行保留——全宽首选整行,放不下折
+  2+2 / 2+1)。
   - **方块(treemap,默认形态)**:squarify(`TreemapLayout`),块内 名字 + 实际
     占用(放得下时),高块底部百分比 10.5pt `.monospaced` 小标(等宽登记例外);
     「可清理」大块药丸 / 小块圆点(p4-uninstaller/05);悬停白名单块(≥140×48)
     时「这块能清」浮在该块右上角。
   - **旭日(两环,v1 形态以正确写法回归)**:内环 = 当前根的子辈、外环 = 孙辈,
-    叶子与密封块延伸占满外环(`SunburstLayout`);**直径 = 方形边长 = 卡内容宽 −
-    2×12(≥ `{layout.spacemap-sunburst-min-side}` 360),卡内居中**(06 拍板
-    「跟外层卡片差不多,小一个 padding」;340/400 固定直径、04 aspectRatio、
-    05 自测宽均废)。**命中 = atan2 标准极角直接
+    叶子与密封块延伸占满外环(`SunburstLayout`);**直径 = min(卡内容宽,
+    可视高 × 0.8)、下限 360,卡内居中**(08 拍板「跟随宽高中小的那个值」;
+    固定直径 / aspectRatio / 自测宽 / 卡宽即边长 / 两列半宽卡均废)。
+    **命中 = atan2 标准极角直接
     比对**(`SunburstArc.contains(angle:)`,纯值可测)——弧角本身就是标准极角,
     05 前视图层多加 π/2「换算」致悬停恒偏 90°(v1 起潜伏,回归测试钉死)。
     环形半径 0.28–0.65 /

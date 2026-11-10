@@ -114,9 +114,6 @@ struct CleanerTabView: View {
     /// 空间地图的导航态放在壳层(07):切子药丸再回来不丢下钻位置。
     @State private var mapDrillPath: String?
     @State private var mapTreeIndex = 0
-    /// 空间地图子页内容宽(space-map-forms/07 两列版式的探针;量的是子页容器宽,
-    /// 与两卡自身尺寸无关,零反馈)。
-    @State private var mapSectionWidth: CGFloat = 0
     /// 轻桥(p4-uninstaller/05):地图「这块能清」→ 切垃圾子页并定位的组;
     /// JunkListSection 消费后自清。切走再回来地图下钻位置不丢(壳层既有态)。
     @State private var pendingJunkGroup: JunkGroup?
@@ -375,11 +372,8 @@ struct CleanerTabView: View {
     // MARK: 子页
 
     /// 空间地图子页(07 = 旭日图 + 03 的结果摘要;两卡读同一次扫描)。
-    /// 两卡并排响应式(space-map-forms/07,用户拍板「卡收窄」):内容宽 ≥ 800
-    /// (= 2×(旭日边长下限 360 + 卡内距 32) + 卡距 16)走两列——旭日随半宽卡,
-    /// 不再顶天立地(全宽卡时「圆 = 卡宽」= 圆 = 窗口宽,06 实案);窄窗回退堆叠。
-    private static let mapTwoColumnMinWidth: CGFloat = 800
-
+    /// 上下堆叠(space-map-forms/08,用户拍板「应该是上下布局,不是两列」——
+    /// 07 两列版废);旭日直径 = min(卡内容宽, 图表区高),见 CleanerSpaceMapView。
     @ViewBuilder private var mapSection: some View {
         switch model.phase {
         case .idle:
@@ -393,25 +387,9 @@ struct CleanerTabView: View {
         case let .scanning(stats):
             scanningCard(stats)
         case let .finished(result):
-            Group {
-                if mapSectionWidth >= Self.mapTwoColumnMinWidth {
-                    HStack(alignment: .top, spacing: 16) {
-                        spaceMapCard
-                            .frame(maxWidth: .infinity)
-                        summaryCard(result)
-                            .frame(maxWidth: .infinity)
-                    }
-                } else {
-                    VStack(spacing: 12) {
-                        spaceMapCard
-                        summaryCard(result)
-                    }
-                }
-            }
-            .onGeometryChange(for: CGFloat.self) { proxy in
-                proxy.size.width
-            } action: { _, width in
-                mapSectionWidth = width
+            VStack(spacing: 12) {
+                spaceMapCard
+                summaryCard(result)
             }
         }
     }
