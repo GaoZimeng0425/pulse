@@ -28,6 +28,56 @@ final class JunkRuleTableTests: XCTestCase {
         "vscode.cache": ("Library/Application Support/Code/CachedData", 1200),
         "cursor.cache": ("Library/Application Support/Cursor/CachedData", 600),
         "docker.desktopData": ("Library/Containers/com.docker.docker/Data", 21600),
+        // p6-cleaner/01 开发工具补行
+        "maven.repository": (".m2/repository", 150),
+        "cargo.registry": (".cargo/registry", 1800),
+        "uv.cache": (".cache/uv", 1600),
+        "go.caches": ("go/pkg/mod", 340),
+        "pnpm.metadataCache": ("Library/Caches/pnpm", 800),
+        "corepack.cache": (".cache/node/corepack", 30),
+        "yarn.cache": ("Library/Caches/Yarn", 40),
+        "deno.cache": ("Library/Caches/deno", 50),
+        "bun.cache": (".bun/install/cache", 70),
+        "electron.toolingCaches": ("Library/Caches/electron", 120),
+        "xcode.archives": ("Library/Developer/Xcode/Archives", 400),
+        "xcode.testDevices": ("Library/Developer/XCTestDevices", 60),
+        // p6-cleaner/01 知识库:浏览器(真机目录名,规范大小写)
+        "browser.arc": ("Library/Caches/Arc", 1700),
+        "browser.dia": ("Library/Caches/Dia", 900),
+        "browser.chrome": ("Library/Caches/Google", 100),
+        "browser.chromium": ("Library/Caches/Chromium", 10),
+        "browser.edge": ("Library/Caches/com.microsoft.edgemac", 10),
+        "browser.brave": ("Library/Caches/com.brave.Browser", 10),
+        "browser.firefox": ("Library/Caches/org.mozilla.firefox", 10),
+        "browser.opera": ("Library/Caches/com.operasoftware.Opera", 10),
+        "browser.zen": ("Library/Caches/Zen", 10),
+        "browser.safari": ("Library/Caches/com.apple.Safari", 30),
+        // p6-cleaner/01 知识库:应用缓存(含三条 Pulse 自定真案)
+        "appcache.cloudkit": ("Library/Caches/CloudKit", 1200),
+        "appcache.geoservices": ("Library/Caches/GeoServices", 50),
+        "appcache.slack": ("Library/Caches/Slack", 10),
+        "appcache.discord": ("Library/Caches/Discord", 10),
+        "appcache.zoom": ("Library/Caches/zoom.us", 10),
+        "appcache.telegram": ("Library/Caches/Telegram", 10),
+        "appcache.whatsapp": ("Library/Caches/WhatsApp", 10),
+        "appcache.notion": ("Library/Caches/Notion", 10),
+        "appcache.spotify": ("Library/Caches/Spotify", 10),
+        "appcache.figma": ("Library/Caches/Figma", 10),
+        "appcache.linear": ("Library/Caches/Linear", 10),
+        "appcache.raycast": ("Library/Caches/Raycast", 10),
+        "appcache.alfred": ("Library/Caches/Alfred", 10),
+        "appcache.claude": ("Library/Caches/Claude", 10),
+        "appcache.chatgpt": ("Library/Caches/ChatGPT", 10),
+        "appcache.iterm2": ("Library/Caches/iTerm2", 10),
+        "appcache.warp": ("Library/Caches/Warp", 10),
+        "appcache.ghostty": ("Library/Caches/Ghostty", 10),
+        "appcache.msAutoUpdate": ("Library/Caches/com.microsoft.autoupdate.fba", 10),
+        "appcache.edgeUpdater": ("Library/Caches/com.microsoft.EdgeUpdater", 10),
+        "appcache.googleUpdater": ("Library/Caches/com.google.Keystone", 10),
+        "appcache.easydict": ("Library/Caches/com.izual.Easydict", 120),
+        "appcache.doubaoIme": ("Library/Caches/com.bytedance.inputmethod.doubaoime", 200),
+        "appcache.zcodeUpdater": ("Library/Caches/@zcodedesktop-updater", 560),
+        "appcache.logs": ("Library/Logs", 100),
     ]
 
     /// 似是而非:名字像、位置像,但不是规则担保的那个目录。一个都不许出现。
@@ -41,6 +91,11 @@ final class JunkRuleTableTests: XCTestCase {
         "Library/Containers/com.docker.docker/Settings",
         "Library/Caches",
         "Library/pnpm",
+        // p6-cleaner/01:知识库外的 Caches 目录不列(认不出 = 不碰,ADR-0008 / spec 定案 10);
+        // 字面匹配大小写敏感,"arc" ≠ "Arc"。
+        "Library/Caches/arc",
+        "Library/Caches/MyGo Music",
+        "Library/Caches/Citro Labs",
     ]
 
     private func scanHome(
@@ -142,6 +197,14 @@ final class JunkRuleTableTests: XCTestCase {
         XCTAssertTrue(JunkRuleTable.rule(id: "docker.desktopData")?.rationale.contains("镜像、容器与卷——删除后全部丢失") == true)
         XCTAssertEqual(JunkRuleTable.rule(id: "jetbrains.caches")?.tier, .checkFirst)
         XCTAssertEqual(JunkRuleTable.rule(id: "xcode.deviceSupport")?.tier, .checkFirst)
+        // p6-cleaner/01 点名档位:归档不可重建恒先检查;系统联动类先检查;
+        // pnpm 元数据缓存与浏览器缓存可安全清理。
+        XCTAssertEqual(JunkRuleTable.rule(id: "xcode.archives")?.tier, .checkFirst)
+        XCTAssertEqual(JunkRuleTable.rule(id: "appcache.cloudkit")?.tier, .checkFirst)
+        XCTAssertEqual(JunkRuleTable.rule(id: "appcache.geoservices")?.tier, .checkFirst)
+        XCTAssertEqual(JunkRuleTable.rule(id: "appcache.doubaoIme")?.tier, .checkFirst)
+        XCTAssertEqual(JunkRuleTable.rule(id: "pnpm.metadataCache")?.tier, .safe)
+        XCTAssertEqual(JunkRuleTable.rule(id: "browser.arc")?.tier, .safe)
         for id in [
             "xcode.derivedData",
             "homebrew.cache",
@@ -154,7 +217,21 @@ final class JunkRuleTableTests: XCTestCase {
         ] {
             XCTAssertEqual(JunkRuleTable.rule(id: id)?.tier, .safe, id)
         }
-        XCTAssertTrue(JunkRuleTable.builtin.allSatisfy { $0.source.contains("MIT") }, "移植规则须注明出处与协议")
+        XCTAssertTrue(
+            JunkRuleTable.builtin.allSatisfy { $0.source.contains("MIT") || $0.source.contains("Pulse 自定") },
+            "每条规则注明出处:移植标 MIT 来源,自定标 Pulse 自定"
+        )
+    }
+
+    /// p6-cleaner/01 组序与归属(spec 定案 8):CaseIterable 序即 UI / 总览品类序。
+    func testGroupOrderAndOwnership() {
+        XCTAssertEqual(
+            JunkGroup.allCases.map(\.title),
+            ["开发工具", "浏览器", "应用缓存", "项目产物", "AI 模型", "卸载残留"]
+        )
+        XCTAssertEqual(JunkGroup.allCases.filter(\.groupsByOwner), [.projectArtifacts, .uninstallLeftovers])
+        // AI 模型组规则在 02 票落地——01 阶段该组必须无规则(空组不出段)。
+        XCTAssertTrue(JunkRuleTable.builtin.filter { $0.group == .aiModels }.isEmpty)
     }
 
     // MARK: 空目录 / 部分扫描 / 口径
@@ -198,16 +275,27 @@ final class JunkRuleTableTests: XCTestCase {
         XCTAssertTrue(afterPaths.isSubset(of: beforePaths), "排除只能让清单变短")
         XCTAssertFalse(afterPaths.contains(home + "/Library/Caches/Homebrew"))
         XCTAssertFalse(afterPaths.contains(home + "/Library/Caches/JetBrains"))
+        XCTAssertFalse(afterPaths.contains(home + "/Library/Caches/Arc"), "浏览器目录同样被收走")
         XCTAssertTrue(afterPaths.contains(home + "/Library/Developer/Xcode/DerivedData"), "不在排除前缀下的项不受影响")
-        XCTAssertEqual(before.count - after.count, 5, "Library/Caches 下的五条规则命中全部被收走")
+        // 正例表按前缀推导期望数——规则表扩,断言跟着自动长,不再写死常数。
+        let expectedCachesHits = positiveExamples.values.filter { $0.path.hasPrefix("Library/Caches/") }.count
+        XCTAssertEqual(before.count - after.count, expectedCachesHits, "Library/Caches 下的规则命中全部被收走")
     }
 
     // MARK: 排序
 
-    func testSortedByBytesDescendingWithinGroup() async {
+    /// p6-cleaner/01 起正例跨多组:全局断言改为「组序单调不降 + 组内大小降序」。
+    func testSortedByGroupOrderThenBytesDescending() async {
         let trees = await scanHome(allExamples())
-        let bytes = JunkMatcher.candidates(in: trees, home: home).map(\.bytes)
-        XCTAssertEqual(bytes, bytes.sorted(by: >))
-        XCTAssertEqual(bytes.first, 28000)
+        let candidates = JunkMatcher.candidates(in: trees, home: home)
+        let groupOrder = Dictionary(uniqueKeysWithValues: JunkGroup.allCases.enumerated().map { ($1, $0) })
+
+        let orders = candidates.map { groupOrder[$0.group] ?? 0 }
+        XCTAssertEqual(orders, orders.sorted(), "候选按 JunkGroup.allCases 组序分段")
+        for (_, items) in Dictionary(grouping: candidates, by: \.group) {
+            let bytes = items.map(\.bytes)
+            XCTAssertEqual(bytes, bytes.sorted(by: >), "组内按实际占用降序")
+        }
+        XCTAssertEqual(candidates.first?.ruleID, "xcode.derivedData", "第一组最大者开头")
     }
 }
