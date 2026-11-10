@@ -114,6 +114,9 @@ struct CleanerTabView: View {
     /// 空间地图的导航态放在壳层(07):切子药丸再回来不丢下钻位置。
     @State private var mapDrillPath: String?
     @State private var mapTreeIndex = 0
+    /// 空间地图子页内容宽(space-map-forms/07 两列版式的探针;量的是子页容器宽,
+    /// 与两卡自身尺寸无关,零反馈)。
+    @State private var mapSectionWidth: CGFloat = 0
     /// 轻桥(p4-uninstaller/05):地图「这块能清」→ 切垃圾子页并定位的组;
     /// JunkListSection 消费后自清。切走再回来地图下钻位置不丢(壳层既有态)。
     @State private var pendingJunkGroup: JunkGroup?
@@ -372,6 +375,11 @@ struct CleanerTabView: View {
     // MARK: 子页
 
     /// 空间地图子页(07 = 旭日图 + 03 的结果摘要;两卡读同一次扫描)。
+    /// 两卡并排响应式(space-map-forms/07,用户拍板「卡收窄」):内容宽 ≥ 800
+    /// (= 2×(旭日边长下限 360 + 卡内距 32) + 卡距 16)走两列——旭日随半宽卡,
+    /// 不再顶天立地(全宽卡时「圆 = 卡宽」= 圆 = 窗口宽,06 实案);窄窗回退堆叠。
+    private static let mapTwoColumnMinWidth: CGFloat = 800
+
     @ViewBuilder private var mapSection: some View {
         switch model.phase {
         case .idle:
@@ -385,20 +393,40 @@ struct CleanerTabView: View {
         case let .scanning(stats):
             scanningCard(stats)
         case let .finished(result):
-            VStack(spacing: 12) {
-                SpaceMapSection(
-                    model: model,
-                    drillPath: $mapDrillPath,
-                    treeIndex: $mapTreeIndex,
-                    onGoToJunk: { group in
-                        subTab = .junk
-                        junkFilter = nil // 地图轻桥定位 = 全量清单里的组,不是总览下钻态。
-                        pendingJunkGroup = group
+            Group {
+                if mapSectionWidth >= Self.mapTwoColumnMinWidth {
+                    HStack(alignment: .top, spacing: 16) {
+                        spaceMapCard
+                            .frame(maxWidth: .infinity)
+                        summaryCard(result)
+                            .frame(maxWidth: .infinity)
                     }
-                )
-                summaryCard(result)
+                } else {
+                    VStack(spacing: 12) {
+                        spaceMapCard
+                        summaryCard(result)
+                    }
+                }
+            }
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.width
+            } action: { _, width in
+                mapSectionWidth = width
             }
         }
+    }
+
+    private var spaceMapCard: some View {
+        SpaceMapSection(
+            model: model,
+            drillPath: $mapDrillPath,
+            treeIndex: $mapTreeIndex,
+            onGoToJunk: { group in
+                subTab = .junk
+                junkFilter = nil // 地图轻桥定位 = 全量清单里的组,不是总览下钻态。
+                pendingJunkGroup = group
+            }
+        )
     }
 
     private func scanningCard(_ stats: ScanStats) -> some View {
@@ -443,16 +471,41 @@ struct CleanerTabView: View {
                     .foregroundStyle(.tertiary)
                     .monospacedDigit()
             }
-            HStack(spacing: 24) {
-                StatValue(label: "实际占用", value: totalAccountedText(result))
-                StatValue(label: "文件", value: "\(result.stats.files)")
-                StatValue(label: "目录", value: "\(result.stats.directories)")
-                StatValue(label: "硬链接去重", value: "\(result.stats.hardlinkSkips)")
+            // 半宽卡(两列版式,space-map-forms/07)下整行放不下:ViewThatFits
+            // 折行(4 项 → 2+2、3 项 → 2+1);全宽堆叠形态首选仍是整行原样。
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 24) {
+                    StatValue(label: "实际占用", value: totalAccountedText(result))
+                    StatValue(label: "文件", value: "\(result.stats.files)")
+                    StatValue(label: "目录", value: "\(result.stats.directories)")
+                    StatValue(label: "硬链接去重", value: "\(result.stats.hardlinkSkips)")
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 24) {
+                        StatValue(label: "实际占用", value: totalAccountedText(result))
+                        StatValue(label: "文件", value: "\(result.stats.files)")
+                    }
+                    HStack(spacing: 24) {
+                        StatValue(label: "目录", value: "\(result.stats.directories)")
+                        StatValue(label: "硬链接去重", value: "\(result.stats.hardlinkSkips)")
+                    }
+                }
             }
-            HStack(spacing: 24) {
-                StatValue(label: "block 口径对照", value: fallbackText(result))
-                StatValue(label: "部分扫描目录", value: "\(result.ledger.count)")
-                StatValue(label: "iCloud 壳文件", value: "\(result.stats.datalessFiles)")
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 24) {
+                    StatValue(label: "block 口径对照", value: fallbackText(result))
+                    StatValue(label: "部分扫描目录", value: "\(result.ledger.count)")
+                    StatValue(label: "iCloud 壳文件", value: "\(result.stats.datalessFiles)")
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 24) {
+                        StatValue(label: "block 口径对照", value: fallbackText(result))
+                        StatValue(label: "部分扫描目录", value: "\(result.ledger.count)")
+                    }
+                    HStack(spacing: 24) {
+                        StatValue(label: "iCloud 壳文件", value: "\(result.stats.datalessFiles)")
+                    }
+                }
             }
             if let note = accountingNote(result) {
                 Text(note)
