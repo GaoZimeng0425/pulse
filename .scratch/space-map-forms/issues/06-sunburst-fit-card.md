@@ -10,7 +10,7 @@
 定宽定高、卡内居中——即用户拍板的「跟外层卡片差不多,每侧小一个 padding」
 (12 = {spacing.card-padding-compact},既有令牌)。
 
-**Status:** done(2026-11-10,待合 develop)
+**Status:** done(2026-11-10,develop@4111ca7)
 spacing 令牌,无新数值)
 
 - [x] 旭日不再溢出/撑爆;边长 = 卡内容宽 − 24,卡内居中,随窗口宽窄伸缩
