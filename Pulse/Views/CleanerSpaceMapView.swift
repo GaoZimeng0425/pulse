@@ -37,6 +37,11 @@ private let sunburstMinSide: CGFloat = 360
 /// 小的那个值画」):扣的两成留给页头 / 卡头 / 面包屑与下方摘要卡露头。
 private let sunburstViewportShare: CGFloat = 0.8
 
+/// 旭日图表区高上限(= 直径上限,{layout.spacemap-sunburst-max-side},
+/// space-map-forms/09 用户实报「旭日的时候卡片那么大,有没有最大高度」):
+/// 高/最大化窗口里卡片不再跟着可视高无限变长(卡总高 ≈ 图表区 + 头部 ~150)。
+private let sunburstMaxSide: CGFloat = 520
+
 /// 展示形态(用户偏好;@AppStorage 记住上次,默认 treemap = v3 既定形态)。
 private enum SpaceMapForm: String, CaseIterable {
     case treemap
@@ -470,12 +475,12 @@ struct SpaceMapSection: View {
             noticeOverlay
         }
         // 上下堆叠、圆随「宽高取小」(space-map-forms/08,用户拍板):图表区高 =
-        // 可视高 × {sunburstViewportShare}(containerRelativeFrame 量滚动视口),
-        // 旭日直径 = min(卡内容宽, 图表区高)、卡内居中——矮窗不顶天立地(06
-        // 教训:边长 = 卡宽 = 窗宽),宽窗不缩成一小块(03/04 固定值教训),
-        // 随窗口大小伸缩。06 的卡级宽探针随之退役:min(w, h) 不再需要知道宽的数值。
+        // clamp(可视高 × {sunburstViewportShare}, 下限 360, 上限 520)
+        // (containerRelativeFrame 量滚动视口),旭日直径 = min(卡内容宽, 图表区高)、
+        // 卡内居中——矮窗不顶天立地(06 教训),高窗卡片封顶不再整屏长
+        // (09 用户实报「卡片那么大」),宽窗不缩成一小块(03/04 固定值教训)。
         .containerRelativeFrame(.vertical) { length, _ in
-            max(length * sunburstViewportShare, sunburstMinSide)
+            min(max(length * sunburstViewportShare, sunburstMinSide), sunburstMaxSide)
         }
     }
 
