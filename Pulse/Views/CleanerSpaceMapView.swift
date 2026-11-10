@@ -13,11 +13,14 @@ import SwiftUI
 // 版面纪律(ui-unify 追改,2026-11-09 用户实报三修,两形态同守):图表区弹性高、
 // 卡头不被挤压;悬停零重排——不出现/消失任何占行元素,信息与按钮都浮在图表内。
 
-/// 两形态共用的强调色循环(DESIGN.md 十个 accent 令牌,零新色;旭日外环随父色)。
-private let chartColors: [Color] = [
-    Metric.cpu, .memory, .network, .battery, .gpu,
-    .sensors, .sound, .bluetooth, .containers, .disk,
-].map(\.accentColor)
+// 同色系深浅(space-map-forms/02,用户拍板 2026-11-10:十色循环嫌闹):整图只用
+// 卡强调色(cleanAccent)按不透明度 0.85→0.30 均分——大块深、小块浅;旭日内环按
+// 占比取阶、外环 = 父色 −0.15;hover 一律 +0.08(封顶 0.95)。密封 = inkTertiary
+// 0.5、「其他」= cardHigh 0.75 不变;块内/弧内文字色随深浅切换(≥0.55 白,其余墨)。
+private let rampHighest: Double = 0.85
+private let rampLowest: Double = 0.30
+private let rampOuterStep: Double = 0.15
+private let hoverBoost: Double = 0.08
 
 /// 图表区最小高({layout.spacemap-chart-min-height}):弹性区吃掉卡的剩余高度;
 /// 220 = 主窗口最小高 560 下整页仍放得下的底线(原定高 340 在矮窗口挤爆页头)。
@@ -27,9 +30,17 @@ private let chartMinHeight: CGFloat = 220
 private let sunburstDiameter: CGFloat = 340
 
 /// 展示形态(用户偏好;@AppStorage 记住上次,默认 treemap = v3 既定形态)。
-private enum SpaceMapForm: String {
+private enum SpaceMapForm: String, CaseIterable {
     case treemap
     case sunburst
+
+    var pillTitle: String {
+        self == .treemap ? "方块" : "旭日"
+    }
+
+    var pillSymbol: String {
+        self == .treemap ? "square.grid.3x3" : "chart.pie"
+    }
 }
 
 struct SpaceMapSection: View {
@@ -111,20 +122,23 @@ struct SpaceMapSection: View {
         .cardShell(compact: false)
     }
 
-    /// 形态切换(卡头 segmented;记住上次选择,与 settings.* 惯例同家)。
-    /// 切换不重置下钻位置——同一棵树换个透镜看,不是重新导航。
+    /// 形态切换 = 标准件 PillTabBar(.selectedOnly 图标形态;space-map-forms/02:
+    /// 原 segmented 被用户点名非标准件)。记住上次选择;切换不重置下钻位置——
+    /// 同一棵树换个透镜看,不是重新导航。
     private var formPicker: some View {
-        Picker("图表形态", selection: $formRaw) {
-            Text("方块").tag(SpaceMapForm.treemap.rawValue)
-            Text("旭日").tag(SpaceMapForm.sunburst.rawValue)
+        PillTabBar(SpaceMapForm.allCases, selection: formBinding, textVisibility: .selectedOnly) { form in
+            PillTabItem(title: form.pillTitle, symbol: form.pillSymbol, tint: accent)
         }
-        .pickerStyle(.segmented)
-        .controlSize(.small)
-        .fixedSize()
-        .help("空间地图的展示形态;切换不改变当前下钻位置")
         .onChange(of: formRaw) { _, _ in
             hoveredKey = nil
         }
+    }
+
+    private var formBinding: Binding<SpaceMapForm> {
+        Binding(
+            get: { SpaceMapForm(rawValue: formRaw) ?? .treemap },
+            set: { formRaw = $0.rawValue }
+        )
     }
 
     private var emptyTreeText: some View {
@@ -173,19 +187,23 @@ struct SpaceMapSection: View {
                     )
                     guard rect.width > 6, rect.height > 6 else { continue }
 
-                    let color = rectColor(tr.node, index: index)
-                    let isHovered = hoveredTreemapIndex == index
+                    let fill = blockFill(
+                        node: tr.node,
+                        rank: index,
+                        count: rects.count,
+                        isHovered: hoveredTreemapIndex == index
+                    )
 
                     context.fill(
                         Path(roundedRect: rect, cornerRadius: 5),
-                        with: .color(color.opacity(isHovered ? 0.9 : tr.node.isSealed ? 0.5 : 0.75))
+                        with: .color(fill.color.opacity(fill.opacity))
                     )
 
                     if rect.width > 48, rect.height > 16 {
                         let name = tr.node.name
                         let sz = PulseFormat.memory(UInt64(max(0, tr.node.bytes)))
                         let pct = String(format: "%.1f%%", tr.rect.width * tr.rect.height * 100)
-                        let textColor: Color = tr.node.isSealed ? .primary : .white
+                        let textColor = fill.textColor
                         let font = Font.system(size: min(11, rect.height / 2.2), weight: .medium)
 
                         context.draw(
@@ -263,14 +281,47 @@ struct SpaceMapSection: View {
         return rects.firstIndex { $0.rect.contains(p) }
     }
 
-    private func rectColor(_ node: SpaceMapNode, index: Int) -> Color {
+    /// 块填充(两形态同一套配色出口):正常块 = 色阶(rank 0 = 最大块最深),
+    /// 密封灰、「其他」浅灰;hover 一律 +0.08。文字色随深浅切换——浅块上白字
+    /// 看不清,换墨色;密封与「其他」本身就是浅面,恒用墨色。
+    private struct BlockFill {
+        let color: Color
+        let opacity: Double
+        let textColor: Color
+    }
+
+    private func blockFill(
+        node: SpaceMapNode,
+        rank: Int,
+        count: Int,
+        isHovered: Bool
+    ) -> BlockFill {
+        let base: BlockFill
         if node.isSealed {
-            return Surface.inkTertiary
+            base = BlockFill(color: Surface.inkTertiary, opacity: 0.5, textColor: .primary)
+        } else if node.isAggregate {
+            base = BlockFill(color: Surface.cardHigh, opacity: 0.75, textColor: .primary)
+        } else {
+            let opacity = rampOpacity(rank: rank, count: count)
+            base = BlockFill(
+                color: accent,
+                opacity: opacity,
+                textColor: opacity >= 0.55 ? .white : .primary
+            )
         }
-        if node.isAggregate {
-            return Surface.cardHigh
-        }
-        return chartColors[index % chartColors.count]
+        guard isHovered else { return base }
+        return BlockFill(
+            color: base.color,
+            opacity: min(base.opacity + hoverBoost, 0.95),
+            textColor: base.textColor
+        )
+    }
+
+    /// 色阶不透明度:rank 0(最大块)最深 0.85,均分到最浅 0.30。
+    private func rampOpacity(rank: Int, count: Int) -> Double {
+        guard count > 1 else { return (rampHighest + rampLowest) / 2 }
+        let t = Double(rank) / Double(count - 1)
+        return rampHighest - t * (rampHighest - rampLowest)
     }
 
     /// 轻桥(p4-uninstaller/05):悬停命中白名单块时,「这块能清」浮在该块右上角。
@@ -354,12 +405,8 @@ struct SpaceMapSection: View {
                     )
                     path.closeSubpath()
                     let isHovered = hovered?.id == arc.id
-                    context.fill(
-                        path,
-                        with: .color(item.color.opacity(
-                            isHovered ? 0.9 : arc.node.isSealed ? 0.5 : 0.75
-                        ))
-                    )
+                    let fillOpacity = isHovered ? min(item.opacity + hoverBoost, 0.95) : item.opacity
+                    context.fill(path, with: .color(item.color.opacity(fillOpacity)))
                 }
 
                 // 「可清理」小圆点(treemap 小块退化为点的同款口径;药丸文字弧里放不下)。
@@ -392,7 +439,7 @@ struct SpaceMapSection: View {
                         layer.rotate(by: .radians(rotation))
                         layer.draw(
                             Text(label).font(.system(size: 10.5, weight: .semibold))
-                                .foregroundColor(.white),
+                                .foregroundColor(item.opacity >= 0.55 ? Color.white : Color.primary),
                             at: .zero,
                             anchor: .center
                         )
@@ -428,20 +475,39 @@ struct SpaceMapSection: View {
         .frame(minHeight: chartMinHeight, maxHeight: .infinity)
     }
 
-    /// 内环按序循环令牌、外环随父色(布局按父-子顺序产出,顺序即着色依据;v1 同款)。
-    private func coloredArcs(_ arcs: [SunburstArc]) -> [(arc: SunburstArc, color: Color)] {
-        var result: [(arc: SunburstArc, color: Color)] = []
-        var ring1Index = 0
-        var current = chartColors[0]
+    /// 同色系着色(space-map-forms/02):内环按占比取色阶(大弧深、小弧浅),
+    /// 外环 = 父色 −0.15;密封灰、「其他」浅灰(布局按父-子顺序产出)。
+    private struct ColoredArc {
+        let arc: SunburstArc
+        let color: Color
+        let opacity: Double
+    }
+
+    private func coloredArcs(_ arcs: [SunburstArc]) -> [ColoredArc] {
+        let ring1Count = arcs.filter { $0.ring == 1 }.count
+        var result: [ColoredArc] = []
+        var ring1Rank = 0
+        var parentOpacity = rampHighest
         for arc in arcs {
-            if arc.ring == 1 {
-                current = chartColors[ring1Index % chartColors.count]
-                ring1Index += 1
+            if arc.node.isSealed {
+                result.append(ColoredArc(arc: arc, color: Surface.inkTertiary, opacity: 0.5))
+                continue
             }
-            let color = arc.node.isSealed
-                ? Surface.inkTertiary
-                : (arc.node.isAggregate ? Surface.cardHigh : current)
-            result.append((arc, color))
+            if arc.node.isAggregate {
+                result.append(ColoredArc(arc: arc, color: Surface.cardHigh, opacity: 0.75))
+                continue
+            }
+            if arc.ring == 1 {
+                parentOpacity = rampOpacity(rank: ring1Rank, count: ring1Count)
+                ring1Rank += 1
+                result.append(ColoredArc(arc: arc, color: accent, opacity: parentOpacity))
+            } else {
+                result.append(ColoredArc(
+                    arc: arc,
+                    color: accent,
+                    opacity: max(parentOpacity - rampOuterStep, 0.2)
+                ))
+            }
         }
         return result
     }

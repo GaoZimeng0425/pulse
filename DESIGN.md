@@ -229,6 +229,9 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 
 ## Components
 
+**总规矩(2026-11-10 用户拍板「以后都应该使用这些标准组件」):新 UI 一律优先
+组装本节标准件;标准件覆盖不了的形态,先补本表再造,不私开同义新件。**
+
 - **卡片家族零件**(arch-review-2026-10-18/02 中4,`Pulse/Views/CardFamily.swift`):卡壳
   `cardShell(compact:)`(底色 + 圆角 + 内距,两档;`padded: false` 只给内距随版式
   变化、自己排内距的卡用——总览卡 16/12、指标主卡 20/12)、主卡头 `CardHeader`(22pt 徽章 +
@@ -437,7 +440,9 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   **双形态、同一画法**(用户拍板 2026-11-09:两种都要 Canvas 绘制,不要两种
   方案)——单个 SwiftUI Canvas 一次 draw call,命中一律坐标反算、不依赖形状
   hit test(方块 = rect.contains;旭日 = atan2 角度 + sqrt 半径)。形态切换 =
-  卡头 segmented 双选「方块 / 旭日」,`settings.spaceMapForm` @AppStorage 记住
+  卡头 `PillTabBar` `.selectedOnly` 双项图标(「方块」square.grid.3x3 /
+  「旭日」chart.pie;space-map-forms/02——原 segmented 非标准件已废),
+  `settings.spaceMapForm` @AppStorage 记住
   上次;切换不重置下钻位置(下钻 / 面包屑由 CleanerTabView 持有,切子药丸不丢)。
   **版面纪律(ui-unify 追改,2026-11-09 用户实报三修,两形态同守)**:①图表区
   弹性高(`{layout.spacemap-chart-min-height}` 起、吃掉卡的剩余高度),卡头 /
@@ -452,16 +457,20 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   - **旭日(两环,v1 形态以正确写法回归)**:内环 = 当前根的子辈、外环 = 孙辈,
     叶子与密封块延伸占满外环(`SunburstLayout`);直径 = 画布短边、上限
     `{layout.sunburst-diameter}`,环形半径 0.36–0.68 / 0.68–0.99;弧间角向留缝;
-    弧内标签 10.5pt semibold 白(份额阈值内才显示、左半圆翻转 180° 外向可读、
-    按弧长量宽截断);「可清理」= 弧内小圆点(药丸弧里放不下)。**中心圈 0.34 =
+    弧内标签 10.5pt semibold(份额阈值内才显示、左半圆翻转 180° 外向可读、
+    按弧长量宽截断;文字色随弧深浅切换);「可清理」= 弧内小圆点(药丸弧里放不下)。**中心圈 0.34 =
     悬停读数位**:悬停弧时显示该块名字 12 + 实际占用 14.5 + 「占当前 N%」(密封
     「只读系统区」/ 合并块「含 N 项」);不悬停时显示当前根 + 「↩ 返回上级」
     (顶层为「点击色块下钻」提示,点按中心圈 = 返回上级)。悬停白名单弧时
     「这块能清」锚在该弧中角外缘、钳制在图内(弧带窄,块内右上角配方套不进)。
-  - **两形态共享**:配色十个 `{colors.accent-*}` 按序循环(旭日外环随父色)、
-    「其他」合并块 = `{colors.surface-card-high}`、系统密封块 =
-    `{colors.inkTertiary}`(不可下钻;不透明度同一套:常规 0.75 / 密封 0.5 /
-    hover 0.9);「这块能清」浮层按钮同一配方(borderless 10.5 semibold 青 +
+  - **两形态共享**:配色 = **同色系深浅**(2026-11-10 用户拍板「颜色不好看」,
+    废十色 accent 循环)——整图只用卡强调色 `cleanAccent` 按不透明度 0.85→0.30
+    均分:大块深、小块浅,旭日内环按占比取阶、外环 = 父色 −0.15;hover 一律
+    +0.08(封顶 0.95);块内 / 弧内文字色随深浅切换(≥0.55 白,其余墨)。
+    「其他」合并块 = `{colors.surface-card-high}` 0.75、系统密封块 =
+    `{colors.inkTertiary}` 0.5(不可下钻);**「其他」合并线两形态统一 1%**——
+    小于整卷 1% 的目录不单独画出,画出来的都要够看清(space-map-forms/02)。
+    「这块能清」浮层按钮同一配方(borderless 10.5 semibold 青 +
     cardHigh 90% 胶囊底,help 文案明示判定来源与地图只读);点块下钻 / 面包屑逐级
     可跳(`›` 分隔,末级加粗,末尾「回到整卷」)/ 头部「在 Finder 中显示」。块与弧
     **不做任何动画**(meter 条同款纪律)。**v1 只读:卡上没有任何删除控件**
@@ -479,7 +488,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   工具栏/历史页用)与 `.comfortable`(13.5→**14.5 medium** + 内距 14×8,高≈34;
   2026-11-05 用户拍板清理页整体升「舒适密度」,唯清理页子页条用此档)。
   两种文字形态:`.selectedOnly`(未选中纯图标 / 选中图标+文字;图标-only 必带
-  a11y label + help)与 `.always`(文字恒显)。四处用法同一组件:主窗口工具栏
+  a11y label + help)与 `.always`(文字恒显)。五处用法同一组件:主窗口工具栏
   tab(`MetricPillTabBar` 薄封装 = `.selectedOnly` + ←/→ 键盘 + 首尾再留 4pt
   与系统玻璃底的间距;选中才展开文字是用户拍板 2026-10-16 的宽度根治法)、
   历史页指标条(同工具栏形态:五项各指标色 + 与主窗口 tab 同符号,系统负载取
@@ -487,7 +496,9 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   只在有分项的指标——温度、功率——出现,挂在指标条正下方,`.always` 无图标,一次
   看一条线不叠加;各项取分项色——功率单域取五路功率卡域配色 `PowerDomain.tint`,
   一个出处;间距沿用页面竖排间距 8 / 12,不另立数值)、历史页范围条(`.always` 无
-  图标,色调随所选指标 / 分项)。
+  图标,色调随所选指标 / 分项)、空间地图形态切换(space-map-forms/02:
+  `.selectedOnly` 双项图标「方块 square.grid.3x3 / 旭日 chart.pie」,卡头内,
+  原 segmented 非标准件已废)。
   玻璃外裹(用户拍板 2026-10-22:历史页要同款包裹):工具栏胶囊是 macOS 26
   工具栏给 `.principal` 自动套的系统玻璃;内容页用法传 `isGlassContainer: true`
   自备同款——药丸外 4pt 内距 + 系统 Liquid Glass `glassEffect()` 胶囊(系统

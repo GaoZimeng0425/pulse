@@ -25,11 +25,12 @@ public enum TreemapLayout {
     /// - Parameters:
     ///   - root: 当前钻入根。
     ///   - maxChildren: 超出的尾部并入「其他」合成块。
-    ///   - minFraction: 低于此占比的尾部并入「其他」。
+    ///   - minFraction: 低于此占比的尾部并入「其他」。默认 1% = 最小可见块
+    ///     (space-map-forms/02 用户拍板:画出来的块都要够看清)。
     public static func layout(
         root: SpaceMapNode,
         maxChildren: Int = 16,
-        minFraction: Double = 0.003
+        minFraction: Double = 0.01
     ) -> [TreemapRect] {
         let sorted = root.children.sorted {
             $0.bytes != $1.bytes ? $0.bytes > $1.bytes : $0.path < $1.path
