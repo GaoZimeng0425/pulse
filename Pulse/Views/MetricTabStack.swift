@@ -189,7 +189,11 @@ struct MetricTabStack<Ranking: View>: View {
                 overviewCards(style: style)
             }
         } else {
-            AdaptiveCardGrid {
+            AdaptiveCardGrid(
+                minimumCardWidth: AdaptiveCardGridMetrics.minimumCardWidth,
+                spacing: AdaptiveCardGridMetrics.spacing,
+                maximumColumns: AdaptiveCardGridMetrics.maximumColumns
+            ) {
                 overviewCards(style: style)
             }
         }
@@ -271,41 +275,11 @@ struct MetricTabBlockBuilder {
     }
 }
 
-/// 自适应网格的常量(泛型 struct 不支持 static 存储属性,独立枚举承载)。
+/// 自适应网格的常量(泛型 struct 不支持 static 存储属性,独立枚举承载;
+/// 网格本体 = CardFamily 的 `AdaptiveCardGrid`,2026-11-10 合一)。
 private enum AdaptiveCardGridMetrics {
     /// 单卡最小宽(DESIGN.md `layout.overview-card-min-width`)。
     static let minimumCardWidth: CGFloat = 340
     static let spacing: CGFloat = 16
     static let maximumColumns = 4
-}
-
-/// 自适应列数的卡片网格(总览用,用户拍板 2026-10-24:列数 1–4 随窗宽):
-/// 列数 = 内容宽容纳的最多列(单卡最小宽 340 + 列距 16),夹在 1…4——
-/// 比系统的 `.adaptive` 多一个**上限**(ultrawide 不出第 5 列)。宽度经
-/// `onGeometryChange` 读取,只在跨档时改状态,拖拽缩放不逐帧重排。
-private struct AdaptiveCardGrid<Card: View>: View {
-    /// 初值取默认窗宽(880)的档位,首帧即正确;onGeometryChange 随后按实测纠正。
-    @State private var columnCount = 2
-    @ViewBuilder let cards: () -> Card
-
-    var body: some View {
-        LazyVGrid(
-            columns: Array(
-                repeating: GridItem(.flexible(), spacing: AdaptiveCardGridMetrics.spacing),
-                count: columnCount
-            ),
-            spacing: AdaptiveCardGridMetrics.spacing
-        ) {
-            cards()
-        }
-        .onGeometryChange(for: Int.self) { proxy in
-            let perColumn = AdaptiveCardGridMetrics.minimumCardWidth + AdaptiveCardGridMetrics.spacing
-            let fitted = Int((proxy.size.width + AdaptiveCardGridMetrics.spacing) / perColumn)
-            return min(AdaptiveCardGridMetrics.maximumColumns, max(1, fitted))
-        } action: { newValue in
-            if newValue != columnCount {
-                columnCount = newValue
-            }
-        }
-    }
 }

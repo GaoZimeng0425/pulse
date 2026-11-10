@@ -300,3 +300,39 @@ struct CardEmptyState: View {
         .padding(.vertical, 16)
     }
 }
+
+/// 自适应列数的卡片网格:列数 = 内容宽容纳的最多列(单卡最小宽 + 列距),
+/// 夹在 1…上限——比系统 `.adaptive` 多一个**上限**(ultrawide 不出更多列)。
+/// 宽度经 `onGeometryChange` 读取,只在跨档时改状态,拖拽缩放不逐帧重排。
+/// 唯一实现(2026-11-10 合一):此前 MetricTabStack 与清理总览各有一份逐行
+/// 相同的私有副本,仅差三个数值——单卡最小宽 / 列距 / 列数上限由调用方按
+/// DESIGN.md 令牌传入(指标页 340·16·4,清理总览 340·12·2)。
+struct AdaptiveCardGrid<Card: View>: View {
+    /// 初值取默认窗宽(880)的档位,首帧即正确;onGeometryChange 随后按实测纠正。
+    @State private var columnCount = 2
+    let minimumCardWidth: CGFloat
+    let spacing: CGFloat
+    let maximumColumns: Int
+    @ViewBuilder let cards: () -> Card
+
+    var body: some View {
+        LazyVGrid(
+            columns: Array(
+                repeating: GridItem(.flexible(), spacing: spacing),
+                count: columnCount
+            ),
+            spacing: spacing
+        ) {
+            cards()
+        }
+        .onGeometryChange(for: Int.self) { proxy in
+            let perColumn = minimumCardWidth + spacing
+            let fitted = Int((proxy.size.width + spacing) / perColumn)
+            return min(maximumColumns, max(1, fitted))
+        } action: { newValue in
+            if newValue != columnCount {
+                columnCount = newValue
+            }
+        }
+    }
+}
