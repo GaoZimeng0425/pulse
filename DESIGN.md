@@ -342,24 +342,39 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
     既有最大档)+ caption 12「可回收 · 其中 X 可放心清」(X 染 `{colors.state-positive}`);
     构成条高 8 圆角 4,三段 = safe `{colors.state-positive}` / check `{colors.state-caution}` /
     inuse `{colors.ink-tertiary}`(段宽按三段合计归一,inuse 段最小可见宽 2%、为 0 不画);
-    图例 11(色块 8×8 圆角 2.5):可安全清理 / 先检查 / 在用保护 / **「另有废纸篓 X」**
-    (色块 `{colors.junk-trash}` 磁盘金);主按钮「一键清理 X 安全项…」(accent-clean、
+    图例 11(统一配方见下):可安全清理 / 先检查 / 在用保护 / **「另有废纸篓 X」**
+    (色块 `{colors.junk-trash}` 磁盘金;X 读不到 / 没查如实写「—」,不写 0);主按钮
+    「一键清理 X 安全项…」(accent-clean、
     `.large` borderedProminent;X = safe 合计;一键 = 全选全部 safe 且**非在用**候选 →
     既有确认单,默认勾选仍全不勾,「先检查」与在用项永不在内)。
+  - **图例统一配方**(p6-review-fixes 收编:Hero / 模块大卡 / 废纸篓卡三处同一
+    `OverviewLegendItem`,此前三副本参数漂移——色块 8×8 r2.5 / 7×7 r2、块字距
+    5 / 4、项间 14、Hero 条-图例纵距 7 全不在 4pt 网格):文字 11 secondary +
+    `monospacedDigit`;色块 8×8 圆角 2.5;色块-文字 `{spacing.unit}` 4;图例项间
+    `{spacing.group-gap}` 12;Hero 构成条与图例纵向 `{spacing.gap}` 8。
   - **模块大卡**(六品类 + 废纸篓共七张):2 列自适应(`{layout.module-card-min-width}`
     340、列距 12、上限 2 列);卡壳走 `cardShell` 全尺寸档(内距 16——原型 18×20 收编到
     零件档,不另立卡壳);图标瓦 42pt(`CategoryIconTile` size 42、圆角随组件公式
     size×0.24;类别身份色 `{colors.junk-*}` + 白符号);类名 `{typography.section-title}`
     17 bold(原型 16 收五档)+ 一句人话 11 secondary(文案蓝本 = 原型);大数字
     `{typography.figure-card}` 24;卡内构成条高 7 圆角 3.5(同三段色,空段不画、
-    inuse>0 最小可见宽 3%);图例 11:可安全清理 X / 先检查 X(>0 才显)/ 在用 X
+    inuse>0 最小可见宽 3%);图例 11(统一配方,见上):可安全清理 X / 先检查 X
+    (>0 才显)/ 在用 X
     (>0 才显)/ N 项;「最大一项:名称 · 大小」行(顶部分隔线 + 上距 10,11,
     名称 semibold primary)+ 右缘 chevron;**整卡可点 = 下钻**全部清单按品类过滤。
-    空组不出卡(该品类候选为空自然缺位,不硬造)。
+    空组不出卡(该品类候选为空自然缺位,不硬造)。下钻空态(该品类被过滤后无
+    条目)走 `CardEmptyState`(与全量空态同族,p6-review-fixes 收编裸 Text)。
   - **废纸篓卡**(变体,非白名单候选):无构成条;读数大数字同 24 档 + 「N 项」
     (多卷才显「所有卷汇总」);独立「清空废纸篓…」按钮(普通 bordered、B 档;复用
     `beginEmptyTrash` → 二次确认流,p6-cleaner/03 自页头迁来,页头原按钮撤除);
-    点卡不下钻。
+    点卡不下钻。**读数四态**(p6-review-fixes;读不到 ≠ 空,只有查到了才出数字):
+    没查 = 读数位给「清点废纸篓」(11pt `.link`,卡片家族授权型能力动作同款)+ 副文
+    「尚未清点」;清点中 = 小号转圈 + 「正在清点…」(刷新时有上次读数则继续显示
+    数字,不闪占位);读不到 = 「重试清点」+ 副文「读不到(权限不足或宗卷不可用)」,
+    不出 0,Hero 图例同步写「—」;查到了 = 大数字 + 「N 项」。**进页不自动清点**:
+    清点要枚举外置宗卷的废纸篓,可能弹系统授权——首次读数只来自用户点击(「清点
+    废纸篓」或「清空废纸篓…」),本次打开期间清点成功过之后进页才自动刷新,读失败
+    后不自动重试(CODING_STANDARDS 权限纪律)。
   - **下钻**:全部清单顶部「‹ 总览」返回行(12 accent 文字按钮 + 品类标题 17 bold +
     「X · N 项」12 secondary + 「全选安全项」)+ 该品类条目(行形态零新,继续
     RowMetrics / CleanerListMetrics 与项目大卡既有形态);总览↔清单切换不丢勾选

@@ -179,9 +179,11 @@ private struct JunkListCard: View {
             if displayedCandidates.isEmpty {
                 if let filter = groupFilter.wrappedValue {
                     drillBackRow(group: filter, items: [], safeItems: [])
-                    Text("该品类在当前清单里没有条目——可能已排除、已移入废纸篓,或重新扫描后不再命中。")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
+                    // 空态走卡片家族零件(与全量空态同族),不再裸 Text。
+                    CardEmptyState(
+                        title: "该品类当前没有条目",
+                        detail: "可能已排除、已移入废纸篓,或重新扫描后不再命中"
+                    )
                     Spacer(minLength: 0)
                 } else {
                     CardEmptyState(
@@ -279,8 +281,8 @@ private struct JunkListCard: View {
                 // 下钻态(p6-cleaner/03):「‹ 总览」返回行(组头的标题/合计/全选安全项
                 // 并入返回行,原型同款,不重复组头)+ 该品类条目;排序沿用该组既有偏好。
                 let items = (byGroup[filter] ?? []).sortedForDisplay(by: sortMode(for: filter))
-                let safeItems = items
-                    .filter { $0.tier == .safe && model.inUseReasons(for: $0, entries: activity) == nil }
+                // 组选资格单出处(CleanInUse.isSafeAutoSelectable):先检查、在用项不参与。
+                let safeItems = items.filter { CleanInUse.isSafeAutoSelectable($0, entries: activity) }
                 VStack(alignment: .leading, spacing: 4) {
                     drillBackRow(group: filter, items: items, safeItems: safeItems)
                     groupRows(for: filter, items: items, activity: activity)
@@ -289,9 +291,9 @@ private struct JunkListCard: View {
                 ForEach(JunkGroup.allCases.filter { byGroup[$0] != nil }, id: \.self) { group in
                     let items = (byGroup[group] ?? []).sortedForDisplay(by: sortMode(for: group))
                     // 组选只吃组内「可安全清理」且**非在用**的项(拍板 B + 在用保护):
-                    // 先检查项、在用项都不参与组选,组里没有可勾项就不给按钮。
-                    let safeItems = items
-                        .filter { $0.tier == .safe && model.inUseReasons(for: $0, entries: activity) == nil }
+                    // 先检查项、在用项都不参与组选,组里没有可勾项就不给按钮
+                    // (资格谓词单出处 CleanInUse.isSafeAutoSelectable)。
+                    let safeItems = items.filter { CleanInUse.isSafeAutoSelectable($0, entries: activity) }
                     VStack(alignment: .leading, spacing: 4) {
                         groupHeader(group, items: items, safeItems: safeItems)
                             .id(group)
@@ -328,10 +330,11 @@ private struct JunkListCard: View {
                 // 状态 = 反映全部非在用子项(手勾的「先检查」也算数,父级
                 // 如实显示半选/全选);动作 = 只全选/全清**安全档**子项
                 // ——没有安全项可勾(纯先检查/纯在用)时 checkbox 置灰
-                // 不给假按钮。
+                // 不给假按钮(资格谓词单出处 CleanInUse.isSafeAutoSelectable)。
                 let nonInUse = projectGroup.items
                     .filter { model.inUseReasons(for: $0, entries: activity) == nil }
-                let autoSelectable = nonInUse.filter { $0.tier == .safe }
+                let autoSelectable = projectGroup.items
+                    .filter { CleanInUse.isSafeAutoSelectable($0, entries: activity) }
                 let allInUse = !projectGroup.items.isEmpty && nonInUse.isEmpty
                 // 收起态按「组/键」记:项目名与 bundle id 同名也不串。
                 let cardKey = group.rawValue + "/" + projectGroup.projectName

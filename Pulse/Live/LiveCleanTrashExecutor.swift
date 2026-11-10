@@ -141,17 +141,26 @@ struct LiveCleanTrashExecutor: CleanTrashExecutor {
 // MARK: - 清点(p4-uninstaller/04:确认弹窗的数字来源)
 
 extension LiveCleanTrashExecutor {
-    /// 点「清空废纸篓」时现点:各卷顶层条目数 + 分配大小求和(约数)。不删任何
-    /// 东西;失败卷如实少报不了——枚举失败按 0 项计(空卷语义),删除时自会报数。
-    func inventory() async -> TrashInventory {
+    /// 点「清空废纸篓」/ 总览「清点」时现点:各卷顶层条目数 + 分配大小求和(约数)。
+    /// 不删任何东西。字节口径见 `allocatedSize`:每个顶层条目整树递归求和,大废纸篓
+    /// 可达秒级,调用方都在后台任务里跑。
+    func inventory() async -> TrashInventory? {
+        Self.inventory(of: Self.userTrashDirectories())
+    }
+
+    /// 清点给定的(卷名, 废纸篓目录)。与发现逻辑分开,单测用临时目录钉住失败语义。
+    /// 任一目录枚举失败 → 整体返回 nil:读不到 ≠ 空,少报一卷与报 0 同样是伪造
+    /// (防御性数据纪律;原实现失败即跳过该卷,读不到的废纸篓被记成 0 项)。
+    /// 调用方按 nil 走占位;真空的目录照常交 0 项——0 是真读数。
+    static func inventory(of directories: [(String, String)]) -> TrashInventory? {
         var volumes: [TrashInventory.Volume] = []
-        for (volume, directory) in Self.userTrashDirectories() {
+        for (volume, directory) in directories {
             guard let entries = try? FileManager.default.contentsOfDirectory(atPath: directory) else {
-                continue
+                return nil
             }
             let names = entries.filter { $0 != ".DS_Store" }
             let bytes = names.reduce(Int64(0)) { partial, name in
-                partial + Self.allocatedSize(atPath: (directory as NSString).appendingPathComponent(name))
+                partial + allocatedSize(atPath: (directory as NSString).appendingPathComponent(name))
             }
             volumes.append(TrashInventory.Volume(name: volume, items: names.count, bytes: bytes))
         }
