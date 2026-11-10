@@ -94,6 +94,13 @@ final class CleanerModel {
     private(set) var historyLoadFailed = false
 
     private var scanTask: Task<Void, Never>?
+    /// 扫描代数(cleaner-scan-hang):startScan 递增,任务侧捕获自己的代数;落位
+    /// (进度/finish)前比对——被强制放弃或被重扫取代的孤儿任务,迟到的结果与
+    /// 进度一律拒收,不污染界面状态。
+    @ObservationIgnored private var scanGeneration = 0
+    /// 取消硬兜底时限:点取消后后台最多这么久没自己收尾,界面就强制退出扫描态。
+    /// 生产默认 5s = 真机正常取消收尾(拼树 + 在途目录 settle)上限之上;测试注入短值。
+    @ObservationIgnored private let scanCancelForceTimeout: TimeInterval
     private let engine = SpaceScanEngine()
     private let exclusions: CleanExclusionsStore
     private let scanRoots: CleanScanRootsStore
@@ -182,8 +189,10 @@ final class CleanerModel {
         },
         aiManifestReader: @escaping (String) -> String? = { path in
             try? String(contentsOfFile: path, encoding: .utf8)
-        }
+        },
+        scanCancelForceTimeout: TimeInterval = 5
     ) {
+        self.scanCancelForceTimeout = scanCancelForceTimeout
         self.exclusions = exclusions
         self.scanRoots = scanRoots
         self.history = history
@@ -497,6 +506,8 @@ final class CleanerModel {
         }
         let liveEnumerator = LiveCleanDirectoryEnumerator()
         let source = enumerator ?? liveEnumerator
+        scanGeneration &+= 1
+        let generation = scanGeneration
         // 方案 A 路径域修正:物理根喂枚举器,树路径以规范根("/")落——匹配/排除/展示同域。
         // 测试注入自定义 roots 时保持原样(夹具路径即规范路径)。
         let canonical = scanRoots == [Self.productionScanRoot] ? ["/"] : nil
@@ -514,7 +525,16 @@ final class CleanerModel {
         )
 
         let collectApps = appInventoryCollector()
-        scanTask = Task.detached(priority: .utility) { [engine, volumeSummaries, scanCache, collectApps, weak self] in
+        // userInitiated(自 utility 升档,cleaner-scan-hang):用户亲手点的扫描不被
+        // 满载机器压制——utility 在系统 100% 负载下被 OS 调度挤到停摆(2026-11-10
+        // 实案:7 分钟零输出、取消无响应),与缓存装载 21s 先例同病;purge 同款定策。
+        scanTask = Task.detached(priority: .userInitiated) { [
+            engine,
+            volumeSummaries,
+            scanCache,
+            collectApps,
+            weak self
+        ] in
             let scanBegin = Date()
             let result = await engine.scan(
                 options,
@@ -522,8 +542,9 @@ final class CleanerModel {
                 progress: { stats in
                     // 引擎每 2048 项发一次(≈10 次/s @2.1 万项/s),直接跳 MainActor
                     // 足够;迟到的进度跳块由 isScanning 守门,不会盖掉 finished。
+                    // 代数守卫:被强制放弃的孤儿任务不再把 .idle 拉回 .scanning。
                     Task { @MainActor in
-                        guard let self, self.isScanning else { return }
+                        guard let self, self.isScanning, self.scanGeneration == generation else { return }
                         self.phase = .scanning(stats)
                     }
                 },
@@ -549,7 +570,10 @@ final class CleanerModel {
             // 落盘缓存(票 11):写一次,失败只记日志不影响扫描结果;体积/耗时实测
             // 见票面(真机 60 万节点 Release 基准)。取消的扫描是半棵树,不落盘——
             // 否则覆盖掉上一份完整缓存,重开看到残缺地图(cleaner-hardening/04)。
-            if let scanCache, !result.cancelled {
+            // 代数守卫(cleaner-scan-hang):被强制放弃/取代的孤儿任务即使跑完也
+            // 不落盘——晚到的旧结果倒灌覆盖新扫描的缓存。
+            if let scanCache, !result.cancelled,
+               await MainActor.run(body: { self?.scanGeneration == generation }) {
                 let started = await MainActor.run { self?.scanStartedAt ?? Date() }
                 let excluded = await MainActor.run { self?.exclusions.paths ?? [] }
                 let meta = SpaceScanMeta(
@@ -567,7 +591,7 @@ final class CleanerModel {
                     category: "Cleaner"
                 )
             }
-            await MainActor.run { self?.finish(result, mapTrees: mapTrees, inventory: inventory) }
+            await MainActor.run { self?.finish(generation, result, mapTrees: mapTrees, inventory: inventory) }
         }
     }
 
@@ -579,10 +603,45 @@ final class CleanerModel {
     }
 
     func cancelScan() {
-        scanTask?.cancel()
+        guard let task = scanTask else { return }
+        task.cancel()
+        // 硬兜底(cleaner-scan-hang):协作取消只在引擎目录入口被消费,worker 停摆
+        // (高负载压制 / 不可中断枚举)时长时间无人应门——2026-11-10 实案点了取消
+        // 全无反应直到杀 app。到时仍未收尾 = 界面强制退出扫描态,孤儿任务断线。
+        let generation = scanGeneration
+        let timeout = scanCancelForceTimeout
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(timeout))
+            self?.abandonScanIfStuck(generation)
+        }
     }
 
-    private func finish(_ result: SpaceScanResult, mapTrees: [SpaceMapNode], inventory: InstalledAppInventory) {
+    /// 取消兜底落点:同一轮扫描仍在 .scanning = 协作取消超时未被消费,放弃它。
+    /// 代数先跳一级把孤儿任务(进度 / finish)断线,再退界面;正常路径若已先
+    /// finish,isScanning 为假,此处零动作。
+    private func abandonScanIfStuck(_ generation: Int) {
+        guard generation == scanGeneration, isScanning else { return }
+        LogService.warn(
+            "取消扫描:\(scanCancelForceTimeout) 秒未收尾,强制放弃本次扫描(后台任务停摆)",
+            category: "Cleaner"
+        )
+        scanGeneration &+= 1
+        scanTask = nil
+        phase = .idle
+        scanStartedAt = nil
+        selection.retain(in: candidates)
+    }
+
+    private func finish(
+        _ generation: Int,
+        _ result: SpaceScanResult,
+        mapTrees: [SpaceMapNode],
+        inventory: InstalledAppInventory
+    ) {
+        guard generation == scanGeneration else {
+            LogService.info("扫描落位:代数已过期(被强制放弃/重扫取代),拒收迟到结果", category: "Cleaner")
+            return
+        }
         scanFinishedAt = Date()
         installedApps = inventory // 先于 phase:清单首读即带全集
         phase = .finished(result)

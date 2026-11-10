@@ -678,6 +678,87 @@ final class CleanerModelTests: XCTestCase {
         XCTAssertEqual(saves.value, 0, "取消的扫描不落盘")
     }
 
+    /// 取消硬兜底(cleaner-scan-hang):枚举停摆(不返回、不应取消)时协作取消无人
+    /// 应门——时限一到界面必须退出扫描态回空态。被放弃的任务断线:之后即使跑完,
+    /// 结果不落位、不落盘;界面也没被它占住,可以重新发起扫描。
+    func testCancelAbandonsStuckScanAndIgnoresItsLateResult() async {
+        final class Counter: @unchecked Sendable {
+            private let lock = NSLock()
+            private var count = 0
+            func bump() {
+                lock.withLock { count += 1 }
+            }
+
+            var value: Int {
+                lock.withLock { count }
+            }
+        }
+        // 首个目录枚举即挂起到测试放行;continuation 不响应取消 = 真停摆。
+        actor StuckEnumerator: CleanDirectoryEnumerator {
+            private var entered = false
+            private var released = false
+            private var waiters: [CheckedContinuation<Void, Never>] = []
+
+            var hasEntered: Bool {
+                entered
+            }
+
+            func release() {
+                released = true
+                for waiter in waiters {
+                    waiter.resume()
+                }
+                waiters = []
+            }
+
+            func entries(ofDirectory _: String) async throws -> [FsEntrySnapshot] {
+                entered = true
+                if !released {
+                    await withCheckedContinuation { waiters.append($0) }
+                }
+                return []
+            }
+        }
+        let saves = Counter()
+        let inventories = Counter()
+        let stuck = StuckEnumerator()
+        let model = CleanerModel(
+            exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
+            scanCache: CleanScanResultStore(load: { nil }, save: { _ in saves.bump() }),
+            homeDirectory: "/Users/me",
+            // 采集在引擎返回之后、落盘与落位之前:被调用 = 任务已走到收尾段(下面的等待锚)。
+            installedAppInventory: { _, _, _ in
+                inventories.bump()
+                return .complete([])
+            },
+            scanCancelForceTimeout: 0.1
+        )
+        func isIdle() -> Bool {
+            if case .idle = model.phase {
+                return true
+            }
+            return false
+        }
+
+        model.startScan(using: stuck, roots: ["/r"])
+        await waitUntil { await stuck.hasEntered }
+        model.cancelScan()
+        await waitUntil { !model.isScanning }
+        XCTAssertTrue(isIdle(), "停摆的扫描被取消后回空态")
+
+        // 放行被放弃的任务:取消后它没再经过目录入口,带着一份「未取消」的结果晚到。
+        await stuck.release()
+        await waitUntil { inventories.value == 1 }
+        try? await Task.sleep(nanoseconds: 200_000_000) // 等它把收尾两步(落盘判定 / 落位)走完
+        XCTAssertTrue(isIdle(), "被放弃的扫描晚到的结果不落位")
+        XCTAssertEqual(saves.value, 0, "被放弃的扫描不落盘")
+
+        // 界面没被旧任务占住:重新扫描照常完成并落盘。
+        model.startScan(using: FakeCleanDirectoryEnumerator(listings: ["/r": .entries([])]), roots: ["/r"])
+        await waitUntil { model.result != nil }
+        XCTAssertEqual(saves.value, 1, "新一轮扫描照常落盘")
+    }
+
     func testCacheStalenessHintWhenExclusionsChangedAfterScan() async {
         final class Box: @unchecked Sendable {
             private let lock = NSLock()
