@@ -179,9 +179,11 @@ private struct JunkListCard: View {
             if displayedCandidates.isEmpty {
                 if let filter = groupFilter.wrappedValue {
                     drillBackRow(group: filter, items: [], safeItems: [])
-                    Text("该品类在当前清单里没有条目——可能已排除、已移入废纸篓,或重新扫描后不再命中。")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
+                    // 空态走卡片家族零件(与全量空态同族),不再裸 Text。
+                    CardEmptyState(
+                        title: "该品类当前没有条目",
+                        detail: "可能已排除、已移入废纸篓,或重新扫描后不再命中"
+                    )
                     Spacer(minLength: 0)
                 } else {
                     CardEmptyState(

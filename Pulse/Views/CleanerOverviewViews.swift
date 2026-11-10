@@ -6,7 +6,7 @@ import SwiftUI
 //
 // 数据面全部来自 PulseCore 纯值:`JunkOverviewAggregator.overview`(Hero 与模块卡)、
 // `TrashInventory`(废纸篓读数)、`JunkOverviewAggregator.safeAutoSelection`(一键清理,
-// 经 CleanerModel.selectAllAndRequestClean 落勾选并弹既有确认单)。本文件只描边配色;
+// 经 CleanerModel.selectAllSafeAndRequestClean 落勾选并弹既有确认单)。本文件只描边配色;
 // 数值令牌见 DESIGN.md §Components「清理总览页」。
 
 // MARK: - 品类卡文案(蓝本 = 丙案 v2 原型;身份色在 MetricAccent.swift 单出处)
@@ -52,7 +52,7 @@ struct CleanerOverviewSection: View {
     /// 点模块大卡 = 下钻全部清单按品类过滤(导航由壳层做,它持有 subTab / junkFilter)。
     let onDrill: (JunkGroup) -> Void
     /// Hero 主按钮「一键清理…」:导航到清单(确认单挂在那)由壳层做,勾选 + requestClean
-    /// 在 `CleanerModel.selectAllAndRequestClean`。
+    /// 在 `CleanerModel.selectAllSafeAndRequestClean`。
     let onOneClickClean: () -> Void
 
     private var accent: Color {
@@ -155,6 +155,35 @@ struct CleanerOverviewSection: View {
     }
 }
 
+// MARK: - 图例(Hero / 模块大卡 / 废纸篓卡共用)
+
+/// 总览图例的尺寸单出处(DESIGN.md §Components「清理总览页·图例」;p6-review-fixes:
+/// 此前三处各写一份,色块 8×8 r2.5 / 7×7 r2、块字距 5 / 4、项间 14 互相漂移)。
+private enum OverviewLegendMetrics {
+    /// 色块边长 / 圆角(DESIGN.md Hero 图例既有值 8×8 圆角 2.5,三处统一到它)。
+    static let swatchSize: CGFloat = 8
+    static let swatchCornerRadius: CGFloat = 2.5
+    /// 色块-文字间距 = {spacing.unit}。
+    static let swatchTextSpacing: CGFloat = 4
+    /// 图例项之间 = {spacing.group-gap}。
+    static let itemSpacing: CGFloat = 12
+}
+
+/// 图例项:色块 + 文字(字号 / 颜色 / 等宽数字由所在图例行统一给)。
+private struct OverviewLegendItem: View {
+    let text: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: OverviewLegendMetrics.swatchTextSpacing) {
+            RoundedRectangle(cornerRadius: OverviewLegendMetrics.swatchCornerRadius, style: .continuous)
+                .fill(tint)
+                .frame(width: OverviewLegendMetrics.swatchSize, height: OverviewLegendMetrics.swatchSize)
+            Text(text)
+        }
+    }
+}
+
 // MARK: - Hero 卡
 
 /// Hero 卡(丙案 v2):可回收总量大数字 + 三段构成条 + 图例(含废纸篓)+ 一键清理主按钮。
@@ -171,7 +200,7 @@ private struct OverviewHeroCard: View {
                 figureText(PulseFormat.memoryFigure(UInt64(max(0, overview.totalBytes))), size: FigureSize.main)
                 caption
             }
-            VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: 8) {
                 // 构成条:hero 高 8 圆角 4,inuse 段最小可见 2%(DESIGN.md 清理总览页)。
                 CompositionBar(
                     safeBytes: overview.safeBytes,
@@ -195,9 +224,11 @@ private struct OverviewHeroCard: View {
             .disabled(overview.safeBytes <= 0 || busy)
             .help("勾选全部「可安全清理」且不在用的项,并弹确认单——「先检查」与在用保护项永不在内")
         }
+        // 内距 24×28 随版式(DESIGN.md Hero 条目);卡壳走零件(padded: false 只给
+        // 底色圆角,圆角令牌 CardMetrics.cornerRadius——不再手写 18)。
         .padding(.vertical, 24)
         .padding(.horizontal, 28)
-        .background(Surface.card, in: .rect(cornerRadius: 18, style: .continuous))
+        .cardShell(compact: false, padded: false)
     }
 
     /// 大数字(figure 族唯一实现 FigureText;hero 取既有最大档 44)。
@@ -218,14 +249,14 @@ private struct OverviewHeroCard: View {
             .foregroundStyle(.secondary)
     }
 
-    /// 图例(11):三段 + 废纸篓(磁盘金色块,读数未清点时如实「—」)。
+    /// 图例(11):三段 + 废纸篓(磁盘金色块,读数没查 / 读不到时如实「—」)。
     private var legend: some View {
-        HStack(spacing: 14) {
-            legendItem("可安全清理 \(bytesText(overview.safeBytes))", tint: Surface.positive)
-            legendItem("先检查 \(bytesText(overview.checkBytes))", tint: Surface.caution)
-            legendItem("在用保护 \(bytesText(overview.inUseBytes))", tint: Surface.inkTertiary)
-            legendItem(
-                "另有废纸篓 \(trashBytes.map { PulseFormat.memory(UInt64(max(0, $0))) } ?? "—")",
+        HStack(spacing: OverviewLegendMetrics.itemSpacing) {
+            OverviewLegendItem(text: "可安全清理 \(bytesText(overview.safeBytes))", tint: Surface.positive)
+            OverviewLegendItem(text: "先检查 \(bytesText(overview.checkBytes))", tint: Surface.caution)
+            OverviewLegendItem(text: "在用保护 \(bytesText(overview.inUseBytes))", tint: Surface.inkTertiary)
+            OverviewLegendItem(
+                text: "另有废纸篓 \(trashBytes.map { PulseFormat.memory(UInt64(max(0, $0))) } ?? "—")",
                 tint: JunkTrashIdentity.color
             )
         }
@@ -233,15 +264,6 @@ private struct OverviewHeroCard: View {
         .foregroundStyle(.secondary)
         .monospacedDigit()
         .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func legendItem(_ text: String, tint: Color) -> some View {
-        HStack(spacing: 5) {
-            RoundedRectangle(cornerRadius: 2.5, style: .continuous)
-                .fill(tint)
-                .frame(width: 8, height: 8)
-            Text(text)
-        }
     }
 
     private func bytesText(_ bytes: Int64) -> String {
@@ -304,15 +326,16 @@ private struct OverviewModuleCard: View {
         }
     }
 
-    /// 图例(11):先检查 / 在用只在 >0 时显(空段不画,原型同款);N 项无色块。
+    /// 图例(11,统一配方 OverviewLegendItem):先检查 / 在用只在 >0 时显(空段
+    /// 不画,原型同款);N 项无色块。
     private var legendRow: some View {
-        HStack(spacing: 14) {
-            legendItem("可安全清理 \(bytesText(row.safeBytes))", tint: Surface.positive, swatch: 7)
+        HStack(spacing: OverviewLegendMetrics.itemSpacing) {
+            OverviewLegendItem(text: "可安全清理 \(bytesText(row.safeBytes))", tint: Surface.positive)
             if row.checkBytes > 0 {
-                legendItem("先检查 \(bytesText(row.checkBytes))", tint: Surface.caution, swatch: 7)
+                OverviewLegendItem(text: "先检查 \(bytesText(row.checkBytes))", tint: Surface.caution)
             }
             if row.inUseBytes > 0 {
-                legendItem("在用 \(bytesText(row.inUseBytes))", tint: Surface.inkTertiary, swatch: 7)
+                OverviewLegendItem(text: "在用 \(bytesText(row.inUseBytes))", tint: Surface.inkTertiary)
             }
             Text("\(row.itemCount) 项")
         }
@@ -320,15 +343,6 @@ private struct OverviewModuleCard: View {
         .foregroundStyle(.secondary)
         .monospacedDigit()
         .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func legendItem(_ text: String, tint: Color, swatch: CGFloat) -> some View {
-        HStack(spacing: 4) {
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(tint)
-                .frame(width: swatch, height: swatch)
-            Text(text)
-        }
     }
 
     private var largestRow: some View {
@@ -421,13 +435,8 @@ private struct OverviewTrashCard: View {
     }
 
     private var metaRow: some View {
-        HStack(spacing: 14) {
-            HStack(spacing: 4) {
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(JunkTrashIdentity.color)
-                    .frame(width: 7, height: 7)
-                Text(metaText)
-            }
+        HStack(spacing: OverviewLegendMetrics.itemSpacing) {
+            OverviewLegendItem(text: metaText, tint: JunkTrashIdentity.color)
             if let reading = phase.reading,
                reading.volumes.filter({ $0.items > 0 }).count > 1 {
                 Text("所有卷汇总")
