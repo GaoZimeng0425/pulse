@@ -12,7 +12,7 @@
 **顺带(用户同句立规):** DESIGN.md §Components 头部补总规矩——新 UI 一律优先
 组装标准组件,覆盖不了的先补表再造,不私开同义新件(此前只对卡片家族有此约束)。
 
-**Status:** done(2026-11-10,待合 develop)
+**Status:** done(2026-11-10,develop@61c0c59)
 
 - [x] 切换器换 PillTabBar(.selectedOnly,square.grid.3x3 / chart.pie 图标)
 - [x] 两形态同色系深浅;深浅两端文字色都可读;hover 提亮统一 +0.08
