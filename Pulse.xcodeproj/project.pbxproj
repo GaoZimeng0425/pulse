@@ -117,6 +117,7 @@
 		9373E71BC708506D35A85877 /* HistoryFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A686C29DAEAD2AC1D94E833 /* HistoryFeatureTests.swift */; };
 		9449EB0472D580D4E71AD350 /* CleanerSpaceMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53623D09AB9CE417052C09D5 /* CleanerSpaceMapView.swift */; };
 		982599D2B6085264FC74583F /* SmcFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA3DD124F0650F10B15F255D /* SmcFeature.swift */; };
+		9BB2782F91E17B5423C2296F /* CleanerOverviewViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC47165BC5F259312DF6927B /* CleanerOverviewViews.swift */; };
 		9C7077BF464DBFD663930F44 /* CleanerOrphanWiringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11274117D204376AE1F5655D /* CleanerOrphanWiringTests.swift */; };
 		9CA9402F5E9A105A62064DC4 /* CleanIPCService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A91773C5190E860C51B6E823 /* CleanIPCService.swift */; };
 		9E646AB14BF339B36602F1B8 /* BatterySensorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D0336878D6164F8E0FA0FCD /* BatterySensorTests.swift */; };
@@ -350,6 +351,7 @@
 		B8B61FF7D57A239D0234D1A3 /* PowerCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerCardViews.swift; sourceTree = "<group>"; };
 		BA0853EEEEB0FB9F6834A00E /* AlertSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSettingsStore.swift; sourceTree = "<group>"; };
 		BA63CBA09D59DD528C7124CA /* StatusBadgeChipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadgeChipTests.swift; sourceTree = "<group>"; };
+		BC47165BC5F259312DF6927B /* CleanerOverviewViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanerOverviewViews.swift; sourceTree = "<group>"; };
 		BD3B00277D6CF515AEA81E6C /* MenuBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarController.swift; sourceTree = "<group>"; };
 		BD925AFC633F3C421507FEE7 /* LiveInstalledAppInventory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveInstalledAppInventory.swift; sourceTree = "<group>"; };
 		BE86A48D24949B3D225394BD /* TestHostIsolationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHostIsolationTests.swift; sourceTree = "<group>"; };
@@ -589,6 +591,7 @@
 				DE72B348BD32348080C6C17C /* ChipView.swift */,
 				466F5B570F281FE23AEDE10C /* CleanerAppViews.swift */,
 				9E8DC1C1BAEF8918D34C6A90 /* CleanerJunkViews.swift */,
+				BC47165BC5F259312DF6927B /* CleanerOverviewViews.swift */,
 				0C6CEE6C6B6AE62D9C87C5E1 /* CleanerSettingsView.swift */,
 				53623D09AB9CE417052C09D5 /* CleanerSpaceMapView.swift */,
 				CEF074B1893DFC234824F594 /* CleanerViews.swift */,
@@ -906,6 +909,7 @@
 				C49326F452F57904BEE4786A /* CleanerAppViews.swift in Sources */,
 				D13598C5852FE5D54CB29D0B /* CleanerJunkViews.swift in Sources */,
 				47428E4FF35C1121BE1BF5AE /* CleanerModel.swift in Sources */,
+				9BB2782F91E17B5423C2296F /* CleanerOverviewViews.swift in Sources */,
 				BBB03F24EFBE9FB3735CEDF7 /* CleanerSettingsView.swift in Sources */,
 				9449EB0472D580D4E71AD350 /* CleanerSpaceMapView.swift in Sources */,
 				BD1F3E7EC48AE3C07CC765D3 /* CleanerViews.swift in Sources */,

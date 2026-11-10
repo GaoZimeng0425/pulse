@@ -75,6 +75,30 @@ extension GroupCategory {
     private static let orphanIdentity = Color.dynamic(light: 0xFF9500, dark: 0xFF9F0A)
 }
 
+// MARK: - 清理品类身份色(p6-cleaner/03,DESIGN.md {colors.junk-*})
+
+extension JunkGroup {
+    /// 清理总览模块大卡的类别身份色(图标瓦底 / 图例色块)唯一出处。映射 =
+    /// 丙案 v2 原型拍板:dev=CPU 蓝 / browser=GPU 粉 / app=App 棕 / proj=内存紫 /
+    /// ai=蓝牙青 / leftover=传感器橙红。同空间地图按序循环 accent-* 的先例——
+    /// 指标色在此作**类别身份**借用,不作页面强调(清理页强调仍只有 accent-clean)。
+    var identityColor: Color {
+        switch self {
+        case .globalToolCache: Metric.cpu.accentColor
+        case .browserCache: Metric.gpu.accentColor
+        case .appCache: GroupCategory.app.identityColor
+        case .projectArtifacts: Metric.memory.accentColor
+        case .aiModels: Metric.bluetooth.accentColor
+        case .uninstallLeftovers: Metric.sensors.accentColor
+        }
+    }
+}
+
+/// 废纸篓卡的身份色({colors.junk-trash} = 磁盘金):非候选、不属 JunkGroup,单独常量。
+enum JunkTrashIdentity {
+    static let color = Metric.disk.accentColor
+}
+
 // MARK: - 内存构成单表(工单 P0.6-05,评审 F5 去重)
 
 /// 内存 by-Type 分段的展示键(名称 + 色):总览内存卡统计点与 by-Type 环形卡

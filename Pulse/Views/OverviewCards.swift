@@ -99,6 +99,8 @@ enum FigureSize {
     static let main: CGFloat = 44
     /// `{typography.figure-main-compact}`:弹窗主卡。
     static let mainCompact: CGFloat = 30
+    /// `{typography.figure-card}`:清理总览模块大卡(p6-cleaner/03)。
+    static let card: CGFloat = 24
     /// `{typography.figure-overview}`:总览卡。
     static let overview: CGFloat = 34
     /// `{typography.figure-overview-compact}`:弹窗总览卡。
