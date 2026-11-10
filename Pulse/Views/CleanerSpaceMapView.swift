@@ -29,6 +29,10 @@ private let hoverBoost: Double = 0.08
 /// ScrollView 里拿到无限高度提案、塌到最小高,所以这个值 ≈ 方块形态的实际高度。
 private let chartMinHeight: CGFloat = 220
 
+/// 旭日方形边长下限({layout.spacemap-sunburst-min-side},space-map-forms/05):
+/// 窄窗防过小;宽窗边长 = 卡宽(铺满,04 拍板)。宽度下限由主窗口最小宽 720 保障。
+private let sunburstMinSide: CGFloat = 360
+
 /// 展示形态(用户偏好;@AppStorage 记住上次,默认 treemap = v3 既定形态)。
 private enum SpaceMapForm: String, CaseIterable {
     case treemap
@@ -51,6 +55,8 @@ struct SpaceMapSection: View {
     let onGoToJunk: (JunkGroup) -> Void
 
     @AppStorage("settings.spaceMapForm") private var formRaw = SpaceMapForm.treemap.rawValue
+    /// 旭日方形边长(测宽回写;见 sunburstBody 尾部的布局注释)。
+    @State private var sunburstSide: CGFloat = sunburstMinSide
     @State private var notice: String?
     /// 悬浮命中键(两形态各编各的:treemap "t<下标>";旭日 = SunburstArc.id)。
     @State private var hoveredKey: String?
@@ -461,11 +467,16 @@ struct SpaceMapSection: View {
             sunburstBridgeButton(arcs: arcs, resolve: resolve, in: geo.size)
             noticeOverlay
         }
-        // 铺满卡宽的方形(space-map-forms/04,用户拍板「放开铺满」):ScrollView 的
-        // 无限高度提案下 aspectRatio(1, .fit) 按宽度成正方——直径 = 卡内容宽,
-        // 无固定值(03 的 400 上限在宽卡里只占中间一点,用户实报「只有中间一点点」)。
-        // swiftlint:disable:next legacy_swiftui_aspect_ratio
-        .aspectRatio(1, contentMode: .fit)
+        // 方形边长 = max(卡宽, 下限),高随宽、卡内居中(space-map-forms/04 拍板
+        // 「放开铺满」;05 换手段:aspectRatio 套在 GeometryReader 上在 ScrollView
+        // 里既不铺满也不居中——用户实报;显式 onGeometryChange 测宽回写才确定)。
+        .frame(height: sunburstSide)
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            max(proxy.size.width, sunburstMinSide)
+        } action: { _, side in
+            sunburstSide = side
+        }
+        .frame(maxWidth: .infinity)
     }
 
     /// 分区异色着色(space-map-forms/03):内环每支一色(按序循环 accent,柔和
@@ -599,27 +610,12 @@ struct SpaceMapSection: View {
         let distance = sqrt(dx * dx + dy * dy)
         // 中心圆区域 → 无弧(中心有自己的交互:返回上级);图外 → 无弧。
         guard distance > radius * 0.26, distance <= radius * 0.995 else { return nil }
-        // atan2 的 0 = 正右(3 点钟),布局的 0 = 正上;统一到布局角再归到 [0, 2π)。
-        var angle = atan2(dy, dx)
-        if angle < 0 {
-            angle += 2 * .pi
-        }
-        var layoutAngle = angle + .pi / 2
-        if layoutAngle >= 2 * .pi {
-            layoutAngle -= 2 * .pi
-        }
+        // atan2 的结果就是标准极角,与弧的 start/end 同一坐标系——直接比对
+        // (space-map-forms/05:旧代码在此多加 π/2「换算」到所谓「0 = 正上」坐标,
+        // 命中恒偏 90°、永远落到顺时针下一段;v1 起潜伏,用户实报 hover 偏移)。
+        let angle = atan2(dy, dx)
         let ring = distance <= radius * 0.65 ? 1 : 2
-        for arc in arcs where arc.ring == ring {
-            // 跨 0 弧(start > end)两头都覆盖。
-            if arc.start <= arc.end {
-                if layoutAngle >= arc.start, layoutAngle < arc.end {
-                    return arc
-                }
-            } else if layoutAngle >= arc.start || layoutAngle < arc.end {
-                return arc
-            }
-        }
-        return nil
+        return arcs.first { $0.ring == ring && $0.contains(angle: angle) }
     }
 
     private func handleSunburstTap(

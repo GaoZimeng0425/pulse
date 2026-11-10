@@ -290,4 +290,28 @@ final class SpaceMapTests: XCTestCase {
         XCTAssertEqual(ring1[0].flipsLabel, false)
         XCTAssertEqual(ring1[1].flipsLabel, true)
     }
+
+    /// 命中判定 = atan2 标准极角直接比对(space-map-forms/05):弧的 start/end 就是
+    /// 标准极角,视图层旧命中多加 π/2「换算」,悬停恒偏 90°、落到顺时针下一段。
+    func testArcContainsStandardPolarAngle() {
+        let root = SpaceMapNode(name: "整卷", path: "/", bytes: 100, children: [
+            SpaceMapNode(name: "a", path: "/a", bytes: 40),
+            SpaceMapNode(name: "b", path: "/b", bytes: 30),
+            SpaceMapNode(name: "c", path: "/c", bytes: 20),
+            SpaceMapNode(name: "d", path: "/d", bytes: 10),
+        ])
+        let ring1 = SunburstLayout.layout(root: root).filter { $0.ring == 1 }
+        // 布局从 -π/2(正上)顺时针:a = [-0.5π, 0.3π)、b = [0.3π, 0.9π)、
+        // c = [0.9π, 1.3π)、d = [1.3π, 1.5π)——d 是正上偏左的收尾窄段。
+        XCTAssertTrue(ring1[0].contains(angle: -.pi / 4), "右上象限中点命中 a")
+        XCTAssertTrue(ring1[0].contains(angle: 0.2 * .pi), "a 尾段——旧 +π/2 换算会错判给 b")
+        XCTAssertFalse(ring1[1].contains(angle: 0.2 * .pi), "a 上的点不得命中顺时针下一段")
+        XCTAssertTrue(ring1[1].contains(angle: .pi / 2), "正下方命中 b")
+        XCTAssertTrue(ring1[2].contains(angle: .pi), "正左命中 c")
+        // 同一物理位置的不同 2π 周期表示:正上偏左的标准角为负(atan2 口径 ≈ -0.53π),
+        // d 的区间却是 [1.3π, 1.5π)——周期折叠必须认出它们是同一点。
+        XCTAssertTrue(ring1[3].contains(angle: -.pi / 2 - 0.1), "正上偏左(atan2 负角)命中 d")
+        XCTAssertTrue(ring1[3].contains(angle: 1.4 * .pi), "同一点的正角表示")
+        XCTAssertFalse(ring1[0].contains(angle: .pi), "正左不属于 a")
+    }
 }
