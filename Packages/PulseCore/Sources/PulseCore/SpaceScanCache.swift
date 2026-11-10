@@ -52,6 +52,10 @@ public struct SpaceScanCachePayload: Sendable {
 }
 
 public enum SpaceScanCache {
+    /// 落盘文件名(mcp-disk-usage/01 提公共:app 侧 CleanScanResultStore 与
+    /// pulse-mcp 读同一文件,名字单一出处)。
+    public static let defaultFileName = "scan-cache-v1.bin"
+
     static let magic: [UInt8] = Array("PSC1".utf8)
     /// 格式版本(魔数后 u32 小端)。不兼容变更:改魔数,不覆写旧文件语义。
     /// v2(2026-11-03):meta 增 cleanedPaths(清理后重开不再回列表);v1 文件弃用,
