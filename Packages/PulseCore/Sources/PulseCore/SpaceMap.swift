@@ -335,6 +335,7 @@ public extension SunburstArc {
 }
 
 /// 两环旭日布局:角度按字节份额分配、小份额尾部并入「其他」、叶子/密封块延伸占满外环。
+/// 合并线默认 1% = 最小可见弧(space-map-forms/02 用户拍板:画出来的弧都要够看清)。
 public enum SunburstLayout {
     /// 满圆弧在 Path 里画不出来(起止重合),留一道细缝。
     static let fullCircleEpsilon = 0.001
@@ -342,7 +343,7 @@ public enum SunburstLayout {
     public static func layout(
         root: SpaceMapNode,
         maxChildren: Int = 12,
-        minArcFraction: Double = 0.005,
+        minArcFraction: Double = 0.01,
         startAngle: Double = -.pi / 2,
         labelMinSpan: Double = 0.23
     ) -> [SunburstArc] {
