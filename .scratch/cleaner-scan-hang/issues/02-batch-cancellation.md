@@ -16,7 +16,7 @@
 置位取消态。变异验证:去掉这两行,新测试红(「批取消冒泡必须置位取消态」);
 恢复,引擎 20 例全绿。
 
-**Status:** done(2026-11-11,合并点见 Comments)
+**Status:** done(2026-11-11,develop@3c8830e)
 
 - [x] `CleanEnumerateFailure.cancelled` 档 + 缓存编解码对称(u8 档 5;取消的
       扫描不落盘,编解码写全防将来语义演变时缓存格式炸)
