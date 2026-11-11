@@ -13,15 +13,36 @@ import SwiftUI
 // 版面纪律(ui-unify 追改,2026-11-09 用户实报三修,两形态同守):图表区弹性高、
 // 卡头不被挤压;悬停零重排——不出现/消失任何占行元素,信息与按钮都浮在图表内。
 
-/// 分区完全异色·柔和版(space-map-forms/03,2026-11-10 二轮:02 同色系深浅上线即
-/// 被毙「为什么一个颜色了」,01 高饱和十色也曾被嫌闹——折中):顶层块按序循环十个
-/// accent 令牌,基色不透明度 0.60;旭日外环 = 父色 −0.13;hover +0.08 封顶 0.95;
-/// 文字色 ≥0.5 白、其余墨。密封 = inkTertiary 0.5、「其他」= cardHigh 0.75 不变。
+/// 分区完全异色·鲜亮版(space-map-forms/03 三轮拍板:01 高饱和 0.75 被嫌「闹」,
+/// 02 同色系被毙,03 柔和 0.60 上线一天用户实报「发灰、想要鲜艳」——2026-11-11
+/// 折中 = 0.70 + 地图内局部提饱和 ×1.25,不动全 app 的 accent 令牌):顶层块按序
+/// 循环十个 accent 令牌,基色不透明度 0.70;旭日外环 = 父色 −0.13;hover +0.08
+/// 封顶 0.95;文字色 ≥0.5 白、其余墨。密封 = inkTertiary 0.5、「其他」= cardHigh
+/// 0.75 不变(灰系不提饱和,saturation 对其无效果)。
 private let sectionColors: [Color] = [
     Metric.cpu, .memory, .network, .battery, .gpu,
     .sensors, .sound, .bluetooth, .containers, .disk,
 ].map(\.accentColor)
-private let sectionBaseOpacity: Double = 0.60
+
+/// 地图内局部提饱和(三轮拍板 2026-11-11):`Color.saturation` 是 View 修饰符,
+/// 色域内提饱和要经 NSColor 走 HSB——s ×1.25 封顶 1、亮度不动;灰系(s≈0)
+/// 原样返回。必须在**取色点**做(动态色按当前外观解析);定义时烤色会把深浅
+/// 双值固定在一个外观里,外观切换颜色不跟。
+private func vivid(_ color: Color) -> Color {
+    guard let ns = NSColor(color).usingColorSpace(.deviceRGB) else { return color }
+    var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+    // NSColor.getHue 不回传成败(iOS 的 UIColor 版才回 Bool);上面已强转
+    // deviceRGB,HSB 换算恒可,出参必被写。
+    ns.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
+    return Color(
+        hue: Double(h),
+        saturation: Double(min(s * 1.25, 1)),
+        brightness: Double(b),
+        opacity: Double(a)
+    )
+}
+
+private let sectionBaseOpacity: Double = 0.70
 private let sectionChildStep: Double = 0.13
 private let hoverBoost: Double = 0.08
 
@@ -298,8 +319,8 @@ struct SpaceMapSection: View {
     }
 
     /// 块填充(两形态同一套配色出口):正常块 = 分区异色(rank 按序循环 accent,
-    /// 柔和 0.60),密封灰、「其他」浅灰;hover 一律 +0.08。文字色随基色深浅——
-    /// 密封与「其他」是浅面恒用墨色,正常块基色 0.60 白字成立。
+    /// 鲜亮 0.70 + 饱和 ×1.25),密封灰、「其他」浅灰;hover 一律 +0.08。文字色随
+    /// 基色深浅——密封与「其他」是浅面恒用墨色,正常块基色 0.70 白字成立。
     private struct BlockFill {
         let color: Color
         let opacity: Double
@@ -317,7 +338,7 @@ struct SpaceMapSection: View {
             BlockFill(color: Surface.cardHigh, opacity: 0.75, textColor: .primary)
         } else {
             BlockFill(
-                color: sectionColors[rank % sectionColors.count],
+                color: vivid(sectionColors[rank % sectionColors.count]),
                 opacity: sectionBaseOpacity,
                 textColor: sectionBaseOpacity >= 0.5 ? .white : .primary
             )
@@ -433,12 +454,16 @@ struct SpaceMapSection: View {
 
                 // 弧内标签(份额阈值内才显示;左半圆翻转 180° 外向可读——v1 规则,
                 // 字号归一 10.5;Canvas 里 Text 没有 maxWidth 约束,先量宽后截断)。
+                // 文字径向排布,长度上限 = 本环带宽(0.65−0.28 / 0.99−0.65),不是弧长
+                // ——按弧长量宽时大弧文字长过环带,伸出压到相邻环的名上(2026-11-11
+                // 用户实报「名字重叠」实案)。
                 for item in colored {
                     let arc = item.arc
                     guard arc.isLabelReadable, !arc.node.isSealed, !arc.node.isAggregate else { continue }
                     let midRadius = arc.ring == 1 ? radius * 0.47 : radius * 0.83
                     let point = polar(center, midRadius, arc.midAngle)
-                    let label = arcLabel(arc.node, maxWidth: midRadius * CGFloat(arc.span) * 0.9)
+                    let ringWidth = arc.ring == 1 ? radius * 0.37 : radius * 0.34
+                    let label = arcLabel(arc.node, maxWidth: ringWidth * 0.9)
                     guard !label.isEmpty else { continue }
                     let rotation = arc.midAngle + (arc.flipsLabel ? .pi : 0)
                     context.drawLayer { layer in
@@ -488,8 +513,8 @@ struct SpaceMapSection: View {
         }
     }
 
-    /// 分区异色着色(space-map-forms/03):内环每支一色(按序循环 accent,柔和
-    /// 0.60),外环 = 父色 −0.13;密封灰、「其他」浅灰(布局按父-子顺序产出)。
+    /// 分区异色着色(space-map-forms/03):内环每支一色(按序循环 accent,鲜亮
+    /// 0.70 + 饱和 ×1.25),外环 = 父色 −0.13;密封灰、「其他」浅灰(布局按父-子顺序产出)。
     private struct ColoredArc {
         let arc: SunburstArc
         let color: Color
@@ -499,7 +524,7 @@ struct SpaceMapSection: View {
     private func coloredArcs(_ arcs: [SunburstArc]) -> [ColoredArc] {
         var result: [ColoredArc] = []
         var ring1Rank = 0
-        var parentColor = sectionColors[0]
+        var parentColor = vivid(sectionColors[0])
         for arc in arcs {
             if arc.node.isSealed {
                 result.append(ColoredArc(arc: arc, color: Surface.inkTertiary, opacity: 0.5))
@@ -510,7 +535,7 @@ struct SpaceMapSection: View {
                 continue
             }
             if arc.ring == 1 {
-                parentColor = sectionColors[ring1Rank % sectionColors.count]
+                parentColor = vivid(sectionColors[ring1Rank % sectionColors.count])
                 ring1Rank += 1
                 result.append(ColoredArc(arc: arc, color: parentColor, opacity: sectionBaseOpacity))
             } else {
@@ -806,14 +831,16 @@ struct SpaceMapSection: View {
         return ""
     }
 
-    /// 弧内标签 = 名字(截断)· 实际占用;大小部分放不下就整条放弃(中心读数兜底)。
+    /// 弧内标签 = 名字优先(截断到可用宽),大小后缀放得下才带(2026-11-11 用户实报
+    /// 「…」过多:旧版恒给「· 大小」留位、名字被多截,小弧整条放弃;现在大小放不下
+    /// 就只显名字——悬停中心圈本就有名字 + 大小的完整读数兜底)。
     private func arcLabel(_ node: SpaceMapNode, maxWidth: CGFloat) -> String {
-        let size = PulseFormat.memory(UInt64(max(0, node.bytes)))
-        let suffix = " · \(size)"
         let font = NSFont.systemFont(ofSize: 10.5, weight: .semibold)
+        let name = measuredTruncation(node.name, font: font, maxWidth: maxWidth)
+        guard !name.isEmpty else { return "" }
+        let suffix = " · \(PulseFormat.memory(UInt64(max(0, node.bytes))))"
+        let nameWidth = (name as NSString).size(withAttributes: [.font: font]).width
         let suffixWidth = (suffix as NSString).size(withAttributes: [.font: font]).width
-        guard maxWidth > suffixWidth + 12 else { return "" }
-        let name = measuredTruncation(node.name, font: font, maxWidth: maxWidth - suffixWidth)
-        return name.isEmpty ? "" : name + suffix
+        return maxWidth - nameWidth >= suffixWidth ? name + suffix : name
     }
 }
