@@ -74,6 +74,9 @@ final class SpaceScanCacheTests: XCTestCase {
                     CleanEnumerateError(path: "/y", reason: .vanished),
                     CleanEnumerateError(path: "/z", reason: .tooDeep),
                     CleanEnumerateError(path: "/w", reason: .other(errno: 13)),
+                    // 批取消档(cleaner-scan-hang/02):取消的扫描按理不落盘,编解码
+                    // 对称写全——roundtrip 保证将来允许部分落盘时缓存格式不炸。
+                    CleanEnumerateError(path: "/c", reason: .cancelled),
                 ],
                 stats: stats,
                 cancelled: true

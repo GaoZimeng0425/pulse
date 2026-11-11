@@ -106,6 +106,9 @@ public enum SpaceScanCache {
             case .tooDeep: w.u8(3)
             case let .other(errno): w.u8(4)
                 w.varint(Int64(errno))
+            // 取消的扫描不落盘(半棵树),此档按理不出现——但编解码对称写全,
+            // 将来若允许部分结果落盘也不用改缓存格式(穷举 switch 也会强制到这)。
+            case .cancelled: w.u8(5)
             }
         }
 
@@ -200,6 +203,7 @@ public enum SpaceScanCache {
             case 4:
                 guard let errno = r.varint() else { return nil }
                 reason = .other(errno: Int32(truncatingIfNeeded: errno))
+            case 5: reason = .cancelled
             default:
                 return nil
             }

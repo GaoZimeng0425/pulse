@@ -504,7 +504,11 @@ final class CleanerModel {
         if case .finished = cleanPhase {
             cleanPhase = .idle
         }
-        let liveEnumerator = LiveCleanDirectoryEnumerator()
+        var liveEnumerator = LiveCleanDirectoryEnumerator()
+        // 批粒度取消(cleaner-scan-hang/02):巨大目录枚举在途时,取消也能在
+        // 一批(~几百条)内被看见;闭包在 worker 任务上下文求值,与引擎的
+        // 目录入口检查同源(取消自 scanTask 传播)。
+        liveEnumerator.isCancelled = { Task.isCancelled }
         let source = enumerator ?? liveEnumerator
         scanGeneration &+= 1
         let generation = scanGeneration
@@ -519,7 +523,8 @@ final class CleanerModel {
             // 字节;前缀出处单一 = OllamaStoreAccounting.retainedFilePrefixes)。
             retainedFilePrefixes: OllamaStoreAccounting.retainedFilePrefixes(home: homeDirectory),
             // petal 式并行(性能票):真机 Data 卷 ≈500 万项,6 个长驻 worker
-            // 吃共享目录栈;测试注入假枚举器时保持默认串行(请求序断言依赖确定性)。
+            // 吃共享目录栈(注:注释史上的「测试注入假枚举器保持串行」豁免
+            // 已不成立——并发恒 6,假枚举器测试只断计数不断请求序,2026-11-11 核)。
             maxConcurrency: Self.productionScanConcurrency,
             canonicalRoots: canonical
         )
