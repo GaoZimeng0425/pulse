@@ -35,6 +35,12 @@ struct LiveCleanDirectoryEnumerator: CleanDirectoryEnumerator {
     private static let fsoptAttrCmnExtended: UInt64 = 0x20
     private static let sfDataless: UInt32 = 0x4000_0000
 
+    /// 批粒度取消检查(cleaner-scan-hang/02):每接完一批(一次 getattrlistbulk,
+    /// ~几百条)查一次;true = 丢弃已读条目、抛 `.cancelled`。nil = 不检查
+    /// (协议形状不变,测试假枚举器 / 单独使用者零影响)。闭包在调用方任务
+    /// 上下文求值,`{ Task.isCancelled }` 与引擎的目录入口检查同源。
+    var isCancelled: (@Sendable () -> Bool)?
+
     func entries(ofDirectory path: String) async throws -> [FsEntrySnapshot] {
         try enumerate(path)
     }
@@ -73,6 +79,11 @@ struct LiveCleanDirectoryEnumerator: CleanDirectoryEnumerator {
                     continue
                 }
                 throw mapErrno(path)
+            }
+            // 批粒度取消:旧版只在目录入口查——巨大目录(几十万条,数秒)枚举
+            // 在途时取消要干等整个目录读完(purge-app 经验 ④:检查要密)。
+            if let isCancelled, isCancelled() {
+                throw CleanEnumerateError(path: path, reason: .cancelled)
             }
             var offset = 0
             for _ in 0 ..< count {

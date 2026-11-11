@@ -75,6 +75,10 @@ public enum CleanEnumerateFailure: Sendable, Equatable {
     case permissionDenied
     /// 枚举中途消失(扫描期间被删/改名)——不算错误环境,如实入册即可。
     case vanished
+    /// 枚举中途用户取消(批粒度检查,cleaner-scan-hang/02):目录记空 partial、
+    /// 如实入台账——取消不是故障,但「这块没扫全」要可追;权限横幅只看
+    /// `.tccDenied`,不受此档影响。
+    case cancelled
     /// 超出引擎深度护栏(dust 教训:递归遍历换平铺后的防御位,见 docs/research/dust-reference.md §2.2)。
     case tooDeep
     case other(errno: Int32)

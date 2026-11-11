@@ -84,6 +84,33 @@ final class LiveCleanDirectoryEnumeratorTests: XCTestCase {
         }
     }
 
+    /// 批粒度取消(cleaner-scan-hang/02):每接完一批查一次 isCancelled——
+    /// true = 抛 `.cancelled`;恒假 / 不注入 = 与旧行为逐字一致。
+    func testBatchCancellationChecks() async throws {
+        try Data(repeating: 0x41, count: 100).write(to: root.appendingPathComponent("a.bin"))
+        try FileManager.default.createDirectory(
+            at: root.appendingPathComponent("sub"), withIntermediateDirectories: false
+        )
+
+        var cancelling = LiveCleanDirectoryEnumerator()
+        cancelling.isCancelled = { true }
+        do {
+            _ = try await cancelling.entries(ofDirectory: root.path)
+            XCTFail("恒取消应在首批后抛 .cancelled")
+        } catch let error as CleanEnumerateError {
+            XCTAssertEqual(error.reason, .cancelled)
+            XCTAssertEqual(error.path, root.path)
+        }
+
+        var notCancelling = LiveCleanDirectoryEnumerator()
+        notCancelling.isCancelled = { false }
+        let full = try await notCancelling.entries(ofDirectory: root.path)
+        XCTAssertEqual(Set(full.map(\.name)), ["a.bin", "sub"], "恒假 = 批检查零影响")
+
+        let plain = try await LiveCleanDirectoryEnumerator().entries(ofDirectory: root.path)
+        XCTAssertEqual(Set(plain.map(\.name)), ["a.bin", "sub"], "不注入 = 旧行为")
+    }
+
     private func fileID(of path: String) throws -> UInt64 {
         var status = stat()
         guard stat(path, &status) == 0 else { throw NSError(domain: "stat", code: 1) }

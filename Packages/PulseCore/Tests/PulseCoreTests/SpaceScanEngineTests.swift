@@ -202,6 +202,29 @@ final class SpaceScanEngineTests: XCTestCase {
         XCTAssertEqual(result.trees[0].fileCount, 1, "已扫部分照常可用")
     }
 
+    /// 批粒度取消(cleaner-scan-hang/02):枚举器在目录中途抛 `.cancelled`——该目录
+    /// 记空 partial 入台账,**结果必须标 cancelled**:批取消恰好发生在最后一个目录
+    /// 时收尾不再经过任何目录入口检查,取消态若不在此刻落位,会被当完整结果落盘。
+    func testBatchCancelledEnumerationMarksResultCancelled() async {
+        struct BatchCancellingEnumerator: CleanDirectoryEnumerator {
+            func entries(ofDirectory path: String) async throws -> [FsEntrySnapshot] {
+                throw CleanEnumerateError(path: path, reason: .cancelled)
+            }
+        }
+        // 取消信号走枚举器内部(批检查),目录入口的 isCancelled 恒放行——
+        // 证明取消态来自批冒泡路径,不依赖下一次入口检查。
+        let result = await engine.scan(
+            SpaceScanOptions(roots: ["/r"]),
+            using: BatchCancellingEnumerator(),
+            isCancelled: { false }
+        )
+
+        XCTAssertTrue(result.cancelled, "批取消冒泡必须置位取消态(否则被当完整结果)")
+        XCTAssertEqual(result.ledger.map(\.reason), [.cancelled], "取消目录如实入台账")
+        XCTAssertEqual(result.trees.count, 1, "占位节点照常产出")
+        XCTAssertTrue(result.trees[0].isPartial, "没扫全的目录标 partial")
+    }
+
     /// 进度:收尾必回调一次,末次统计与最终 stats 一致(< 2048 项时只在收尾发)。
     func testProgressCallbackCarriesFinalStats() async {
         let fs = FakeCleanDirectoryEnumerator(listings: [

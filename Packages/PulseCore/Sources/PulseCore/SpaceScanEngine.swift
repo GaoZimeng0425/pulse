@@ -420,6 +420,12 @@ private final class ScanCore: @unchecked Sendable {
         do {
             entries = try await enumerator.entries(ofDirectory: job.path)
         } catch let error as CleanEnumerateError {
+            // 批粒度取消从枚举器内部冒泡(cleaner-scan-hang/02):取消态必须此刻
+            // 落位——若批取消恰好发生在最后一个目录上,收尾不会再经过任何目录
+            // 入口检查,result.cancelled 将为假,被当完整结果落盘 = 伪造。
+            if case .cancelled = error.reason {
+                markCancelledAndDrain()
+            }
             recordPlaceholder(error: error, display: job.displayPath, ownModifiedEpoch: job.modifiedEpoch)
             settleOne()
             return

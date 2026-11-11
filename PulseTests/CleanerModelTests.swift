@@ -694,34 +694,10 @@ final class CleanerModelTests: XCTestCase {
             }
         }
         // 首个目录枚举即挂起到测试放行;continuation 不响应取消 = 真停摆。
-        actor StuckEnumerator: CleanDirectoryEnumerator {
-            private var entered = false
-            private var released = false
-            private var waiters: [CheckedContinuation<Void, Never>] = []
-
-            var hasEntered: Bool {
-                entered
-            }
-
-            func release() {
-                released = true
-                for waiter in waiters {
-                    waiter.resume()
-                }
-                waiters = []
-            }
-
-            func entries(ofDirectory _: String) async throws -> [FsEntrySnapshot] {
-                entered = true
-                if !released {
-                    await withCheckedContinuation { waiters.append($0) }
-                }
-                return []
-            }
-        }
+        // (类型见文件底 StuckReleaseEnumerator;放行后返回空条目。)
+        let stuck = StuckReleaseEnumerator(entriesAfterRelease: [])
         let saves = Counter()
         let inventories = Counter()
-        let stuck = StuckEnumerator()
         let model = CleanerModel(
             exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
             scanCache: CleanScanResultStore(load: { nil }, save: { _ in saves.bump() }),
@@ -1299,5 +1275,92 @@ final class CleanerModelTests: XCTestCase {
         let ollama = model.candidates.first { $0.ruleID == "ai.ollama" }
         XCTAssertEqual(ollama?.bytes, 5100, "兜底 = 整目录字节")
         XCTAssertEqual(ollama?.accountingNote, OllamaStoreAccounting.fallbackNote)
+    }
+
+    /// 上轮遗留补测(cleaner-scan-hang/01 遗留项):进度回调的代数守卫——被强制
+    /// 放弃的孤儿任务晚到的收尾进度,不得把「放弃后立刻重扫」的新扫描数字串台。
+    func testAbandonedScanLateProgressDoesNotBleedIntoNewScan() async {
+        final class Counter: @unchecked Sendable {
+            private let lock = NSLock()
+            private var count = 0
+            func bump() {
+                lock.withLock { count += 1 }
+            }
+
+            var value: Int {
+                lock.withLock { count }
+            }
+        }
+        let inventories = Counter()
+        // A(放行后带回 1 条文件):孤儿收尾的 core.finish() 必发一份「1 项」进度。
+        let orphan = StuckReleaseEnumerator(entriesAfterRelease: [
+            CleanFixture.file("late.bin"),
+        ])
+        // B:挂起在途,phase 停在 .scanning 的初始空统计上。
+        let current = StuckReleaseEnumerator(entriesAfterRelease: [])
+        let model = CleanerModel(
+            exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
+            homeDirectory: "/Users/me",
+            installedAppInventory: { _, _, _ in
+                inventories.bump()
+                return .complete([])
+            },
+            scanCancelForceTimeout: 0.1
+        )
+
+        model.startScan(using: orphan, roots: ["/r"])
+        await waitUntil { await orphan.hasEntered }
+        model.cancelScan()
+        await waitUntil { !model.isScanning } // 硬兜底放弃 A
+
+        model.startScan(using: current, roots: ["/r"])
+        await waitUntil { await current.hasEntered } // B 在途,初始统计 0 项
+
+        await orphan.release() // A 收尾:进度(1 项)晚到,代数不匹配应被拒收
+        await waitUntil { inventories.value == 1 }
+        try? await Task.sleep(nanoseconds: 200_000_000) // 让 A 的收尾进度排进主 actor
+
+        guard case let .scanning(stats) = model.phase else {
+            return XCTFail("B 在途应保持扫描态,实际 \(model.phase)")
+        }
+        XCTAssertEqual(stats.entriesSeen, 0, "被放弃任务的晚到进度不得串进新扫描的数字")
+
+        await current.release() // 清尾:B 正常完成
+        await waitUntil { model.result != nil }
+    }
+}
+
+// MARK: - 共用测试小件
+
+/// 首个目录枚举即挂起到测试放行;continuation 不响应取消 = 真停摆(cleaner-scan-hang)。
+/// 放行后返回给定条目(空 = 只验证挂起;带条目 = 让孤儿收尾时发出含条目的进度/结果)。
+private actor StuckReleaseEnumerator: CleanDirectoryEnumerator {
+    private var entered = false
+    private var released = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private let entriesAfterRelease: [FsEntrySnapshot]
+
+    init(entriesAfterRelease: [FsEntrySnapshot]) {
+        self.entriesAfterRelease = entriesAfterRelease
+    }
+
+    var hasEntered: Bool {
+        entered
+    }
+
+    func release() {
+        released = true
+        for waiter in waiters {
+            waiter.resume()
+        }
+        waiters = []
+    }
+
+    func entries(ofDirectory _: String) async throws -> [FsEntrySnapshot] {
+        entered = true
+        if !released {
+            await withCheckedContinuation { waiters.append($0) }
+        }
+        return entriesAfterRelease
     }
 }
