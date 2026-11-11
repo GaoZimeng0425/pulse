@@ -88,7 +88,9 @@ final class LiveCleanDirectoryEnumeratorTests: XCTestCase {
     /// true = 抛 `.cancelled`;恒假 / 不注入 = 与旧行为逐字一致。
     func testBatchCancellationChecks() async throws {
         try Data(repeating: 0x41, count: 100).write(to: root.appendingPathComponent("a.bin"))
-        try FileManager.default.createDirectory(at: root.appendingPathComponent("sub"))
+        try FileManager.default.createDirectory(
+            at: root.appendingPathComponent("sub"), withIntermediateDirectories: false
+        )
 
         var cancelling = LiveCleanDirectoryEnumerator()
         cancelling.isCancelled = { true }
