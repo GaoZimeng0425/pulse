@@ -81,12 +81,12 @@ final class AgentSessionReaderTests: XCTestCase {
         // cwd 公式命中(-Users-x-pulse)。
         let direct = reader.claudeTranscriptTail(cwd: "/Users/x/pulse", sessionId: "s1")
             .flatMap(ClaudeTranscriptTail.parse)
-        XCTAssertEqual(direct?.contextTokens, 479_872)
+        XCTAssertEqual(direct?.context?.contextTokens, 479_872)
 
         // cwd 公式失配(会话起于别处)→ 回退 projects 一层扫描仍找到。
         let fallback = reader.claudeTranscriptTail(cwd: "/Users/x/other", sessionId: "s1")
             .flatMap(ClaudeTranscriptTail.parse)
-        XCTAssertEqual(fallback?.model, "claude-opus-5-5")
+        XCTAssertEqual(fallback?.context?.model, "claude-opus-5-5")
 
         // 完全不存在 → nil。
         XCTAssertNil(reader.claudeTranscriptTail(cwd: "/Users/x/gone", sessionId: "s9"))

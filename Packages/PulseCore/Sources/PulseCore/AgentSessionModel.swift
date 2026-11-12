@@ -72,35 +72,96 @@ public struct ClaudeContextReading: Equatable, Sendable {
     public let timestamp: Date?
 }
 
-/// jsonl 尾部字节解析:从尾往前找第一条带 usage 的 assistant 记录。
-/// 容错:首行半行(尾读从字节中间起)解析失败自然丢弃;全无 → nil(新会话未发首条)。
+/// 尾读组合产物:末条上下文读数 + 末条有效用户指令(agent-tab/03 当前任务摘要)。
+public struct ClaudeTranscriptReading: Equatable, Sendable {
+    public let context: ClaudeContextReading?
+    /// 末条有效用户指令截断(≤120 字符,换行折空格);噪音行全滤掉后为 nil。
+    public let lastUserPrompt: String?
+
+    public init(context: ClaudeContextReading?, lastUserPrompt: String?) {
+        self.context = context
+        self.lastUserPrompt = lastUserPrompt
+    }
+}
+
+/// jsonl 尾部字节解析:从尾往前一次遍历,双目标——① 末条带 usage 的 assistant
+/// 记录(上下文读数);② 末条**有效用户指令**(当前任务摘要,agent-tab/03)。
+/// 容错:首行半行(尾读从字节中间起)解析失败自然丢弃;两者全无 → nil。
 public enum ClaudeTranscriptTail {
-    public static func parse(_ data: Data) -> ClaudeContextReading? {
+    public static func parse(_ data: Data) -> ClaudeTranscriptReading? {
         guard let text = String(data: data, encoding: .utf8) else { return nil }
+        var context: ClaudeContextReading?
+        var prompt: String?
         for line in text.split(separator: "\n", omittingEmptySubsequences: true).reversed() {
             guard
                 let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)),
-                let record = object as? [String: Any],
-                record["type"] as? String == "assistant"
+                let record = object as? [String: Any]
             else { continue }
-            let message = record["message"] as? [String: Any]
-            let usage = message?["usage"] as? [String: Any]
-            guard let usage else { continue }
-            let input = usage["input_tokens"] as? Int ?? 0
-            let cacheRead = usage["cache_read_input_tokens"] as? Int ?? 0
-            let cacheCreation = usage["cache_creation_input_tokens"] as? Int ?? 0
-            let contextTokens: Int = if cacheRead == 0, cacheCreation > 0 {
-                input + cacheCreation
-            } else {
-                input + cacheRead
+            let recordType = record["type"] as? String
+
+            if recordType == "assistant", context == nil {
+                let message = record["message"] as? [String: Any]
+                let usage = message?["usage"] as? [String: Any]
+                guard let usage else { continue }
+                let input = usage["input_tokens"] as? Int ?? 0
+                let cacheRead = usage["cache_read_input_tokens"] as? Int ?? 0
+                let cacheCreation = usage["cache_creation_input_tokens"] as? Int ?? 0
+                let contextTokens: Int = if cacheRead == 0, cacheCreation > 0 {
+                    input + cacheCreation
+                } else {
+                    input + cacheRead
+                }
+                context = ClaudeContextReading(
+                    model: message?["model"] as? String,
+                    contextTokens: contextTokens,
+                    timestamp: (record["timestamp"] as? String).flatMap(AgentISO8601.parse)
+                )
             }
-            return ClaudeContextReading(
-                model: message?["model"] as? String,
-                contextTokens: contextTokens,
-                timestamp: (record["timestamp"] as? String).flatMap(AgentISO8601.parse)
-            )
+
+            if recordType == "user", prompt == nil,
+               record["isSidechain"] as? Bool != true {
+                prompt = sanitizeUserPrompt(
+                    userPromptText(record["message"] as? [String: Any])
+                )
+            }
+
+            if context != nil, prompt != nil {
+                break
+            }
+        }
+        guard context != nil || prompt != nil else { return nil }
+        return ClaudeTranscriptReading(context: context, lastUserPrompt: prompt)
+    }
+
+    /// 用户指令文本:content 为字符串直接用;数组只认 `type=="text"` 块拼接
+    /// (tool_result-only 的行是工具回传,不是指令)。
+    private static func userPromptText(_ message: [String: Any]?) -> String? {
+        guard let message else { return nil }
+        if let string = message["content"] as? String {
+            return string
+        }
+        if let blocks = message["content"] as? [[String: Any]] {
+            let texts = blocks.compactMap {
+                ($0["type"] as? String) == "text" ? $0["text"] as? String : nil
+            }
+            guard !texts.isEmpty else { return nil }
+            return texts.joined(separator: " ")
         }
         return nil
+    }
+
+    /// 噪音过滤 + 截断(实测 2026-11-12):`<` 开头 = slash 命令/命令回显/
+    /// system-reminder 等注入;固定句式开头 = resume 摘要;空行不算。
+    private static func sanitizeUserPrompt(_ raw: String?) -> String? {
+        guard let raw else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              !trimmed.hasPrefix("<"),
+              !trimmed.hasPrefix("This session is being continued"),
+              !trimmed.hasPrefix("Caveat:")
+        else { return nil }
+        let flattened = trimmed.replacingOccurrences(of: "\n", with: " ")
+        return String(flattened.prefix(120))
     }
 }
 
@@ -239,6 +300,12 @@ public struct ClaudeAgentSessionStatus: Identifiable, Equatable, Sendable {
     public let contextLimit: Int?
     /// 会话目录下子代理计数(subagents/agent-*.jsonl)。
     public let subagentCount: Int
+    /// 会话自定义名(注册表 `name`,如 "octok-client-bf");缺失为 nil,
+    /// UI 退回项目名(agent-tab/03)。
+    public let name: String?
+    /// 当前任务摘要:jsonl 末条有效用户指令截断;无有效指令为 nil,UI 退回
+    /// pid·时长·状态(agent-tab/03)。
+    public let taskSummary: String?
 
     public var id: pid_t {
         pid
@@ -272,7 +339,9 @@ public struct ClaudeAgentSessionStatus: Identifiable, Equatable, Sendable {
         model: String?,
         contextTokens: Int?,
         contextLimit: Int?,
-        subagentCount: Int
+        subagentCount: Int,
+        name: String? = nil,
+        taskSummary: String? = nil
     ) {
         self.pid = pid
         self.sessionId = sessionId
@@ -284,6 +353,8 @@ public struct ClaudeAgentSessionStatus: Identifiable, Equatable, Sendable {
         self.contextTokens = contextTokens
         self.contextLimit = contextLimit
         self.subagentCount = subagentCount
+        self.name = name
+        self.taskSummary = taskSummary
     }
 }
 
@@ -374,7 +445,7 @@ public struct AgentSessionCatalog: Sendable {
     /// 一次刷新时连同实例一起读下的会话级读数(节流轮复用,不再 IO)。
     private struct ClaudeReading: Sendable {
         let entry: ClaudeInstanceEntry
-        let tail: ClaudeContextReading?
+        let tail: ClaudeTranscriptReading?
         let subagentCount: Int
     }
 
@@ -433,12 +504,14 @@ public struct AgentSessionCatalog: Sendable {
                     cwd: reading.entry.cwd,
                     status: reading.entry.status,
                     ageSeconds: reading.entry.startedAt.map { now.timeIntervalSince($0) },
-                    model: reading.tail?.model,
-                    contextTokens: reading.tail?.contextTokens,
-                    contextLimit: reading.tail?.contextTokens.map {
-                        ClaudeContextWindow.limit(model: reading.tail?.model, contextTokens: $0)
+                    model: reading.tail?.context?.model,
+                    contextTokens: reading.tail?.context?.contextTokens,
+                    contextLimit: reading.tail?.context?.contextTokens.map {
+                        ClaudeContextWindow.limit(model: reading.tail?.context?.model, contextTokens: $0)
                     },
-                    subagentCount: reading.subagentCount
+                    subagentCount: reading.subagentCount,
+                    name: reading.entry.name,
+                    taskSummary: reading.tail?.lastUserPrompt
                 )
             }
     }
