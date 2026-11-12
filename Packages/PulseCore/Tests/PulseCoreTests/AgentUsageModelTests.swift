@@ -63,6 +63,27 @@ private func dayKey(_ year: Int, _ month: Int, _ day: Int) -> String {
     return formatter.string(from: Date(timeIntervalSince1970: TimeInterval(noonMs(year, month, day)) / 1000))
 }
 
+/// 相对时钟的动态夹具三件(硬编码日期 + 真实 now 的组合午夜后必挂,
+/// 2026-11-13 00:05 /tmp check 实案):毫秒纪元、UTC ISO 串、本地日键。
+private func nowMs(_ date: Date) -> Int64 {
+    Int64(date.timeIntervalSince1970 * 1000)
+}
+
+private func isoUtc(_ date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone(identifier: "UTC")
+    return formatter.string(from: date)
+}
+
+private func localDayKey(_ date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd"
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    return formatter.string(from: date)
+}
+
 /// assistant 行夹具(usage 形状 = projects jsonl 实测;cwd 可选注入)。
 private func claudeLine(
     id: String?,
@@ -328,30 +349,32 @@ final class AgentUsageModelTests: XCTestCase {
     func testRefreshTodayThrottlesAndScopesToToday() throws {
         let store = try AgentUsageStore(database: HistoryDatabase.openInMemory())
         let reader = FakeUsageReader()
+        let now = Date()
+        let yesterday = now.addingTimeInterval(-86400)
+        // 夹具日期相对 now 动态取(硬编码日期 + 真实 now = 午夜后必挂)。
         reader.zcode = [
             ZCodeUsageSample(
                 id: "today",
-                startedAtMs: noonMs(2026, 11, 12),
+                startedAtMs: nowMs(now),
                 inputTokens: 10,
                 outputTokens: 5,
                 computedTotalTokens: 15
             ),
             ZCodeUsageSample(
                 id: "yesterday",
-                startedAtMs: noonMs(2026, 11, 11),
+                startedAtMs: nowMs(yesterday),
                 inputTokens: 10,
                 outputTokens: 5,
                 computedTotalTokens: 15
             ),
         ]
-        let now = Date()
         reader.claudeFiles = [
-            (key: "s1.jsonl", modifiedAt: now, lines: [claudeLine(id: "m1", timestamp: "2026-11-12T12:00:00.000Z")]),
+            (key: "s1.jsonl", modifiedAt: now, lines: [claudeLine(id: "m1", timestamp: isoUtc(now))]),
             // 昨天的文件:今天档不喂(文件级 mtime 过滤是 Live 侧职责,fake 同口径)。
             (
                 key: "s2.jsonl",
-                modifiedAt: now.addingTimeInterval(-86400),
-                lines: [claudeLine(id: "m2", timestamp: "2026-11-11T12:00:00.000Z")]
+                modifiedAt: yesterday,
+                lines: [claudeLine(id: "m2", timestamp: isoUtc(yesterday))]
             ),
         ]
         var catalog = AgentUsageCatalog()
@@ -362,13 +385,14 @@ final class AgentUsageModelTests: XCTestCase {
         XCTAssertNotNil(reader.capturedModifiedSince)
         // 只剩今天两行(claude + zcode 各一),昨天的数据定时档不碰。
         XCTAssertEqual(first?.count, 2)
-        XCTAssertFalse(first?.contains { $0.day == dayKey(2026, 11, 11) } ?? true)
+        XCTAssertFalse(first?.contains { $0.day == localDayKey(yesterday) } ?? true)
 
         // 节流窗内:跳过(nil)。
         XCTAssertNil(catalog.refreshToday(reader: reader, store: store, now: now.addingTimeInterval(60)))
     }
 
     /// 全量档:三源全拉;cache 只填缺天、不覆盖 jsonl 已有行、不填今天。
+    /// 「今天」相对 now 动态取(硬编码日期 + 真实 now = 午夜后必挂)。
     func testFullRescanBackfillsCacheGaps() throws {
         let store = try AgentUsageStore(database: HistoryDatabase.openInMemory())
         // 库里已有 11-01 的 jsonl 行(模拟此前扫过)。
@@ -376,20 +400,21 @@ final class AgentUsageModelTests: XCTestCase {
             AgentDailyUsageRow(day: "2026-11-01", source: .claude, origin: .jsonl, totalTokens: 100),
         ])
 
+        let now = Date()
+        let today = localDayKey(now)
         let reader = FakeUsageReader()
         reader.zcode = [
             ZCodeUsageSample(
                 id: "u1",
-                startedAtMs: noonMs(2026, 11, 12),
+                startedAtMs: nowMs(now),
                 inputTokens: 100,
                 outputTokens: 50,
                 computedTotalTokens: 150
             ),
         ]
         reader.claudeFiles = [
-            (key: "s1.jsonl", modifiedAt: Date(), lines: [claudeLine(id: "m1", timestamp: "2026-11-10T12:00:00.000Z")]),
+            (key: "s1.jsonl", modifiedAt: now, lines: [claudeLine(id: "m1", timestamp: isoUtc(now))]),
         ]
-        let today = dayKey(2026, 11, 12)
         reader.statsCache = """
         {"dailyModelTokens":[
           {"date":"2026-11-01","tokensByModel":{"m":500}},
@@ -399,7 +424,6 @@ final class AgentUsageModelTests: XCTestCase {
         """.data(using: .utf8)
 
         var catalog = AgentUsageCatalog()
-        let now = Date()
         let rows = catalog.fullRescan(reader: reader, store: store, now: now)
 
         // 11-01 仍是 jsonl 100(cache 500 不覆盖);11-04 补 cache 700;
