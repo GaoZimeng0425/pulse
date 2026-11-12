@@ -479,7 +479,7 @@ await server.withMethodHandler(ListTools.self) { _ in
         ),
         Tool(
             name: "recent_alerts",
-            description: "最近 N 小时的告警历史(同主体聚合:最近触发时刻/读数/次数)。涵盖 CPU 负载、组 CPU、新组内存、磁盘可用、dev server 闲置。落盘从 Pulse 装上本版本起累积,更早的没有留档。",
+            description: "最近 N 小时的告警历史(同主体聚合:最近触发时刻/读数/次数,附最近一次触发的归因——承载组与前几名进程)。涵盖 CPU 负载、组 CPU、新组内存、磁盘可用、dev server 闲置。落盘从 Pulse 装上本版本起累积,更早的没有留档;归因自 alert-offender-outlets 版本起记录。",
             inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([

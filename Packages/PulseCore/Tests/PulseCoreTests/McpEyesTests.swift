@@ -149,16 +149,30 @@ final class McpEyesTests: XCTestCase {
 
     func testAlertEventStoreRecordsAndQueryAggregates() async throws {
         let store = AlertEventStore(database: queue)
-        try await store.record(AlertOccurrence(
-            kind: .systemLoad, subjectKey: "system", value: 80, firedAt: Date(timeIntervalSince1970: Double(base))
-        ))
-        try await store.record(AlertOccurrence(
-            kind: .systemLoad, subjectKey: "system", value: 85, firedAt: Date(timeIntervalSince1970: Double(base + 120))
-        ))
-        try await store.record(AlertOccurrence(
-            kind: .groupCPU, subjectKey: "g|xcode", subjectName: "Xcode", value: 320,
-            firedAt: Date(timeIntervalSince1970: Double(base + 60))
-        ))
+        try await store.record(
+            AlertOccurrence(
+                kind: .systemLoad, subjectKey: "system", value: 80,
+                firedAt: Date(timeIntervalSince1970: Double(base))
+            ),
+            offender: .none
+        )
+        try await store.record(
+            AlertOccurrence(
+                kind: .systemLoad, subjectKey: "system", value: 85,
+                firedAt: Date(timeIntervalSince1970: Double(base + 120))
+            ),
+            offender: AlertOffenderSummary(
+                groupName: "octok",
+                entries: [AlertOffenderEntry(name: "electron", cpuPercent: 320, memoryBytes: 1000)]
+            )
+        )
+        try await store.record(
+            AlertOccurrence(
+                kind: .groupCPU, subjectKey: "g|xcode", subjectName: "Xcode", value: 320,
+                firedAt: Date(timeIntervalSince1970: Double(base + 60))
+            ),
+            offender: .none
+        )
 
         let endSeconds = base + 180
         let rows = try await queue.read { db in
@@ -173,6 +187,17 @@ final class McpEyesTests: XCTestCase {
         let groupRow = rows.first { $0.kind == AlertKind.groupCPU.rawValue }
         XCTAssertEqual(groupRow?.subjectName, "Xcode")
         XCTAssertEqual(groupRow?.count, 1)
+
+        // 归因随最近一次触发落库(alert-offender-outlets):第二次 systemLoad 带
+        // 归因(聚合取最新一行),老行/无归因行读出 nil/空表不炸。
+        XCTAssertEqual(rows.first?.offenderGroup, "octok")
+        XCTAssertEqual(rows.first?.offenderEntries.map(\.name), ["electron"])
+        XCTAssertNil(groupRow?.offenderGroup)
+        XCTAssertEqual(groupRow?.offenderEntries, [])
+
+        // 输出文案点名「当时是谁干的」。
+        let text = McpEyesText.alertHistory(rows, now: Date(timeIntervalSince1970: Double(endSeconds)))
+        XCTAssertTrue(text.contains("归因:octok:electron 320%"), "输出行带归因,实际:\n\(text)")
     }
 
     // MARK: dev server 状态(mcp-eyes/02)

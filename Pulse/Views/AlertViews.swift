@@ -55,7 +55,9 @@ struct AlertBannerView: View {
         }
     }
 
-    /// 单条触发中告警:铃铛 + 标题 + 读数副文。
+    /// 单条触发中告警:铃铛 + 标题 + 读数副文。副文与系统通知共用同一拼装
+    /// 函数(alert-offender-outlets),归因行(fired 时按触发当轮算好存在
+    /// center.offenders)自动同口径——应用内提示也点名「谁在吃」。
     private func row(_ occurrence: AlertOccurrence) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: "bell.badge.fill")
@@ -64,9 +66,12 @@ struct AlertBannerView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(AlertNotificationContent.title(for: occurrence))
                     .font(.system(size: isCompact ? 11 : 12, weight: .semibold))
-                Text(AlertNotificationContent.body(for: occurrence))
-                    .font(.system(size: isCompact ? 10.5 : 11))
-                    .foregroundStyle(.secondary)
+                Text(AlertNotificationContent.body(
+                    for: occurrence,
+                    offender: center.offenders[occurrence.offenderKey] ?? .none
+                ))
+                .font(.system(size: isCompact ? 10.5 : 11))
+                .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
         }
