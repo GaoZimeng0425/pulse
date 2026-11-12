@@ -51,6 +51,7 @@ struct MonitorFeatures {
     let alerts: AlertCenter
     let devServers: DevServerFeature
     let agentSessions: AgentSessionFeature
+    let agentUsage: AgentUsageFeature
     let rankings: RankingsFeature
     let history: HistoryFeature
     let disk: DiskFeature
@@ -71,6 +72,7 @@ struct MonitorFeatures {
             alerts,
             devServers,
             agentSessions,
+            agentUsage,
             rankings,
             history,
             disk,
@@ -107,6 +109,7 @@ extension SystemMonitor {
                 ),
                 devServers: DevServerFeature(portScanner: LiveDevServerPortScanner()),
                 agentSessions: AgentSessionFeature(reader: LiveAgentSessionReader()),
+                agentUsage: AgentUsageFeature(reader: LiveAgentUsageReader(), store: history.agentUsageStore),
                 rankings: RankingsFeature(nettopSource: LiveNettopCSVSource()),
                 history: history,
                 disk: DiskFeature(

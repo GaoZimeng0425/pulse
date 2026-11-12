@@ -66,6 +66,17 @@ struct MetricTabStack<Ranking: View>: View {
                 "claude-sessions",
                 ClaudeSessionsCardView(sessions: snapshot.claudeSessions, isCompact: isCompact)
             )
+            // 每日消耗(agent-tab/02):折线 + 热力图;「重新扫描」= 全量档
+            // 手动触发(补漏天——未启动 Pulse 的日子点一下即回填)。
+            builder.card(
+                "agent-usage",
+                AgentUsageCardView(
+                    rows: monitor.agentUsage.rows,
+                    isCompact: isCompact,
+                    isScanning: monitor.agentUsage.isScanning,
+                    onRescan: { monitor.agentUsage.requestFullRescan() }
+                )
+            )
             builder.card(
                 "zcode-sessions",
                 ZCodeSessionsCardView(sessions: snapshot.zcodeSessions, isCompact: isCompact)

@@ -34,6 +34,9 @@ final class HistoryFeature: MonitorFeature {
     /// dev server 状态(mcp-eyes/02):本模块消费 `.devServers` 广播入写流,
     /// store 内部分钟节流(DevServerFeature 零改动)。
     let devServerHistory: DevServerStateStore?
+    /// 每日 token 账本(agent-tab/02):AgentUsageFeature 的落库口,同库同队列。
+    /// 引擎缺席 → nil:用量功能安静禁用(无历史库可写)。
+    let agentUsageStore: AgentUsageStore?
     @ObservationIgnored private var feed = HistoryFeed()
     /// 串行写入流的一笔:轮次落库,或项目根对账(改根迁移组身份)——同一条流保证
     /// 对账与落库按发生次序生效。
@@ -54,6 +57,7 @@ final class HistoryFeature: MonitorFeature {
         cleanHistory = engine?.database.map { CleanHistoryStore(database: $0) }
         alertHistory = engine?.database.map { AlertEventStore(database: $0) }
         devServerHistory = engine?.database.map { DevServerStateStore(database: $0) }
+        agentUsageStore = engine?.database.map { AgentUsageStore(database: $0) }
     }
 
     // MARK: - MonitorFeature
