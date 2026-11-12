@@ -264,6 +264,25 @@ struct InertAgentSessionReader: AgentSessionReading {
     }
 }
 
+/// 惰性每日账本读源(agent-tab/02):一律空——预览不起文件读/不开库,账本
+/// 恒空,图表空态观感与「还没数据」一致。
+struct InertAgentUsageReader: AgentUsageReading {
+    func zcodeUsageSamples(sinceStartedAtMs: Int64?) -> (
+        samples: [ZCodeUsageSample], legacySchema: Bool
+    ) {
+        ([], false)
+    }
+
+    func readClaudeTranscripts(
+        modifiedSince: Date?,
+        consume: (_ line: String) -> Void
+    ) {}
+
+    func claudeStatsCacheData() -> Data? {
+        nil
+    }
+}
+
 /// 每核 tick:空样本(系统负载按 0 计,CoreTickDiffer 的退化口径)。
 struct InertCoreTickSource: CoreTickSource {
     func sample() -> CoreTickSample {
@@ -341,6 +360,7 @@ extension SystemMonitor {
                 alerts: .inert(),
                 devServers: DevServerFeature(portScanner: InertDevServerPortScanner()),
                 agentSessions: AgentSessionFeature(reader: InertAgentSessionReader()),
+                agentUsage: AgentUsageFeature(reader: InertAgentUsageReader(), store: nil),
                 rankings: RankingsFeature(nettopSource: InertNettopCSVSource()),
                 history: HistoryFeature(engine: historyEngine),
                 disk: DiskFeature(

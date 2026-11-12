@@ -336,8 +336,34 @@ public enum HistoryDatabase {
             try db.execute(sql: "ALTER TABLE alert_event ADD COLUMN offender_entries TEXT")
         }
 
+        // 每日 token 账本(agent-tab/02):一天 × 一来源一行,主键 (day, source)
+        // 覆盖式 upsert——源会删历史(ZCode session 级联删 / Claude 30 天滚动
+        // 清理),落库行不受源存亡影响。读写在 AgentUsageStore;只加表不改旧表。
+        migrator.registerMigration(agentUsageMigrationID) { db in
+            try db.execute(sql: """
+            CREATE TABLE agent_daily_usage (
+                day                TEXT    NOT NULL,
+                source             TEXT    NOT NULL,
+                origin             TEXT    NOT NULL,
+                input_tokens       INTEGER NOT NULL,
+                output_tokens      INTEGER NOT NULL,
+                cache_read_tokens  INTEGER NOT NULL,
+                cache_write_tokens INTEGER NOT NULL,
+                reasoning_tokens   INTEGER NOT NULL,
+                total_tokens       INTEGER NOT NULL,
+                request_count      INTEGER NOT NULL,
+                scanned_at         INTEGER NOT NULL,
+                PRIMARY KEY (day, source)
+            )
+            """)
+            try db.execute(sql: "CREATE INDEX agent_daily_usage_day ON agent_daily_usage(day)")
+        }
+
         return migrator
     }
+
+    /// 每日账本迁移标识(agent-tab/02)。
+    static let agentUsageMigrationID = "agent-tab-02-usage"
 
     /// 清理历史迁移标识(p4-cleaner/04)。
     static let cleanHistoryMigrationID = "p4-cleaner-04-clean-history"
@@ -355,5 +381,6 @@ public enum HistoryDatabase {
         "gauge_min", "gauge_hour", "lineage", "groups", "metadata",
         "clean_run", "clean_item",
         "alert_event", "dev_server_state",
+        "agent_daily_usage",
     ]
 }

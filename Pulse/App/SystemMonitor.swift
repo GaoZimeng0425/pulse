@@ -112,6 +112,11 @@ final class SystemMonitor {
         features.agentSessions
     }
 
+    /// 每日 token 账本(智能体 tab,agent-tab/02)。
+    var agentUsage: AgentUsageFeature {
+        features.agentUsage
+    }
+
     /// 特权助手能耗读数(p3-root-mcp/03):root Energy Impact 聚合,电池页
     /// 「AI 助手」卡与设置页助手状态直读(p3-root-mcp/04)。
     var energyImpact: EnergyImpactFeature {

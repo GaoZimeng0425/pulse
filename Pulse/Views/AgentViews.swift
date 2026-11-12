@@ -10,7 +10,21 @@ import SwiftUI
 // 的 AI 身份色)——「正常/偏高/紧张」的阈值变色集中在既有三处,本页不开第四处。
 
 /// 智能体页指标色:蓝牙青(DESIGN.md junk-ai 先例;tab accent 同源)。
-private let agentsAccent = Metric.bluetooth.accentColor
+/// 智能体页各卡(AgentViews / AgentUsageViews)共用。
+let agentsAccent = Metric.bluetooth.accentColor
+
+/// token 合计的短型:556k / 1.2M(小数点手拼,不随区域漂移)。
+/// 智能体页会话行与每日消耗摘要共用同一格式。
+func agentTokenText(_ tokens: Int) -> String {
+    if tokens >= 1_000_000 {
+        let tenths = Int((Double(tokens) / 100_000).rounded())
+        return "\(tenths / 10).\(tenths % 10)M"
+    }
+    if tokens >= 1000 {
+        return "\(tokens / 1000)k"
+    }
+    return "\(tokens)"
+}
 
 /// Claude 用量限额卡:5 小时窗 / 本周两条读数行(meter + 百分比)+ 窗口重置注记。
 /// 快照是账户级(全部实例共享),单窗缺失如实少一行。
@@ -182,7 +196,7 @@ struct ZCodeSessionsCardView: View {
                 .monospacedDigit()
                 .foregroundStyle(.primary)
             if let tokens = session.totalTokens {
-                Text(tokenText(tokens))
+                Text(agentTokenText(tokens))
                     .font(.system(size: valueSize))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
@@ -194,18 +208,6 @@ struct ZCodeSessionsCardView: View {
     /// "sess_<uuid>" → 前 8 位(工作区名缺失时的兜底行名)。
     private func shortSessionID(_ sessionId: String) -> String {
         String(sessionId.dropFirst("sess_".count).prefix(8))
-    }
-
-    /// token 合计的短型:556k / 1.2M(小数点手拼,不随区域漂移)。
-    private func tokenText(_ tokens: Int) -> String {
-        if tokens >= 1_000_000 {
-            let tenths = Int((Double(tokens) / 100_000).rounded())
-            return "\(tenths / 10).\(tenths % 10)M"
-        }
-        if tokens >= 1000 {
-            return "\(tokens / 1000)k"
-        }
-        return "\(tokens)"
     }
 }
 
