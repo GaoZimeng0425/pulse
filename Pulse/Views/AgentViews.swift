@@ -112,14 +112,16 @@ struct ClaudeSessionsCardView: View {
         .cardShell(compact: isCompact)
     }
 
-    /// 一行会话(实体行):蚂蚁图标 + 项目名;pid / 时长 / 状态副文;上下文%与子代理数贴右。
+    /// 一行会话(实体行):蚂蚁图标 + 名字(会话自定义名优先,缺省项目名);
+    /// 副文优先当前任务摘要(末条用户指令截断),缺省 pid·时长·状态;
+    /// 上下文%与子代理数贴右。
     private func row(_ session: ClaudeAgentSessionStatus) -> some View {
         let valueSize = RowMetrics.valueFontSize(compact: isCompact)
         return CardEntityRow(
             systemImage: "ant",
             tint: agentsAccent,
-            name: session.projectName,
-            sub: rowSub(session),
+            name: session.name ?? session.projectName,
+            sub: session.taskSummary ?? rowSub(session),
             compact: isCompact
         ) {
             Text(contextText(session))

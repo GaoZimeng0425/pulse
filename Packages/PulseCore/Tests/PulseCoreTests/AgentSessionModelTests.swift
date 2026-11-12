@@ -44,15 +44,15 @@ final class AgentSessionModelTests: XCTestCase {
         {"type":"last-prompt","prompt":"下一步"}
         """
         let reading = ClaudeTranscriptTail.parse(Data(text.utf8))
-        XCTAssertEqual(reading?.model, "claude-opus-5-5")
-        XCTAssertEqual(reading?.contextTokens, 479_872)
-        XCTAssertEqual(reading?.timestamp, AgentISO8601.parse("2026-11-12T08:15:08.276Z"))
+        XCTAssertEqual(reading?.context?.model, "claude-opus-5-5")
+        XCTAssertEqual(reading?.context?.contextTokens, 479_872)
+        XCTAssertEqual(reading?.context?.timestamp, AgentISO8601.parse("2026-11-12T08:15:08.276Z"))
     }
 
     func testTranscriptTailFirstCacheBuildCountsCreationOnly() {
         // 会话首建缓存:cache_read 为 0 且 cache_creation > 0 → input + creation。
         let text = assistantLine(input: 100, cacheRead: 0, cacheCreation: 5000)
-        XCTAssertEqual(ClaudeTranscriptTail.parse(Data(text.utf8))?.contextTokens, 5100)
+        XCTAssertEqual(ClaudeTranscriptTail.parse(Data(text.utf8))?.context?.contextTokens, 5100)
     }
 
     func testTranscriptTailTakesLastAssistantAndDropsHalfLine() {
@@ -63,12 +63,56 @@ final class AgentSessionModelTests: XCTestCase {
         {"type":"attachment","message":{}}
         \(assistantLine(input: 5, cacheRead: 30000, cacheCreation: 0))
         """
-        XCTAssertEqual(ClaudeTranscriptTail.parse(Data(text.utf8))?.contextTokens, 30005)
+        XCTAssertEqual(ClaudeTranscriptTail.parse(Data(text.utf8))?.context?.contextTokens, 30005)
     }
 
     func testTranscriptTailWithoutUsageReturnsNil() {
         XCTAssertNil(ClaudeTranscriptTail.parse(Data(#"{"type":"assistant","message":{"model":"m"}}"#.utf8)))
         XCTAssertNil(ClaudeTranscriptTail.parse(Data()))
+    }
+
+    // MARK: - 当前任务摘要(agent-tab/03)
+
+    /// 末条有效用户指令:tool_result 回传 / sidechain 子链 / 注入噪音("<"、
+    /// resume 摘要)全跳过,取最后一条真实指令;与上下文读数同窗产出。
+    func testTailPicksLastValidUserPrompt() {
+        let text = """
+        {"type":"user","message":{"content":"修弹窗布局循环"}}
+        {"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1"}]}}
+        {"type":"user","isSidechain":true,"message":{"content":"子代理的指令"}}
+        {"type":"user","message":{"content":"<command-name>/clear</command-name>"}}
+        {"type":"user","message":{"content":"This session is being continued from a previous conversation"}}
+        {"type":"user","message":{"content":[{"type":"text","text":"给每日消耗卡"},{"type":"text","text":"加热力图"}]}}
+        \(assistantLine(input: 2, cacheRead: 1000, cacheCreation: 0))
+        """
+        let reading = ClaudeTranscriptTail.parse(Data(text.utf8))
+        XCTAssertEqual(reading?.lastUserPrompt, "给每日消耗卡 加热力图")
+        XCTAssertEqual(reading?.context?.contextTokens, 1002)
+    }
+
+    /// 只有指令没有 assistant usage:prompt 单独成立(新会话首条发出前)。
+    func testTailPromptAloneWithoutAssistant() {
+        let text = #"{"type":"user","message":{"content":"刚起的第一句话"}}"#
+        let reading = ClaudeTranscriptTail.parse(Data(text.utf8))
+        XCTAssertNil(reading?.context)
+        XCTAssertEqual(reading?.lastUserPrompt, "刚起的第一句话")
+    }
+
+    /// 指令截断:换行折空格、封顶 120 字符;全噪音 → prompt 为 nil 但 context 照常。
+    func testTailPromptTruncatesAndRejectsAllNoise() {
+        let long = String(repeating: "字", count: 200)
+        let truncated = ClaudeTranscriptTail.parse(
+            Data(#"{"type":"user","message":{"content":"\#(long)"}"#.utf8 + Data("}".utf8))
+        )?.lastUserPrompt
+        XCTAssertEqual(truncated?.count, 120)
+
+        let noiseOnly = """
+        {"type":"user","message":{"content":"<system-reminder>x</system-reminder>"}}
+        \(assistantLine(input: 1, cacheRead: 10, cacheCreation: 0))
+        """
+        let reading = ClaudeTranscriptTail.parse(Data(noiseOnly.utf8))
+        XCTAssertNil(reading?.lastUserPrompt)
+        XCTAssertEqual(reading?.context?.contextTokens, 11)
     }
 
     // MARK: - 上下文窗口二档
