@@ -30,10 +30,19 @@ final class AgentUsageReaderTests: XCTestCase {
 
     // MARK: ZCode db
 
+    /// 建假 db(GRDB 不建父目录,先自建 `.zcode/cli/db/`)。
+    private func makeUsageDatabase() throws -> DatabaseQueue {
+        let dbURL = home.appendingPathComponent(".zcode/cli/db/db.sqlite")
+        try FileManager.default.createDirectory(
+            at: dbURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        return try DatabaseQueue(path: dbURL.path)
+    }
+
     /// 现代 schema:带 computed_total_tokens 列,读回样本、legacy=false。
     func testZCodeModernSchema() throws {
-        let dbPath = home.appendingPathComponent(".zcode/cli/db/db.sqlite").path
-        let db = try DatabaseQueue(path: dbPath)
+        let db = try makeUsageDatabase()
         try db.write { db in
             try db.execute(sql: """
             CREATE TABLE model_usage (
@@ -62,8 +71,7 @@ final class AgentUsageReaderTests: XCTestCase {
 
     /// legacy schema:无 computed_total_tokens 列 → legacy=true、total 为 nil。
     func testZCodeLegacySchema() throws {
-        let dbPath = home.appendingPathComponent(".zcode/cli/db/db.sqlite").path
-        let db = try DatabaseQueue(path: dbPath)
+        let db = try makeUsageDatabase()
         try db.write { db in
             try db.execute(sql: """
             CREATE TABLE model_usage (
@@ -114,9 +122,10 @@ final class AgentUsageReaderTests: XCTestCase {
 
         let reader = LiveAgentUsageReader(home: home)
 
-        // 今天档:只有 s1 的两行(user 行也喂——解析过滤是内核职责)。
+        // 今天档(模拟「今天 0 点」:取一分钟前,刚写的文件都算新):只有 s1
+        // 的两行(user 行也喂——解析过滤是内核职责)。
         var todayLines: [String] = []
-        reader.readClaudeTranscripts(modifiedSince: Date()) { todayLines.append($0) }
+        reader.readClaudeTranscripts(modifiedSince: Date().addingTimeInterval(-60)) { todayLines.append($0) }
         XCTAssertEqual(todayLines.count, 2)
 
         // 全量档:三个文件都喂(尾行无换行也喂)。
