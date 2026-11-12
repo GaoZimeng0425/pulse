@@ -96,7 +96,7 @@ public enum NemoNotchToastContent {
             return NemoNotchToastPayload(
                 key: key(for: occurrence),
                 title: clamp("系统负载过高\(who)", to: titleLimit),
-                body: clamp(offenderBody(
+                body: clamp(AlertOffenderAttribution.bodyText(
                     lead: "最耗 CPU", entries: offender.entries,
                     metric: { entry in entry.cpuPercent.map { PulseFormat.cpuPercent($0) } }
                 ), to: bodyLimit),
@@ -110,7 +110,7 @@ public enum NemoNotchToastContent {
                     "「\(occurrence.subjectName ?? "组")」CPU \(PulseFormat.cpuPercent(occurrence.value))",
                     to: titleLimit
                 ),
-                body: clamp(offenderBody(
+                body: clamp(AlertOffenderAttribution.bodyText(
                     lead: "最耗 CPU", entries: offender.entries,
                     metric: { entry in entry.cpuPercent.map { PulseFormat.cpuPercent($0) } }
                 ), to: bodyLimit),
@@ -124,7 +124,7 @@ public enum NemoNotchToastContent {
                     "新组「\(occurrence.subjectName ?? "未知")」内存 \(PulseFormat.memory(UInt64(max(0, occurrence.value))))",
                     to: titleLimit
                 ),
-                body: clamp(offenderBody(
+                body: clamp(AlertOffenderAttribution.bodyText(
                     lead: "占内存最多", entries: offender.entries,
                     metric: { entry in PulseFormat.memory(entry.memoryBytes) }
                 ), to: bodyLimit),
@@ -151,23 +151,6 @@ public enum NemoNotchToastContent {
         let raw = "alert|\(occurrence.kind.rawValue)|\(occurrence.subjectKey)"
             .replacingOccurrences(of: "::", with: "||")
         return String(raw.prefix(keyLimit))
-    }
-
-    /// 正文模板:"<引导语>:进程甲 320%、进程乙 88%"。无百分数的新出生进程
-    /// 只列名;归因为空(组已不在场/无归因种类由调用方决定是否发)时给引导语
-    /// + 兜底句。
-    static func offenderBody(
-        lead: String,
-        entries: [AlertOffenderEntry],
-        metric: (AlertOffenderEntry) -> String?
-    ) -> String {
-        guard !entries.isEmpty else {
-            return "\(lead):进程已不在场,打开 Pulse 查看排行。"
-        }
-        let parts = entries.map { entry in
-            metric(entry).map { "\(entry.name) \($0)" } ?? entry.name
-        }
-        return "\(lead):\(parts.joined(separator: "、"))"
     }
 
     /// 钳长(契约上限按 Swift 字符计;前置信息在前的文案截尾不伤「谁」)。

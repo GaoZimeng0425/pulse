@@ -19,6 +19,10 @@ public struct AlertEventRow: Equatable, Sendable {
     public let latestAtSeconds: Int
     /// 窗口内触发次数。
     public let count: Int
+    /// 最近一次触发的归因:承载组(nil = 无归因或迁移前老行)。
+    public let offenderGroup: String?
+    /// 最近一次触发的归因进程(空 = 无归因或迁移前老行)。
+    public let offenderEntries: [AlertOffenderEntry]
 
     public init(
         kind: String,
@@ -26,7 +30,9 @@ public struct AlertEventRow: Equatable, Sendable {
         subjectName: String?,
         latestValue: Double,
         latestAtSeconds: Int,
-        count: Int
+        count: Int,
+        offenderGroup: String? = nil,
+        offenderEntries: [AlertOffenderEntry] = []
     ) {
         self.kind = kind
         self.subjectKey = subjectKey
@@ -34,6 +40,8 @@ public struct AlertEventRow: Equatable, Sendable {
         self.latestValue = latestValue
         self.latestAtSeconds = latestAtSeconds
         self.count = count
+        self.offenderGroup = offenderGroup
+        self.offenderEntries = offenderEntries
     }
 }
 
@@ -84,7 +92,8 @@ public enum McpEyesQuery {
         let latest = try Row.fetchAll(
             db,
             sql: """
-            SELECT e.kind, e.subject_key, e.subject_name, e.value, e.ts
+            SELECT e.kind, e.subject_key, e.subject_name, e.value, e.ts,
+                   e.offender_group, e.offender_entries
             FROM alert_event AS e
             WHERE e.ts >= ? AND e.ts <= ?
               AND e.ts = (
@@ -119,7 +128,11 @@ public enum McpEyesQuery {
                 subjectName: row["subject_name"],
                 latestValue: row["value"] ?? 0,
                 latestAtSeconds: row["ts"],
-                count: counts["\(kind)|\(subjectKey)"] ?? 1
+                count: counts["\(kind)|\(subjectKey)"] ?? 1,
+                offenderGroup: row["offender_group"],
+                offenderEntries: AlertOffenderSummary.entries(
+                    fromJSON: row["offender_entries"]
+                )
             )
         }
     }
@@ -231,21 +244,39 @@ public enum McpEyesText {
         return lines.joined(separator: "\n")
     }
 
-    /// recent_alerts 输出(同主体聚合)。
+    /// recent_alerts 输出(同主体聚合)。归因(alert-offender-outlets)随最近
+    /// 一次触发落库——「当时是谁干的」直接可答;老行无归因不硬造。
     public static func alertHistory(_ rows: [AlertEventRow], now: Date) -> String {
         if rows.isEmpty {
             return "窗口内没有告警记录(app 触发过才会落库;落盘自 mcp-eyes 起生效,更早的告警没有留档)。"
         }
-        var lines = ["窗口内告警 \(rows.count) 类(同主体聚合,按最近触发降序):"]
+        var lines = ["窗口内告警 \(rows.count) 类(同主体聚合,按最近触发降序;括号内为最近一次触发的归因):"]
         for row in rows {
             let title = AlertKind(rawValue: row.kind)?.title ?? row.kind
             var line = "- \(title)\(row.subjectName.map { "(\($0))" } ?? "") — 最近 \(ageText(atSeconds: row.latestAtSeconds, now: now)),读数 \(formatAlertValue(kind: row.kind, value: row.latestValue))"
             if row.count > 1 {
                 line += ",窗口内 \(row.count) 次"
             }
+            if let group = row.offenderGroup {
+                let metric = offenderMetric(kind: row.kind)
+                let attribution = AlertOffenderAttribution.bodyText(
+                    lead: group, entries: row.offenderEntries, metric: metric
+                )
+                line += "(归因:\(attribution))"
+            }
             lines.append(line)
         }
         return lines.joined(separator: "\n")
+    }
+
+    /// 归因行的读数口径:CPU 类带 CPU%,内存类带内存,新出生进程(nil)只列名。
+    private static func offenderMetric(kind: String) -> (AlertOffenderEntry) -> String? {
+        switch AlertKind(rawValue: kind) {
+        case .newGroupMemory:
+            { entry in PulseFormat.memory(entry.memoryBytes) }
+        default:
+            { entry in entry.cpuPercent.map { PulseFormat.cpuPercent($0) } }
+        }
     }
 
     /// list_dev_servers 输出;超过 `goneAfterSeconds` 未见如实说可能已退出。

@@ -142,4 +142,75 @@ final class AlertOffenderTests: XCTestCase {
             XCTAssertEqual(summary, .none)
         }
     }
+
+    // MARK: - 共享文案(bodyText,alert-offender-outlets 五出口单出处)
+
+    /// 正文模板:引导语 + 名字读数串;新出生进程(nil 读数)只列名。
+    func testBodyTextListsEntriesWithMetric() {
+        let entries = [
+            AlertOffenderEntry(name: "electron", cpuPercent: 320, memoryBytes: 1000),
+            AlertOffenderEntry(name: "fresh", cpuPercent: nil, memoryBytes: 2000),
+        ]
+        let text = AlertOffenderAttribution.bodyText(
+            lead: "最耗 CPU", entries: entries,
+            metric: { entry in entry.cpuPercent.map { "\(String(format: "%g", $0))%" } }
+        )
+        XCTAssertEqual(text, "最耗 CPU:electron 320%、fresh")
+    }
+
+    /// entries 为空:引导语 + 兜底句(组已不在场)。
+    func testBodyTextEmptyEntriesGivesFallback() {
+        XCTAssertEqual(
+            AlertOffenderAttribution.bodyText(
+                lead: "最耗 CPU", entries: [], metric: { _ in nil }
+            ),
+            "最耗 CPU:进程已不在场,打开 Pulse 查看排行。"
+        )
+    }
+
+    /// 日志一行摘要:承载组 + 第一名进程(带读数);无归因给「无归因」。
+    func testLogLineNamesGroupAndFirstEntry() {
+        let attributed = AlertOffenderSummary(
+            groupName: "octok",
+            entries: [
+                AlertOffenderEntry(name: "electron", cpuPercent: 320, memoryBytes: 1),
+                AlertOffenderEntry(name: "node", cpuPercent: 88, memoryBytes: 1),
+            ]
+        )
+        XCTAssertEqual(
+            AlertOffenderAttribution.logLine(for: attributed),
+            "承载组 octok,electron 320%"
+        )
+        XCTAssertEqual(AlertOffenderAttribution.logLine(for: .none), "无归因")
+    }
+
+    // MARK: - 落库 JSON(alert_event.offender_entries)
+
+    /// entriesJSON 往返:编解码等值;空表 → nil(列值 NULL,老行兼容口径一致)。
+    func testEntriesJSONRoundTrip() {
+        let entries = [
+            AlertOffenderEntry(name: "electron", cpuPercent: 320.5, memoryBytes: 1000),
+            AlertOffenderEntry(name: "fresh", cpuPercent: nil, memoryBytes: 2000),
+        ]
+        let summary = AlertOffenderSummary(groupName: "octok", entries: entries)
+        let json = summary.entriesJSON
+        XCTAssertNotNil(json)
+        XCTAssertEqual(AlertOffenderSummary.entries(fromJSON: json), entries)
+
+        XCTAssertNil(AlertOffenderSummary(groupName: nil, entries: []).entriesJSON, "空表不落列")
+        XCTAssertEqual(AlertOffenderSummary.entries(fromJSON: nil), [], "老行 NULL 读出空表")
+        XCTAssertEqual(
+            AlertOffenderSummary.entries(fromJSON: "not json"),
+            [],
+            "坏行不炸读侧"
+        )
+    }
+
+    /// 归因键 = 种类|主体(与系统通知 identifier 同规则)。
+    func testOffenderKeyMatchesNotificationIdentifier() {
+        let occurrence = AlertOccurrence(
+            kind: .groupCPU, subjectKey: "bundle:/X.app", value: 300, firedAt: Date()
+        )
+        XCTAssertEqual(occurrence.offenderKey, "groupCPU|bundle:/X.app")
+    }
 }

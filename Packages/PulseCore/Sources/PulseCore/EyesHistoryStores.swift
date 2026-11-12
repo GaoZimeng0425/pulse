@@ -9,7 +9,8 @@ import GRDB
 // 把钥匙),口径不双写。
 
 /// 告警历史:AlertCenter 触发时记一笔(fire-and-forget,触发稀疏、乱序无害;
-/// 同秒同主体 REPLACE 天然去重)。
+/// 同秒同主体 REPLACE 天然去重)。alert-offender-outlets 起连带归因落库
+/// (触发当轮口径),recent_alerts 才答得了「当时是谁干的」。
 public actor AlertEventStore {
     private let database: DatabaseQueue
 
@@ -17,12 +18,14 @@ public actor AlertEventStore {
         self.database = database
     }
 
-    public func record(_ occurrence: AlertOccurrence) throws {
+    public func record(_ occurrence: AlertOccurrence, offender: AlertOffenderSummary) throws {
         try database.write { db in
             try db.execute(
                 sql: """
-                INSERT OR REPLACE INTO alert_event (ts, kind, subject_key, subject_name, value)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO alert_event (
+                    ts, kind, subject_key, subject_name, value, offender_group, offender_entries
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 arguments: [
                     Int(occurrence.firedAt.timeIntervalSince1970),
@@ -30,6 +33,8 @@ public actor AlertEventStore {
                     occurrence.subjectKey,
                     occurrence.subjectName,
                     occurrence.value,
+                    offender.groupName,
+                    offender.entriesJSON,
                 ]
             )
         }

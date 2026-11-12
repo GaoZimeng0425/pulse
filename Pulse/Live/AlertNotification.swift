@@ -130,11 +130,16 @@ enum AlertNotificationContent {
     static let routeUserInfoKey = "pulse.alertRoute"
 
     /// 告警 → 通知载荷。identifier 稳定(种类+主体):同类同主体重发即替换。
-    static func make(for occurrence: AlertOccurrence) -> AlertNotificationPayload {
+    /// alert-offender-outlets:body 追加归因(有 entries 才追加),系统通知与
+    /// 应用内提示行共用本函数——两出口「谁在吃」口径一致。
+    static func make(
+        for occurrence: AlertOccurrence,
+        offender: AlertOffenderSummary = .none
+    ) -> AlertNotificationPayload {
         AlertNotificationPayload(
             identifier: "\(occurrence.kind.rawValue)|\(occurrence.subjectKey)",
             title: title(for: occurrence),
-            body: body(for: occurrence),
+            body: body(for: occurrence, offender: offender),
             route: occurrence.kind.route
         )
     }
@@ -150,19 +155,37 @@ enum AlertNotificationContent {
         }
     }
 
-    static func body(for occurrence: AlertOccurrence) -> String {
+    static func body(
+        for occurrence: AlertOccurrence,
+        offender: AlertOffenderSummary = .none
+    ) -> String {
+        let base: String
         switch occurrence.kind {
         case .systemLoad:
-            "系统 CPU 负载 \(PulseFormat.cpuPercent(occurrence.value)),持续过高。"
+            base = "系统 CPU 负载 \(PulseFormat.cpuPercent(occurrence.value)),持续过高。"
         case .groupCPU:
-            "CPU \(PulseFormat.cpuPercent(occurrence.value)),持续过高。"
+            base = "CPU \(PulseFormat.cpuPercent(occurrence.value)),持续过高。"
         case .newGroupMemory:
-            "内存 \(PulseFormat.memory(UInt64(max(0, occurrence.value))))。"
+            base = "内存 \(PulseFormat.memory(UInt64(max(0, occurrence.value))))。"
         case .diskAvailable:
-            "可用 \(PulseFormat.diskCapacity(UInt64(max(0, occurrence.value)))),剩余空间紧张。"
+            return "可用 \(PulseFormat.diskCapacity(UInt64(max(0, occurrence.value)))),剩余空间紧张。"
         case .devServerIdle:
-            "「\(occurrence.subjectName ?? "dev server")」已闲置 \(PulseFormat.duration(seconds: occurrence.value)),确认一下是否还需要。"
+            return "「\(occurrence.subjectName ?? "dev server")」已闲置 \(PulseFormat.duration(seconds: occurrence.value)),确认一下是否还需要。"
         }
+        // 磁盘/dev server 无归因不硬造(上方已 return);CPU/内存类有归因进程才
+        // 追加——正文两行内点名「谁在吃」,组名随引导语带出(系统级告警组名
+        // 不在 title,组级告警 title 已有,引导语统一带括号保持口径)。
+        guard !offender.entries.isEmpty else { return base }
+        let lead: String = switch occurrence.kind {
+        case .newGroupMemory:
+            offender.groupName.map { "占内存最多(\($0))" } ?? "占内存最多"
+        default:
+            offender.groupName.map { "最耗 CPU(\($0))" } ?? "最耗 CPU"
+        }
+        let metric: (AlertOffenderEntry) -> String? = occurrence.kind == .newGroupMemory
+            ? { entry in PulseFormat.memory(entry.memoryBytes) }
+            : { entry in entry.cpuPercent.map { PulseFormat.cpuPercent($0) } }
+        return base + AlertOffenderAttribution.bodyText(lead: lead, entries: offender.entries, metric: metric)
     }
 
     /// userInfo → 路由(缺失/未知值 = nil,调用方回落"只开窗不切页")。

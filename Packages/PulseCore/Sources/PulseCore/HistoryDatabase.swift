@@ -328,6 +328,13 @@ public enum HistoryDatabase {
             )
             """)
         }
+        // alert-offender-outlets:告警历史带归因(触发当轮承载组 + 前三名进程),
+        // recent_alerts 才答得了「当时是谁干的」。旧行 NULL = 无归因(clean_item
+        // permanent_route 同款列迁移先例)。
+        migrator.registerMigration(alertOffenderMigrationID) { db in
+            try db.execute(sql: "ALTER TABLE alert_event ADD COLUMN offender_group TEXT")
+            try db.execute(sql: "ALTER TABLE alert_event ADD COLUMN offender_entries TEXT")
+        }
 
         return migrator
     }
@@ -337,6 +344,9 @@ public enum HistoryDatabase {
 
     /// mcp-eyes 两表迁移标识(mcp-eyes/02)。
     static let eyesMigrationID = "mcp-eyes-v1"
+
+    /// alert_event 归因两列迁移标识(alert-offender-outlets)。
+    static let alertOffenderMigrationID = "alert-offender-outlets-v1"
 
     // MARK: 表名单(测试与自检共用)
 

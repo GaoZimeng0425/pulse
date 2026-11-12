@@ -160,6 +160,19 @@ final class AlertCenterTests: XCTestCase {
         )
     }
 
+    /// 一轮带进程的主干上下文(AlertCenterToastTests 同款):喂食与归因暂存
+    /// 同轮同源——归因出口的用例必须走 onRound,ingestSampling 不更新归因原料。
+    private func round(load: Double, processes: [RawProcess]) -> RoundContext {
+        let snapshot = ProcessSnapshot(takenAt: Date(), processes: processes)
+        var spine = RoundSpine(configuration: GroupingConfiguration(projectRoots: []))
+        return spine.advance(SamplingUpdate(
+            snapshot: snapshot,
+            diff: CPUDiffer.diff(previous: nil, current: snapshot),
+            cpu: CPULoadBreakdown(total: load, user: load, system: 0),
+            rankings: .empty
+        ))
+    }
+
     /// 让 setEnabled 里授权 Task 跑完(同 actor yield 数次足够)。
     private func settle() async {
         for _ in 0 ..< 10 {
@@ -553,5 +566,50 @@ final class AlertCenterTests: XCTestCase {
         }
         XCTAssertTrue(center.activeAlerts.isEmpty)
         XCTAssertTrue(sender.sent.isEmpty)
+    }
+
+    // MARK: - 归因出口(alert-offender-outlets)
+
+    /// 触发 → 系统通知正文点名当轮进程、offenders 字典同步写入;解除 → 两者
+    /// 都清。归因口径 = 触发当轮(onRound 暂存,ingestSampling 不更新)。
+    func testFiredNotificationBodyNamesOffenderAndOffendersLifecycle() async {
+        let sender = FakeAlertSender()
+        let clock = MutableClock(t0)
+        let center = AlertCenter(
+            store: AlertSettingsStore(defaults: makeDefaults()),
+            sender: sender,
+            toastSender: InertNemoNotchToastSender(),
+            clock: { clock.now }
+        )
+        await center.refreshAuthorization()
+        center.setEnabled(true, for: .systemLoad)
+        await settle()
+
+        let electron = RawProcess(
+            pid: 100, parentPID: 1,
+            executablePath: "/usr/local/bin/electron", argv: ["electron"]
+        )
+        for _ in 0 ..< 3 {
+            center.onRound(round(load: 80, processes: [electron]))
+            clock.advance(150)
+        }
+        await settle() // 发送是 Task 出口:让它在断言前跑完
+
+        XCTAssertEqual(sender.sent.count, 1)
+        let body = sender.sent[0].body
+        XCTAssertTrue(body.contains("最耗 CPU"), "正文带归因引导语,实际:\(body)")
+        XCTAssertTrue(body.contains("electron"), "正文点名当轮进程,实际:\(body)")
+
+        let offender = center.offenders["systemLoad|system"]
+        XCTAssertNotNil(offender, "fired 时按 offenderKey 写入归因")
+        XCTAssertEqual(offender?.entries.map(\.name).first, "electron")
+
+        // 解除:应用内提示与归因一起清(同主体再触发归因是新算的)。
+        for _ in 0 ..< 6 {
+            center.onRound(round(load: 10, processes: [electron]))
+            clock.advance(5)
+        }
+        XCTAssertTrue(center.activeAlerts.isEmpty, "resolved 清应用内提示")
+        XCTAssertTrue(center.offenders.isEmpty, "resolved 清归因缓存")
     }
 }

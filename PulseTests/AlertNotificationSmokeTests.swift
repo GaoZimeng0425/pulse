@@ -26,6 +26,33 @@ final class AlertNotificationSmokeTests: XCTestCase {
         XCTAssertEqual(payload.identifier, "groupCPU|bundle:/Applications/X.app", "标识 = 种类|主体(重发替换)")
     }
 
+    /// 带归因文案(alert-offender-outlets):CPU/内存类正文追加「引导语(组名):
+    /// 进程 读数」串;无归因(默认 .none)保持原文案。
+    func testBodyAppendsOffenderNamesWhenAttributed() {
+        let occurrence = AlertOccurrence(
+            kind: .systemLoad, subjectKey: "system", value: 87,
+            firedAt: Date(timeIntervalSince1970: 1_000_000)
+        )
+        let offender = AlertOffenderSummary(
+            groupName: "octok",
+            entries: [
+                AlertOffenderEntry(name: "electron", cpuPercent: 320, memoryBytes: 1000),
+                AlertOffenderEntry(name: "node", cpuPercent: 88, memoryBytes: 2000),
+            ]
+        )
+        let body = AlertNotificationContent.body(for: occurrence, offender: offender)
+        XCTAssertTrue(body.hasPrefix("系统 CPU 负载"), "原文案在前,实际:\(body)")
+        XCTAssertTrue(body.contains("最耗 CPU(octok)"), "引导语带承载组名,实际:\(body)")
+        XCTAssertTrue(body.contains("electron 320%"), "点名进程与读数,实际:\(body)")
+
+        // 无归因:磁盘/dev server 不硬造;systemLoad 拿到空归因(极端:采样空转)
+        // 也只发原文案。
+        XCTAssertEqual(
+            AlertNotificationContent.body(for: occurrence, offender: .none),
+            "系统 CPU 负载 87%,持续过高。"
+        )
+    }
+
     func testRouteParsingRoundTripAndFallback() {
         let route = AlertNotificationContent.route(
             from: [AlertNotificationContent.routeUserInfoKey: AlertRoute.disk.rawValue]

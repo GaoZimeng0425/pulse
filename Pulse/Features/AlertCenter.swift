@@ -23,6 +23,10 @@ final class AlertCenter {
     /// 触发中未解除的告警(新在前;应用内提示的唯一数据源)。
     /// 引擎事件出口写入(handle);预览注入直写同模块可用。
     var activeAlerts: [AlertOccurrence] = []
+    /// 触发中告警的归因(alert-offender-outlets):key = AlertOccurrence.offenderKey,
+    /// fired 时按触发当轮快照算好、resolved 清除——应用内提示行与补发通知共用
+    /// (归因口径 = 触发当轮,不能展示时重算)。
+    var offenders: [String: AlertOffenderSummary] = [:]
     /// 系统通知已授权(启动时现查;请求后、每次发送前更新)。
     private(set) var notificationsAuthorized = false
     /// 系统侧已拒绝(设置页 / 横幅提示"仅应用内提示")。没问过不算拒绝。
@@ -155,7 +159,14 @@ final class AlertCenter {
         }
         if store.systemDeliveryEnabled, let skipped, notificationsAuthorized, !wasAuthorized {
             let backlog = activeAlerts
-                .map(AlertNotificationContent.make(for:))
+                .map { occurrence in
+                    // 补发同样带归因:fired 时已按触发当轮算好存在 offenders 里
+                    // (还在 activeAlerts = 未解除 = 归因未清)。
+                    AlertNotificationContent.make(
+                        for: occurrence,
+                        offender: offenders[occurrence.offenderKey] ?? .none
+                    )
+                }
                 .filter { !skipped.contains($0.identifier) }
             if !backlog.isEmpty {
                 let sender = sender
@@ -191,21 +202,32 @@ final class AlertCenter {
                     $0.kind == occurrence.kind && $0.subjectKey == occurrence.subjectKey
                 }
                 activeAlerts.insert(occurrence, at: 0)
+                // 归因一次算好五出口共用(toast / 系统通知 / 应用内提示 / 日志 / 历史),
+                // 口径 = 触发当轮快照(AlertOffender 既有定案)。
+                let offender = AlertOffenderAttribution.summarize(
+                    occurrence: occurrence,
+                    groups: latestGroups,
+                    cpuPercentByPID: latestCPUPercentByPID
+                )
+                offenders[occurrence.offenderKey] = offender
                 LogService.info(
                     "告警触发:\(occurrence.kind.title)"
                         + (occurrence.subjectName.map { "(\($0))" } ?? "")
-                        + " 读数=\(occurrence.value)",
+                        + " 读数=\(occurrence.value) 归因="
+                        + AlertOffenderAttribution.logLine(for: offender),
                     category: "Alert"
                 )
-                deliver(occurrence, into: &payloads)
-                // mcp-eyes/02:触发即留档(fire-and-forget;触发稀疏,乱序无害)。
+                deliver(occurrence, offender: offender, into: &payloads)
+                // mcp-eyes/02:触发即留档(fire-and-forget;触发稀疏,乱序无害);
+                // alert-offender-outlets 起连带归因,recent_alerts 可答「谁干的」。
                 if let alertHistory {
-                    Task { try? await alertHistory.record(occurrence) }
+                    Task { try? await alertHistory.record(occurrence, offender: offender) }
                 }
             case let .resolved(kind, subjectKey):
                 activeAlerts.removeAll {
                     $0.kind == kind && $0.subjectKey == subjectKey
                 }
+                offenders.removeValue(forKey: "\(kind.rawValue)|\(subjectKey)")
                 LogService.info("告警恢复:\(kind.title)(\(subjectKey))", category: "Alert")
             }
         }
@@ -230,17 +252,17 @@ final class AlertCenter {
     /// 卡(store.toastDeliveryEnabled;devServerIdle 不进)。两开关独立,可双开
     /// 可全关(全关只剩应用内提示)。NemoNotch 发送 fire-and-forget——未运行
     /// 是常态,失败只在发送器内记日志,主流程零影响。
-    private func deliver(_ occurrence: AlertOccurrence, into payloads: inout [AlertNotificationPayload]) {
+    private func deliver(
+        _ occurrence: AlertOccurrence,
+        offender: AlertOffenderSummary,
+        into payloads: inout [AlertNotificationPayload]
+    ) {
         if store.systemDeliveryEnabled {
-            payloads.append(AlertNotificationContent.make(for: occurrence))
+            payloads.append(AlertNotificationContent.make(for: occurrence, offender: offender))
         }
         guard store.toastDeliveryEnabled, let payload = NemoNotchToastContent.make(
             for: occurrence,
-            offender: AlertOffenderAttribution.summarize(
-                occurrence: occurrence,
-                groups: latestGroups,
-                cpuPercentByPID: latestCPUPercentByPID
-            ),
+            offender: offender,
             jumpBundleId: Bundle.main.bundleIdentifier
         ) else { return }
         let toastSender = toastSender
