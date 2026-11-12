@@ -16,6 +16,7 @@ final class MonitorAssemblyTests: XCTestCase {
             network: NetworkFeature(),
             alerts: .inert(),
             devServers: DevServerFeature(portScanner: InertDevServerPortScanner()),
+            agentSessions: AgentSessionFeature(reader: InertAgentSessionReader()),
             rankings: RankingsFeature(nettopSource: InertNettopCSVSource()),
             history: HistoryFeature(engine: nil),
             disk: DiskFeature(

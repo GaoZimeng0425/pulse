@@ -107,6 +107,11 @@ final class SystemMonitor {
         features.devServers
     }
 
+    /// AI 助手会话聚合(智能体 tab,agent-tab/01)。
+    var agentSessions: AgentSessionFeature {
+        features.agentSessions
+    }
+
     /// 特权助手能耗读数(p3-root-mcp/03):root Energy Impact 聚合,电池页
     /// 「AI 助手」卡与设置页助手状态直读(p3-root-mcp/04)。
     var energyImpact: EnergyImpactFeature {
