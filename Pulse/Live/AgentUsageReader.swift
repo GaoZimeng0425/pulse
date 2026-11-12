@@ -111,6 +111,9 @@ struct LiveAgentUsageReader: AgentUsageReading {
             options: [.skipsHiddenFiles]
         ) else { return }
         let rootPrefix = projectsRoot.path + "/"
+        // enumerator 可能返回标准化拼写(/var → /private/var 的 symlink 解析),
+        // 两个前缀都备;都不匹配退文件名(该文件的项目归组降级,行照常计)。
+        let standardizedRootPrefix = projectsRoot.standardizedFileURL.path + "/"
 
         for case let url as URL in enumerator {
             guard url.pathExtension == "jsonl",
@@ -122,7 +125,14 @@ struct LiveAgentUsageReader: AgentUsageReading {
                   || (values.contentModificationDate ?? .distantPast) >= modifiedSince!
             else { continue }
             // 相对路径 <slug>/<sessionId>.jsonl:项目归组的输入(agent-tab/04)。
-            let relativePath = String(url.path.dropFirst(rootPrefix.count))
+            let rawPath = url.path
+            let relativePath: String = if rawPath.hasPrefix(rootPrefix) {
+                String(rawPath.dropFirst(rootPrefix.count))
+            } else if rawPath.hasPrefix(standardizedRootPrefix) {
+                String(rawPath.dropFirst(standardizedRootPrefix.count))
+            } else {
+                url.lastPathComponent
+            }
             readFileLines(url) { line in
                 consume(relativePath, line)
             }
