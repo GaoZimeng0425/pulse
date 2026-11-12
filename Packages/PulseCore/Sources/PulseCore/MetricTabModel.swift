@@ -15,6 +15,9 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
     case disk
     case network
     case containers
+    /// 智能体页(agent-tab/01):AI 编码助手(Claude Code / ZCode)会话与用量限额,
+    /// dev server 卡从总览迁入;弹窗与主窗口同轴。
+    case agents
     case battery
     /// 清理页(p4-cleaner/03):主窗口专属——弹窗不入列(spec「菜单栏徽标与弹窗不动」,
     /// `popoverAxis` 排除;主窗口轴 `displayAxis` 含它,排在电池后、历史前)。
@@ -37,6 +40,7 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .disk: "磁盘"
         case .network: "网络"
         case .containers: "容器"
+        case .agents: "智能体"
         case .battery: "电池"
         case .cleaner: "清理"
         case .history: "历史"
@@ -55,6 +59,7 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .disk: "internaldrive"
         case .network: "network"
         case .containers: "cube.box.fill"
+        case .agents: "person.2.fill"
         case .battery: "battery.100percent"
         case .cleaner: "sparkles"
         case .history: "clock.arrow.circlepath"
@@ -76,6 +81,9 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .disk: .disk
         case .network: .network
         case .containers: .containers
+        // 智能体页取蓝牙青:清理品类令牌里 ai=蓝牙青(junk-ai),AI 身份色全 app 一致;
+        // 与外设页共用是既有先例(总览/CPU 同取 cpu)。
+        case .agents: .bluetooth
         case .battery: .battery
         case .cleaner: .disk
         case .history: .cpu
@@ -175,7 +183,7 @@ public extension MetricTab {
         case .sensors: [.smc]
         case .peripherals: [.bluetooth]
         case .containers: [.containers]
-        case .cpu, .memory, .disk, .network, .battery, .cleaner, .history: []
+        case .cpu, .memory, .disk, .network, .agents, .battery, .cleaner, .history: []
         }
     }
 }
@@ -254,7 +262,8 @@ public struct MetricTabContent: Equatable, Sendable {
         let ranked: [ProcessGroup]
         let metric: GroupCardMetric
         switch tab {
-        case .overview, .cpu, .gpu, .sensors, .peripherals, .disk, .network, .containers, .battery, .cleaner, .history:
+        case .overview, .cpu, .gpu, .sensors, .peripherals, .disk, .network, .containers, .agents, .battery, .cleaner,
+             .history:
             ranked = Leaderboard.ranked(groups, by: \.cpuPercent, id: \.id)
             metric = .cpu
         case .memory:

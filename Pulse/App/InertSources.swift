@@ -240,6 +240,30 @@ struct InertDevServerPortScanner: DevServerPortScanning {
     }
 }
 
+/// 惰性 AI 助手会话读源(智能体 tab,agent-tab/01):一律空——预览不起文件读,
+/// 空态观感与「没有在跑的 agent」一致。
+struct InertAgentSessionReader: AgentSessionReading {
+    func claudeRegistryFiles() -> [Data] {
+        []
+    }
+
+    func claudeUsageSnapshotFile() -> Data? {
+        nil
+    }
+
+    func claudeTranscriptTail(cwd: String, sessionId: String) -> Data? {
+        nil
+    }
+
+    func claudeSubagentCount(cwd: String, sessionId: String) -> Int {
+        0
+    }
+
+    func zcodeAgentMetadataFiles(lookback: TimeInterval, now: Date) -> [(session: String, data: Data)] {
+        []
+    }
+}
+
 /// 每核 tick:空样本(系统负载按 0 计,CoreTickDiffer 的退化口径)。
 struct InertCoreTickSource: CoreTickSource {
     func sample() -> CoreTickSample {
@@ -316,6 +340,7 @@ extension SystemMonitor {
                 network: NetworkFeature(),
                 alerts: .inert(),
                 devServers: DevServerFeature(portScanner: InertDevServerPortScanner()),
+                agentSessions: AgentSessionFeature(reader: InertAgentSessionReader()),
                 rankings: RankingsFeature(nettopSource: InertNettopCSVSource()),
                 history: HistoryFeature(engine: historyEngine),
                 disk: DiskFeature(

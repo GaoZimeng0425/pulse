@@ -9,7 +9,8 @@ import SwiftUI
 /// 一个 tab 的内容栈:主窗口与弹窗读同一份——卡片组成、顺序、数据出处全在这里,
 /// 两处只差排版档(`isCompact`:弹窗 360pt 定宽)。排版差异只有三种,全由宽度决定:
 /// 卡用紧凑档;主窗口并排的两卡(内存双环 / 各卷 + 快照)在弹窗里上下排;主窗口的
-/// 节标题(此刻 / 开发服务)弹窗不画,卡片各自带标题。排行卡一律卡内标题,不配节标题。
+/// 节标题(此刻,及智能体页的开发服务)弹窗不画,卡片各自带标题。排行卡一律卡内
+/// 标题,不配节标题。
 ///
 /// 组排行卡由宿主经 `ranking` 给:主窗口带搜索过滤与可排序进程表,弹窗是紧凑行与
 /// 简版下钻——只差交互深度,出现在哪些 tab、排在哪里由本栈决定。
@@ -56,6 +57,19 @@ struct MetricTabStack<Ranking: View>: View {
                 memoryByApp
             })
             builder.groupRanking()
+        case .agents:
+            // 智能体页(agent-tab/01):Claude 用量 / Claude Code 会话 / ZCode 会话
+            // + 从总览迁入的开发服务(迁出后总览回归纯系统指标)。
+            let snapshot = monitor.agentSessions.snapshot
+            builder.card("claude-usage", ClaudeUsageCardView(usage: snapshot.usage, isCompact: isCompact))
+            builder.card(
+                "claude-sessions",
+                ClaudeSessionsCardView(sessions: snapshot.claudeSessions, isCompact: isCompact)
+            )
+            builder.card(
+                "zcode-sessions",
+                ZCodeSessionsCardView(sessions: snapshot.zcodeSessions, isCompact: isCompact)
+            )
             sectionTitle("开发服务", into: &builder)
             // dev server 卡(工单 p1-history/08):全部停止只上抛请求,确认对话框
             // (KillRequestFlow 关口)把关后才发信号。
