@@ -112,6 +112,9 @@ public struct ZCodeUsageSample: Equatable, Sendable {
     public var cacheReadTokens: Int?
     public var cacheWriteTokens: Int?
     public var computedTotalTokens: Int?
+    /// 会话工作区真路径(session 表 directory/path;legacy schema 无 join 为 nil,
+    /// 该行只进合计轨不进项目轨)。agent-tab/04。
+    public var workspacePath: String?
 
     public init(
         id: String,
@@ -123,7 +126,8 @@ public struct ZCodeUsageSample: Equatable, Sendable {
         reasoningTokens: Int? = nil,
         cacheReadTokens: Int? = nil,
         cacheWriteTokens: Int? = nil,
-        computedTotalTokens: Int? = nil
+        computedTotalTokens: Int? = nil,
+        workspacePath: String? = nil
     ) {
         self.id = id
         self.startedAtMs = startedAtMs
@@ -135,6 +139,57 @@ public struct ZCodeUsageSample: Equatable, Sendable {
         self.cacheReadTokens = cacheReadTokens
         self.cacheWriteTokens = cacheWriteTokens
         self.computedTotalTokens = computedTotalTokens
+        self.workspacePath = workspacePath
+    }
+}
+
+// MARK: - 工作区归组(agent-tab/04)
+
+/// 路径 → 项目名,worktree 归组主仓(tokscale `--merge-worktrees` 同思路,纯
+/// 路径推导零 IO):含 `/.worktrees/<slug>` 段或 `/.git/worktrees/<name>` 段的,
+/// 项目 = 该段**前一路径段**(`/Users/x/pulse/.worktrees/agent-usage` → `pulse`);
+/// 其余取末段 basename。Claude slug 与 ZCode 真路径统一走「已切好的段数组」
+/// 核心(slug 的 "-" 切分同样产生字面 `.worktrees` 段——"." 开头无歧义)。
+public enum AgentWorkspaceResolution {
+    /// 核心规则:段数组里找 `.worktrees` 字面段,或 `.git` 紧跟 `worktrees`
+    /// 的段对;命中取前一段,否则末段。空/退化输入返回 nil(调用方放弃项目轨)。
+    public static func projectName(components: [String]) -> String? {
+        guard let last = components.last, !last.isEmpty else { return nil }
+        if let worktrees = components.firstIndex(of: ".worktrees"), worktrees > 0 {
+            let project = components[worktrees - 1]
+            if !project.isEmpty {
+                return project
+            }
+        }
+        if let git = components.firstIndex(of: ".git"),
+           components.indices.contains(git + 1), components[git + 1] == "worktrees",
+           git > 0 {
+            let project = components[git - 1]
+            if !project.isEmpty {
+                return project
+            }
+        }
+        return last
+    }
+
+    /// 真路径(`/` 切分;ZCode workspace、任意 cwd)。
+    public static func projectName(fromPath path: String) -> String? {
+        let components = path.split(separator: "/").map(String.init)
+        return projectName(components: components)
+    }
+
+    /// Claude projects 目录的 slug(cwd 的 "/"→"-";`-` 切分)。
+    /// 项目名含 "-" 时末段才逐字保真,worktree 归组不受影响(`.worktrees` 字面
+    /// 段以 "." 开头,slug 切分不歧义)。
+    public static func projectName(fromSlug slug: String) -> String? {
+        let components = slug.split(separator: "-").map(String.init)
+        return projectName(components: components)
+    }
+
+    /// 相对路径 `<slug>/<sessionId>.jsonl` 的 slug 段(项目归组输入)。
+    public static func slug(fromRelativePath path: String) -> String? {
+        guard let first = path.split(separator: "/").first, !first.isEmpty else { return nil }
+        return String(first)
     }
 }
 
@@ -147,6 +202,9 @@ public struct ClaudeUsageSample: Equatable, Sendable {
     public var outputTokens: Int
     public var cacheReadTokens: Int
     public var cacheWriteTokens: Int
+    /// 行内真实工作目录(实测 assistant 行 100% 带;项目归组首选,含 - 的
+    /// 项目名保真。agent-tab/04)。
+    public var cwd: String?
 
     public init(
         timestampMs: Int64,
@@ -154,7 +212,8 @@ public struct ClaudeUsageSample: Equatable, Sendable {
         inputTokens: Int,
         outputTokens: Int,
         cacheReadTokens: Int,
-        cacheWriteTokens: Int
+        cacheWriteTokens: Int,
+        cwd: String? = nil
     ) {
         self.timestampMs = timestampMs
         self.messageId = messageId
@@ -162,6 +221,68 @@ public struct ClaudeUsageSample: Equatable, Sendable {
         self.outputTokens = outputTokens
         self.cacheReadTokens = cacheReadTokens
         self.cacheWriteTokens = cacheWriteTokens
+        self.cwd = cwd
+    }
+}
+
+/// 每日账本的**项目轨**行:一天 × 来源 × 项目一行,主键 `(day, source, project)`。
+/// 与合计表 `agent_daily_usage` 平行(同一次扫描双轨产出);stats-cache 回填无
+/// 项目维度,不进本表。展示只用 total / requests,五桶留作对称排查。
+public struct AgentProjectUsageRow: Codable, Equatable, Sendable, FetchableRecord, PersistableRecord {
+    public static let databaseTableName = "agent_daily_project_usage"
+
+    public var day: String
+    public var source: AgentUsageSource
+    /// 归组后的项目名(worktree 已折回主仓名)。
+    public var project: String
+    public var inputTokens: Int
+    public var outputTokens: Int
+    public var cacheReadTokens: Int
+    public var cacheWriteTokens: Int
+    public var reasoningTokens: Int
+    public var totalTokens: Int
+    public var requestCount: Int
+    public var scannedAt: Int64
+
+    /// 表列蛇形,映射集中一处(同 AgentDailyUsageRow 惯例)。
+    enum CodingKeys: String, CodingKey {
+        case day
+        case source
+        case project
+        case inputTokens = "input_tokens"
+        case outputTokens = "output_tokens"
+        case cacheReadTokens = "cache_read_tokens"
+        case cacheWriteTokens = "cache_write_tokens"
+        case reasoningTokens = "reasoning_tokens"
+        case totalTokens = "total_tokens"
+        case requestCount = "request_count"
+        case scannedAt = "scanned_at"
+    }
+
+    public init(
+        day: String,
+        source: AgentUsageSource,
+        project: String,
+        inputTokens: Int = 0,
+        outputTokens: Int = 0,
+        cacheReadTokens: Int = 0,
+        cacheWriteTokens: Int = 0,
+        reasoningTokens: Int = 0,
+        totalTokens: Int = 0,
+        requestCount: Int = 0,
+        scannedAt: Int64 = 0
+    ) {
+        self.day = day
+        self.source = source
+        self.project = project
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.cacheReadTokens = cacheReadTokens
+        self.cacheWriteTokens = cacheWriteTokens
+        self.reasoningTokens = reasoningTokens
+        self.totalTokens = totalTokens
+        self.requestCount = requestCount
+        self.scannedAt = scannedAt
     }
 }
 
@@ -267,7 +388,8 @@ public enum ClaudeTranscriptUsageParser {
             inputTokens: input,
             outputTokens: output,
             cacheReadTokens: cacheRead,
-            cacheWriteTokens: cacheWrite
+            cacheWriteTokens: cacheWrite,
+            cwd: (record["cwd"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         )
     }
 }
@@ -314,6 +436,8 @@ public struct AgentDailyAggregator {
     }
 
     private var buckets: [Key: Bucket] = [:]
+    /// 项目轨(agent-tab/04):与合计轨同喂双写;cache 回填只进合计轨。
+    private var projectBuckets: [ProjectKey: Bucket] = [:]
     private var seenClaudeMessageIDs: Set<String> = []
     /// 非 static(DateFormatter 非并发安全,实例持有;聚合器本身单线程使用)。
     private let dayFormatter: DateFormatter
@@ -322,6 +446,12 @@ public struct AgentDailyAggregator {
         var day: String
         var source: AgentUsageSource
         var origin: AgentUsageOrigin
+    }
+
+    private struct ProjectKey: Hashable {
+        var day: String
+        var source: AgentUsageSource
+        var project: String
     }
 
     public init() {
@@ -353,12 +483,18 @@ public struct AgentDailyAggregator {
 
         let key = Key(day: day, source: .zcode, origin: .db)
         accumulate(into: &buckets[key, default: Bucket()], normalized: normalized)
+        // 项目轨:workspace 归组失败(legacy 无 join / 路径退化)只进合计轨。
+        if let project = sample.workspacePath.flatMap(AgentWorkspaceResolution.projectName(fromPath:)) {
+            let projectKey = ProjectKey(day: day, source: .zcode, project: project)
+            accumulate(into: &projectBuckets[projectKey, default: Bucket()], normalized: normalized)
+        }
     }
 
     /// 聚合一条 Claude 样本;重复 message.id 只计一次——msg id 是 Anthropic 消息
     /// 级全局标识,resume/compact 把历史复制进新文件时同 id 不双计。
-    /// id 缺失如实计不去重。
-    public mutating func addClaude(_ sample: ClaudeUsageSample) {
+    /// id 缺失如实计不去重。`slug` = 会话 jsonl 所在 projects 子目录名,归组
+    /// 项目轨用(agent-tab/04)。
+    public mutating func addClaude(_ sample: ClaudeUsageSample, slug: String? = nil) {
         let total = sample.inputTokens + sample.outputTokens
             + sample.cacheReadTokens + sample.cacheWriteTokens
         guard total > 0,
@@ -379,6 +515,19 @@ public struct AgentDailyAggregator {
         bucket.total += total
         bucket.requests += 1
         buckets[key] = bucket
+
+        if let project = sample.cwd.flatMap(AgentWorkspaceResolution.projectName(fromPath:))
+            ?? slug.flatMap(AgentWorkspaceResolution.projectName(fromSlug:)) {
+            let projectKey = ProjectKey(day: day, source: .claude, project: project)
+            var projectBucket = projectBuckets[projectKey, default: Bucket()]
+            projectBucket.input += sample.inputTokens
+            projectBucket.output += sample.outputTokens
+            projectBucket.cacheRead += sample.cacheReadTokens
+            projectBucket.cacheWrite += sample.cacheWriteTokens
+            projectBucket.total += total
+            projectBucket.requests += 1
+            projectBuckets[projectKey] = projectBucket
+        }
     }
 
     /// stats-cache 回填天(只有 total;day 字符串原样入桶)。
@@ -413,6 +562,28 @@ public struct AgentDailyAggregator {
     /// 是否已聚合到任何行(编排器判断「今天有没有数据」用)。
     public var isEmpty: Bool {
         buckets.isEmpty
+    }
+
+    /// 项目轨行(按天、来源、项目排序;`scannedAt` 统一盖当前时刻)。
+    public func projectRows(scannedAt: Date) -> [AgentProjectUsageRow] {
+        let stamp = Int64(scannedAt.timeIntervalSince1970)
+        return projectBuckets
+            .map { key, bucket in
+                AgentProjectUsageRow(
+                    day: key.day,
+                    source: key.source,
+                    project: key.project,
+                    inputTokens: bucket.input,
+                    outputTokens: bucket.output,
+                    cacheReadTokens: bucket.cacheRead,
+                    cacheWriteTokens: bucket.cacheWrite,
+                    reasoningTokens: bucket.reasoning,
+                    totalTokens: bucket.total,
+                    requestCount: bucket.requests,
+                    scannedAt: stamp
+                )
+            }
+            .sorted { ($0.day, $0.source.rawValue, $0.project) < ($1.day, $1.source.rawValue, $1.project) }
     }
 
     private func accumulate(
@@ -520,6 +691,27 @@ public final class AgentUsageStore: Sendable {
             try AgentDailyUsageRow.fetchCount(db) > 0
         }
     }
+
+    // MARK: 项目轨(agent-tab/04)
+
+    /// 项目行覆盖写(主键 (day, source, project) 冲突即替换)。
+    public func upsertProjects(_ rows: [AgentProjectUsageRow]) throws {
+        guard !rows.isEmpty else { return }
+        try database.write { db in
+            for row in rows {
+                try row.save(db)
+            }
+        }
+    }
+
+    /// 全部项目行(按天升序;UI 按窗口聚合用)。
+    public func projectRows() throws -> [AgentProjectUsageRow] {
+        try database.read { db in
+            try AgentProjectUsageRow
+                .order(sql: "day ASC, source ASC, project ASC")
+                .fetchAll(db)
+        }
+    }
 }
 
 // MARK: - IO 接缝
@@ -534,11 +726,12 @@ public protocol AgentUsageReading: Sendable {
     )
 
     /// 逐行喂 `~/.claude/projects/` 下会话 jsonl(`modifiedSince` nil = 全部
-    /// 文件;文件级 mtime 过滤)。consume 在调用线程同步逐行执行(非逃逸
-    /// 语义),不跨线程。
+    /// 文件;文件级 mtime 过滤)。`relativePath` = 相对 projects 的
+    /// `<slug>/<sessionId>.jsonl`(项目归组从 slug 反解,agent-tab/04);consume
+    /// 在调用线程同步逐行执行(非逃逸语义),不跨线程。
     func readClaudeTranscripts(
         modifiedSince: Date?,
-        consume: (_ line: String) -> Void
+        consume: (_ relativePath: String, _ line: String) -> Void
     )
 
     /// `~/.claude/stats-cache.json` 内容;缺失返回 nil。
@@ -585,13 +778,17 @@ public struct AgentUsageCatalog {
         for sample in samples.samples {
             aggregator.addZCode(sample, legacySchema: samples.legacySchema)
         }
-        reader.readClaudeTranscripts(modifiedSince: startOfToday) { line in
+        reader.readClaudeTranscripts(modifiedSince: startOfToday) { relativePath, line in
             guard let sample = ClaudeTranscriptUsageParser.parse(line: line) else { return }
             // 捕获聚合器:去重集跨文件累积,不能每次调用新建。
-            aggregator.addClaude(sample)
+            aggregator.addClaude(
+                sample,
+                slug: AgentWorkspaceResolution.slug(fromRelativePath: relativePath)
+            )
         }
 
         try? store.upsert(aggregator.rows(scannedAt: now))
+        try? store.upsertProjects(aggregator.projectRows(scannedAt: now))
         return try? store.rows()
     }
 
@@ -610,9 +807,12 @@ public struct AgentUsageCatalog {
         for sample in samples.samples {
             aggregator.addZCode(sample, legacySchema: samples.legacySchema)
         }
-        reader.readClaudeTranscripts(modifiedSince: nil) { line in
+        reader.readClaudeTranscripts(modifiedSince: nil) { relativePath, line in
             guard let sample = ClaudeTranscriptUsageParser.parse(line: line) else { return }
-            aggregator.addClaude(sample)
+            aggregator.addClaude(
+                sample,
+                slug: AgentWorkspaceResolution.slug(fromRelativePath: relativePath)
+            )
         }
         for backfill in ClaudeStatsCacheParser.dailyTotals(from: reader.claudeStatsCacheData()) {
             aggregator.addStatsCacheDay(backfill.day, totalTokens: backfill.totalTokens)
@@ -631,6 +831,8 @@ public struct AgentUsageCatalog {
         )
         try? store.upsert(merged.upserts)
         try? store.insertIfAbsent(merged.insertsIfAbsent)
+        // 项目轨:细粒度源全量覆盖(cache 无项目维度,不进此表)。
+        try? store.upsertProjects(aggregator.projectRows(scannedAt: now))
         return (try? store.rows()) ?? []
     }
 }

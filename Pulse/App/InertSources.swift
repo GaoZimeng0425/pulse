@@ -275,7 +275,7 @@ struct InertAgentUsageReader: AgentUsageReading {
 
     func readClaudeTranscripts(
         modifiedSince: Date?,
-        consume: (_ line: String) -> Void
+        consume: (_ relativePath: String, _ line: String) -> Void
     ) {}
 
     func claudeStatsCacheData() -> Data? {

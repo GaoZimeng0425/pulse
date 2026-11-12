@@ -72,6 +72,7 @@ struct MetricTabStack<Ranking: View>: View {
                 "agent-usage",
                 AgentUsageCardView(
                     rows: monitor.agentUsage.rows,
+                    projectRows: monitor.agentUsage.projectRows,
                     isCompact: isCompact,
                     isScanning: monitor.agentUsage.isScanning,
                     onRescan: { monitor.agentUsage.requestFullRescan() }

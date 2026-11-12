@@ -14,6 +14,8 @@ import PulseCore
 final class AgentUsageFeature: MonitorFeature {
     /// 账本全表(按天升序);空 = 还没扫过或确实没有数据。
     private(set) var rows: [AgentDailyUsageRow] = []
+    /// 项目轨全表(agent-tab/04):UI 按窗口聚合出项目排行。
+    private(set) var projectRows: [AgentProjectUsageRow] = []
     /// 全量扫描进行中(UI 转圈与禁用重入)。
     private(set) var isScanning = false
 
@@ -52,8 +54,10 @@ final class AgentUsageFeature: MonitorFeature {
         Task.detached(priority: .utility) { [reader, store] in
             var catalog = AgentUsageCatalog()
             let result = catalog.fullRescan(reader: reader, store: store!, now: .now)
+            let projects = (try? store!.projectRows()) ?? []
             await MainActor.run { [weak self] in
                 self?.rows = result
+                self?.projectRows = projects
                 self?.isScanning = false
             }
         }
@@ -71,8 +75,10 @@ final class AgentUsageFeature: MonitorFeature {
                 _ = catalog.refreshToday(reader: reader, store: store, now: .now)
             }
             let result = (try? store.rows()) ?? []
+            let projects = (try? store.projectRows()) ?? []
             await MainActor.run { [weak self] in
                 self?.rows = result
+                self?.projectRows = projects
                 self?.isScanning = false
             }
         }
@@ -85,8 +91,10 @@ final class AgentUsageFeature: MonitorFeature {
             var catalog = AgentUsageCatalog()
             guard let fresh = catalog.refreshToday(reader: reader, store: store, now: now)
             else { return }
+            let projects = (try? store.projectRows()) ?? []
             await MainActor.run { [weak self] in
                 self?.rows = fresh
+                self?.projectRows = projects
             }
         }
     }

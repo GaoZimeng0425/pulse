@@ -40,20 +40,29 @@ final class AgentUsageReaderTests: XCTestCase {
         return try DatabaseQueue(path: dbURL.path)
     }
 
-    /// 现代 schema:带 computed_total_tokens 列,读回样本、legacy=false。
+    /// 现代 schema:带 computed_total_tokens 列 + session 表 join,读回样本
+    /// (含 workspace)、legacy=false。
     func testZCodeModernSchema() throws {
         let db = try makeUsageDatabase()
         try db.write { db in
             try db.execute(sql: """
             CREATE TABLE model_usage (
-                id TEXT PRIMARY KEY, started_at INTEGER, completed_at INTEGER,
+                id TEXT PRIMARY KEY, session_id TEXT, started_at INTEGER, completed_at INTEGER,
                 duration_ms INTEGER, input_tokens INTEGER, output_tokens INTEGER,
                 reasoning_tokens INTEGER, cache_read_input_tokens INTEGER,
                 cache_creation_input_tokens INTEGER, computed_total_tokens INTEGER
             )
             """)
             try db.execute(sql: """
-            INSERT INTO model_usage VALUES ('u1', 1000, 9000, 5000, 100, 50, 10, 80, 5, 150)
+            CREATE TABLE session (
+                id TEXT PRIMARY KEY, directory TEXT, path TEXT
+            )
+            """)
+            try db.execute(sql: """
+            INSERT INTO session VALUES ('sess_1', '/Users/x/pulse/.worktrees/agent-project', NULL)
+            """)
+            try db.execute(sql: """
+            INSERT INTO model_usage VALUES ('u1', 'sess_1', 1000, 9000, 5000, 100, 50, 10, 80, 5, 150)
             """)
         }
 
@@ -63,6 +72,7 @@ final class AgentUsageReaderTests: XCTestCase {
         XCTAssertEqual(result.samples.count, 1)
         XCTAssertEqual(result.samples.first?.id, "u1")
         XCTAssertEqual(result.samples.first?.computedTotalTokens, 150)
+        XCTAssertEqual(result.samples.first?.workspacePath, "/Users/x/pulse/.worktrees/agent-project")
 
         // 增量过滤(WHERE 下推到 SQL)。
         let since = reader.zcodeUsageSamples(sinceStartedAtMs: 5000)
@@ -123,15 +133,22 @@ final class AgentUsageReaderTests: XCTestCase {
         let reader = LiveAgentUsageReader(home: home)
 
         // 今天档(模拟「今天 0 点」:取一分钟前,刚写的文件都算新):只有 s1
-        // 的两行(user 行也喂——解析过滤是内核职责)。
+        // 的两行(user 行也喂——解析过滤是内核职责);相对路径 <slug>/<file>。
         var todayLines: [String] = []
-        reader.readClaudeTranscripts(modifiedSince: Date().addingTimeInterval(-60)) { todayLines.append($0) }
+        reader.readClaudeTranscripts(modifiedSince: Date().addingTimeInterval(-60)) { _, line in
+            todayLines.append(line)
+        }
         XCTAssertEqual(todayLines.count, 2)
 
-        // 全量档:三个文件都喂(尾行无换行也喂)。
+        // 全量档:三个文件都喂(尾行无换行也喂);首段 = slug。
+        var allPaths: [String] = []
         var allLines: [String] = []
-        reader.readClaudeTranscripts(modifiedSince: nil) { allLines.append($0) }
+        reader.readClaudeTranscripts(modifiedSince: nil) { path, line in
+            allPaths.append(path)
+            allLines.append(line)
+        }
         XCTAssertEqual(allLines.count, 3)
+        XCTAssertTrue(allPaths.allSatisfy { $0 == "-Users-x-pulse/s1.jsonl" || $0 == "-Users-x-pulse/s2.jsonl" })
     }
 
     /// stats-cache 原样读回;缺失 nil。
