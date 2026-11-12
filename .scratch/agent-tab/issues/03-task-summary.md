@@ -17,7 +17,7 @@
   截断,不调模型(abtop 的 `claude --print` 方案不用)。
 - v1 票 Out of scope 的「Claude name 展示」「last-prompt 任务摘要」两项就此清掉。
 
-**Status:** done(2026-11-12,develop 合并点见下;装机目验归用户)
+**Status:** done(2026-11-12,develop@c8e2ffb;装机目验归用户)
 
 - [x] PulseCore:`ClaudeTranscriptTail.parse` 返回组合读数 `ClaudeTranscriptReading`
       (context + lastUserPrompt,一次倒序遍历双目标、各自命中即冻结);userPromptText
