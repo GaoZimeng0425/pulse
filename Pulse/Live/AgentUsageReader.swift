@@ -110,12 +110,6 @@ struct LiveAgentUsageReader: AgentUsageReading {
             includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
             options: [.skipsHiddenFiles]
         ) else { return }
-        let rootPrefix = projectsRoot.path + "/"
-        // enumerator 返回 symlink 解析后的拼写(实测临时目录 /var → /private/var;
-        // standardizedFileURL 只做词法标准化不解析 symlink),按 resolvingSymlinks
-        // 前缀切;都不匹配退文件名(该文件的项目归组降级,行照常计)。
-        let resolvedRootPrefix = projectsRoot.resolvingSymlinksInPath().path + "/"
-
         for case let url as URL in enumerator {
             guard url.pathExtension == "jsonl",
                   let values = try? url.resourceValues(
@@ -126,14 +120,12 @@ struct LiveAgentUsageReader: AgentUsageReading {
                   || (values.contentModificationDate ?? .distantPast) >= modifiedSince!
             else { continue }
             // 相对路径 <slug>/<sessionId>.jsonl:项目归组的输入(agent-tab/04)。
-            let rawPath = url.path
-            let relativePath: String = if rawPath.hasPrefix(rootPrefix) {
-                String(rawPath.dropFirst(rootPrefix.count))
-            } else if rawPath.hasPrefix(resolvedRootPrefix) {
-                String(rawPath.dropFirst(resolvedRootPrefix.count))
-            } else {
-                url.lastPathComponent
-            }
+            // 取「父目录名 + 文件名」拼——enumerator 会把 URL 解析成 symlink 后的
+            // 绝对拼写(实测 /var → /private/var,且 resolvingSymlinksInPath 还原
+            // 不出 enumerator 的拼写),任何绝对前缀匹配都不可靠;projects 布局
+            // 恒为 slug 一层,父目录名即 slug。
+            let relativePath = url.deletingLastPathComponent().lastPathComponent
+                + "/" + url.lastPathComponent
             readFileLines(url) { line in
                 consume(relativePath, line)
             }
