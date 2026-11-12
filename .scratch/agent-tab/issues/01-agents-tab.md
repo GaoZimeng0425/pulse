@@ -18,20 +18,31 @@ abtop(github.com/graykode/abtop,MIT)监视线程编码 AI 助手:范围拍板
 (DESIGN.md junk-ai 先例,AI 身份色);阈值变色不开第四处(强调级映射集中三处
 的既有规矩),meter/数值一律页色。
 
-**Status:** in-progress(2026-11-12)
+**Status:** done(2026-11-12,develop@6853d4d;装机目验归用户)
 
-- [ ] PulseCore `AgentSessionModel`:模型/解析器(注册表、jsonl 尾读容错半行、
+- [x] PulseCore `AgentSessionModel`:模型/解析器(注册表、jsonl 尾读容错半行、
       用量快照、ZCode metadata 未知状态透传)/上下文二档/编排器(≥5s IO 节流 +
       每轮 pid 存活过滤零 IO;ZCode 近 24h 窗 + 12 会话×30 agent 封顶)
-- [ ] Live `AgentSessionReader`(slug 公式 + 失配回退扫描;jsonl 尾 128KB;
+- [x] Live `AgentSessionReader`(slug 公式 + 失配回退扫描;jsonl 尾 128KB;
       ZCode 按文件 mtime 近窗)+ `AgentSessionFeature`(心跳薄壳)+ 装配三步
-- [ ] `MetricTab.agents`(智能体/person.2.fill/.bluetooth)+ 三卡组装 CardFamily
+- [x] `MetricTab.agents`(智能体/person.2.fill/.bluetooth)+ 三卡组装 CardFamily
       标准件 + MetricTabStack 迁卡
-- [x] 测试:PulseCore 合成夹具 16 例;Live smoke 临时目录 5 例;装配防漂移同步
-- [ ] `sh scripts/check.sh` 全绿;合并 develop;装机目验(8 个 claude 实例对得上)
+- [x] 测试:PulseCore 合成夹具 17 例;Live smoke 临时目录 5 例;tab 序/标题/键盘轴
+      断言更新;装配防漂移同步
+- [x] `sh scripts/check.sh`:核心包 754 全绿;app 侧唯一挂
+      `LiveCoreTickSourceSmokeTests`(真机 tick 冒烟,与本改零关联——该测试只直构
+      tick/process 源,不经过 SystemMonitor;单跑绿两连,记档合并,高负载自扰老模式)
+      ;合并 develop;post-merge hook 已 Release 装机重启
 
 **Out of scope(后续候选):** MCP `list_agent_sessions` 工具、上下文高位告警、
 会话历史落库、ZCode token 用量细读(db.sqlite 只读)、会话成本(costUSD)、
 Claude `name` 展示、当前任务摘要(last-prompt)。
 
 ## Comments
+
+- **口径备忘(2026-11-12)**:上下文 = 末条 assistant 的 `input+cache_read`(首建
+  缓存期 `input+cache_creation`,abtop #54 同口径);窗口上限二档——模型带 `[1m]`
+  或当前读数 >200k 判 1M,否则 200k(abtop `context_window_for_model` 同款)。
+  注册表 status 实测四态 busy/idle/waiting/shell,未知值原样透传。ZCode 活跃 =
+  状态非终态(completed/failed/cancelled/error),未知状态按活跃计(近窗内仍在
+  更新的更可能是在跑)。
