@@ -359,11 +359,37 @@ public enum HistoryDatabase {
             try db.execute(sql: "CREATE INDEX agent_daily_usage_day ON agent_daily_usage(day)")
         }
 
+        // 每日账本项目轨(agent-tab/04):一天 × 来源 × 项目一行(worktree 已归组
+        // 主仓),主键 (day, source, project) 覆盖式 upsert。与合计表平行,
+        // stats-cache 回填无项目维度不进此表。读写在 AgentUsageStore。
+        migrator.registerMigration(agentProjectUsageMigrationID) { db in
+            try db.execute(sql: """
+            CREATE TABLE agent_daily_project_usage (
+                day                TEXT    NOT NULL,
+                source             TEXT    NOT NULL,
+                project            TEXT    NOT NULL,
+                input_tokens       INTEGER NOT NULL,
+                output_tokens      INTEGER NOT NULL,
+                cache_read_tokens  INTEGER NOT NULL,
+                cache_write_tokens INTEGER NOT NULL,
+                reasoning_tokens   INTEGER NOT NULL,
+                total_tokens       INTEGER NOT NULL,
+                request_count      INTEGER NOT NULL,
+                scanned_at         INTEGER NOT NULL,
+                PRIMARY KEY (day, source, project)
+            )
+            """)
+            try db.execute(sql: "CREATE INDEX agent_daily_project_usage_day ON agent_daily_project_usage(day)")
+        }
+
         return migrator
     }
 
     /// 每日账本迁移标识(agent-tab/02)。
     static let agentUsageMigrationID = "agent-tab-02-usage"
+
+    /// 账本项目轨迁移标识(agent-tab/04)。
+    static let agentProjectUsageMigrationID = "agent-tab-04-project-usage"
 
     /// 清理历史迁移标识(p4-cleaner/04)。
     static let cleanHistoryMigrationID = "p4-cleaner-04-clean-history"
@@ -381,6 +407,6 @@ public enum HistoryDatabase {
         "gauge_min", "gauge_hour", "lineage", "groups", "metadata",
         "clean_run", "clean_item",
         "alert_event", "dev_server_state",
-        "agent_daily_usage",
+        "agent_daily_usage", "agent_daily_project_usage",
     ]
 }

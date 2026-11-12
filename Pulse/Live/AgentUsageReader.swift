@@ -51,23 +51,34 @@ struct LiveAgentUsageReader: AgentUsageReading {
         guard !columns.isEmpty else { return ([], false) }
         let legacySchema = !columns.contains { $0.name == "computed_total_tokens" }
 
-        var sql = """
-        SELECT id, started_at, completed_at, duration_ms, input_tokens, output_tokens,
-               reasoning_tokens, cache_read_input_tokens, cache_creation_input_tokens
+        // 列名全限定 model_usage 前缀(modern 版 join session 后 `id` 等会歧义);
+        // workspace 两列走别名,缺失(NULL)→ 样本 workspacePath nil,只进合计轨。
+        let baseColumns = """
+        model_usage.id, model_usage.started_at, model_usage.completed_at, model_usage.duration_ms,
+        model_usage.input_tokens, model_usage.output_tokens, model_usage.reasoning_tokens,
+        model_usage.cache_read_input_tokens, model_usage.cache_creation_input_tokens
         """
-        if !legacySchema {
-            sql += ", computed_total_tokens"
+        var sql = if legacySchema {
+            "SELECT \(baseColumns) FROM model_usage"
+        } else {
+            """
+            SELECT \(baseColumns), model_usage.computed_total_tokens,
+                   NULLIF(s.directory, '') AS workspace_directory, NULLIF(s.path, '') AS workspace_path
+            FROM model_usage LEFT JOIN session s ON s.id = model_usage.session_id
+            """
         }
-        sql += " FROM model_usage"
         var arguments: [DatabaseValueConvertible] = []
         if let sinceStartedAtMs {
-            sql += " WHERE started_at >= ?"
+            sql += " WHERE model_usage.started_at >= ?"
             arguments.append(sinceStartedAtMs)
         }
 
         var samples: [ZCodeUsageSample] = []
         _ = try? database.read { db in
             for row in try Row.fetchAll(db, sql: sql, arguments: StatementArguments(arguments)) {
+                let workspace: String? = legacySchema
+                    ? nil
+                    : ((row["workspace_directory"] as String?) ?? (row["workspace_path"] as String?))
                 samples.append(
                     ZCodeUsageSample(
                         id: row["id"] ?? "",
@@ -79,7 +90,8 @@ struct LiveAgentUsageReader: AgentUsageReading {
                         reasoningTokens: row["reasoning_tokens"],
                         cacheReadTokens: row["cache_read_input_tokens"],
                         cacheWriteTokens: row["cache_creation_input_tokens"],
-                        computedTotalTokens: legacySchema ? nil : row["computed_total_tokens"]
+                        computedTotalTokens: legacySchema ? nil : row["computed_total_tokens"],
+                        workspacePath: workspace
                     )
                 )
             }
@@ -89,7 +101,7 @@ struct LiveAgentUsageReader: AgentUsageReading {
 
     func readClaudeTranscripts(
         modifiedSince: Date?,
-        consume: (_ line: String) -> Void
+        consume: (_ relativePath: String, _ line: String) -> Void
     ) {
         let projectsRoot = home.appendingPathComponent(".claude/projects")
         let manager = FileManager.default
@@ -98,6 +110,7 @@ struct LiveAgentUsageReader: AgentUsageReading {
             includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
             options: [.skipsHiddenFiles]
         ) else { return }
+        let rootPrefix = projectsRoot.path + "/"
 
         for case let url as URL in enumerator {
             guard url.pathExtension == "jsonl",
@@ -108,7 +121,11 @@ struct LiveAgentUsageReader: AgentUsageReading {
                   modifiedSince == nil
                   || (values.contentModificationDate ?? .distantPast) >= modifiedSince!
             else { continue }
-            readFileLines(url, consume: consume)
+            // 相对路径 <slug>/<sessionId>.jsonl:项目归组的输入(agent-tab/04)。
+            let relativePath = String(url.path.dropFirst(rootPrefix.count))
+            readFileLines(url) { line in
+                consume(relativePath, line)
+            }
         }
     }
 

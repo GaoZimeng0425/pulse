@@ -29,12 +29,12 @@ private final class FakeUsageReader: AgentUsageReading, @unchecked Sendable {
 
     func readClaudeTranscripts(
         modifiedSince: Date?,
-        consume: (_ line: String) -> Void
+        consume: (_ relativePath: String, _ line: String) -> Void
     ) {
         capturedModifiedSince = modifiedSince
         for file in claudeFiles where modifiedSince == nil || file.modifiedAt >= modifiedSince! {
             for line in file.lines {
-                consume(line)
+                consume(file.key, line)
             }
         }
     }
@@ -63,18 +63,20 @@ private func dayKey(_ year: Int, _ month: Int, _ day: Int) -> String {
     return formatter.string(from: Date(timeIntervalSince1970: TimeInterval(noonMs(year, month, day)) / 1000))
 }
 
-/// assistant 行夹具(usage 形状 = projects jsonl 实测)。
+/// assistant 行夹具(usage 形状 = projects jsonl 实测;cwd 可选注入)。
 private func claudeLine(
     id: String?,
     timestamp: String = "2026-11-10T12:00:00.000Z",
     input: Int = 100,
     cacheRead: Int = 50,
     cacheWrite: Int = 10,
-    output: Int = 200
+    output: Int = 200,
+    cwd: String? = nil
 ) -> String {
     let messageId = id.map { "\"id\":\"\($0)\"," } ?? ""
+    let cwdField = cwd.map { "\"cwd\":\"\($0)\"," } ?? ""
     return """
-    {"type":"assistant","timestamp":"\(timestamp)","message":{\(messageId)"role":"assistant","usage":{"input_tokens":\(input),"cache_read_input_tokens":\(cacheRead),"cache_creation_input_tokens":\(cacheWrite),"output_tokens":\(output)}}}
+    {"type":"assistant","timestamp":"\(timestamp)",\(cwdField)"message":{\(messageId)"role":"assistant","usage":{"input_tokens":\(input),"cache_read_input_tokens":\(cacheRead),"cache_creation_input_tokens":\(cacheWrite),"output_tokens":\(output)}}}
     """
 }
 
@@ -408,5 +410,123 @@ final class AgentUsageModelTests: XCTestCase {
         XCTAssertEqual(rows.first { $0.day == "2026-11-04" }?.totalTokens, 700)
         XCTAssertFalse(rows.contains { $0.day == today && $0.origin == .cache })
         XCTAssertEqual(rows.first { $0.day == today && $0.source == .zcode }?.totalTokens, 150)
+    }
+
+    // MARK: 工作区归组与项目轨(agent-tab/04)
+
+    /// 归组三形态:worktree 折主仓、.git/worktrees 折主仓、普通取末段;退化输入 nil。
+    func testWorkspaceResolution() {
+        XCTAssertEqual(
+            AgentWorkspaceResolution.projectName(fromPath: "/Users/x/pulse/.worktrees/agent-project"),
+            "pulse"
+        )
+        XCTAssertEqual(
+            AgentWorkspaceResolution.projectName(fromPath: "/Users/x/pulse/.git/worktrees/feat"),
+            "pulse"
+        )
+        XCTAssertEqual(
+            AgentWorkspaceResolution.projectName(fromPath: "/Users/x/macos/pulse"),
+            "pulse"
+        )
+        // slug(worktree 段字面保留;项目名含 "-" 不受影响——末段逐字)。
+        XCTAssertEqual(
+            AgentWorkspaceResolution.projectName(fromSlug: "-Users-x-pulse-.worktrees-agent-usage"),
+            "pulse"
+        )
+        XCTAssertEqual(
+            AgentWorkspaceResolution.projectName(fromSlug: "-Users-aa-Documents-Learn-macos-pulse"),
+            "pulse"
+        )
+        XCTAssertNil(AgentWorkspaceResolution.projectName(fromPath: ""))
+        XCTAssertEqual(AgentWorkspaceResolution.slug(fromRelativePath: "-Users-x-pulse/s1.jsonl"), "-Users-x-pulse")
+    }
+
+    /// 双轨聚合:同一样本进合计轨与项目轨(worktree 归组主仓名);
+    /// workspace 缺失只进合计轨;cache 回填只进合计轨。
+    func testAggregatorDualTrack() throws {
+        var aggregator = AgentDailyAggregator()
+        aggregator.addZCode(
+            ZCodeUsageSample(
+                id: "u1", startedAtMs: noonMs(2026, 11, 10),
+                inputTokens: 100, outputTokens: 50, computedTotalTokens: 150,
+                workspacePath: "/Users/x/pulse/.worktrees/agent-project"
+            ),
+            legacySchema: false
+        )
+        aggregator.addZCode(
+            ZCodeUsageSample(
+                id: "u2", startedAtMs: noonMs(2026, 11, 10),
+                inputTokens: 10, outputTokens: 5, computedTotalTokens: 15,
+                workspacePath: nil
+            ),
+            legacySchema: false
+        )
+        try aggregator.addClaude(
+            XCTUnwrap(ClaudeTranscriptUsageParser.parse(line: claudeLine(id: "m1", cwd: "/Users/x/octok-client"))),
+            slug: "-Users-x-octok-client"
+        )
+        // cwd 缺失的老格式行:slug 兜底(含 - 项目名取末词,限制如实钉住)。
+        try aggregator.addClaude(
+            XCTUnwrap(ClaudeTranscriptUsageParser.parse(line: claudeLine(
+                id: "m2",
+                timestamp: "2026-11-10T13:00:00.000Z"
+            ))),
+            slug: "-Users-x-my-app"
+        )
+        aggregator.addStatsCacheDay(dayKey(2026, 11, 10), totalTokens: 999)
+
+        let totals = aggregator.rows(scannedAt: Date())
+        XCTAssertEqual(totals.filter { $0.source == .zcode }.first?.totalTokens, 165)
+
+        let projects = aggregator.projectRows(scannedAt: Date())
+        XCTAssertEqual(projects.count, 3) // zcode→pulse、claude→octok-client(cwd 保真)、slug 兜底→app
+        let pulse = projects.first { $0.project == "pulse" }
+        XCTAssertEqual(pulse?.source, .zcode)
+        XCTAssertEqual(pulse?.totalTokens, 150) // u2 无 workspace 不进项目轨
+        XCTAssertEqual(projects.first { $0.project == "octok-client" }?.totalTokens, 360)
+        XCTAssertEqual(projects.first { $0.project == "app" }?.totalTokens, 360)
+    }
+
+    /// 项目表 store:覆盖写 + 排序读回。
+    func testStoreProjectRows() throws {
+        let store = try AgentUsageStore(database: HistoryDatabase.openInMemory())
+        try store.upsertProjects([
+            AgentProjectUsageRow(day: "2026-11-10", source: .claude, project: "pulse", totalTokens: 100, scannedAt: 1),
+        ])
+        try store.upsertProjects([
+            AgentProjectUsageRow(day: "2026-11-10", source: .claude, project: "pulse", totalTokens: 260, scannedAt: 2),
+            AgentProjectUsageRow(day: "2026-11-10", source: .zcode, project: "pulse", totalTokens: 40, scannedAt: 2),
+        ])
+        let rows = try store.projectRows()
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(rows.first { $0.source == .claude }?.totalTokens, 260)
+    }
+
+    /// 全量档产出项目轨行(编排器 upsertProjects 接线)。
+    func testFullRescanWritesProjectRows() throws {
+        let store = try AgentUsageStore(database: HistoryDatabase.openInMemory())
+        let reader = FakeUsageReader()
+        reader.zcode = [
+            ZCodeUsageSample(
+                id: "u1", startedAtMs: noonMs(2026, 11, 12),
+                inputTokens: 100, outputTokens: 50, computedTotalTokens: 150,
+                workspacePath: "/Users/x/pulse/.worktrees/agent-project"
+            ),
+        ]
+        reader.claudeFiles = [
+            (
+                key: "-Users-x-pulse/s1.jsonl",
+                modifiedAt: Date(),
+                lines: [claudeLine(id: "m1", timestamp: "2026-11-12T12:00:00.000Z")]
+            ),
+        ]
+
+        var catalog = AgentUsageCatalog()
+        _ = catalog.fullRescan(reader: reader, store: store, now: Date())
+
+        let projects = try store.projectRows()
+        // 两家都归到 pulse(claude slug 末段 = pulse)。
+        XCTAssertEqual(projects.count, 2)
+        XCTAssertTrue(projects.allSatisfy { $0.project == "pulse" })
     }
 }

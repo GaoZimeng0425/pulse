@@ -13,6 +13,8 @@ import SwiftUI
 struct AgentUsageCardView: View {
     /// 账本全表(按天升序);空 = 还没扫过。
     let rows: [AgentDailyUsageRow]
+    /// 项目轨全表(agent-tab/04);窗口内聚合出项目排行。
+    var projectRows: [AgentProjectUsageRow] = []
     /// 弹窗紧凑档。
     var isCompact = false
     /// 全量扫描进行中(按钮转圈与禁用重入)。
@@ -60,6 +62,7 @@ struct AgentUsageCardView: View {
                     }
                     lineChart
                     summaryRow
+                    projectRank
                     heatmap
                     Text("近 \(Self.heatmapWeeks) 周 · Claude 与 ZCode 合计")
                         .font(.system(size: 10.5))
@@ -169,6 +172,61 @@ struct AgentUsageCardView: View {
             .font(.system(size: 11))
             .monospacedDigit()
             .foregroundStyle(.secondary)
+    }
+
+    // MARK: 项目排行(agent-tab/04)
+
+    /// 近 N 天项目排行:两家合计、按量降序、封顶 8 行(超出补「另 N 项」);
+    /// worktree 消耗已归组主仓名。无项目数据(只有 cache 回填的日子)整节不画。
+    @ViewBuilder
+    private var projectRank: some View {
+        let ranked = projectTotals(days: range.days)
+        if !ranked.isEmpty {
+            VStack(alignment: .leading, spacing: RowMetrics.cardRowSpacing(compact: isCompact)) {
+                ForEach(Array(ranked.prefix(8)), id: \.project) { item in
+                    CardEntityRow(
+                        systemImage: "folder",
+                        tint: agentsAccent,
+                        name: item.project,
+                        sub: nil,
+                        compact: isCompact
+                    ) {
+                        Text(agentTokenText(Int(item.total)))
+                            .font(.system(size: RowMetrics.valueFontSize(compact: isCompact), weight: .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(.primary)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+                if ranked.count > 8 {
+                    Text("另 \(ranked.count - 8) 个项目")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
+    }
+
+    /// 窗口内项目合计(两家合并),按量降序。
+    private func projectTotals(days: Int) -> [(project: String, total: Double)] {
+        let keys = windowDayKeys(days: days)
+        var totals: [String: Double] = [:]
+        for row in projectRows where keys.contains(row.day) && row.totalTokens > 0 {
+            totals[row.project, default: 0] += Double(row.totalTokens)
+        }
+        return totals
+            .map { (project: $0.key, total: $0.value) }
+            .sorted { $0.total > $1.total }
+    }
+
+    /// 近 N 天(含今天)的日键集合(与 recentDayTotals 同法生成)。
+    private func windowDayKeys(days: Int) -> Set<String> {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        return Set((0 ..< days).compactMap { offset in
+            calendar.date(byAdding: .day, value: -offset, to: today)
+                .map { Self.dayKey($0, calendar: calendar) }
+        })
     }
 
     // MARK: 热力图
