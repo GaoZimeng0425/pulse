@@ -285,14 +285,12 @@ struct AgentUsagePaneView: View {
             if projects.isEmpty {
                 CardEmptyState(title: "窗口内没有项目数据", detail: "只有粗粒度回填的日子没有项目维度")
             } else {
-                // 单列满宽大卡(用户实报 360 两列无呼吸感,2026-11-13 追补):
-                // min 960 > 常规窗内容宽 → 恒一列、卡宽随窗口;
-                // {layout.agent-project-card-min-width}。
-                AdaptiveCardGrid(
-                    minimumCardWidth: 960,
-                    spacing: 12,
-                    maximumColumns: 2
-                ) {
+                // 恒单列满宽(2026-11-13 二度修正,用户实报窄窗内容被裁):SwiftUI
+                // `GridItem(.flexible(minimum:))` 的 min 是**硬下限**,容器再窄
+                // 不缩——min 960 在窄窗/弹窗把内容撑出容器右缘(与 CSS min-width
+                // 在窄容器会被轨道压缩不同,SwiftUI 语义套不得)。「单列 100%
+                // 宽随容器缩放」= VStack,卡内长内容(四桶行等)自会缩字/换行。
+                VStack(alignment: .leading, spacing: 12) {
                     ForEach(projects) { project in
                         AgentProjectCardView(project: project, windowDays: range.days)
                     }

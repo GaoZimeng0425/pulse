@@ -66,3 +66,8 @@
   develop 单跑绿后疑代码——06b 同码三连绿(load 22-24)坐实外部 CPU 尖峰撞
   采样窗口的噪声(该用例差值 = 全局口径 − 进程求和,风暴天第三方 CPU 必推进);
   判定链 = diff 面干净(纯 UI 常量)+ 同码多轮单跑绿。
+- 二度修正(用户实报「整个页面宽度超过 app 宽度,缩小被裁」):min 960 网格在
+  窄窗溢出——**SwiftUI `GridItem(.flexible(minimum:))` 的 min 是硬下限,容器
+  再窄不缩**(CSS min-width 在窄容器会被 auto-fill 轨道压缩,SwiftUI 不会);
+  「单列 100% 随容器」的正确写法就是 VStack,不需要网格。AdaptiveCardGrid 只
+  适用于 min ≤ 最窄容器宽的场景(总览 340 vs 最小窗内容 672 恒安全)。
