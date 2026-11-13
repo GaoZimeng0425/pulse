@@ -92,7 +92,51 @@ run_hosted() {
     -derivedDataPath build \
  \
     -clonedSourcePackagesDirPath "$pkg_cache"  $only_flag \
-    > "$log" 2>&1
+    > "$log" 2>&1 &
+  xcodebuild_pid=$!
+  hang_watchdog "$log" &
+  watchdog_pid=$!
+  wait "$xcodebuild_pid"
+  wd_status=$?
+  kill "$watchdog_pid" 2>/dev/null
+  wait "$watchdog_pid" 2>/dev/null
+  return "$wd_status"
+}
+
+# 挂起活体取证看门狗(2026-11-13 根因查证配套):"hung before establishing
+# connection" 的宿主被 xcodebuild 347s 超时收尸后无证可取——必须并发盯。
+# 判据「宿主进程存活 且 测试日志 >60s 无写入」= 疑似挂起(正常轮测试输出
+# 持续追加,mtime 恒新;挂起轮自 "Testing started" 后全静默)。命中即趁活体
+# 抓 ps wchan(卡在哪个内核等待点)+ sample(调用栈)存证 build/Logs/Test/,
+# 每 pid 只取一次,不打断 xcodebuild(超时/重试行为不变)。
+# 已知误报面:单个长用例 >60s 无输出时会多拍两张只读快照,无害。
+hang_watchdog() {
+  wd_log=$1
+  wd_dir=$root/build/Logs/Test
+  mkdir -p "$wd_dir"
+  wd_captured=""
+  while kill -0 "$xcodebuild_pid" 2>/dev/null; do
+    for wd_pid in $(pgrep -f "build/Build/Products/Debug/Pulse.app/Contents/MacOS/Pulse$" 2>/dev/null); do
+      case " $wd_captured " in
+        *" $wd_pid "*) continue ;;
+      esac
+      wd_now=$(date +%s)
+      wd_mtime=$(stat -f %m "$wd_log" 2>/dev/null || echo "$wd_now")
+      wd_age=$((wd_now - wd_mtime))
+      if [ "$wd_age" -gt 60 ]; then
+        wd_stamp=$(date +%Y%m%d-%H%M%S)
+        {
+          echo "== 疑似挂起宿主 pid $wd_pid · 测试日志 ${wd_age}s 无写入 · $(date) =="
+          echo "== 宿主命令行 =="
+          ps -o pid,ppid,state,wchan,etime,command -p "$wd_pid"
+        } > "$wd_dir/hang-evidence-$wd_stamp.txt" 2>&1
+        sample "$wd_pid" 3 -file "$wd_dir/hang-sample-$wd_stamp.txt" >/dev/null 2>&1
+        echo "   🔎 疑似挂起宿主(pid $wd_pid,日志 ${wd_age}s 静默)已留证: $wd_dir/hang-evidence-$wd_stamp.txt"
+        wd_captured="$wd_captured $wd_pid "
+      fi
+    done
+    sleep 5
+  done
 }
 
 # 输出整体重定向到日志而不是 tee:POSIX sh 拿不到管道里 xcodebuild 的退出码,
