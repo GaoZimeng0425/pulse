@@ -99,6 +99,31 @@ enum JunkTrashIdentity {
     static let color = Metric.disk.accentColor
 }
 
+// MARK: - 智能体页模型 / harness 分区色(agent-tab/05,DESIGN.md {colors.agent-model-*})
+
+/// 每日消耗卡「模型分段条 / harness 分段条」的分区异色唯一出处。原型示意色
+/// 青/紫/琥珀映射既有令牌(lead 与页 accent 同源蓝牙青,同 junk-* 先例——指标色
+/// 作类别身份借用,不作页面强调);harness claude/zcode = 前两色(原型同款)。
+enum AgentModelTint {
+    static let lead = Metric.bluetooth.accentColor
+    static let second = Metric.memory.accentColor
+    static let rest = Metric.disk.accentColor
+
+    /// harness = source 分段色。
+    static func harness(_ source: AgentUsageSource) -> Color {
+        source == .claude ? lead : second
+    }
+
+    /// 分段序号 → 色(0 起;越界收尾档)。
+    static func tint(at index: Int) -> Color {
+        switch index {
+        case 0: lead
+        case 1: second
+        default: rest
+        }
+    }
+}
+
 // MARK: - 内存构成单表(工单 P0.6-05,评审 F5 去重)
 
 /// 内存 by-Type 分段的展示键(名称 + 色):总览内存卡统计点与 by-Type 环形卡

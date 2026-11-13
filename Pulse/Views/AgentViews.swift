@@ -26,6 +26,25 @@ func agentTokenText(_ tokens: Int) -> String {
     return "\(tokens)"
 }
 
+/// 同格式拆两段给 `FigureText`(数值整号 + 单位半号):46M → ("46", "M")。
+/// 每日消耗数字卡与项目大卡共用(agent-tab/05)。
+func agentTokenFigure(_ tokens: Int) -> (value: String, unit: String) {
+    let text = agentTokenText(tokens)
+    if let unit = text.last, "kMB".contains(unit) {
+        return (String(text.dropLast()), String(unit))
+    }
+    return (text, "")
+}
+
+/// 计数的短型:486 / 1.2k(请求数;agent-tab/05)。
+func agentCountText(_ count: Int) -> String {
+    if count >= 1000 {
+        let tenths = Int((Double(count) / 100).rounded())
+        return "\(tenths / 10).\(tenths % 10)k"
+    }
+    return "\(count)"
+}
+
 /// Claude 用量限额卡:5 小时窗 / 本周两条读数行(meter + 百分比)+ 窗口重置注记。
 /// 快照是账户级(全部实例共享),单窗缺失如实少一行。
 struct ClaudeUsageCardView: View {

@@ -16,6 +16,8 @@ final class AgentUsageFeature: MonitorFeature {
     private(set) var rows: [AgentDailyUsageRow] = []
     /// 项目轨全表(agent-tab/04):UI 按窗口聚合出项目排行。
     private(set) var projectRows: [AgentProjectUsageRow] = []
+    /// 模型轨全表(agent-tab/05):项目卡模型分段条按窗口聚合。
+    private(set) var modelRows: [AgentModelUsageRow] = []
     /// 全量扫描进行中(UI 转圈与禁用重入)。
     private(set) var isScanning = false
 
@@ -55,9 +57,11 @@ final class AgentUsageFeature: MonitorFeature {
             var catalog = AgentUsageCatalog()
             let result = catalog.fullRescan(reader: reader, store: store!, now: .now)
             let projects = (try? store!.projectRows()) ?? []
+            let models = (try? store!.modelRows()) ?? []
             await MainActor.run { [weak self] in
                 self?.rows = result
                 self?.projectRows = projects
+                self?.modelRows = models
                 self?.isScanning = false
             }
         }
@@ -76,9 +80,11 @@ final class AgentUsageFeature: MonitorFeature {
             }
             let result = (try? store.rows()) ?? []
             let projects = (try? store.projectRows()) ?? []
+            let models = (try? store.modelRows()) ?? []
             await MainActor.run { [weak self] in
                 self?.rows = result
                 self?.projectRows = projects
+                self?.modelRows = models
                 self?.isScanning = false
             }
         }
@@ -92,9 +98,11 @@ final class AgentUsageFeature: MonitorFeature {
             guard let fresh = catalog.refreshToday(reader: reader, store: store, now: now)
             else { return }
             let projects = (try? store.projectRows()) ?? []
+            let models = (try? store.modelRows()) ?? []
             await MainActor.run { [weak self] in
                 self?.rows = fresh
                 self?.projectRows = projects
+                self?.modelRows = models
             }
         }
     }

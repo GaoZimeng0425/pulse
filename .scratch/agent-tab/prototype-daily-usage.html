@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Pulse · 每日消耗卡 · 终稿原型</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "SF Pro Text", "PingFang SC", sans-serif;
+    background: #1e1e20; color: #f5f5f7; padding: 28px 24px 80px;
+    -webkit-font-smoothing: antialiased;
+  }
+  body.light { background: #f2f2f2; color: #1d1d1f; }
+  .toggle {
+    display: inline-flex; gap: 4px; margin-bottom: 26px;
+    border: 1px solid rgba(128,128,128,.35); border-radius: 8px; overflow: hidden;
+  }
+  .toggle button { font-size: 12px; padding: 4px 14px; border: 0; cursor: pointer; background: transparent; color: inherit; }
+  .toggle button.on { background: #29aaf3; color: #fff; }
+
+  .card { width: 680px; border-radius: 18px; padding: 16px; background: #2a2a2c; }
+  body.light .card { background: #ffffff; box-shadow: 0 0 0 1px rgba(0,0,0,.06); }
+  .lift { background: #343436; border-radius: 12px; }
+  body.light .lift { background: #f2f2f2; }
+  .accent { color: #29aaf3; }
+  .num { font-variant-numeric: tabular-nums; }
+  .caption { font-size: 10.5px; opacity: .45; }
+
+  .cardhead { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .cardhead .dot { width: 22px; height: 22px; border-radius: 7px; background: #29aaf3;
+    display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; }
+  .cardhead .t { font-size: 12px; font-weight: 600; color: #29aaf3; flex: 1; }
+  .rescan { font-size: 11px; padding: 3px 10px; border-radius: 6px; cursor: pointer;
+    border: 1px solid rgba(128,128,128,.4); background: transparent; color: inherit; }
+
+  .pills { display: inline-flex; gap: 4px; }
+  .pill { font-size: 11px; padding: 3px 10px; border-radius: 99px; cursor: pointer; color: rgba(128,128,128,.95); }
+  .pill.on { background: rgba(41,170,243,.15); color: #29aaf3; font-weight: 600; }
+
+  /* 数字卡排(三卡同规格) */
+  .numrow { display: flex; gap: 10px; margin-bottom: 10px; }
+  .numcard { flex: 1; padding: 10px 14px 9px; }
+  .numcard .l { font-size: 10.5px; opacity: .55; margin-bottom: 2px; }
+  .numcard .v { font-size: 28px; font-weight: 700; letter-spacing: -0.4px; }
+  .numcard .delta { font-size: 10.5px; color: #30d158; margin-top: 2px; }
+
+  /* 图表卡:统一外包装(lift)+ 标题行(左标题右时间筛选)+ 图表 */
+  .chartsec { padding: 12px 14px 13px; margin-bottom: 10px; }
+  .chartsec:last-child { margin-bottom: 0; }
+  .chartsec .sec-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .chartsec .sec-title { font-size: 12px; font-weight: 600; opacity: .75; }
+  .chartsec .heatnote { display: flex; justify-content: space-between; margin-top: 8px; }
+  /* 热力图:外层恒 100% 宽,内容(大正方格)超宽时横向滚动 */
+  .heatwrap { width: 100%; overflow-x: auto; padding-bottom: 2px; }
+  .heatwrap::-webkit-scrollbar { height: 6px; }
+  .heatwrap::-webkit-scrollbar-thumb { background: rgba(128,128,128,.35); border-radius: 3px; }
+  .heatwrap::-webkit-scrollbar-track { background: transparent; }
+
+  /* 项目大卡:每行 2 张。四层:头 / 主数值 / 模型(条+点图例)/ harness+活跃。
+     间距走 4pt 网格(2/4/8/12),字号走阶梯(10.5/12/14.5/24)。 */
+  /* 列数自适应:卡最小 240 / 最大 340,容器宽决定列数(680 卡 = 2 列,弹窗 312 = 1 列) */
+  .projcards { display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 340px));
+    justify-content: space-between; gap: 12px; }
+  /* 两列放不下(240×2+12=492)即单列,单列时卡片恒 100% 宽(不停在 min 宽) */
+  @media (max-width: 540px) {
+    .projcards { grid-template-columns: 1fr; }
+    .projcard { max-width: none; }
+  }
+  .projcard { padding: 12px; border-radius: 10px; background: rgba(128,128,128,.10); }
+  body.light .projcard { background: #ffffff; box-shadow: 0 0 0 1px rgba(0,0,0,.05); }
+
+  /* 层 1:头(项目名 / 占比) */
+  .projcard .head { display: flex; justify-content: space-between; align-items: baseline; }
+  .projcard .name { font-size: 14.5px; font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .projcard .share { font-size: 10.5px; opacity: .45; margin-left: 8px; flex-shrink: 0; }
+
+  /* 层 2:主数值 + 环比 */
+  .projcard .valrow { margin-top: 4px; display: flex; align-items: first baseline; gap: 8px; }
+  .projcard .v { font-size: 24px; font-weight: 700; letter-spacing: -0.3px; }
+  .projcard .delta { font-size: 10.5px; color: #30d158; }
+  body.light .projcard .delta { color: #248a3d; }
+
+  /* 层 3:模型 —— 堆叠条 + 色点图例(三档同色透明度) */
+  .projcard .block { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(128,128,128,.14); }
+  .projcard .segbar { height: 4px; border-radius: 2px; overflow: hidden; display: flex;
+    background: rgba(128,128,128,.14); }
+  .projcard .segbar i { display: block; height: 100%; background: #29aaf3; }
+  .projcard .legend { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  .projcard .legend .it { display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10.5px; opacity: .7; }
+  .projcard .legend .sw { width: 6px; height: 6px; border-radius: 2px; background: #29aaf3; }
+
+  /* 层 4:harness + 活跃(同一条 segbar 语言;活跃行左右两段) */
+  .projcard .meta { margin-top: 6px; font-size: 10.5px; opacity: .55;
+    display: flex; justify-content: space-between; }
+  .projcard .live { color: #30d158; }
+  body.light .projcard .live { color: #248a3d; }
+</style>
+</head>
+<body class="dark">
+<div class="toggle"><button class="on" data-mode="dark">深色</button><button data-mode="light">浅色</button></div>
+
+<div class="card">
+  <div class="cardhead">
+    <span class="t">每日消耗</span>
+    <button class="rescan">重新扫描</button>
+  </div>
+
+  <div class="numrow">
+    <div class="numcard lift">
+      <div class="l">今日消耗</div>
+      <div class="v num accent">46M</div>
+      <div class="delta num">▲ 较昨日 +12%</div>
+    </div>
+    <div class="numcard lift">
+      <div class="l" id="sum-l">7 天合计</div>
+      <div class="v num" id="sum-v">312M</div>
+      <div class="delta num">▲ 较上周 +8%</div>
+    </div>
+    <div class="numcard lift">
+      <div class="l" id="avg-l">日均(7 天)</div>
+      <div class="v num" id="avg-v">45M</div>
+      <div class="delta num">峰 78M/天</div>
+    </div>
+  </div>
+
+  <div class="chartsec lift">
+    <div class="sec-head">
+      <span class="sec-title">Token 消耗</span>
+      <span class="pills"><span class="pill on">年</span></span>
+    </div>
+    <div class="heatwrap"><svg id="heat" width="648" height="112"></svg></div>
+    <div class="heatnote">
+      <span class="caption">Claude 与 ZCode 合计</span>
+      <span class="caption num">最多一天 78M</span>
+    </div>
+  </div>
+
+  <div class="chartsec lift">
+    <div class="sec-head">
+      <span class="sec-title">走势</span>
+      <span class="pills" id="trend-pills"><span class="pill on" data-n="7">7 天</span><span class="pill" data-n="30">30 天</span></span>
+    </div>
+    <svg id="line" width="648" height="96"></svg>
+  </div>
+
+  <div class="chartsec lift">
+    <div class="sec-head">
+      <span class="sec-title">项目</span>
+      <span class="pills" id="proj-pills"><span class="pill on" data-n="7">7 天</span><span class="pill" data-n="30">30 天</span></span>
+    </div>
+    <div class="projcards" id="projcards"></div>
+  </div>
+</div>
+
+<script>
+const ACCENT = "#29aaf3";
+const projects7 = [
+  { name: "pulse", total: 210, delta: "▲12%", activeDays: 6, requests: "1.2k 次", live: 2,
+    harnessPct: [70, 30],
+    models: [{ name: "opus-5-5", share: 62 }, { name: "glm-5.2", share: 28 }, { name: "haiku", share: 10 }, { name: "sonnet-5", share: 4 }] },
+  { name: "octok-client", total: 64, delta: "▲8%", activeDays: 5, requests: "486 次", live: 1,
+    harnessPct: [55, 45],
+    models: [{ name: "opus-5-5", share: 70 }, { name: "glm-5.2", share: 30 }] },
+  { name: "NemoNotch", total: 28, delta: "▼5%", activeDays: 4, requests: "312 次", idle: "2 时",
+    harnessPct: [100, 0],
+    models: [{ name: "sonnet-5", share: 85 }, { name: "haiku", share: 15 }] },
+  { name: "sage", total: 7, delta: "▲3%", activeDays: 2, requests: "74 次", idle: "3 天",
+    harnessPct: [0, 100],
+    models: [{ name: "glm-5.2", share: 100 }] },
+  { name: "其它", total: 3, delta: "—", activeDays: 1, requests: "21 次", idle: "6 天",
+    harnessPct: [60, 40],
+    models: [{ name: "haiku", share: 100 }] },
+];
+const projects30 = [
+  { name: "pulse", total: 902, delta: "▲9%", activeDays: 26, requests: "5.4k 次", live: 2,
+    harnessPct: [72, 28],
+    models: [{ name: "opus-5-5", share: 58 }, { name: "glm-5.2", share: 32 }, { name: "haiku", share: 10 }] },
+  { name: "octok-client", total: 287, delta: "▲14%", activeDays: 21, requests: "2.1k 次", live: 1,
+    harnessPct: [50, 50],
+    models: [{ name: "opus-5-5", share: 66 }, { name: "glm-5.2", share: 34 }] },
+  { name: "NemoNotch", total: 141, delta: "▼3%", activeDays: 18, requests: "1.4k 次", idle: "2 时",
+    harnessPct: [100, 0],
+    models: [{ name: "sonnet-5", share: 80 }, { name: "haiku", share: 20 }] },
+  { name: "sage", total: 36, delta: "▲6%", activeDays: 9, requests: "402 次", idle: "3 天",
+    harnessPct: [0, 100],
+    models: [{ name: "glm-5.2", share: 100 }] },
+  { name: "其它", total: 22, delta: "▲2%", activeDays: 6, requests: "160 次", idle: "6 天",
+    harnessPct: [55, 45],
+    models: [{ name: "haiku", share: 100 }] },
+];
+const days7 = [31, 38, 52, 44, 61, 18, 46];
+const days30 = Array.from({ length: 30 }, (_, i) =>
+  Math.round(20 + 45 * Math.abs(Math.sin(i / 4.1)) * (i % 7 >= 5 ? 0.4 : 1)));
+const weeks = 52;
+const heat = [];
+for (let i = 0; i < weeks * 7; i++) {
+  const dow = i % 7, recency = i / (weeks * 7);
+  const early = i < weeks * 7 * 0.5;
+  let v = (0.25 + 0.75 * recency) * (dow >= 5 ? 0.35 : 1) * (0.5 + Math.abs(Math.sin(i / 3.7)) * 0.8);
+  if (early) v = Math.random() < 0.55 ? 0 : v * 0.45;
+  if (i === weeks * 7 - 3) v = 1;
+  heat.push(Math.min(v, 1));
+}
+
+// 走势:左侧 y 轴 token 刻度 + 水平网格线,底部 x 轴天刻度(今 在右)
+function fmtTok(v) {
+  return v >= 1000 ? (v / 1000).toFixed(1).replace(/\.0$/, "") + "B" : v + "M";
+}
+function drawLine(data) {
+  const svg = document.getElementById("line");
+  const w = 648, h = 96;
+  const left = 34, bottom = 16, pad = 6;                 // 左侧 token 刻度列 / 底部天刻度行
+  const plotW = w - left - 4, plotH = h - bottom - pad;
+  const rawMax = Math.max(...data);
+  const max = rawMax * 1.15;
+  const axis = 'font-size="9.5" fill="rgba(160,160,165,0.75)" text-anchor="end"';
+  const axisC = 'font-size="9.5" fill="rgba(160,160,165,0.75)" text-anchor="middle"';
+  let out = `<rect x="${left}" y="0" width="${plotW}" height="${plotH}" rx="8" fill="${ACCENT}" opacity="0.06"/>`;
+  // 网格线 + y 刻度:0 / 半值 / 峰值
+  [0, rawMax / 2, rawMax].forEach(v => {
+    const y = pad + (1 - v / max) * plotH;
+    out += `<line x1="${left + 4}" y1="${y.toFixed(1)}" x2="${w - 4}" y2="${y.toFixed(1)}"
+      stroke="rgba(128,128,128,0.18)" stroke-width="1"/>` +
+      `<text x="${left - 4}" y="${(y + 3).toFixed(1)}" ${axis} class="num">${fmtTok(Math.round(v))}</text>`;
+  });
+  const pts = data.map((v, i) => [
+    left + (i + 0.5) * plotW / data.length,
+    pad + (1 - v / max) * plotH,
+  ]);
+  const d = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
+  out += `<path d="${d}" fill="none" stroke="${ACCENT}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<circle cx="${pts.at(-1)[0]}" cy="${pts.at(-1)[1]}" r="3" fill="${ACCENT}"/>`;
+  // x 刻度:首 / 每 6 天 / 今
+  const stepDays = data.length === 7 ? 3 : 6;
+  for (let i = data.length - 1; i >= 0; i -= stepDays) {
+    const ago = data.length - 1 - i;
+    out += `<text x="${pts[i][0].toFixed(1)}" y="${h - 3}" ${axisC}>${ago === 0 ? "今天" : ago + " 天前"}</text>`;
+  }
+  svg.innerHTML = out;
+}
+
+// 热力墙:固定大正方格(边 14),内容宽 = 列数 × 步进,超宽由外层横向滚动;
+// 底部周数刻度(每 8 周一标,含"今")
+function drawHeat() {
+  const svg = document.getElementById("heat");
+  const gap = 4, side = 14, step = side + gap;
+  const cols = weeks;
+  const w = cols * step - gap;
+  const gridH = 7 * step - gap;
+  const axisY = gridH + 12;
+  svg.setAttribute("width", w);
+  svg.setAttribute("height", axisY + 4);
+  let out = `<rect width="${w}" height="${gridH}" rx="8" fill="rgba(128,128,128,0.06)"/>`;
+  for (let i = 0; i < cols * 7; i++) {
+    const idx = heat.length - cols * 7 + i;
+    if (idx < 0) continue;
+    const col = Math.floor(i / 7), row = i % 7, v = heat[idx];
+    const level = v <= 0.08 ? 0 : Math.min(4, Math.ceil(v * 4));
+    out += `<rect x="${col * step}" y="${row * step}" width="${side}" height="${side}" rx="3"
+      fill="${level === 0 ? "rgba(128,128,128,0.16)" : ACCENT}" opacity="${[0, 0.25, 0.5, 0.75, 1][level]}"/>`;
+  }
+  const axisStyle = 'font-size="9.5" fill="rgba(160,160,165,0.75)" text-anchor="middle"';
+  for (let c = 0; c < cols; c += 8) {
+    const weeksAgo = cols - 1 - c;
+    const label = weeksAgo === 0 ? "今" : weeksAgo + "周";
+    out += `<text x="${c * step + side / 2}" y="${axisY}" ${axisStyle}>${label}</text>`;
+  }
+  out += `<text x="${(cols - 1) * step + side / 2}" y="${axisY}" ${axisStyle}>今</text>`;
+  svg.innerHTML = out;
+}
+
+// 分类色板(柔和异色,分区不同色;产品码映射 DESIGN 令牌)与 3 项截断
+const MCOLORS = ["#29aaf3", "#a78bfa", "#ffb340"];
+const HCOLORS = { claude: "#29aaf3", zcode: "#a78bfa" };
+function top3(models) {
+  const sorted = [...models].sort((a, b) => b.share - a.share);
+  if (sorted.length <= 3) return sorted;
+  const rest = sorted.slice(2).reduce((a, m) => a + m.share, 0);
+  return [sorted[0], sorted[1], { name: "其他", share: rest }];
+}
+function drawProjCards(list) {
+  const sum = list.reduce((a, p) => a + p.total, 0);
+  document.getElementById("projcards").innerHTML = list.map(p => {
+    const models = top3(p.models);
+    const segs = models.map((m, i) =>
+      `<i style="width:${m.share}%;background:${MCOLORS[i]}"></i>`).join("");
+    const legend = models.map((m, i) =>
+      `<span class="it num"><span class="sw" style="background:${MCOLORS[i]}"></span>${m.name} ${m.share}%</span>`).join("");
+    const [h1, h2] = p.harnessPct;
+    return `
+    <div class="projcard">
+      <div class="head">
+        <span class="name">${p.name}</span>
+        <span class="share num">占 ${(p.total / sum * 100).toFixed(0)}%</span>
+      </div>
+      <div class="valrow">
+        <span class="v num">${p.total}M</span>
+        <span class="delta num">${p.delta}</span>
+      </div>
+      <div class="block">
+        <div class="segbar">${segs}</div>
+        <div class="legend">${legend}</div>
+      </div>
+      <div class="block">
+        <div class="segbar"><i style="width:${h1}%;background:${HCOLORS.claude}"></i><i style="width:${h2}%;background:${HCOLORS.zcode}"></i></div>
+        <div class="meta num">
+          <span>claude ${h1}% · zcode ${h2}%</span>
+          <span class="${p.live ? "live" : ""}">${p.live ? "● 在跑 " + p.live : "静了 " + p.idle}</span>
+        </div>
+      </div>
+      <div class="meta num" style="margin-top:8px">
+        <span>活跃 ${p.activeDays}/7 天</span>
+        <span>${p.requests}</span>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+// 时间筛选联动(走势/项目各切各的,数字卡排跟随档位更新)
+function applyRange(n) {
+  const data = n === 7 ? days7 : days30;
+  drawLine(data);
+  drawProjCards(n === 7 ? projects7 : projects30);
+  const sum = data.reduce((a, b) => a + b, 0);
+  document.getElementById("sum-l").textContent = `${n} 天合计`;
+  document.getElementById("avg-l").textContent = `日均(${n} 天)`;
+  document.getElementById("sum-v").textContent = sum + "M";
+  document.getElementById("avg-v").textContent = Math.round(sum / n) + "M";
+}
+document.querySelectorAll("#trend-pills .pill, #proj-pills .pill").forEach(b => {
+  b.onclick = () => {
+    b.parentElement.querySelectorAll(".pill").forEach(x => x.classList.toggle("on", x === b));
+    applyRange(+b.dataset.n);
+  };
+});
+document.querySelectorAll(".toggle button").forEach(b => {
+  b.onclick = () => {
+    document.body.className = b.dataset.mode;
+    document.querySelectorAll(".toggle button").forEach(x => x.classList.toggle("on", x === b));
+  };
+});
+
+drawHeat();
+applyRange(7);
+</script>
+</body>
+</html>

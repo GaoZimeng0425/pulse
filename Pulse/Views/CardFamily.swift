@@ -58,15 +58,18 @@ extension EnvironmentValues {
 }
 
 /// 主卡头:22pt 指标徽章 + 卡标题(12 semibold,指标色)+ 右侧附件(可选)。
+/// `symbolName` nil = 无徽章只留标题(用户拍板 agent-tab/05:每日消耗卡头删徽章)。
 struct CardHeader<Accessory: View>: View {
-    let symbolName: String
+    let symbolName: String?
     let title: String
     let tint: Color
     @ViewBuilder var accessory: () -> Accessory
 
     var body: some View {
         HStack(spacing: 7) {
-            MetricBadge(symbolName: symbolName, tint: tint)
+            if let symbolName {
+                MetricBadge(symbolName: symbolName, tint: tint)
+            }
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(tint)
@@ -313,12 +316,19 @@ struct AdaptiveCardGrid<Card: View>: View {
     let minimumCardWidth: CGFloat
     let spacing: CGFloat
     let maximumColumns: Int
+    /// 单卡最大宽(nil = 不封顶;每日消耗项目大卡 340——列少时均分会超出原型
+    /// minmax(240, 340) 的封顶,agent-tab/05)。带初值 → memberwise init 默认参,
+    /// 既有调用面不动。
+    var maximumCardWidth: CGFloat?
     @ViewBuilder let cards: () -> Card
 
     var body: some View {
         LazyVGrid(
             columns: Array(
-                repeating: GridItem(.flexible(), spacing: spacing),
+                repeating: GridItem(
+                    .flexible(minimum: minimumCardWidth, maximum: maximumCardWidth ?? .infinity),
+                    spacing: spacing
+                ),
                 count: columnCount
             ),
             spacing: spacing

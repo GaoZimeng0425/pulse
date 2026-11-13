@@ -382,6 +382,30 @@ public enum HistoryDatabase {
             try db.execute(sql: "CREATE INDEX agent_daily_project_usage_day ON agent_daily_project_usage(day)")
         }
 
+        // 每日账本模型轨(agent-tab/05):一天 × 来源 × 项目 × 模型一行,主键
+        // (day, source, project, model) 覆盖式 upsert——项目卡模型分段条的数据源。
+        // 模型标识缺失的老行不进此表,五桶对称留排查。读写在 AgentUsageStore。
+        migrator.registerMigration(agentModelUsageMigrationID) { db in
+            try db.execute(sql: """
+            CREATE TABLE agent_daily_model_usage (
+                day                TEXT    NOT NULL,
+                source             TEXT    NOT NULL,
+                project            TEXT    NOT NULL,
+                model              TEXT    NOT NULL,
+                input_tokens       INTEGER NOT NULL,
+                output_tokens      INTEGER NOT NULL,
+                cache_read_tokens  INTEGER NOT NULL,
+                cache_write_tokens INTEGER NOT NULL,
+                reasoning_tokens   INTEGER NOT NULL,
+                total_tokens       INTEGER NOT NULL,
+                request_count      INTEGER NOT NULL,
+                scanned_at         INTEGER NOT NULL,
+                PRIMARY KEY (day, source, project, model)
+            )
+            """)
+            try db.execute(sql: "CREATE INDEX agent_daily_model_usage_day ON agent_daily_model_usage(day)")
+        }
+
         return migrator
     }
 
@@ -390,6 +414,9 @@ public enum HistoryDatabase {
 
     /// 账本项目轨迁移标识(agent-tab/04)。
     static let agentProjectUsageMigrationID = "agent-tab-04-project-usage"
+
+    /// 账本模型轨迁移标识(agent-tab/05)。
+    static let agentModelUsageMigrationID = "agent-tab-05-model-usage"
 
     /// 清理历史迁移标识(p4-cleaner/04)。
     static let cleanHistoryMigrationID = "p4-cleaner-04-clean-history"
@@ -407,6 +434,6 @@ public enum HistoryDatabase {
         "gauge_min", "gauge_hour", "lineage", "groups", "metadata",
         "clean_run", "clean_item",
         "alert_event", "dev_server_state",
-        "agent_daily_usage", "agent_daily_project_usage",
+        "agent_daily_usage", "agent_daily_project_usage", "agent_daily_model_usage",
     ]
 }

@@ -84,7 +84,7 @@ private func localDayKey(_ date: Date) -> String {
     return formatter.string(from: date)
 }
 
-/// assistant 行夹具(usage 形状 = projects jsonl 实测;cwd 可选注入)。
+/// assistant 行夹具(usage 形状 = projects jsonl 实测;cwd / model 可选注入)。
 private func claudeLine(
     id: String?,
     timestamp: String = "2026-11-10T12:00:00.000Z",
@@ -92,12 +92,14 @@ private func claudeLine(
     cacheRead: Int = 50,
     cacheWrite: Int = 10,
     output: Int = 200,
-    cwd: String? = nil
+    cwd: String? = nil,
+    model: String? = nil
 ) -> String {
     let messageId = id.map { "\"id\":\"\($0)\"," } ?? ""
     let cwdField = cwd.map { "\"cwd\":\"\($0)\"," } ?? ""
+    let modelField = model.map { "\"model\":\"\($0)\"," } ?? ""
     return """
-    {"type":"assistant","timestamp":"\(timestamp)",\(cwdField)"message":{\(messageId)"role":"assistant","usage":{"input_tokens":\(input),"cache_read_input_tokens":\(cacheRead),"cache_creation_input_tokens":\(cacheWrite),"output_tokens":\(output)}}}
+    {"type":"assistant","timestamp":"\(timestamp)",\(cwdField)"message":{\(messageId)\(modelField)"role":"assistant","usage":{"input_tokens":\(input),"cache_read_input_tokens":\(cacheRead),"cache_creation_input_tokens":\(cacheWrite),"output_tokens":\(output)}}}
     """
 }
 
@@ -552,5 +554,137 @@ final class AgentUsageModelTests: XCTestCase {
         // 两家都归到 pulse(claude slug 末段 = pulse)。
         XCTAssertEqual(projects.count, 2)
         XCTAssertTrue(projects.allSatisfy { $0.project == "pulse" })
+    }
+
+    // MARK: 模型轨(agent-tab/05)
+
+    /// 解析器提出 message.model;缺失为 nil。
+    func testClaudeLineParsesModel() throws {
+        let withModel = try XCTUnwrap(
+            ClaudeTranscriptUsageParser.parse(line: claudeLine(id: "m1", model: "claude-opus-5-5"))
+        )
+        XCTAssertEqual(withModel.model, "claude-opus-5-5")
+        let without = try XCTUnwrap(ClaudeTranscriptUsageParser.parse(line: claudeLine(id: "m2")))
+        XCTAssertNil(without.model)
+    }
+
+    /// 三轨聚合:模型挂在项目之下——项目 + 模型都归组成功才进;模型缺失 /
+    /// 项目缺失都只进前两轨;模型分桶独立于来源(claude 与 zcode 同模型各自一行,
+    /// source 是主键的一部分)。
+    func testAggregatorModelTrack() throws {
+        var aggregator = AgentDailyAggregator()
+        aggregator.addZCode(
+            ZCodeUsageSample(
+                id: "u1", startedAtMs: noonMs(2026, 11, 10),
+                inputTokens: 100, outputTokens: 50, computedTotalTokens: 150,
+                workspacePath: "/Users/x/pulse/.worktrees/agent-project",
+                modelId: "GLM-5.3"
+            ),
+            legacySchema: false
+        )
+        // workspace 在、model_id 缺(老 schema):只进项目轨。
+        aggregator.addZCode(
+            ZCodeUsageSample(
+                id: "u2", startedAtMs: noonMs(2026, 11, 10),
+                inputTokens: 10, outputTokens: 5, computedTotalTokens: 15,
+                workspacePath: "/Users/x/pulse"
+            ),
+            legacySchema: false
+        )
+        // workspace 缺、model 在:只进合计轨(模型轨挂项目之下,项目未知不进)。
+        aggregator.addZCode(
+            ZCodeUsageSample(
+                id: "u3", startedAtMs: noonMs(2026, 11, 10),
+                inputTokens: 1, outputTokens: 1, computedTotalTokens: 2,
+                modelId: "GLM-5.3"
+            ),
+            legacySchema: false
+        )
+        try aggregator.addClaude(
+            XCTUnwrap(ClaudeTranscriptUsageParser.parse(
+                line: claudeLine(id: "m1", cwd: "/Users/x/pulse", model: "claude-opus-5-5")
+            ))
+        )
+        // model 缺失的老行:进项目轨、不进模型轨。
+        try aggregator.addClaude(
+            XCTUnwrap(ClaudeTranscriptUsageParser.parse(line: claudeLine(
+                id: "m2",
+                timestamp: "2026-11-10T13:00:00.000Z",
+                cwd: "/Users/x/pulse"
+            )))
+        )
+
+        let models = aggregator.modelRows(scannedAt: Date())
+        XCTAssertEqual(models.count, 2) // zcode→GLM-5.3、claude→claude-opus-5-5(同项目不同来源)
+        let glm = models.first { $0.model == "GLM-5.3" }
+        XCTAssertEqual(glm?.project, "pulse")
+        XCTAssertEqual(glm?.source, .zcode)
+        XCTAssertEqual(glm?.totalTokens, 150) // u2/u3 不进模型轨
+        let opus = models.first { $0.model == "claude-opus-5-5" }
+        XCTAssertEqual(opus?.source, .claude)
+        XCTAssertEqual(opus?.totalTokens, 360)
+        XCTAssertEqual(opus?.requestCount, 1)
+
+        // 前两轨不受模型轨增减影响(u2 计入项目轨、u3 只进合计轨)。
+        let projects = aggregator.projectRows(scannedAt: Date())
+        let pulseZcode = projects.first { $0.project == "pulse" && $0.source == .zcode }
+        XCTAssertEqual(pulseZcode?.totalTokens, 165)
+    }
+
+    /// 模型表 store:覆盖写 + 排序读回。
+    func testStoreModelRows() throws {
+        let store = try AgentUsageStore(database: HistoryDatabase.openInMemory())
+        try store.upsertModels([
+            AgentModelUsageRow(
+                day: "2026-11-10",
+                source: .claude,
+                project: "pulse",
+                model: "claude-opus-5-5",
+                totalTokens: 100,
+                scannedAt: 1
+            ),
+        ])
+        try store.upsertModels([
+            AgentModelUsageRow(
+                day: "2026-11-10",
+                source: .claude,
+                project: "pulse",
+                model: "claude-opus-5-5",
+                totalTokens: 260,
+                scannedAt: 2
+            ),
+            AgentModelUsageRow(
+                day: "2026-11-10",
+                source: .claude,
+                project: "pulse",
+                model: "glm-5.2",
+                totalTokens: 40,
+                scannedAt: 2
+            ),
+        ])
+        let rows = try store.modelRows()
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(rows.first { $0.model == "claude-opus-5-5" }?.totalTokens, 260)
+    }
+
+    /// 全量档产出模型轨行(编排器 upsertModels 接线)。
+    func testFullRescanWritesModelRows() throws {
+        let store = try AgentUsageStore(database: HistoryDatabase.openInMemory())
+        let reader = FakeUsageReader()
+        reader.zcode = [
+            ZCodeUsageSample(
+                id: "u1", startedAtMs: nowMs(Date()),
+                inputTokens: 100, outputTokens: 50, computedTotalTokens: 150,
+                workspacePath: "/Users/x/pulse/.worktrees/agent-project",
+                modelId: "GLM-5.3"
+            ),
+        ]
+        var catalog = AgentUsageCatalog()
+        _ = catalog.fullRescan(reader: reader, store: store, now: Date())
+
+        let models = try store.modelRows()
+        XCTAssertEqual(models.count, 1)
+        XCTAssertEqual(models.first?.model, "GLM-5.3")
+        XCTAssertEqual(models.first?.project, "pulse")
     }
 }

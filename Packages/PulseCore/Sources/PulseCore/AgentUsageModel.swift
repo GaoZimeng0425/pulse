@@ -115,6 +115,9 @@ public struct ZCodeUsageSample: Equatable, Sendable {
     /// 会话工作区真路径(session 表 directory/path;legacy schema 无 join 为 nil,
     /// 该行只进合计轨不进项目轨)。agent-tab/04。
     public var workspacePath: String?
+    /// 模型标识(model_usage.model_id,如 "GLM-5.3";老 schema 列缺为 nil,
+    /// 该行不进模型轨)。agent-tab/05。
+    public var modelId: String?
 
     public init(
         id: String,
@@ -127,7 +130,8 @@ public struct ZCodeUsageSample: Equatable, Sendable {
         cacheReadTokens: Int? = nil,
         cacheWriteTokens: Int? = nil,
         computedTotalTokens: Int? = nil,
-        workspacePath: String? = nil
+        workspacePath: String? = nil,
+        modelId: String? = nil
     ) {
         self.id = id
         self.startedAtMs = startedAtMs
@@ -140,6 +144,7 @@ public struct ZCodeUsageSample: Equatable, Sendable {
         self.cacheWriteTokens = cacheWriteTokens
         self.computedTotalTokens = computedTotalTokens
         self.workspacePath = workspacePath
+        self.modelId = modelId
     }
 }
 
@@ -205,6 +210,9 @@ public struct ClaudeUsageSample: Equatable, Sendable {
     /// 行内真实工作目录(实测 assistant 行 100% 带;项目归组首选,含 - 的
     /// 项目名保真。agent-tab/04)。
     public var cwd: String?
+    /// 模型标识(message.model,如 "claude-opus-5-5";实测带 usage 的 assistant
+    /// 行 100% 带,缺失为 nil 不进模型轨。agent-tab/05)。
+    public var model: String?
 
     public init(
         timestampMs: Int64,
@@ -213,7 +221,8 @@ public struct ClaudeUsageSample: Equatable, Sendable {
         outputTokens: Int,
         cacheReadTokens: Int,
         cacheWriteTokens: Int,
-        cwd: String? = nil
+        cwd: String? = nil,
+        model: String? = nil
     ) {
         self.timestampMs = timestampMs
         self.messageId = messageId
@@ -222,6 +231,7 @@ public struct ClaudeUsageSample: Equatable, Sendable {
         self.cacheReadTokens = cacheReadTokens
         self.cacheWriteTokens = cacheWriteTokens
         self.cwd = cwd
+        self.model = model
     }
 }
 
@@ -275,6 +285,72 @@ public struct AgentProjectUsageRow: Codable, Equatable, Sendable, FetchableRecor
         self.day = day
         self.source = source
         self.project = project
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.cacheReadTokens = cacheReadTokens
+        self.cacheWriteTokens = cacheWriteTokens
+        self.reasoningTokens = reasoningTokens
+        self.totalTokens = totalTokens
+        self.requestCount = requestCount
+        self.scannedAt = scannedAt
+    }
+}
+
+/// 每日账本的**模型轨**行:一天 × 来源 × 项目 × 模型一行,主键
+/// `(day, source, project, model)`(agent-tab/05)。挂在项目轨之下(项目卡内的
+/// 模型分段条数据源);模型标识缺失(Claude 老行无 message.model / ZCode 老
+/// schema 无 model_id)不进本表,五桶留作对称排查同前两表。
+public struct AgentModelUsageRow: Codable, Equatable, Sendable, FetchableRecord, PersistableRecord {
+    public static let databaseTableName = "agent_daily_model_usage"
+
+    public var day: String
+    public var source: AgentUsageSource
+    public var project: String
+    /// 模型标识原样串(Claude "claude-opus-5-5" / ZCode "GLM-5.3";显示层剥前缀)。
+    public var model: String
+    public var inputTokens: Int
+    public var outputTokens: Int
+    public var cacheReadTokens: Int
+    public var cacheWriteTokens: Int
+    public var reasoningTokens: Int
+    public var totalTokens: Int
+    public var requestCount: Int
+    public var scannedAt: Int64
+
+    /// 表列蛇形,映射集中一处(同 AgentDailyUsageRow 惯例)。
+    enum CodingKeys: String, CodingKey {
+        case day
+        case source
+        case project
+        case model
+        case inputTokens = "input_tokens"
+        case outputTokens = "output_tokens"
+        case cacheReadTokens = "cache_read_tokens"
+        case cacheWriteTokens = "cache_write_tokens"
+        case reasoningTokens = "reasoning_tokens"
+        case totalTokens = "total_tokens"
+        case requestCount = "request_count"
+        case scannedAt = "scanned_at"
+    }
+
+    public init(
+        day: String,
+        source: AgentUsageSource,
+        project: String,
+        model: String,
+        inputTokens: Int = 0,
+        outputTokens: Int = 0,
+        cacheReadTokens: Int = 0,
+        cacheWriteTokens: Int = 0,
+        reasoningTokens: Int = 0,
+        totalTokens: Int = 0,
+        requestCount: Int = 0,
+        scannedAt: Int64 = 0
+    ) {
+        self.day = day
+        self.source = source
+        self.project = project
+        self.model = model
         self.inputTokens = inputTokens
         self.outputTokens = outputTokens
         self.cacheReadTokens = cacheReadTokens
@@ -389,7 +465,8 @@ public enum ClaudeTranscriptUsageParser {
             outputTokens: output,
             cacheReadTokens: cacheRead,
             cacheWriteTokens: cacheWrite,
-            cwd: (record["cwd"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            cwd: (record["cwd"] as? String).flatMap { $0.isEmpty ? nil : $0 },
+            model: (message["model"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         )
     }
 }
@@ -438,6 +515,8 @@ public struct AgentDailyAggregator {
     private var buckets: [Key: Bucket] = [:]
     /// 项目轨(agent-tab/04):与合计轨同喂双写;cache 回填只进合计轨。
     private var projectBuckets: [ProjectKey: Bucket] = [:]
+    /// 模型轨(agent-tab/05):挂在项目轨之下(项目 + 模型都归组成功才进)。
+    private var modelBuckets: [ModelKey: Bucket] = [:]
     private var seenClaudeMessageIDs: Set<String> = []
     /// 非 static(DateFormatter 非并发安全,实例持有;聚合器本身单线程使用)。
     private let dayFormatter: DateFormatter
@@ -452,6 +531,13 @@ public struct AgentDailyAggregator {
         var day: String
         var source: AgentUsageSource
         var project: String
+    }
+
+    private struct ModelKey: Hashable {
+        var day: String
+        var source: AgentUsageSource
+        var project: String
+        var model: String
     }
 
     public init() {
@@ -487,6 +573,11 @@ public struct AgentDailyAggregator {
         if let project = sample.workspacePath.flatMap(AgentWorkspaceResolution.projectName(fromPath:)) {
             let projectKey = ProjectKey(day: day, source: .zcode, project: project)
             accumulate(into: &projectBuckets[projectKey, default: Bucket()], normalized: normalized)
+            // 模型轨:项目归组成功且带模型标识才进(agent-tab/05)。
+            if let model = sample.modelId, !model.isEmpty {
+                let modelKey = ModelKey(day: day, source: .zcode, project: project, model: model)
+                accumulate(into: &modelBuckets[modelKey, default: Bucket()], normalized: normalized)
+            }
         }
     }
 
@@ -507,26 +598,26 @@ public struct AgentDailyAggregator {
         }
 
         let key = Key(day: day, source: .claude, origin: .jsonl)
-        var bucket = buckets[key, default: Bucket()]
-        bucket.input += sample.inputTokens
-        bucket.output += sample.outputTokens
-        bucket.cacheRead += sample.cacheReadTokens
-        bucket.cacheWrite += sample.cacheWriteTokens
-        bucket.total += total
-        bucket.requests += 1
-        buckets[key] = bucket
+        // Claude 五桶天然互斥,归一化形状直通(reasoning 恒 0——output 已含 thinking)。
+        let normalized = (
+            netInput: sample.inputTokens,
+            netOutput: sample.outputTokens,
+            cacheRead: sample.cacheReadTokens,
+            cacheWrite: sample.cacheWriteTokens,
+            reasoning: 0,
+            total: total
+        )
+        accumulate(into: &buckets[key, default: Bucket()], normalized: normalized)
 
         if let project = sample.cwd.flatMap(AgentWorkspaceResolution.projectName(fromPath:))
             ?? slug.flatMap(AgentWorkspaceResolution.projectName(fromSlug:)) {
             let projectKey = ProjectKey(day: day, source: .claude, project: project)
-            var projectBucket = projectBuckets[projectKey, default: Bucket()]
-            projectBucket.input += sample.inputTokens
-            projectBucket.output += sample.outputTokens
-            projectBucket.cacheRead += sample.cacheReadTokens
-            projectBucket.cacheWrite += sample.cacheWriteTokens
-            projectBucket.total += total
-            projectBucket.requests += 1
-            projectBuckets[projectKey] = projectBucket
+            accumulate(into: &projectBuckets[projectKey, default: Bucket()], normalized: normalized)
+            // 模型轨:项目归组成功且行带 message.model 才进(agent-tab/05)。
+            if let model = sample.model, !model.isEmpty {
+                let modelKey = ModelKey(day: day, source: .claude, project: project, model: model)
+                accumulate(into: &modelBuckets[modelKey, default: Bucket()], normalized: normalized)
+            }
         }
     }
 
@@ -584,6 +675,34 @@ public struct AgentDailyAggregator {
                 )
             }
             .sorted { ($0.day, $0.source.rawValue, $0.project) < ($1.day, $1.source.rawValue, $1.project) }
+    }
+
+    /// 模型轨行(按天、来源、项目、模型排序;`scannedAt` 统一盖当前时刻)。
+    public func modelRows(scannedAt: Date) -> [AgentModelUsageRow] {
+        let stamp = Int64(scannedAt.timeIntervalSince1970)
+        return modelBuckets
+            .map { key, bucket in
+                AgentModelUsageRow(
+                    day: key.day,
+                    source: key.source,
+                    project: key.project,
+                    model: key.model,
+                    inputTokens: bucket.input,
+                    outputTokens: bucket.output,
+                    cacheReadTokens: bucket.cacheRead,
+                    cacheWriteTokens: bucket.cacheWrite,
+                    reasoningTokens: bucket.reasoning,
+                    totalTokens: bucket.total,
+                    requestCount: bucket.requests,
+                    scannedAt: stamp
+                )
+            }
+            .sorted { ($0.day, $0.source.rawValue, $0.project, $0.model) < (
+                $1.day,
+                $1.source.rawValue,
+                $1.project,
+                $1.model
+            ) }
     }
 
     private func accumulate(
@@ -712,6 +831,27 @@ public final class AgentUsageStore: Sendable {
                 .fetchAll(db)
         }
     }
+
+    // MARK: 模型轨(agent-tab/05)
+
+    /// 模型行覆盖写(主键 (day, source, project, model) 冲突即替换)。
+    public func upsertModels(_ rows: [AgentModelUsageRow]) throws {
+        guard !rows.isEmpty else { return }
+        try database.write { db in
+            for row in rows {
+                try row.save(db)
+            }
+        }
+    }
+
+    /// 全部模型行(按天升序;UI 按窗口聚合用)。
+    public func modelRows() throws -> [AgentModelUsageRow] {
+        try database.read { db in
+            try AgentModelUsageRow
+                .order(sql: "day ASC, source ASC, project ASC, model ASC")
+                .fetchAll(db)
+        }
+    }
 }
 
 // MARK: - IO 接缝
@@ -789,6 +929,7 @@ public struct AgentUsageCatalog {
 
         try? store.upsert(aggregator.rows(scannedAt: now))
         try? store.upsertProjects(aggregator.projectRows(scannedAt: now))
+        try? store.upsertModels(aggregator.modelRows(scannedAt: now))
         return try? store.rows()
     }
 
@@ -831,8 +972,9 @@ public struct AgentUsageCatalog {
         )
         try? store.upsert(merged.upserts)
         try? store.insertIfAbsent(merged.insertsIfAbsent)
-        // 项目轨:细粒度源全量覆盖(cache 无项目维度,不进此表)。
+        // 项目轨:细粒度源全量覆盖(cache 无项目维度,不进此表);模型轨同口径。
         try? store.upsertProjects(aggregator.projectRows(scannedAt: now))
+        try? store.upsertModels(aggregator.modelRows(scannedAt: now))
         return (try? store.rows()) ?? []
     }
 }

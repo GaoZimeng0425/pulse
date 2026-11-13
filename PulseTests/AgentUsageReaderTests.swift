@@ -40,9 +40,49 @@ final class AgentUsageReaderTests: XCTestCase {
         return try DatabaseQueue(path: dbURL.path)
     }
 
-    /// 现代 schema:带 computed_total_tokens 列 + session 表 join,读回样本
-    /// (含 workspace)、legacy=false。
+    /// 现代 schema:带 computed_total_tokens + model_id 列 + session 表 join,读回
+    /// 样本(含 workspace / 模型)、legacy=false。
     func testZCodeModernSchema() throws {
+        let db = try makeUsageDatabase()
+        try db.write { db in
+            try db.execute(sql: """
+            CREATE TABLE model_usage (
+                id TEXT PRIMARY KEY, session_id TEXT, started_at INTEGER, completed_at INTEGER,
+                duration_ms INTEGER, input_tokens INTEGER, output_tokens INTEGER,
+                reasoning_tokens INTEGER, cache_read_input_tokens INTEGER,
+                cache_creation_input_tokens INTEGER, computed_total_tokens INTEGER,
+                model_id TEXT
+            )
+            """)
+            try db.execute(sql: """
+            CREATE TABLE session (
+                id TEXT PRIMARY KEY, directory TEXT, path TEXT
+            )
+            """)
+            try db.execute(sql: """
+            INSERT INTO session VALUES ('sess_1', '/Users/x/pulse/.worktrees/agent-project', NULL)
+            """)
+            try db.execute(sql: """
+            INSERT INTO model_usage VALUES ('u1', 'sess_1', 1000, 9000, 5000, 100, 50, 10, 80, 5, 150, 'GLM-5.3')
+            """)
+        }
+
+        let reader = LiveAgentUsageReader(home: home)
+        let result = reader.zcodeUsageSamples(sinceStartedAtMs: nil)
+        XCTAssertFalse(result.legacySchema)
+        XCTAssertEqual(result.samples.count, 1)
+        XCTAssertEqual(result.samples.first?.id, "u1")
+        XCTAssertEqual(result.samples.first?.computedTotalTokens, 150)
+        XCTAssertEqual(result.samples.first?.workspacePath, "/Users/x/pulse/.worktrees/agent-project")
+        XCTAssertEqual(result.samples.first?.modelId, "GLM-5.3")
+
+        // 增量过滤(WHERE 下推到 SQL)。
+        let since = reader.zcodeUsageSamples(sinceStartedAtMs: 5000)
+        XCTAssertTrue(since.samples.isEmpty)
+    }
+
+    /// 现代 schema 但 model_id 列缺(更老库):SELECT 补 NULL 降级,样本不带模型。
+    func testZCodeModernSchemaWithoutModelIDColumn() throws {
         let db = try makeUsageDatabase()
         try db.write { db in
             try db.execute(sql: """
@@ -59,24 +99,14 @@ final class AgentUsageReaderTests: XCTestCase {
             )
             """)
             try db.execute(sql: """
-            INSERT INTO session VALUES ('sess_1', '/Users/x/pulse/.worktrees/agent-project', NULL)
-            """)
-            try db.execute(sql: """
-            INSERT INTO model_usage VALUES ('u1', 'sess_1', 1000, 9000, 5000, 100, 50, 10, 80, 5, 150)
+            INSERT INTO model_usage VALUES ('u1', NULL, 1000, 9000, 5000, 100, 50, 10, 80, 5, 150)
             """)
         }
 
-        let reader = LiveAgentUsageReader(home: home)
-        let result = reader.zcodeUsageSamples(sinceStartedAtMs: nil)
+        let result = LiveAgentUsageReader(home: home).zcodeUsageSamples(sinceStartedAtMs: nil)
         XCTAssertFalse(result.legacySchema)
         XCTAssertEqual(result.samples.count, 1)
-        XCTAssertEqual(result.samples.first?.id, "u1")
-        XCTAssertEqual(result.samples.first?.computedTotalTokens, 150)
-        XCTAssertEqual(result.samples.first?.workspacePath, "/Users/x/pulse/.worktrees/agent-project")
-
-        // 增量过滤(WHERE 下推到 SQL)。
-        let since = reader.zcodeUsageSamples(sinceStartedAtMs: 5000)
-        XCTAssertTrue(since.samples.isEmpty)
+        XCTAssertNil(result.samples.first?.modelId)
     }
 
     /// legacy schema:无 computed_total_tokens 列 → legacy=true、total 为 nil。

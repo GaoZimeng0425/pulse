@@ -44,19 +44,22 @@ struct LiveAgentUsageReader: AgentUsageReading {
         else { return ([], false) }
 
         // 列探测:表不在 → 空;`computed_total_tokens` 缺失 = legacy schema
-        // (tokscale 同款判定,唯一索引列不猜)。
+        // (tokscale 同款判定,唯一索引列不猜)。`model_id` 缺失(更老 schema)
+        // → SELECT 补 NULL,样本不带模型、只进合计/项目轨(agent-tab/05)。
         let columns = (try? database.read { db in
             try db.columns(in: "model_usage")
         }) ?? []
         guard !columns.isEmpty else { return ([], false) }
         let legacySchema = !columns.contains { $0.name == "computed_total_tokens" }
+        let hasModelID = columns.contains { $0.name == "model_id" }
 
         // 列名全限定 model_usage 前缀(modern 版 join session 后 `id` 等会歧义);
         // workspace 两列走别名,缺失(NULL)→ 样本 workspacePath nil,只进合计轨。
         let baseColumns = """
         model_usage.id, model_usage.started_at, model_usage.completed_at, model_usage.duration_ms,
         model_usage.input_tokens, model_usage.output_tokens, model_usage.reasoning_tokens,
-        model_usage.cache_read_input_tokens, model_usage.cache_creation_input_tokens
+        model_usage.cache_read_input_tokens, model_usage.cache_creation_input_tokens,
+        \(hasModelID ? "model_usage.model_id" : "NULL AS model_id")
         """
         var sql = if legacySchema {
             "SELECT \(baseColumns) FROM model_usage"
@@ -91,7 +94,8 @@ struct LiveAgentUsageReader: AgentUsageReading {
                         cacheReadTokens: row["cache_read_input_tokens"],
                         cacheWriteTokens: row["cache_creation_input_tokens"],
                         computedTotalTokens: legacySchema ? nil : row["computed_total_tokens"],
-                        workspacePath: workspace
+                        workspacePath: workspace,
+                        modelId: (row["model_id"] as String?).flatMap { $0.isEmpty ? nil : $0 }
                     )
                 )
             }

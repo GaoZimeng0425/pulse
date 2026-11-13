@@ -295,6 +295,8 @@ final class AgentSessionModelTests: XCTestCase {
         XCTAssertEqual(snapshot.zcodeSessions.map(\.sessionId), ["sess_new", "sess_old"])
         let latest = snapshot.zcodeSessions[0]
         XCTAssertEqual(latest.workspaceName, "pulse")
+        // 真路径随行(agent-tab/05:在跑归组要全路径走 worktree 折叠)。
+        XCTAssertEqual(latest.workspaceRoot, "/Users/aa00930/Documents/Learn/macos/pulse")
         XCTAssertEqual(latest.activeAgents, 1)
         XCTAssertEqual(latest.totalAgents, 3)
         XCTAssertEqual(latest.totalTokens, 500)

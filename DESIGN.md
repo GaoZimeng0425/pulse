@@ -34,11 +34,15 @@ colors:
   junk-ai: = {accent-bluetooth}
   junk-leftover: = {accent-sensors}
   junk-trash: = {accent-disk}
+  agent-model-lead: = {accent-bluetooth}
+  agent-model-second: = {accent-memory}
+  agent-model-rest: = {accent-disk}
 typography:
   font: "SF Pro(系统默认,不引第三方字体)"
   figure-overview: "34pt bold rounded, tabular"
   figure-main: "44pt bold rounded, tabular"
   figure-main-compact: "30pt bold rounded, tabular"
+  figure-stat: "28pt bold rounded, tabular"
   figure-card: "24pt bold rounded, tabular"
   figure-overview-compact: "22pt bold rounded, tabular"
   figure-ring: "19pt bold rounded, tabular"
@@ -112,6 +116,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{colors.accent-clean}` | `Surface.cleanAccent` | 清理页专属强调(2026-11-06 用户拍板 Teal;此前借磁盘金被评丑、指标色是 tab 身份色不跨页借):清理页主按钮 / 排序选中段 / 勾选框选中 / 选中条目卡底 / 子页药丸统一取此 |
 | `{colors.category-*}` | `GroupCategory.identityColor` | 非 App 组的图标瓦片底色;孤儿另作组行强调色(见下) |
 | `{colors.junk-*}` | `JunkGroup.identityColor`(MetricAccent.swift) | 清理品类身份色(p6-cleaner/03,丙案 v2 原型拍板映射):dev=CPU 蓝 / browser=GPU 粉 / app=App 棕 / project=内存紫 / ai=蓝牙青 / leftover=传感器橙红 / trash=磁盘金——清理总览模块大卡图标瓦与图例的类别底色。同空间地图按序循环 `accent-*` 的先例:指标色在此作**类别身份**借用,不作页面强调(清理页强调仍只有 accent-clean) |
+| `{colors.agent-model-*}` | `AgentModelTint`(MetricAccent.swift) | 智能体页每日消耗卡的模型 / harness 分区异色(agent-tab/05,原型示意色 青/紫/琥珀 映射既有令牌):lead=青(蓝牙,与页 accent 同源)/ second=紫(内存)/ rest=琥珀(磁盘);harness claude/zcode = 前两色。同 junk-* 先例:指标色在此作**类别身份**借用,不作页面强调 |
 | `{colors.state-negative}` | `Surface.negative` | 高负载、紧张、结束进程等负面偏差 |
 | `{colors.state-inactive}` | `Surface.inactive` | 行首状态点的"停 / 未连接"态(容器未运行、蓝牙设备未连接);亮起态取所在页指标色(p2-review/03 入表) |
 
@@ -137,6 +142,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{typography.figure-main}` | 44pt bold `.rounded` + `monospacedDigit` | 指标 tab 主卡大数字 |
 | `{typography.figure-overview}` | 34pt bold `.rounded` + `monospacedDigit` | 总览卡大数字(单位半号 48%) |
 | `{typography.figure-main-compact}` | 30pt(同族) | 弹窗主卡大数字 |
+| `{typography.figure-stat}` | 28pt(同族) | 智能体页每日消耗数字卡大数字(agent-tab/05;原型 28 原值入表) |
 | `{typography.figure-card}` | 24pt(同族) | 清理总览模块大卡大数字(`FigureSize.card`,p6-cleaner/03;原型 24 原值入表) |
 | `{typography.figure-overview-compact}` | 22pt(同族) | 弹窗总览卡大数字 |
 | `{typography.figure-ring}` / `-compact` | 19 / 16pt(同族) | 环心数字(全尺寸 / 弹窗) |
@@ -588,6 +594,41 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   同色文字),两态语言(✓正常 / 高负载),阈值在 `StatusBadgeRules`(组 >100%、
   系统 <30% / >70%)。现役用法 = 指标卡大数字旁(系统负载);排行行不挂"高负载"
   文字 chip,组高负载 = 数值红字 + 最忙进程名 chip(见排行列表条,2026-10-30 用户拍板)。
+- **每日消耗卡 v2**(agent-tab/05,定稿原型 `.scratch/agent-tab/prototype-daily-usage.html`
+  是唯一视觉真相,JS 坐标数学直译;原型非 4pt 网格值按下表收编):卡头**无徽章**
+  (用户拍板:只留标题文字 + 右「重新扫描」,CardHeader 徽章可选化),四段
+  **顺序** = 数字卡排 →「Token 消耗」热力墙 →「走势」→「项目」。
+  - **数字卡排**:三张等宽 lift 小卡(`{colors.surface-card-high}` 底 +
+    `{rounded.card-compact}` 12 + 内距 8×12[原型 10×14×9 收网格] + 卡间
+    `{spacing.gap}` 8):标签 `{typography.micro}` secondary → 数值
+    `{typography.figure-stat}` 28(今日消耗取页 accent 色;弹窗超宽读数
+    `minimumScaleFactor` 兜底)→ 副行 micro(环比 ▲=`{colors.state-positive}` /
+    ▼=`{colors.state-negative}` / 无基准 tertiary;日均副行是峰值不是环比)。
+    三卡随 7/30 档位联动(N 天合计 / 日均(N 天))。
+  - **图表区统一外包装**:lift 卡(cardHigh + 12 圆角 + 内距 12[原型 12×14×13 收编]
+    + 区间 `{spacing.group-gap}` 12)× 标题行 = 左标题 `{typography.card-title}`
+    secondary + 右时间筛选药丸(`PillTabBar` 7/30;热力墙右侧恒放单选项「年」
+    占位——时间筛选位置恒定)+ 头-图距 `{spacing.gap}` 8[原型 10 收编]。
+  - **热力墙**(自封装小组件,生态空白:专项库无 LICENSE / DGCharts 无此形态 /
+    官方 RectangleMark 像素失控):正方格边 14、间距 `{spacing.unit}` 4、52 列
+    (一年 364 天,最新在右)、内容宽 932 超宽由外层横向滚动(开卡锚到最右
+    「今」)、底刻度每 8 周(51周/43周/…/3周/今,`{typography.micro}` tertiary)、
+    四档色阶(值/窗口峰值 ×4 向上取整,≤8% 灰档 `{colors.surface-card-high}`;
+    accent 透明度 0.25/0.5/0.75/1)、图区底 6% accent。
+  - **走势** = 官方 Swift Charts(`LineMark` + 自定 `AxisMarks`;agent-tab/05
+    首次引入——StripChartView 避开它的是"组卡多每卡一图"高频重绘场景,本卡
+    单图):y 轴三档 0/半值/峰值 + 网格线、域顶留 15% 头寸;x 轴 7 天图每 3 天 /
+    30 天图每 6 天(「今天」在右);线 2pt 页 accent、末点圆点、缺天画 0、
+    图区 6% accent 底;轴字 `{typography.micro}` tertiary[原型 9.5 收五档]。
+  - **项目大卡**:`AdaptiveCardGrid`(单卡 min 240 / max 340 / 列距
+    `{spacing.group-gap}` 12、单列满宽);卡 = cardHigh 底 + `{rounded.inner}` 10 +
+    内距 12。四层:头(项目名 14.5 semibold + 占比 micro tertiary)→ 主数值
+    `{typography.figure-card}` 24 + 环比 micro → 模型分段条(高 4 圆角 2,分段色
+    `{colors.agent-model-*}` 按序,占比前二 + 剩余并「其他」;色点图例 6×6 圆角 2 +
+    micro)→ harness 分段条 + 底行(claude/zcode 占比 micro tertiary;「● 在跑 N」
+    `{colors.state-positive}` / 「静了 N 天」)+ 活跃行(活跃 N/窗口 天 · 请求数)。
+    层间分隔 = hairline divider(卡内层界,不是卡描边)。分段条轨道 =
+    `{colors.ink-tertiary}` 14%[原型 rgba(128,128,128,.14) 收编]。
 
 ## Do's and Don'ts
 
@@ -626,6 +667,8 @@ chip 图标 9.5pt → micro 10.5;排行行 chevron 9pt → 10。
   指标色 / 类别色。
 - **环形图用 Apple Charts(`SectorMark`),走势图自绘 Canvas**:环形的扇区几何与图例
   交给 Charts 最省;走势是高频重绘的 44 柱 / 56 点,自绘可控成本——有意分工,不统一。
+  每日消耗卡的「走势」用 Charts `LineMark`(agent-tab/05:单图低频重绘,不是
+  高频多卡场景)——同一分工的第二个先例。
 - **菜单栏徽标强调色直写 `.orange/.red`**:位图经 ImageRenderer 预绘,本轮没有验证动态色
   在离屏渲染里能否按外观正确解析,暂留系统色、集中在 `MenuBarBadgeRenderer.color` 一处;
   要换成语义令牌须先实机验证深浅两种外观。
