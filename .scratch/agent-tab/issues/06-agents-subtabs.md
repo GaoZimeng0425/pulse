@@ -30,7 +30,7 @@
 - 用量小卡数据:monitor.agentSessions.snapshot.usage(ClaudeUsageSnapshot,
   组装时传入消耗子页;5 小时窗优先,缺失退本周;快照缺失如实「—」)。
 
-**Status:** done(2026-11-13;装机目验归用户)
+**Status:** done(2026-11-13,develop@a0c8707;装机目验归用户)
 
 **Checklist:**
 
