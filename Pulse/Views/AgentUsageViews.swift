@@ -285,10 +285,11 @@ struct AgentUsagePaneView: View {
             if projects.isEmpty {
                 CardEmptyState(title: "窗口内没有项目数据", detail: "只有粗粒度回填的日子没有项目维度")
             } else {
-                // 宽卡(用户拍板加宽):min 360——主窗默认内容宽两列各 ~410,
-                // 680 视口一列满宽;上限 2 列。
+                // 单列满宽大卡(用户实报 360 两列无呼吸感,2026-11-13 追补):
+                // min 960 > 常规窗内容宽 → 恒一列、卡宽随窗口;
+                // {layout.agent-project-card-min-width}。
                 AdaptiveCardGrid(
-                    minimumCardWidth: 360,
+                    minimumCardWidth: 960,
                     spacing: 12,
                     maximumColumns: 2
                 ) {
@@ -527,21 +528,23 @@ struct AgentProjectCardView: View {
     let windowDays: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        // 呼吸感令牌档(2026-11-13 用户实报过密追补):内距 = {spacing.card-padding}
+        // 16、层间距 = {spacing.group-gap} 12(两列 410 时代收编的 12/8 作废)。
+        VStack(alignment: .leading, spacing: 12) {
             header
             valueRow
-            Divider().padding(.horizontal, -12)
+            Divider().padding(.horizontal, -16)
             bucketsRow
             if !project.models.isEmpty {
-                Divider().padding(.horizontal, -12)
+                Divider().padding(.horizontal, -16)
                 modelBlock
             }
-            Divider().padding(.horizontal, -12)
+            Divider().padding(.horizontal, -16)
             harnessBlock
-            Divider().padding(.horizontal, -12)
+            Divider().padding(.horizontal, -16)
             activityRow
         }
-        .padding(12)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Surface.cardHigh, in: .rect(cornerRadius: 10))
         .accessibilityElement(children: .combine)
@@ -574,7 +577,7 @@ struct AgentProjectCardView: View {
     /// 层 3:四桶 + 缓存倍率一行(tokscale 对齐,agent-tab/06;账本五桶现成)。
     /// 倍率 = 缓存读 ÷ 净(输入+输出),衡量缓存吃掉多少重复读取。
     private var bucketsRow: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: 16) {
             bucket("Input", agentTokenText(project.inputTokens))
             bucket("Output", agentTokenText(project.outputTokens))
             bucket("Cache R", agentTokenText(project.cacheReadTokens))
@@ -599,7 +602,7 @@ struct AgentProjectCardView: View {
 
     /// 层 4:模型分段条(top3 已并「其他」)+ 色点图例。
     private var modelBlock: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             AgentSegmentedBar(
                 segments: project.models.enumerated().map { index, model in
                     (fraction: model.share, tint: AgentModelTint.tint(at: index))
@@ -629,7 +632,7 @@ struct AgentProjectCardView: View {
 
     /// 层 5:harness(= source)分段条 + 底行(claude/zcode 占比 · 在跑/静了)。
     private var harnessBlock: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             AgentSegmentedBar(
                 segments: [
                     (fraction: project.claudeShare, tint: AgentModelTint.harness(.claude)),
