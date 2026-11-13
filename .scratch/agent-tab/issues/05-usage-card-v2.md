@@ -47,7 +47,7 @@ Swift Charts(首次引入)、热力墙 = 自封装小组件、分段条 = SwiftU
 **测试纪律:** 夹具日期一律从 now 动态推导(硬编码 + 真实时钟跨午夜必挂);
 enumerator 相对路径用父目录名拼(04 票实案)。
 
-**Status:** done(2026-11-13;装机目验归用户)
+**Status:** done(2026-11-13,develop@73d68a2;装机目验归用户)
 
 **Checklist:**
 
