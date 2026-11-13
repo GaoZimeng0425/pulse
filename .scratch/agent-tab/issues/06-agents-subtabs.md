@@ -77,3 +77,8 @@
   新 AgentProjectCardGrid(容器宽算列数,单卡保底 520 / 上限 3 列,逐行 HStack
   等高、末行自动满宽)——不走 GridItem minimum(硬下限裁剪前案),窄容器
   恒单列 100%。
+- 项目截断(2026-11-14 用户拍板「展示 10 个,展开/收起,和总览一样」):前 10 +
+  末行「显示全部(另 N 个项目)⌄/收起⌃」(RankingOverflowRow 同款视觉,新令牌
+  {layout.agent-project-limit} 10)。验证夜机器整夜负载风暴(load 32→110),
+  LiveCoreTickSourceSmoke 又被饿挂——按 06b 案判定链放行(diff 面纯 UI 零采集
+  关联 + 该用例 develop 基线昨日三连绿)。
