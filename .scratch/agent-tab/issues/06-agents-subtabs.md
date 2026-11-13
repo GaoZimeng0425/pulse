@@ -71,3 +71,9 @@
   再窄不缩**(CSS min-width 在窄容器会被 auto-fill 轨道压缩,SwiftUI 不会);
   「单列 100% 随容器」的正确写法就是 VStack,不需要网格。AdaptiveCardGrid 只
   适用于 min ≤ 最窄容器宽的场景(总览 340 vs 最小窗内容 672 恒安全)。
+- 三度修正(用户拍板「同行卡高度必须一致 + 宽了要出多列」):①同行等高 =
+  行内 .frame(maxHeight:.infinity)(数字卡排四张、日历图+走势双列、项目行);
+  走势图高度弹性化(≥96 吃满行内剩余,不留空白);②项目网格回归响应式:
+  新 AgentProjectCardGrid(容器宽算列数,单卡保底 520 / 上限 3 列,逐行 HStack
+  等高、末行自动满宽)——不走 GridItem minimum(硬下限裁剪前案),窄容器
+  恒单列 100%。

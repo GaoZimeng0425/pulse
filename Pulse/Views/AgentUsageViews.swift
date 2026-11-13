@@ -94,7 +94,7 @@ struct AgentUsagePaneView: View {
             CardHeader(symbolName: nil, title: "消耗总览", tint: agentsAccent) {
                 EmptyView()
             }
-            HStack(spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
                 numberCell(
                     label: "今日消耗",
                     tokens: figures.todayTotal,
@@ -143,6 +143,7 @@ struct AgentUsagePaneView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
         .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
+        .frame(maxHeight: .infinity, alignment: .top) // 同行四卡等高(2026-11-13 用户拍板)
         .accessibilityElement(children: .combine)
     }
 
@@ -171,6 +172,7 @@ struct AgentUsagePaneView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
         .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
+        .frame(maxHeight: .infinity, alignment: .top)
         .accessibilityElement(children: .combine)
     }
 
@@ -189,12 +191,15 @@ struct AgentUsagePaneView: View {
 
     // MARK: 卡 2/3:日历图 + 走势(一排两列,不够宽上下排)
 
-    /// 媒体查询语义:横排放得下(两卡理想宽合计 ≤ 容器)则并排,否则竖排。
+    /// 媒体查询语义:横排放得下(两卡理想宽合计 ≤ 容器)则并排,否则竖排;
+    /// 并排时两卡等高(用户拍板 2026-11-13)——走势图高度弹性,吃掉行内多余。
     private var chartRow: some View {
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .top, spacing: 16) {
                 heatCard
+                    .frame(maxHeight: .infinity, alignment: .top)
                 trendCard
+                    .frame(maxHeight: .infinity, alignment: .top)
             }
             VStack(alignment: .leading, spacing: 16) {
                 heatCard
@@ -285,16 +290,12 @@ struct AgentUsagePaneView: View {
             if projects.isEmpty {
                 CardEmptyState(title: "窗口内没有项目数据", detail: "只有粗粒度回填的日子没有项目维度")
             } else {
-                // 恒单列满宽(2026-11-13 二度修正,用户实报窄窗内容被裁):SwiftUI
-                // `GridItem(.flexible(minimum:))` 的 min 是**硬下限**,容器再窄
-                // 不缩——min 960 在窄窗/弹窗把内容撑出容器右缘(与 CSS min-width
-                // 在窄容器会被轨道压缩不同,SwiftUI 语义套不得)。「单列 100%
-                // 宽随容器缩放」= VStack,卡内长内容(四桶行等)自会缩字/换行。
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(projects) { project in
-                        AgentProjectCardView(project: project, windowDays: range.days)
-                    }
-                }
+                // 响应式多列(2026-11-13 三度修正,用户拍板「同行等高 + 宽了出多列」):
+                // 列数按容器实宽容纳的最多列(单卡保底 520、上限 3 列),逐行 HStack
+                // 排布——行内卡 .frame(maxHeight:.infinity) 等高、末行不满自动满宽;
+                // 不用 LazyVGrid(行内不拉齐高度)也不用 GridItem minimum(硬下限,
+                // 窄容器溢出裁剪,前案实锤),容器多窄单列都 100% 宽。
+                AgentProjectCardGrid(projects: projects, windowDays: range.days)
             }
         }
         .cardShell(compact: isCompact)
@@ -511,8 +512,55 @@ struct AgentTrendChart: View {
         .chartPlotStyle { plot in
             plot.background(agentsAccent.opacity(0.06), in: .rect(cornerRadius: 8))
         }
-        .frame(height: 96)
+        .frame(minHeight: 96, maxHeight: .infinity) // 双列等高时吃满行内剩余
         .accessibilityHidden(true) // 数值由数字卡排承载
+    }
+}
+
+// MARK: - 项目卡响应式网格(agent-tab/06 三度修正)
+
+/// 项目大卡响应式网格:列数 = 容器实宽容纳的最多列(单卡保底 520,上限 3),
+/// 逐行 HStack——**行内等高**、末行不满自动满宽;容器多窄都单列 100%(不走
+/// GridItem minimum,规避 flexible 硬下限在窄容器溢出裁剪的前案)。
+private struct AgentProjectCardGrid: View {
+    /// 单卡保底宽(低于此宁可少一列——呼吸感是 06 追补的实报教训)。
+    private static let minimumCardWidth: CGFloat = 520
+    private static let spacing: CGFloat = 12
+    private static let maximumColumns = 3
+
+    let projects: [AgentProjectSummary]
+    let windowDays: Int
+
+    /// 初值 1:窄窗/弹窗首帧即正确,宽度变化后纠正。
+    @State private var columnCount = 1
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Self.spacing) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                HStack(alignment: .top, spacing: Self.spacing) {
+                    ForEach(row) { project in
+                        AgentProjectCardView(project: project, windowDays: windowDays)
+                            .frame(maxHeight: .infinity, alignment: .top)
+                    }
+                }
+            }
+        }
+        .onGeometryChange(for: Int.self) { proxy in
+            let perColumn = Self.minimumCardWidth + Self.spacing
+            return min(Self.maximumColumns, max(1, Int((proxy.size.width + Self.spacing) / perColumn)))
+        } action: { newValue in
+            if newValue != columnCount {
+                columnCount = newValue
+            }
+        }
+    }
+
+    /// 按列数分行(不足列的末行自动满宽——HStack 内卡 maxWidth ∞)。
+    private var rows: [[AgentProjectSummary]] {
+        guard columnCount > 1 else { return projects.map { [$0] } }
+        return stride(from: 0, to: projects.count, by: columnCount).map {
+            Array(projects[$0 ..< min($0 + columnCount, projects.count)])
+        }
     }
 }
 
