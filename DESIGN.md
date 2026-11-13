@@ -203,7 +203,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.row-host-icon}` | 14pt | 下钻进程行宿主 App 徽标图标边长(project-visibility/02;徽标文字随行 `{typography.caption}` secondary,图标-文字间距 `{spacing.inline}`) |
 | `{layout.overview-card-min-width}` | 340pt | 总览卡自适应网格的单卡最小宽(主窗口列数 1–3 由它派生:列数 = 内容宽容纳的最多列,340 + 列距 16,上限 3;4 列上限已废,agent-tab/06 用户拍板) |
 | `{layout.module-card-min-width}` | 340pt | 清理总览模块大卡自适应网格的单卡最小宽(p6-cleaner/03):列数 = min(2, 内容宽容纳列数)——720 最小窗 1 列、默认窗 880 起 2 列、**上限 2 列**(品类只有六卡,不随 ultrawide 拉列);列距 `{spacing.group-gap}` 12 |
-| `{layout.agent-project-card-min-width}` | 960pt | 智能体页消耗子页项目卡网格单卡最小宽(agent-tab/06 追补:用户实报两列 ~410 无呼吸感;≥ 常规窗内容宽 → **恒单列满宽**,卡宽随窗口,两列需 1932+ 实质封存);列距 12 |
+| `{layout.agent-project-card-min-width}` | ~~960pt~~ | **superseded**(agent-tab/06 二度修正):SwiftUI `GridItem(.flexible(minimum:))` 的 min 是硬下限,容器再窄不缩——960 在窄窗/弹窗把内容撑出容器右缘被裁(与 CSS min-width 会被轨道压缩不同)。项目大卡终态 = **恒单列满宽 VStack**,无网格参数 |
 | `{layout.ranking-limit}` | 20 行 | 各排行(弹窗与主窗口同规则)只列前 20 名,超出补末行:弹窗「查看全部(另 N 项)」跳主窗口并落地即展开,主窗口「显示全部(另 N 项)」原地展开 / 「收起」(ranking-limit/01,2026-11-02 用户拍板;原 11-01 `popover-ranking-limit` 只截弹窗)。主窗口搜索命中不截 |
 | `{layout.sheet-width}` | 460pt | 确认清单 sheet 定宽(清理页「清理…」,p4-cleaner/04;原型 B 变体同值) |
 | `{layout.sheet-list-max-height}` | 220pt | 确认清单 sheet 内逐行列表的最大高(超出滚动,总量与按钮恒在视口内) |
@@ -610,8 +610,8 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
     5 小时窗% 优先缺失退本周,副行「本周 N% · 重置 X 后」,快照缺失「—」不伪造);
     lift 小卡规格同下;②**日历图 + 走势一排两列**(`ViewThatFits` 媒体查询语义:
     容器不够宽上下排)——「重新扫描」在日历图卡头(与「年」占位药丸并排);
-    ③**项目大卡单列满宽**(`{layout.agent-project-card-min-width}` 960:用户实报
-    两列 ~410 无呼吸感,2026-11-13 追补;恒一列、卡宽随窗口)。
+    ③**项目大卡恒单列满宽**(VStack:用户实报两列 ~410 无呼吸感 + 窄窗 min 960
+    溢出裁剪两度实报后终态;卡宽恒 = 容器宽,窄窗/弹窗不裁)。
   - **数字卡排**:等宽 lift 小卡(`{colors.surface-card-high}` 底 +
     `{rounded.card-compact}` 12 + 内距 8×12 + 卡间 `{spacing.gap}` 8):标签
     `{typography.micro}` secondary → 数值 `{typography.figure-stat}` 28(今日消耗
