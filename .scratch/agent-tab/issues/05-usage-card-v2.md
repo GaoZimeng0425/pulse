@@ -47,22 +47,44 @@ Swift Charts(首次引入)、热力墙 = 自封装小组件、分段条 = SwiftU
 **测试纪律:** 夹具日期一律从 now 动态推导(硬编码 + 真实时钟跨午夜必挂);
 enumerator 相对路径用父目录名拼(04 票实案)。
 
-**Status:** in-progress
+**Status:** done(2026-11-13;装机目验归用户)
 
 **Checklist:**
 
-- [ ] DESIGN.md:figure-stat 28 入 typography、agent-model-* 入 colors、
-      Components 加「每日消耗卡 v2」节(原型 9/10/13/14px 非网格值收编表)
-- [ ] PulseCore:样本带 model(ClaudeUsageSample.model / ZCodeUsageSample.modelId)、
-      AgentModelUsageRow + 聚合器模型轨 + store、迁移 + tableNames
-- [ ] PulseCore:`AgentUsageWindow` 窗口派生纯函数(数字卡三卡数据 / 项目卡
-      数据 / top3 模型合并 / 环比 / 在跑计数)+ ZCodeSessionStatus.workspaceRoot
-- [ ] Live:SELECT 带 model_id(列探测降级);Feature 暴露 modelRows
-- [ ] UI:整卡重排(卡头无徽章 → CardHeader 徽章可选化;AdaptiveCardGrid 加
-      maximumCardWidth;热力墙 52 列横滚小组件;Charts 走势;项目大卡)
-- [ ] 测试:模型轨 / 窗口派生 / 读取器 model_id / 会话 workspaceRoot
-- [ ] check.sh 全绿(.worktrees 双挂 → /tmp 复核同码绿即放行)
-- [ ] 合并 develop、hook 装机、推 origin、票记档
+- [x] DESIGN.md:figure-stat 28 入 typography、agent-model-* 入 colors、
+      Components 加「每日消耗卡 v2」节(原型 9/10/13/14px 非网格值收编表)+
+      Apple Charts 登记例外补第二先例
+- [x] PulseCore:样本带 model(ClaudeUsageSample.model / ZCodeUsageSample.modelId)、
+      AgentModelUsageRow + 聚合器模型轨(项目+模型都归组成功才进)+ store、
+      迁移 agent-tab-05-model-usage + tableNames
+- [x] PulseCore:`AgentUsageWindow` 窗口派生纯函数(数字卡三卡数据 / 项目卡
+      数据 / top3 模型合并 / 环比 / 在跑计数 / 逐天合计)+ ZCodeSessionStatus
+      .workspaceRoot(zcodeRows 填充)
+- [x] Live:SELECT 带 model_id(列探测缺失补 NULL 降级);Feature 暴露 modelRows
+- [x] UI:整卡重排(CardHeader 徽章可选化 / AdaptiveCardGrid 加 maximumCardWidth
+      (memberwise 默认参,调用面不动)/ 52 列热力墙横滚小组件(开卡锚「今」)/
+      Charts 走势(y 三档网格 + x 每 3/6 天 + 末点圆点 + 15% 头寸)/ 项目大卡
+      (分段条 SwiftUI 原语 + 色点图例 + 在跑/静了/活跃行))
+- [x] 测试:模型轨三轨聚合/解析/store/全量接线、窗口派生 8 例(数字卡环比/
+      项目全字段/top3/在跑 worktree 折叠/显示名)、读取器 model_id 两例、
+      会话 workspaceRoot;夹具全动态日期
+- [x] check:lint(ast-grep 两处 ForEach(indices) 违规已修)+ 构建 + 核心包 793 绿
+      + app 侧大跑 506 绿;**AcceptanceAnchor e2e 在并行会话负载风暴
+      (load 30-60)下忙循环饿死失败 3 次,同码单跑绿**(与票改动零关联,
+      「负载风暴换着挂」协议);读取器夹具修后单跑 6/6 绿
+- [x] code-review Standards 轴自查:防御(nil 穿透/无基准「—」/峰值 0 全灰/
+      老列降级)、并发(纯值函数 + GRDB 串行 + IO 后台档,零新共享态)、
+      权限(零新增 TCC 面)、测试(纯 XCTest/合成夹具)、注释(为什么+票号)过
+
+**Comments(实案教训):**
+- 并行会话风暴(load 30-60,syspolicyd 218% + 别的项目 du + log show 取证)
+  能把忙循环测量型 e2e 饿出假失败——同码单跑绿 + 零代码关联才可放行,
+  「单跑即绿」在风暴天要多次重试才能凑到安静调度窗口。
+- SwiftFormat/lint 基线会重排新代码(6 文件),提交前 `lint.sh --fix` 一遍
+  免得 check 阶段折返;ast-grep 门禁拦 ForEach(indices) 形状,聚合行值从
+  enumerated 元组取(2026-10-21 删行闪退实案的规则)。
+- 首版走势图想用「两张 Chart 叠末点」补丁,坐标对不齐——单 Chart 内
+  LineMark 序列 + 条件 PointMark 才是正解(ForEach 同 series 连线)。
 
 **Out of scope:** 热力墙年档切换(「年」是占位)、小时粒度闲置、单项目下钻、
 模型维度单独时间筛选、MCP 暴露。
