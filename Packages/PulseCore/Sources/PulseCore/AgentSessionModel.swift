@@ -364,6 +364,9 @@ public struct ZCodeSessionStatus: Identifiable, Equatable, Sendable {
     public let sessionId: String
     /// 工作区 basename(取该会话 agents 的 workspaceRoot;混合时取最新一条的)。
     public let workspaceName: String?
+    /// 工作区真路径(与 workspaceName 同源;「在跑」按项目归组要全路径走
+    /// worktree 折叠,basename 会把 worktree 会话记到 slug 名下。agent-tab/05)。
+    public let workspaceRoot: String?
     /// 活跃(非终态)agent 数 / 全部 agent 数。
     public let activeAgents: Int
     public let totalAgents: Int
@@ -382,10 +385,12 @@ public struct ZCodeSessionStatus: Identifiable, Equatable, Sendable {
         activeAgents: Int,
         totalAgents: Int,
         totalTokens: Int?,
-        updatedAgoSeconds: TimeInterval?
+        updatedAgoSeconds: TimeInterval?,
+        workspaceRoot: String? = nil
     ) {
         self.sessionId = sessionId
         self.workspaceName = workspaceName
+        self.workspaceRoot = workspaceRoot
         self.activeAgents = activeAgents
         self.totalAgents = totalAgents
         self.totalTokens = totalTokens
@@ -537,7 +542,8 @@ public struct AgentSessionCatalog: Sendable {
                     activeAgents: capped.filter(\.isActive).count,
                     totalAgents: capped.count,
                     totalTokens: tokenReadings.isEmpty ? nil : tokenReadings.reduce(0, +),
-                    updatedAgoSeconds: latest?.updatedAt.map { now.timeIntervalSince($0) }
+                    updatedAgoSeconds: latest?.updatedAt.map { now.timeIntervalSince($0) },
+                    workspaceRoot: latest?.workspaceRoot
                 )
             }
             .sorted { ($0.updatedAgoSeconds ?? 0) < ($1.updatedAgoSeconds ?? 0) }

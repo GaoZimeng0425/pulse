@@ -1,20 +1,29 @@
+import Charts
 import PulseCore
 import SwiftUI
 
-// MARK: - 每日消耗卡(agent-tab/02)
+// MARK: - 每日消耗卡(agent-tab/02;05 按定稿原型整体重排)
 
 //
-// Claude + ZCode 两家按天 token 合计的折线(7/30 天切换)与 GitHub 贡献图式
-// 热力图(近 13 周)。数据 = AgentUsageFeature 的账本行(自落库,不受源删除
-// 影响);「重新扫描」= 手动全量档(补漏天)。配色一律本页指标色(蓝牙青),
-// 不开阈值变色第四处;图表无轴无标签,数值由文字行承载(StripChartView 同决策)。
+// 定稿原型 `.scratch/agent-tab/prototype-daily-usage.html`(唯一视觉真相,JS
+// 坐标数学直译):卡头无徽章(用户拍板:只留标题 + 右「重新扫描」)→ 数字卡排
+// (三张同规格 lift 小卡,figure-stat 28)→「Token 消耗」热力墙(52 列一年,
+// 正方格边 14 间距 4,超宽横向滚动)→「走势」(官方 Swift Charts,本 app 首次
+// 引入:单图低频重绘,不是 StripChartView 避开的高频多卡场景)→「项目」大卡
+// (自适应网格 min 240 / max 340,模型 / harness 分段条分区异色)。
+// 数据派生全部走 PulseCore `AgentUsageWindow`(纯值,UI 只描不算);数字 /
+// 环比 / 活跃天数 / 请求数 / 在跑数都由现有账本与会话快照派生,零新增采集。
 
 /// 每日消耗卡。
 struct AgentUsageCardView: View {
     /// 账本全表(按天升序);空 = 还没扫过。
     let rows: [AgentDailyUsageRow]
-    /// 项目轨全表(agent-tab/04);窗口内聚合出项目排行。
+    /// 项目轨全表(agent-tab/04);窗口内聚合出项目大卡。
     var projectRows: [AgentProjectUsageRow] = []
+    /// 模型轨全表(agent-tab/05);项目大卡模型分段条。
+    var modelRows: [AgentModelUsageRow] = []
+    /// 会话快照的项目在跑数(项目名 → N;MetricTabStack 组装时传入)。
+    var liveProjectCounts: [String: Int] = [:]
     /// 弹窗紧凑档。
     var isCompact = false
     /// 全量扫描进行中(按钮转圈与禁用重入)。
@@ -22,52 +31,44 @@ struct AgentUsageCardView: View {
     /// 「重新扫描」动作(UI 按钮的唯一触发源)。
     var onRescan: () -> Void
 
-    /// 折线范围切换。
+    /// 折线 / 项目的范围切换(数字卡排随档位联动)。
     private enum Range: Hashable {
         case week
         case month
 
         var days: Int {
-            switch self {
-            case .week: 7
-            case .month: 30
-            }
+            self == .week ? 7 : 30
         }
 
         var title: String {
-            switch self {
-            case .week: "7 天"
-            case .month: "30 天"
-            }
+            self == .week ? "7 天" : "30 天"
         }
+
+        /// 合计卡环比基准的称谓(7 天比上周、30 天比上月)。
+        var previousLabel: String {
+            self == .week ? "较上周" : "较上月"
+        }
+    }
+
+    /// 热力墙「年」占位单选项(时间筛选位置恒定;档位切换是未来功能)。
+    private enum HeatSpan: Hashable {
+        case year
     }
 
     @State private var range: Range = .week
 
-    /// 热力图:13 周(列 = 连续 7 天一组,顺序铺格,最新在右下)。
-    private static let heatmapWeeks = 13
-    private static let heatmapCellSpacing: CGFloat = 3
-
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            CardHeader(symbolName: "chart.line.uptrend.xyaxis", title: "每日消耗", tint: agentsAccent) {
+            CardHeader(symbolName: nil, title: "每日消耗", tint: agentsAccent) {
                 rescanButton
             }
             if rows.isEmpty {
                 emptyState
             } else {
-                VStack(alignment: .leading, spacing: 12) {
-                    PillTabBar([Range.week, .month], selection: $range) { item in
-                        PillTabItem(title: item.title, symbol: nil, tint: agentsAccent)
-                    }
-                    lineChart
-                    summaryRow
-                    projectRank
-                    heatmap
-                    Text("近 \(Self.heatmapWeeks) 周 · Claude 与 ZCode 合计")
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.tertiary)
-                }
+                numberRow
+                heatSection
+                trendSection
+                projectSection
             }
         }
         .cardShell(compact: isCompact)
@@ -108,204 +109,529 @@ struct AgentUsageCardView: View {
         }
     }
 
-    // MARK: 折线
+    // MARK: 数字卡排(三卡同规格,随档位联动)
 
-    /// 近 N 天合计折线(缺数据天画 0——账本无行即当日无记录,不猜)。轨道与
-    /// 画法与 HistoryCurveView 同族(9% 底、2pt 圆头线、窗口最大值归一)。
-    private var lineChart: some View {
-        let values = recentDayTotals(days: range.days).map(\.total)
-        return Canvas { context, size in
-            drawLine(values, in: &context, size: size)
-        }
-        .frame(height: isCompact ? 44 : 64)
-        .background(agentsAccent.opacity(0.09), in: .rect(cornerRadius: 8))
-        .accessibilityHidden(true) // 数值由下方文字行承载
-    }
-
-    private func drawLine(_ values: [Double], in context: inout GraphicsContext, size: CGSize) {
-        let count = values.count
-        guard count > 1 else {
-            // 单点:落一个点(HistoryCurveView 单点段同款)。
-            if let only = values.first, only > 0 {
-                let radius: CGFloat = 1
-                context.fill(
-                    Path(ellipseIn: CGRect(
-                        x: size.width / 2 - radius,
-                        y: size.height / 2 - radius,
-                        width: radius * 2,
-                        height: radius * 2
-                    )),
-                    with: .color(agentsAccent)
-                )
+    private var numberRow: some View {
+        let figures = AgentUsageWindow.figures(rows: rows, days: range.days)
+        return HStack(spacing: 8) {
+            numberCard(
+                label: "今日消耗",
+                tokens: figures.todayTotal,
+                valueTint: agentsAccent
+            ) {
+                AgentDeltaText(label: "较昨日", delta: figures.todayDelta)
             }
-            return
+            numberCard(
+                label: "\(figures.windowDays) 天合计",
+                tokens: figures.windowTotal
+            ) {
+                AgentDeltaText(label: range.previousLabel, delta: figures.windowDelta)
+            }
+            numberCard(
+                label: "日均(\(figures.windowDays) 天)",
+                tokens: figures.windowAverage
+            ) {
+                Text("峰 \(agentTokenText(figures.windowPeak))/天")
+                    .font(.system(size: 10.5))
+                    .monospacedDigit()
+                    .foregroundStyle(.tertiary)
+            }
         }
-        let inset: CGFloat = 6
-        let drawableHeight = size.height - inset * 2
-        let normalizer = max(values.max() ?? 0, 1)
-
-        func point(_ index: Int) -> CGPoint {
-            CGPoint(
-                x: (CGFloat(index) + 0.5) * size.width / CGFloat(count),
-                y: inset + (1 - CGFloat(min(max(values[index] / normalizer, 0), 1))) * drawableHeight
-            )
-        }
-
-        var path = Path()
-        path.move(to: point(0))
-        for index in 1 ..< count {
-            path.addLine(to: point(index))
-        }
-        context.stroke(
-            path,
-            with: .color(agentsAccent),
-            style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
-        )
     }
 
-    /// 区间摘要:近 N 天合计 · 日均。
-    private var summaryRow: some View {
-        let totals = recentDayTotals(days: range.days)
-        let sum = totals.reduce(0) { $0 + $1.total }
-        let average = sum / Double(max(totals.count, 1))
-        return Text("近 \(range.days) 天合计 \(agentTokenText(Int(sum))) · 日均 \(agentTokenText(Int(average)))")
-            .font(.system(size: 11))
-            .monospacedDigit()
-            .foregroundStyle(.secondary)
+    /// 一张 lift 数字小卡:标签 → 大数字(figure-stat 28)→ 副行;等宽分布。
+    private func numberCard(
+        label: String,
+        tokens: Int,
+        valueTint: Color? = nil,
+        @ViewBuilder sub: () -> some View
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.system(size: 10.5))
+                .foregroundStyle(.secondary)
+            let figure = agentTokenFigure(tokens)
+            FigureText(value: figure.value, unit: figure.unit, size: FigureSize.stat)
+                .foregroundStyle(valueTint ?? Color.primary)
+                .minimumScaleFactor(0.5) // 弹窗 312 档三等分 ≈ 91pt,超宽读数兜底
+            sub()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+        .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
     }
 
-    // MARK: 项目排行(agent-tab/04)
+    // MARK: 图表区统一外包装(lift + 标题行 + 图表)
 
-    /// 近 N 天项目排行:两家合计、按量降序、封顶 8 行(超出补「另 N 项」);
-    /// worktree 消耗已归组主仓名。无项目数据(只有 cache 回填的日子)整节不画。
-    @ViewBuilder
-    private var projectRank: some View {
-        let ranked = projectTotals(days: range.days)
-        if !ranked.isEmpty {
-            VStack(alignment: .leading, spacing: RowMetrics.cardRowSpacing(compact: isCompact)) {
-                ForEach(Array(ranked.prefix(8)), id: \.project) { item in
-                    CardEntityRow(
-                        systemImage: "folder",
-                        tint: agentsAccent,
-                        name: item.project,
-                        sub: nil,
-                        compact: isCompact
-                    ) {
-                        Text(agentTokenText(Int(item.total)))
-                            .font(.system(size: RowMetrics.valueFontSize(compact: isCompact), weight: .semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(.primary)
-                    }
-                    .accessibilityElement(children: .combine)
-                }
-                if ranked.count > 8 {
-                    Text("另 \(ranked.count - 8) 个项目")
+    /// 7/30 时间筛选药丸(走势与项目各一份,同一 state 视觉同步)。
+    private var rangePills: some View {
+        PillTabBar([Range.week, .month], selection: $range) { item in
+            PillTabItem(title: item.title, symbol: nil, tint: agentsAccent)
+        }
+    }
+
+    private func chartSection(
+        title: String,
+        @ViewBuilder pills: () -> some View,
+        @ViewBuilder content: () -> some View
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                pills()
+            }
+            content()
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
+    }
+
+    // MARK: Token 消耗(热力墙)
+
+    private var heatSection: some View {
+        chartSection(title: "Token 消耗") {
+            PillTabBar([HeatSpan.year], selection: .constant(HeatSpan.year)) { span in
+                PillTabItem(title: span == .year ? "年" : "", symbol: nil, tint: agentsAccent)
+            }
+        } content: {
+            let totals = AgentUsageWindow.dayTotals(rows: rows, days: AgentHeatWall.weeks * 7)
+            VStack(alignment: .leading, spacing: 8) {
+                AgentHeatWall(totals: totals)
+                HStack {
+                    Text("Claude 与 ZCode 合计")
                         .font(.system(size: 10.5))
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                    Text("最多一天 \(agentTokenText(totals.map(\.total).max() ?? 0))")
+                        .font(.system(size: 10.5))
+                        .monospacedDigit()
                         .foregroundStyle(.tertiary)
                 }
             }
         }
     }
 
-    /// 窗口内项目合计(两家合并),按量降序。
-    private func projectTotals(days: Int) -> [(project: String, total: Double)] {
-        let keys = windowDayKeys(days: days)
-        var totals: [String: Double] = [:]
-        for row in projectRows where keys.contains(row.day) && row.totalTokens > 0 {
-            totals[row.project, default: 0] += Double(row.totalTokens)
+    // MARK: 走势(Swift Charts)
+
+    private var trendSection: some View {
+        chartSection(title: "走势", pills: { rangePills }) {
+            AgentTrendChart(
+                totals: AgentUsageWindow.dayTotals(rows: rows, days: range.days)
+            )
         }
-        return totals
-            .map { (project: $0.key, total: $0.value) }
-            .sorted { $0.total > $1.total }
     }
 
-    /// 近 N 天(含今天)的日键集合(与 recentDayTotals 同法生成)。
-    private func windowDayKeys(days: Int) -> Set<String> {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        return Set((0 ..< days).compactMap { offset in
-            calendar.date(byAdding: .day, value: -offset, to: today)
-                .map { Self.dayKey($0, calendar: calendar) }
-        })
-    }
+    // MARK: 项目(大卡网格)
 
-    // MARK: 热力图
-
-    /// 近 13 周格子墙:当天量按窗口最大值分四档着色(GitHub 贡献图式),
-    /// 无数据格 = 卡内抬升底;顺序铺格(列 = 连续 7 天),最新在右下。
-    private var heatmap: some View {
-        let totals = recentDayTotals(days: Self.heatmapWeeks * 7)
-        return Canvas { context, size in
-            drawHeatmap(totals, in: &context, size: size)
-        }
-        .frame(height: 84)
-        .accessibilityHidden(true) // 数值由折线区摘要行承载
-    }
-
-    private func drawHeatmap(
-        _ totals: [DayTotal],
-        in context: inout GraphicsContext,
-        size: CGSize
-    ) {
-        let weeks = Self.heatmapWeeks
-        let spacing = Self.heatmapCellSpacing
-        let cellSide = min(
-            (size.width - spacing * CGFloat(weeks - 1)) / CGFloat(weeks),
-            (size.height - spacing * 6) / 7
+    /// 窗口内有项目数据才出节(只有 cache 回填日子的窗口整节不画,04 票先例)。
+    @ViewBuilder
+    private var projectSection: some View {
+        let projects = AgentUsageWindow.projects(
+            projectRows: projectRows,
+            modelRows: modelRows,
+            days: range.days,
+            liveCounts: liveProjectCounts
         )
-        let maxValue = totals.map(\.total).max() ?? 0
+        if !projects.isEmpty {
+            chartSection(title: "项目", pills: { rangePills }) {
+                AdaptiveCardGrid(
+                    minimumCardWidth: 240,
+                    spacing: 12,
+                    maximumColumns: 4,
+                    maximumCardWidth: 340
+                ) {
+                    ForEach(projects) { project in
+                        AgentProjectCardView(project: project, windowDays: range.days)
+                    }
+                }
+            }
+        }
+    }
+}
 
-        for (index, day) in totals.enumerated() {
+// MARK: - 环比文字(数字卡副行与项目卡共用)
+
+/// ▲ +12% / ▼ -8% / 持平 / —(无基准):▲ 绿 ▼ 红,零与无基准灰。
+/// 颜色是方向语义(DESIGN.md state-positive/negative),箭头已载方向信息。
+private struct AgentDeltaText: View {
+    var label: String?
+    let delta: Double?
+
+    var body: some View {
+        let text: String
+        let style: AnyShapeStyle
+        if let delta {
+            let percent = Int((abs(delta) * 100).rounded())
+            if delta > 0 {
+                text = arrowLabel("▲", "+\(percent)%")
+                style = AnyShapeStyle(Surface.positive)
+            } else if delta < 0 {
+                text = arrowLabel("▼", "-\(percent)%")
+                style = AnyShapeStyle(Surface.negative)
+            } else {
+                text = "\(label.map { "\($0) " } ?? "")持平"
+                style = AnyShapeStyle(.tertiary)
+            }
+        } else {
+            // 前窗无基准:如实「—」,不出 0% 假读数。
+            text = "\(label.map { "\($0) " } ?? "")—"
+            style = AnyShapeStyle(.tertiary)
+        }
+        return Text(text)
+            .font(.system(size: 10.5))
+            .monospacedDigit()
+            .foregroundStyle(style)
+    }
+
+    private func arrowLabel(_ arrow: String, _ value: String) -> String {
+        if let label {
+            "\(arrow) \(label) \(value)"
+        } else {
+            "\(arrow) \(value)"
+        }
+    }
+}
+
+// MARK: - 热力墙(自封装小组件,agent-tab/05)
+
+/// 一年 52 列贡献图式格子墙(正方格边 14、间距 4、内容宽 932 超宽横向滚动、
+/// 开卡锚到最右「今」)。四档色阶按窗口峰值归一(≤8% 灰档),底部每 8 周刻度
+/// +「今」;坐标数学直译自定稿原型 drawHeat()。
+private struct AgentHeatWall: View {
+    static let weeks = 52
+    private static let side: CGFloat = 14
+    private static let gap: CGFloat = 4
+
+    /// 旧 → 新的逐天合计(weeks × 7 条;天数固定,缺天 0)。
+    let totals: [AgentDayTotal]
+
+    var body: some View {
+        let step = Self.side + Self.gap
+        let contentWidth = CGFloat(Self.weeks) * step - Self.gap
+        ScrollView(.horizontal, showsIndicators: true) {
+            Canvas { context, _ in
+                draw(in: &context, step: step)
+            }
+            .frame(width: contentWidth, height: Self.axisHeight(step: step))
+        }
+        .defaultScrollAnchor(.trailing) // 开卡锚「今」(最新在右)
+        .accessibilityHidden(true) // 数值由下方注记行承载
+    }
+
+    /// 图高 = 7 行格子 + 12 刻度行(原型 axisY = gridH + 12)。
+    private static func axisHeight(step: CGFloat) -> CGFloat {
+        7 * step - gap + 12 + 4
+    }
+
+    private func draw(in context: inout GraphicsContext, step: CGFloat) {
+        let gridHeight = 7 * step - Self.gap
+        let contentWidth = CGFloat(Self.weeks) * step - Self.gap
+
+        // 图区底(灰 6%,圆角 8,原型同款)。
+        context.fill(
+            Path(roundedRect: CGRect(x: 0, y: 0, width: contentWidth, height: gridHeight), cornerRadius: 8),
+            with: .color(Color.primary.opacity(0.06))
+        )
+
+        let cells = Self.weeks * 7
+        let maxValue = totals.map(\.total).max() ?? 0
+        for index in 0 ..< min(cells, totals.count) {
             let column = index / 7
             let row = index % 7
+            let value = Double(totals[totals.count - cells + index].total)
             let rect = CGRect(
-                x: CGFloat(column) * (cellSide + spacing),
-                y: CGFloat(row) * (cellSide + spacing),
-                width: cellSide,
-                height: cellSide
+                x: CGFloat(column) * step,
+                y: CGFloat(row) * step,
+                width: Self.side,
+                height: Self.side
             )
-            let corner = min(2.5, cellSide / 3)
-            let color: Color
-            if day.total <= 0 || maxValue <= 0 {
-                color = Surface.cardHigh
-            } else {
-                // 四档着色:1/4 → 1.0 透明度。
-                let level = min(4, Int(ceil(day.total / maxValue * 4)))
-                let opacity: Double = [0, 0.25, 0.5, 0.75, 1][level]
-                color = agentsAccent.opacity(opacity)
+            // 四档:值/峰值 ×4 向上取整;≤8% 与零值归灰档。
+            let normalized = maxValue > 0 ? value / Double(maxValue) : 0
+            let level = normalized <= 0.08 ? 0 : min(4, Int(ceil(normalized * 4)))
+            let color: Color = level == 0
+                ? Surface.cardHigh
+                : agentsAccent.opacity([0, 0.25, 0.5, 0.75, 1][level])
+            context.fill(
+                Path(roundedRect: rect, cornerRadius: 3),
+                with: .color(color)
+            )
+        }
+
+        // 底部周数刻度:每 8 周一标(51周/43周/…/3周)+ 最右「今」。
+        let axisFont = Font.system(size: 10.5)
+        for column in stride(from: 0, to: Self.weeks, by: 8) {
+            let weeksAgo = Self.weeks - 1 - column
+            let label = weeksAgo == 0 ? "今" : "\(weeksAgo)周"
+            drawAxis(label, at: CGFloat(column) * step + Self.side / 2, in: &context, font: axisFont)
+        }
+        drawAxis(
+            "今",
+            at: CGFloat(Self.weeks - 1) * step + Self.side / 2,
+            in: &context,
+            font: axisFont
+        )
+    }
+
+    private func drawAxis(_ label: String, at x: CGFloat, in context: inout GraphicsContext, font: Font) {
+        let step = Self.side + Self.gap
+        let y = 7 * step - Self.gap + 12
+        context.draw(
+            Text(label)
+                .font(font)
+                .monospacedDigit()
+                .foregroundStyle(.tertiary),
+            at: CGPoint(x: x, y: y),
+            anchor: .center
+        )
+    }
+}
+
+// MARK: - 走势(官方 Swift Charts,agent-tab/05 首次引入)
+
+/// 近 N 天合计折线 + xy 坐标轴:y 三档(0/半值/峰值)网格线、x 每 3/6 天
+/// (「今天」在右);域顶留 15% 头寸、线 2pt 圆头、末点圆点、缺天画 0、图区
+/// 6% accent 底。缺天画 0 = 账本无行即当日无记录,不猜。
+private struct AgentTrendChart: View {
+    let totals: [AgentDayTotal]
+
+    private struct Point: Identifiable {
+        let index: Int
+        let value: Double
+        var id: Int {
+            index
+        }
+    }
+
+    var body: some View {
+        let points = totals.enumerated().map { Point(index: $0.offset, value: Double($0.element.total)) }
+        let rawMax = max(points.map(\.value).max() ?? 0, 1)
+        let domainMax = rawMax * 1.15 // 域顶头寸,峰不顶格(原型 ×1.15 同款)
+        let stepDays = points.count <= 7 ? 3 : 6
+        let xMarks = stride(from: points.count - 1, through: 0, by: -stepDays).map(Double.init)
+
+        Chart {
+            ForEach(points) { point in
+                LineMark(
+                    x: .value("天", Double(point.index)),
+                    y: .value("Token", point.value)
+                )
+                .foregroundStyle(agentsAccent)
+                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
             }
-            context.fill(Path(roundedRect: rect, cornerRadius: corner), with: .color(color))
-        }
-    }
-
-    // MARK: 数据成形
-
-    /// 近 `days` 天(含今天)的逐天合计,旧 → 新;账本无行的天 = 0。
-    private func recentDayTotals(days: Int) -> [DayTotal] {
-        let calendar = Calendar.current
-        var byDay: [String: Double] = [:]
-        for row in rows where row.totalTokens > 0 {
-            byDay[row.day, default: 0] += Double(row.totalTokens)
-        }
-        let today = calendar.startOfDay(for: Date())
-        return (0 ..< days).reversed().map { offset in
-            guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else {
-                return DayTotal(day: "", total: 0)
+            if let last = points.last {
+                PointMark(
+                    x: .value("天", Double(last.index)),
+                    y: .value("Token", last.value)
+                )
+                .foregroundStyle(agentsAccent)
+                .symbolSize(30)
             }
-            let key = Self.dayKey(date, calendar: calendar)
-            return DayTotal(day: key, total: byDay[key] ?? 0)
+        }
+        .chartXScale(domain: -0.5 ... Double(max(points.count - 1, 1)) + 0.5)
+        .chartYScale(domain: 0 ... domainMax)
+        .chartYAxis {
+            // y 三档:0 / 半值 / 峰值(峰值不顶格,域顶有头寸)。
+            AxisMarks(values: [0.0, rawMax / 2, rawMax]) { value in
+                AxisGridLine()
+                    .foregroundStyle(Color.primary.opacity(0.08))
+                AxisValueLabel {
+                    if let amount = value.as(Double.self) {
+                        Text(agentTokenText(Int(amount)))
+                            .font(.system(size: 10.5))
+                            .monospacedDigit()
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+        }
+        .chartXAxis {
+            AxisMarks(values: xMarks) { value in
+                AxisValueLabel {
+                    if let index = value.as(Double.self).map(Int.init) {
+                        let ago = points.count - 1 - index
+                        Text(ago == 0 ? "今天" : "\(ago) 天前")
+                            .font(.system(size: 10.5))
+                            .monospacedDigit()
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+        }
+        .chartPlotStyle { plot in
+            plot.background(agentsAccent.opacity(0.06), in: .rect(cornerRadius: 8))
+        }
+        .frame(height: 96)
+        .accessibilityHidden(true) // 数值由数字卡排承载
+    }
+}
+
+// MARK: - 项目大卡
+
+/// 项目一张大卡(cardHigh 底、圆角 10、内距 12):头(名/占比)→ 主数值 +
+/// 环比 → 模型分段条 + 色点图例 → harness 分段条 + 底行(在跑/静了)→ 活跃行。
+private struct AgentProjectCardView: View {
+    let project: AgentProjectSummary
+    let windowDays: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            header
+            valueRow
+            if !project.models.isEmpty {
+                Divider().padding(.horizontal, -12).padding(.top, 0)
+                modelBlock
+            }
+            Divider().padding(.horizontal, -12).padding(.top, 0)
+            harnessBlock
+            Divider().padding(.horizontal, -12).padding(.top, 0)
+            activityRow
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Surface.cardHigh, in: .rect(cornerRadius: 10))
+        .accessibilityElement(children: .combine)
+    }
+
+    /// 层 1:项目名 + 占窗口份额。
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(project.project)
+                .font(.system(size: 14.5, weight: .semibold))
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 8)
+            Text("占 \(Int((project.share * 100).rounded()))%")
+                .font(.system(size: 10.5))
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
         }
     }
 
-    /// 毫秒免 DateFormatter(线程安全;与账本行同格式)。
-    private static func dayKey(_ date: Date, calendar: Calendar) -> String {
-        let parts = calendar.dateComponents([.year, .month, .day], from: date)
-        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    /// 层 2:主数值(figure-card 24)+ 环比。
+    private var valueRow: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            let figure = agentTokenFigure(project.total)
+            FigureText(value: figure.value, unit: figure.unit, size: FigureSize.card)
+            AgentDeltaText(label: nil, delta: project.delta)
+        }
     }
 
-    private struct DayTotal {
-        var day: String
-        var total: Double
+    /// 层 3:模型分段条(top3 已并「其他」)+ 色点图例。
+    private var modelBlock: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            AgentSegmentedBar(
+                segments: project.models.enumerated().map { index, model in
+                    (fraction: model.share, tint: AgentModelTint.tint(at: index))
+                }
+            )
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 76), spacing: 12, alignment: .leading)],
+                alignment: .leading,
+                spacing: 4
+            ) {
+                ForEach(Array(project.models.enumerated()), id: \.offset) { index, model in
+                    HStack(spacing: 4) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(AgentModelTint.tint(at: index))
+                            .frame(width: 6, height: 6)
+                        Text(
+                            "\(AgentUsageWindow.modelDisplayName(model.name)) \(Int((model.share * 100).rounded()))%"
+                        )
+                        .font(.system(size: 10.5))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    /// 层 4:harness(= source)分段条 + 底行(claude/zcode 占比 · 在跑/静了)。
+    private var harnessBlock: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            AgentSegmentedBar(
+                segments: [
+                    (fraction: project.claudeShare, tint: AgentModelTint.harness(.claude)),
+                    (fraction: 1 - project.claudeShare, tint: AgentModelTint.harness(.zcode)),
+                ]
+            )
+            HStack {
+                Text(
+                    "claude \(Int((project.claudeShare * 100).rounded()))% · zcode \(Int(((1 - project.claudeShare) * 100).rounded()))%"
+                )
+                .font(.system(size: 10.5))
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
+                Spacer(minLength: 8)
+                liveState
+            }
+        }
+    }
+
+    /// 在跑(会话快照实时)> 今天活跃 > 静了 N 天(日粒度,派不出小时)。
+    @ViewBuilder
+    private var liveState: some View {
+        if project.liveSessions > 0 {
+            Text("● 在跑 \(project.liveSessions)")
+                .font(.system(size: 10.5))
+                .monospacedDigit()
+                .foregroundStyle(Surface.positive)
+        } else if project.idleDays == 0 {
+            Text("今天活跃")
+                .font(.system(size: 10.5))
+                .foregroundStyle(.tertiary)
+        } else {
+            Text("静了 \(project.idleDays) 天")
+                .font(.system(size: 10.5))
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    /// 尾行:活跃天数 / 请求数。
+    private var activityRow: some View {
+        HStack {
+            Text("活跃 \(project.activeDays)/\(windowDays) 天")
+                .font(.system(size: 10.5))
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
+            Spacer(minLength: 8)
+            Text("\(agentCountText(project.requests)) 次")
+                .font(.system(size: 10.5))
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
+        }
+    }
+}
+
+// MARK: - 分段条(SwiftUI 原语,agent-tab/05)
+
+/// 占比分段条(高 4 圆角 2,轨道 = 三级墨 14%);段宽按 fraction、>0 才画。
+private struct AgentSegmentedBar: View {
+    let segments: [(fraction: Double, tint: Color)]
+
+    var body: some View {
+        GeometryReader { proxy in
+            HStack(spacing: 0) {
+                ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
+                    if segment.fraction > 0 {
+                        Rectangle()
+                            .fill(segment.tint)
+                            // 微段保底 2pt 可见(与清理构成条 inuse 段同思路)。
+                            .frame(width: max(proxy.size.width * segment.fraction, 2))
+                    }
+                }
+            }
+        }
+        .frame(height: 4)
+        .background(Surface.inkTertiary.opacity(0.14), in: .rect(cornerRadius: 2))
+        .clipShape(RoundedRectangle(cornerRadius: 2))
+        .accessibilityHidden(true)
     }
 }
 
@@ -314,27 +640,72 @@ struct AgentUsageCardView: View {
         AgentDailyUsageRow(day: day, source: source, origin: .jsonl, totalTokens: total)
     }
 
-    let formatter = DateFormatter()
-    formatter.dateFormat = "yyyy-MM-dd"
-    let today = formatter.string(from: Date())
-
+    let calendar = Calendar.current
+    let now = Date()
     func back(_ days: Int) -> String {
-        formatter.string(from: Calendar.current.date(byAdding: .day, value: -days, to: Date())!)
+        let date = calendar.date(byAdding: .day, value: -days, to: now)!
+        return String(
+            format: "%04d-%02d-%02d",
+            calendar.component(.year, from: date),
+            calendar.component(.month, from: date),
+            calendar.component(.day, from: date)
+        )
     }
 
     var rows: [AgentDailyUsageRow] = []
-    for offset in 0 ..< 91 {
-        let base = Double(91 - offset) / 91
+    for offset in 0 ..< 364 {
+        let base = Double(364 - offset) / 364
         let wave = 0.4 + 0.6 * abs(sin(Double(offset) / 5))
         let total = Int(base * wave * 800_000_000)
         rows.append(row(back(offset), source: .claude, total: total))
         rows.append(row(back(offset), source: .zcode, total: total / 3))
     }
-    rows.append(row(today, source: .claude, total: 320_000_000))
-    rows.append(row(today, source: .zcode, total: 64_000_000))
+    rows.append(row(back(0), source: .claude, total: 320_000_000))
+    rows.append(row(back(0), source: .zcode, total: 64_000_000))
+
+    var projectRows: [AgentProjectUsageRow] = []
+    var modelRows: [AgentModelUsageRow] = []
+    let projects: [(String, Int, [String: Int])] = [
+        ("pulse", 600, ["claude-opus-5-5": 6, "GLM-5.3": 3, "claude-sonnet-5": 1]),
+        ("octok-client", 200, ["claude-opus-5-5": 7, "GLM-5.3": 3]),
+        ("NemoNotch", 90, ["claude-sonnet-5": 9]),
+        ("sage", 30, ["GLM-5.3": 10]),
+    ]
+    for (name, weight, models) in projects {
+        for offset in 0 ..< 30 where offset % (name == "sage" ? 4 : 2) == 0 {
+            let total = weight * 1_000_000 * (offset < 7 ? 1 : 2)
+            projectRows.append(
+                AgentProjectUsageRow(
+                    day: back(offset), source: .claude, project: name,
+                    totalTokens: total / 2, requestCount: 40
+                )
+            )
+            projectRows.append(
+                AgentProjectUsageRow(
+                    day: back(offset), source: .zcode, project: name,
+                    totalTokens: total / 2, requestCount: 20
+                )
+            )
+            for (model, share) in models {
+                modelRows.append(
+                    AgentModelUsageRow(
+                        day: back(offset), source: .claude, project: name, model: model,
+                        totalTokens: total / 2 * share / 10
+                    )
+                )
+            }
+        }
+    }
 
     return VStack(spacing: 16) {
-        AgentUsageCardView(rows: rows, isScanning: false, onRescan: {})
+        AgentUsageCardView(
+            rows: rows,
+            projectRows: projectRows,
+            modelRows: modelRows,
+            liveProjectCounts: ["pulse": 2],
+            isScanning: false,
+            onRescan: {}
+        )
         AgentUsageCardView(rows: [], isScanning: true, onRescan: {})
         AgentUsageCardView(rows: [], isScanning: false, onRescan: {})
     }

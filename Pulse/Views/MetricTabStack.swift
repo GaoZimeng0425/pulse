@@ -66,13 +66,19 @@ struct MetricTabStack<Ranking: View>: View {
                 "claude-sessions",
                 ClaudeSessionsCardView(sessions: snapshot.claudeSessions, isCompact: isCompact)
             )
-            // 每日消耗(agent-tab/02):折线 + 热力图;「重新扫描」= 全量档
-            // 手动触发(补漏天——未启动 Pulse 的日子点一下即回填)。
+            // 每日消耗(agent-tab/02;05 定稿原型重排 + 模型 / harness 维度):
+            // 数字卡排 → 热力墙 → Charts 走势 → 项目大卡;「重新扫描」= 全量档
+            // 手动触发(补漏天)。在跑数从会话快照按项目名匹配(组装时传入)。
             builder.card(
                 "agent-usage",
                 AgentUsageCardView(
                     rows: monitor.agentUsage.rows,
                     projectRows: monitor.agentUsage.projectRows,
+                    modelRows: monitor.agentUsage.modelRows,
+                    liveProjectCounts: AgentUsageWindow.liveProjectCounts(
+                        claudeSessions: snapshot.claudeSessions,
+                        zcodeSessions: snapshot.zcodeSessions
+                    ),
                     isCompact: isCompact,
                     isScanning: monitor.agentUsage.isScanning,
                     onRescan: { monitor.agentUsage.requestFullRescan() }
