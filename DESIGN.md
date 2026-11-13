@@ -203,6 +203,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.row-host-icon}` | 14pt | 下钻进程行宿主 App 徽标图标边长(project-visibility/02;徽标文字随行 `{typography.caption}` secondary,图标-文字间距 `{spacing.inline}`) |
 | `{layout.overview-card-min-width}` | 340pt | 总览卡自适应网格的单卡最小宽(主窗口列数 1–3 由它派生:列数 = 内容宽容纳的最多列,340 + 列距 16,上限 3;4 列上限已废,agent-tab/06 用户拍板) |
 | `{layout.module-card-min-width}` | 340pt | 清理总览模块大卡自适应网格的单卡最小宽(p6-cleaner/03):列数 = min(2, 内容宽容纳列数)——720 最小窗 1 列、默认窗 880 起 2 列、**上限 2 列**(品类只有六卡,不随 ultrawide 拉列);列距 `{spacing.group-gap}` 12 |
+| `{layout.agent-project-card-min-width}` | 960pt | 智能体页消耗子页项目卡网格单卡最小宽(agent-tab/06 追补:用户实报两列 ~410 无呼吸感;≥ 常规窗内容宽 → **恒单列满宽**,卡宽随窗口,两列需 1932+ 实质封存);列距 12 |
 | `{layout.ranking-limit}` | 20 行 | 各排行(弹窗与主窗口同规则)只列前 20 名,超出补末行:弹窗「查看全部(另 N 项)」跳主窗口并落地即展开,主窗口「显示全部(另 N 项)」原地展开 / 「收起」(ranking-limit/01,2026-11-02 用户拍板;原 11-01 `popover-ranking-limit` 只截弹窗)。主窗口搜索命中不截 |
 | `{layout.sheet-width}` | 460pt | 确认清单 sheet 定宽(清理页「清理…」,p4-cleaner/04;原型 B 变体同值) |
 | `{layout.sheet-list-max-height}` | 220pt | 确认清单 sheet 内逐行列表的最大高(超出滚动,总量与按钮恒在视口内) |
@@ -609,8 +610,8 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
     5 小时窗% 优先缺失退本周,副行「本周 N% · 重置 X 后」,快照缺失「—」不伪造);
     lift 小卡规格同下;②**日历图 + 走势一排两列**(`ViewThatFits` 媒体查询语义:
     容器不够宽上下排)——「重新扫描」在日历图卡头(与「年」占位药丸并排);
-    ③**项目宽卡**(用户拍板加宽:`AdaptiveCardGrid` 单卡 min 360 / 上限 2 列,
-    主窗默认内容宽两列各 ~410、680 视口一列满宽)。
+    ③**项目大卡单列满宽**(`{layout.agent-project-card-min-width}` 960:用户实报
+    两列 ~410 无呼吸感,2026-11-13 追补;恒一列、卡宽随窗口)。
   - **数字卡排**:等宽 lift 小卡(`{colors.surface-card-high}` 底 +
     `{rounded.card-compact}` 12 + 内距 8×12 + 卡间 `{spacing.gap}` 8):标签
     `{typography.micro}` secondary → 数值 `{typography.figure-stat}` 28(今日消耗
@@ -628,12 +629,13 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
     单图):y 轴三档 0/半值/峰值 + 网格线、域顶留 15% 头寸;x 轴 7 天图每 3 天 /
     30 天图每 6 天(「今天」在右);线 2pt 页 accent、末点圆点、缺天画 0、
     图区 6% accent 底;轴字 `{typography.micro}` tertiary[原型 9.5 收五档]。
-  - **项目大卡**(agent-tab/06 对齐 tokscale 参数):卡 = cardHigh 底 +
-    `{rounded.inner}` 10 + 内距 12。层序:头(项目名 14.5 semibold + 占比 micro
+  - **项目大卡**(agent-tab/06 对齐 tokscale 参数;间距 = 同日追补令牌档):卡 =
+    cardHigh 底 + `{rounded.inner}` 10 + 内距 `{spacing.card-padding}` 16、层间距
+    `{spacing.group-gap}` 12(首版 12/8 是两列窄卡时代收编,单列大卡下过密,作废)。层序:头(项目名 14.5 semibold + 占比 micro
     tertiary)→ 主数值 `{typography.figure-card}` 24 + 环比 micro → **四桶 +
     缓存倍率行**(Input / Output / Cache R / Cache W / Cache× 五格等分,标签
-    micro tertiary + 值 12 semibold 等宽;倍率 = 缓存读 ÷ 净(输入+输出),
-    分母 0 →「—」)→ 模型分段条(高 4 圆角 2,分段色 `{colors.agent-model-*}`
+    micro tertiary + 值 12 semibold 等宽,五格间距 16;倍率 = 缓存读 ÷ 净
+    (输入+输出),分母 0 →「—」)→ 模型分段条(高 4 圆角 2,分段色 `{colors.agent-model-*}`
     按序,占比前二 + 剩余并「其他」;色点图例 6×6 圆角 2 + micro)→ harness
     分段条 + 底行(claude/zcode 占比 micro tertiary;「● 在跑 N」
     `{colors.state-positive}` / 「静了 N 天」)→ 活跃行(活跃 N/窗口 天 ·
