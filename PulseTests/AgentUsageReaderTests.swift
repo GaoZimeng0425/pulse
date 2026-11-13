@@ -137,6 +137,55 @@ final class AgentUsageReaderTests: XCTestCase {
         XCTAssertFalse(result.legacySchema)
     }
 
+    /// 现存会话数(agent-tab/06):Claude = slug 目录下 jsonl 文件数(只列名);
+    /// ZCode = db 按 workspace 数不同 session_id(NULL workspace 不计)。
+    func testAgentSessionCounts() throws {
+        try write("{}", relativePath: ".claude/projects/-Users-x-pulse/s1.jsonl")
+        try write("{}", relativePath: ".claude/projects/-Users-x-pulse/s2.jsonl")
+        // 非 jsonl 伴生文件不计;空目录不产生条目。
+        try write("x", relativePath: ".claude/projects/-Users-x-pulse/s1.key")
+        try FileManager.default.createDirectory(
+            at: home.appendingPathComponent(".claude/projects/-empty"),
+            withIntermediateDirectories: true
+        )
+        try write("{}", relativePath: ".claude/projects/-Users-x-sage/only.jsonl")
+
+        let db = try makeUsageDatabase()
+        try db.write { db in
+            try db.execute(sql: """
+            CREATE TABLE model_usage (
+                id TEXT PRIMARY KEY, session_id TEXT, started_at INTEGER
+            )
+            """)
+            try db.execute(sql: """
+            CREATE TABLE session (id TEXT PRIMARY KEY, directory TEXT, path TEXT)
+            """)
+            try db.execute(sql: """
+            INSERT INTO session VALUES
+              ('a', '/Users/x/pulse/.worktrees/t1', NULL),
+              ('b', '/Users/x/pulse', NULL),
+              ('c', '/Users/x/sage', NULL),
+              ('d', NULL, NULL)
+            """)
+            try db.execute(sql: """
+            INSERT INTO model_usage VALUES
+              ('u1', 'a', 1000), ('u2', 'a', 2000),
+              ('u3', 'b', 3000),
+              ('u4', 'c', 4000),
+              ('u5', 'd', 5000)
+            """)
+        }
+
+        let counts = LiveAgentUsageReader(home: home).agentSessionCounts()
+        XCTAssertEqual(counts.claude["-Users-x-pulse"], 2)
+        XCTAssertEqual(counts.claude["-Users-x-sage"], 1)
+        XCTAssertEqual(counts.claude.count, 2)
+        XCTAssertEqual(counts.zcode["/Users/x/pulse/.worktrees/t1"], 1)
+        XCTAssertEqual(counts.zcode["/Users/x/pulse"], 1)
+        XCTAssertEqual(counts.zcode["/Users/x/sage"], 1)
+        XCTAssertEqual(counts.zcode.count, 3) // NULL workspace 的会话(d)归不了组
+    }
+
     // MARK: Claude jsonl 与 stats-cache
 
     /// 流式逐行 + mtime 过滤:今天档只喂今天有改动的文件。

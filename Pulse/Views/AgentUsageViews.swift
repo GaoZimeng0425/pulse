@@ -2,37 +2,37 @@ import Charts
 import PulseCore
 import SwiftUI
 
-// MARK: - 每日消耗卡(agent-tab/02;05 按定稿原型整体重排)
+// MARK: - 消耗子页(agent-tab/06,定稿骨架 wireframe-agents-page.html)
 
 //
-// 定稿原型 `.scratch/agent-tab/prototype-daily-usage.html`(唯一视觉真相,JS
-// 坐标数学直译):卡头无徽章(用户拍板:只留标题 + 右「重新扫描」)→ 数字卡排
-// (三张同规格 lift 小卡,figure-stat 28)→「Token 消耗」热力墙(52 列一年,
-// 正方格边 14 间距 4,超宽横向滚动)→「走势」(官方 Swift Charts,本 app 首次
-// 引入:单图低频重绘,不是 StripChartView 避开的高频多卡场景)→「项目」大卡
-// (自适应网格 min 240 / max 340,模型 / harness 分段条分区异色)。
-// 数据派生全部走 PulseCore `AgentUsageWindow`(纯值,UI 只描不算);数字 /
-// 环比 / 活跃天数 / 请求数 / 在跑数都由现有账本与会话快照派生,零新增采集。
+// 「每日消耗」外壳拆掉、四块平级成卡(用户拍板):数字卡排(四张一排,含
+// Claude 用量)→ 日历图 + 走势一排两列(容器不够宽上下排)→ 项目宽卡
+// (媒体查询列数)。range(7/30)子页内共享,数字卡排随档位联动;「重新扫描」
+// 在日历图卡头(全量档手动触发,补漏天)。项目卡对齐 tokscale 参数:四桶 +
+// 缓存倍率 + 会话数(Cost / 精确 Last Active 用户点名不做)。数据派生全走
+// PulseCore `AgentUsageWindow`(纯值,UI 只描不算)。
 
-/// 每日消耗卡。
-struct AgentUsageCardView: View {
+/// 消耗子页(智能体页三子 tab 之一)。
+struct AgentUsagePaneView: View {
     /// 账本全表(按天升序);空 = 还没扫过。
     let rows: [AgentDailyUsageRow]
-    /// 项目轨全表(agent-tab/04);窗口内聚合出项目大卡。
     var projectRows: [AgentProjectUsageRow] = []
-    /// 模型轨全表(agent-tab/05);项目大卡模型分段条。
     var modelRows: [AgentModelUsageRow] = []
-    /// 会话快照的项目在跑数(项目名 → N;MetricTabStack 组装时传入)。
+    /// 项目现存会话数(agent-tab/06,扫描现数)。
+    var sessionCounts: [String: Int] = [:]
+    /// Claude 用量快照(数字卡排第 4 张;两窗全缺如实「—」)。
+    var usage: ClaudeUsageSnapshot?
+    /// 会话快照的项目在跑数(组装时传入)。
     var liveProjectCounts: [String: Int] = [:]
     /// 弹窗紧凑档。
     var isCompact = false
     /// 全量扫描进行中(按钮转圈与禁用重入)。
     var isScanning = false
-    /// 「重新扫描」动作(UI 按钮的唯一触发源)。
+    /// 「重新扫描」动作(日历图卡头按钮的唯一触发源)。
     var onRescan: () -> Void
 
-    /// 折线 / 项目的范围切换(数字卡排随档位联动)。
-    private enum Range: Hashable {
+    /// 走势 / 项目的范围切换(数字卡排随档位联动)。
+    enum Range: Hashable {
         case week
         case month
 
@@ -50,25 +50,187 @@ struct AgentUsageCardView: View {
         }
     }
 
-    /// 热力墙「年」占位单选项(时间筛选位置恒定;档位切换是未来功能)。
-    private enum HeatSpan: Hashable {
+    /// 日历图「年」占位单选项(时间筛选位置恒定;档位切换是未来功能)。
+    enum HeatSpan: Hashable {
         case year
     }
 
     @State private var range: Range = .week
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            CardHeader(symbolName: nil, title: "每日消耗", tint: agentsAccent) {
-                rescanButton
+        if rows.isEmpty {
+            emptyState
+        } else {
+            VStack(alignment: .leading, spacing: 16) {
+                numberCard
+                chartRow
+                projectCard
             }
-            if rows.isEmpty {
-                emptyState
+        }
+    }
+
+    @ViewBuilder
+    private var emptyState: some View {
+        if isScanning {
+            CardEmptyState(
+                title: "正在扫描本地记录",
+                detail: "正在从 Claude 与 ZCode 的会话记录回填每日消耗"
+            )
+            .cardShell(compact: isCompact)
+        } else {
+            CardEmptyState(
+                title: "还没有每日数据",
+                detail: "点「重新扫描」,从 Claude 与 ZCode 的本地记录回填历史"
+            )
+            .cardShell(compact: isCompact)
+        }
+    }
+
+    // MARK: 卡 1:数字卡排(四张一排)
+
+    private var numberCard: some View {
+        let figures = AgentUsageWindow.figures(rows: rows, days: range.days)
+        return VStack(alignment: .leading, spacing: 12) {
+            CardHeader(symbolName: nil, title: "消耗总览", tint: agentsAccent) {
+                EmptyView()
+            }
+            HStack(spacing: 8) {
+                numberCell(
+                    label: "今日消耗",
+                    tokens: figures.todayTotal,
+                    valueTint: agentsAccent
+                ) {
+                    AgentDeltaText(label: "较昨日", delta: figures.todayDelta)
+                }
+                numberCell(
+                    label: "\(figures.windowDays) 天合计",
+                    tokens: figures.windowTotal
+                ) {
+                    AgentDeltaText(label: range.previousLabel, delta: figures.windowDelta)
+                }
+                numberCell(
+                    label: "日均(\(figures.windowDays) 天)",
+                    tokens: figures.windowAverage
+                ) {
+                    Text("峰 \(agentTokenText(figures.windowPeak))/天")
+                        .font(.system(size: 10.5))
+                        .monospacedDigit()
+                        .foregroundStyle(.tertiary)
+                }
+                usageCell
+            }
+        }
+        .cardShell(compact: isCompact)
+    }
+
+    /// 一张 lift 数字小卡:标签 → 大数字(figure-stat 28)→ 副行;等宽分布。
+    private func numberCell(
+        label: String,
+        tokens: Int,
+        valueTint: Color? = nil,
+        @ViewBuilder sub: () -> some View
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.system(size: 10.5))
+                .foregroundStyle(.secondary)
+            let figure = agentTokenFigure(tokens)
+            FigureText(value: figure.value, unit: figure.unit, size: FigureSize.stat)
+                .foregroundStyle(valueTint ?? Color.primary)
+                .minimumScaleFactor(0.5) // 弹窗紧凑档四等分,超宽读数兜底
+            sub()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+        .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
+    }
+
+    /// 第 4 张 = Claude 用量(5 小时窗优先,缺失退本周;快照缺失「—」不伪造)。
+    private var usageCell: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Claude 用量")
+                .font(.system(size: 10.5))
+                .foregroundStyle(.secondary)
+            if let window = usage?.fiveHour ?? usage?.sevenDay {
+                FigureText(value: "\(window.usedPercentage)", unit: "%", size: FigureSize.stat)
+                    .foregroundStyle(Color.primary)
+                    .minimumScaleFactor(0.5)
+                Text(usageSubline)
+                    .font(.system(size: 10.5))
+                    .monospacedDigit()
+                    .foregroundStyle(.tertiary)
             } else {
-                numberRow
-                heatSection
-                trendSection
-                projectSection
+                FigureText(value: "—", unit: "", size: FigureSize.stat)
+                    .foregroundStyle(Color.primary)
+                Text("未读到快照")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+        .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
+    }
+
+    /// 用量副行:本周占用 + 窗口重置(读得到的才写)。
+    private var usageSubline: String {
+        var parts: [String] = []
+        if let week = usage?.sevenDay {
+            parts.append("本周 \(week.usedPercentage)%")
+        }
+        if let resetsIn = usage?.fiveHour?.resetsAt.map(\.timeIntervalSinceNow),
+           resetsIn > 0 {
+            parts.append("重置 \(PulseFormat.duration(seconds: resetsIn))后")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    // MARK: 卡 2/3:日历图 + 走势(一排两列,不够宽上下排)
+
+    /// 媒体查询语义:横排放得下(两卡理想宽合计 ≤ 容器)则并排,否则竖排。
+    private var chartRow: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 16) {
+                heatCard
+                trendCard
+            }
+            VStack(alignment: .leading, spacing: 16) {
+                heatCard
+                trendCard
+            }
+        }
+    }
+
+    /// 7/30 时间筛选药丸(走势与项目各一份,同一 state 视觉同步)。
+    private var rangePills: some View {
+        PillTabBar([Range.week, .month], selection: $range) { item in
+            PillTabItem(title: item.title, symbol: nil, tint: agentsAccent)
+        }
+    }
+
+    private var heatCard: some View {
+        let totals = AgentUsageWindow.dayTotals(rows: rows, days: AgentHeatWall.weeks * 7)
+        return VStack(alignment: .leading, spacing: 12) {
+            CardHeader(symbolName: nil, title: "Token 消耗", tint: agentsAccent) {
+                HStack(spacing: 8) {
+                    PillTabBar([HeatSpan.year], selection: .constant(HeatSpan.year)) { span in
+                        PillTabItem(title: span == .year ? "年" : "", symbol: nil, tint: agentsAccent)
+                    }
+                    rescanButton
+                }
+            }
+            AgentHeatWall(totals: totals)
+            HStack {
+                Text("Claude 与 ZCode 合计")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.tertiary)
+                Spacer()
+                Text("最多一天 \(agentTokenText(totals.map(\.total).max() ?? 0))")
+                    .font(.system(size: 10.5))
+                    .monospacedDigit()
+                    .foregroundStyle(.tertiary)
             }
         }
         .cardShell(compact: isCompact)
@@ -94,156 +256,41 @@ struct AgentUsageCardView: View {
         .disabled(isScanning)
     }
 
-    @ViewBuilder
-    private var emptyState: some View {
-        if isScanning {
-            CardEmptyState(
-                title: "正在扫描本地记录",
-                detail: "正在从 Claude 与 ZCode 的会话记录回填每日消耗"
-            )
-        } else {
-            CardEmptyState(
-                title: "还没有每日数据",
-                detail: "点「重新扫描」,从 Claude 与 ZCode 的本地记录回填历史"
-            )
-        }
-    }
-
-    // MARK: 数字卡排(三卡同规格,随档位联动)
-
-    private var numberRow: some View {
-        let figures = AgentUsageWindow.figures(rows: rows, days: range.days)
-        return HStack(spacing: 8) {
-            numberCard(
-                label: "今日消耗",
-                tokens: figures.todayTotal,
-                valueTint: agentsAccent
-            ) {
-                AgentDeltaText(label: "较昨日", delta: figures.todayDelta)
+    private var trendCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            CardHeader(symbolName: nil, title: "走势", tint: agentsAccent) {
+                rangePills
             }
-            numberCard(
-                label: "\(figures.windowDays) 天合计",
-                tokens: figures.windowTotal
-            ) {
-                AgentDeltaText(label: range.previousLabel, delta: figures.windowDelta)
-            }
-            numberCard(
-                label: "日均(\(figures.windowDays) 天)",
-                tokens: figures.windowAverage
-            ) {
-                Text("峰 \(agentTokenText(figures.windowPeak))/天")
-                    .font(.system(size: 10.5))
-                    .monospacedDigit()
-                    .foregroundStyle(.tertiary)
-            }
-        }
-    }
-
-    /// 一张 lift 数字小卡:标签 → 大数字(figure-stat 28)→ 副行;等宽分布。
-    private func numberCard(
-        label: String,
-        tokens: Int,
-        valueTint: Color? = nil,
-        @ViewBuilder sub: () -> some View
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .font(.system(size: 10.5))
-                .foregroundStyle(.secondary)
-            let figure = agentTokenFigure(tokens)
-            FigureText(value: figure.value, unit: figure.unit, size: FigureSize.stat)
-                .foregroundStyle(valueTint ?? Color.primary)
-                .minimumScaleFactor(0.5) // 弹窗 312 档三等分 ≈ 91pt,超宽读数兜底
-            sub()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
-        .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
-    }
-
-    // MARK: 图表区统一外包装(lift + 标题行 + 图表)
-
-    /// 7/30 时间筛选药丸(走势与项目各一份,同一 state 视觉同步)。
-    private var rangePills: some View {
-        PillTabBar([Range.week, .month], selection: $range) { item in
-            PillTabItem(title: item.title, symbol: nil, tint: agentsAccent)
-        }
-    }
-
-    private func chartSection(
-        title: String,
-        @ViewBuilder pills: () -> some View,
-        @ViewBuilder content: () -> some View
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(title)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 8)
-                pills()
-            }
-            content()
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
-    }
-
-    // MARK: Token 消耗(热力墙)
-
-    private var heatSection: some View {
-        chartSection(title: "Token 消耗") {
-            PillTabBar([HeatSpan.year], selection: .constant(HeatSpan.year)) { span in
-                PillTabItem(title: span == .year ? "年" : "", symbol: nil, tint: agentsAccent)
-            }
-        } content: {
-            let totals = AgentUsageWindow.dayTotals(rows: rows, days: AgentHeatWall.weeks * 7)
-            VStack(alignment: .leading, spacing: 8) {
-                AgentHeatWall(totals: totals)
-                HStack {
-                    Text("Claude 与 ZCode 合计")
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.tertiary)
-                    Spacer()
-                    Text("最多一天 \(agentTokenText(totals.map(\.total).max() ?? 0))")
-                        .font(.system(size: 10.5))
-                        .monospacedDigit()
-                        .foregroundStyle(.tertiary)
-                }
-            }
-        }
-    }
-
-    // MARK: 走势(Swift Charts)
-
-    private var trendSection: some View {
-        chartSection(title: "走势", pills: { rangePills }) {
             AgentTrendChart(
                 totals: AgentUsageWindow.dayTotals(rows: rows, days: range.days)
             )
         }
+        .cardShell(compact: isCompact)
     }
 
-    // MARK: 项目(大卡网格)
+    // MARK: 卡 4:项目(宽卡,媒体查询列数)
 
-    /// 窗口内有项目数据才出节(只有 cache 回填日子的窗口整节不画,04 票先例)。
-    @ViewBuilder
-    private var projectSection: some View {
+    private var projectCard: some View {
         let projects = AgentUsageWindow.projects(
             projectRows: projectRows,
             modelRows: modelRows,
             days: range.days,
-            liveCounts: liveProjectCounts
+            liveCounts: liveProjectCounts,
+            sessionCounts: sessionCounts
         )
-        if !projects.isEmpty {
-            chartSection(title: "项目", pills: { rangePills }) {
+        return VStack(alignment: .leading, spacing: 12) {
+            CardHeader(symbolName: nil, title: "项目", tint: agentsAccent) {
+                rangePills
+            }
+            if projects.isEmpty {
+                CardEmptyState(title: "窗口内没有项目数据", detail: "只有粗粒度回填的日子没有项目维度")
+            } else {
+                // 宽卡(用户拍板加宽):min 360——主窗默认内容宽两列各 ~410,
+                // 680 视口一列满宽;上限 2 列。
                 AdaptiveCardGrid(
-                    minimumCardWidth: 240,
+                    minimumCardWidth: 360,
                     spacing: 12,
-                    maximumColumns: 4,
-                    maximumCardWidth: 340
+                    maximumColumns: 2
                 ) {
                     ForEach(projects) { project in
                         AgentProjectCardView(project: project, windowDays: range.days)
@@ -251,13 +298,13 @@ struct AgentUsageCardView: View {
                 }
             }
         }
+        .cardShell(compact: isCompact)
     }
 }
 
 // MARK: - 环比文字(数字卡副行与项目卡共用)
 
 /// ▲ +12% / ▼ -8% / 持平 / —(无基准):▲ 绿 ▼ 红,零与无基准灰。
-/// 颜色是方向语义(DESIGN.md state-positive/negative),箭头已载方向信息。
 private struct AgentDeltaText: View {
     var label: String?
     let delta: Double?
@@ -302,7 +349,7 @@ private struct AgentDeltaText: View {
 /// 一年 52 列贡献图式格子墙(正方格边 14、间距 4、内容宽 932 超宽横向滚动、
 /// 开卡锚到最右「今」)。四档色阶按窗口峰值归一(≤8% 灰档),底部每 8 周刻度
 /// +「今」;坐标数学直译自定稿原型 drawHeat()。
-private struct AgentHeatWall: View {
+struct AgentHeatWall: View {
     static let weeks = 52
     private static let side: CGFloat = 14
     private static let gap: CGFloat = 4
@@ -396,7 +443,7 @@ private struct AgentHeatWall: View {
 /// 近 N 天合计折线 + xy 坐标轴:y 三档(0/半值/峰值)网格线、x 每 3/6 天
 /// (「今天」在右);域顶留 15% 头寸、线 2pt 圆头、末点圆点、缺天画 0、图区
 /// 6% accent 底。缺天画 0 = 账本无行即当日无记录,不猜。
-private struct AgentTrendChart: View {
+struct AgentTrendChart: View {
     let totals: [AgentDayTotal]
 
     private struct Point: Identifiable {
@@ -470,11 +517,12 @@ private struct AgentTrendChart: View {
     }
 }
 
-// MARK: - 项目大卡
+// MARK: - 项目大卡(agent-tab/06 加宽 + tokscale 参数对齐)
 
-/// 项目一张大卡(cardHigh 底、圆角 10、内距 12):头(名/占比)→ 主数值 +
-/// 环比 → 模型分段条 + 色点图例 → harness 分段条 + 底行(在跑/静了)→ 活跃行。
-private struct AgentProjectCardView: View {
+/// 项目一张宽卡(cardHigh 底、圆角 10、内距 12):头(名/占比)→ 主数值 +
+/// 环比 → 四桶 + 缓存倍率行 → 模型分段条 + 色点图例 → harness 分段条 +
+/// 底行(在跑/静了)→ 活跃行(活跃/会话数/请求数)。
+struct AgentProjectCardView: View {
     let project: AgentProjectSummary
     let windowDays: Int
 
@@ -482,13 +530,15 @@ private struct AgentProjectCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             header
             valueRow
+            Divider().padding(.horizontal, -12)
+            bucketsRow
             if !project.models.isEmpty {
-                Divider().padding(.horizontal, -12).padding(.top, 0)
+                Divider().padding(.horizontal, -12)
                 modelBlock
             }
-            Divider().padding(.horizontal, -12).padding(.top, 0)
+            Divider().padding(.horizontal, -12)
             harnessBlock
-            Divider().padding(.horizontal, -12).padding(.top, 0)
+            Divider().padding(.horizontal, -12)
             activityRow
         }
         .padding(12)
@@ -521,7 +571,33 @@ private struct AgentProjectCardView: View {
         }
     }
 
-    /// 层 3:模型分段条(top3 已并「其他」)+ 色点图例。
+    /// 层 3:四桶 + 缓存倍率一行(tokscale 对齐,agent-tab/06;账本五桶现成)。
+    /// 倍率 = 缓存读 ÷ 净(输入+输出),衡量缓存吃掉多少重复读取。
+    private var bucketsRow: some View {
+        HStack(alignment: .top, spacing: 12) {
+            bucket("Input", agentTokenText(project.inputTokens))
+            bucket("Output", agentTokenText(project.outputTokens))
+            bucket("Cache R", agentTokenText(project.cacheReadTokens))
+            bucket("Cache W", agentTokenText(project.cacheWriteTokens))
+            bucket("Cache×", project.cacheMultiplier.map { String(format: "%.1fx", $0) } ?? "—")
+        }
+    }
+
+    private func bucket(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.system(size: 10.5))
+                .foregroundStyle(.tertiary)
+            Text(value)
+                .font(.system(size: 12, weight: .semibold))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 层 4:模型分段条(top3 已并「其他」)+ 色点图例。
     private var modelBlock: some View {
         VStack(alignment: .leading, spacing: 6) {
             AgentSegmentedBar(
@@ -551,7 +627,7 @@ private struct AgentProjectCardView: View {
         }
     }
 
-    /// 层 4:harness(= source)分段条 + 底行(claude/zcode 占比 · 在跑/静了)。
+    /// 层 5:harness(= source)分段条 + 底行(claude/zcode 占比 · 在跑/静了)。
     private var harnessBlock: some View {
         VStack(alignment: .leading, spacing: 6) {
             AgentSegmentedBar(
@@ -593,10 +669,14 @@ private struct AgentProjectCardView: View {
         }
     }
 
-    /// 尾行:活跃天数 / 请求数。
+    /// 尾行:活跃天数 · 现存会话数 / 请求数。
     private var activityRow: some View {
         HStack {
             Text("活跃 \(project.activeDays)/\(windowDays) 天")
+                .font(.system(size: 10.5))
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
+            Text("· 会话 \(project.sessions)")
                 .font(.system(size: 10.5))
                 .monospacedDigit()
                 .foregroundStyle(.tertiary)
@@ -612,7 +692,7 @@ private struct AgentProjectCardView: View {
 // MARK: - 分段条(SwiftUI 原语,agent-tab/05)
 
 /// 占比分段条(高 4 圆角 2,轨道 = 三级墨 14%);段宽按 fraction、>0 才画。
-private struct AgentSegmentedBar: View {
+struct AgentSegmentedBar: View {
     let segments: [(fraction: Double, tint: Color)]
 
     var body: some View {
@@ -635,7 +715,7 @@ private struct AgentSegmentedBar: View {
     }
 }
 
-#Preview("每日消耗") {
+#Preview("消耗子页") {
     func row(_ day: String, source: AgentUsageSource, total: Int) -> AgentDailyUsageRow {
         AgentDailyUsageRow(day: day, source: source, origin: .jsonl, totalTokens: total)
     }
@@ -677,12 +757,15 @@ private struct AgentSegmentedBar: View {
             projectRows.append(
                 AgentProjectUsageRow(
                     day: back(offset), source: .claude, project: name,
+                    inputTokens: total / 5, outputTokens: total / 10,
+                    cacheReadTokens: total / 2, cacheWriteTokens: total / 20,
                     totalTokens: total / 2, requestCount: 40
                 )
             )
             projectRows.append(
                 AgentProjectUsageRow(
                     day: back(offset), source: .zcode, project: name,
+                    inputTokens: total / 10, outputTokens: total / 20,
                     totalTokens: total / 2, requestCount: 20
                 )
             )
@@ -697,18 +780,19 @@ private struct AgentSegmentedBar: View {
         }
     }
 
-    return VStack(spacing: 16) {
-        AgentUsageCardView(
-            rows: rows,
-            projectRows: projectRows,
-            modelRows: modelRows,
-            liveProjectCounts: ["pulse": 2],
-            isScanning: false,
-            onRescan: {}
-        )
-        AgentUsageCardView(rows: [], isScanning: true, onRescan: {})
-        AgentUsageCardView(rows: [], isScanning: false, onRescan: {})
-    }
+    return AgentUsagePaneView(
+        rows: rows,
+        projectRows: projectRows,
+        modelRows: modelRows,
+        sessionCounts: ["pulse": 291, "octok-client": 142],
+        usage: ClaudeUsageSnapshot(
+            fiveHour: .init(usedPercentage: 17, resetsAt: now.addingTimeInterval(3600)),
+            sevenDay: .init(usedPercentage: 42, resetsAt: nil)
+        ),
+        liveProjectCounts: ["pulse": 2],
+        isScanning: false,
+        onRescan: {}
+    )
     .padding(24)
     .frame(width: 680)
     .background(Surface.window)

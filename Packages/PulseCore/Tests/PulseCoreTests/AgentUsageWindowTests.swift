@@ -239,4 +239,75 @@ final class AgentUsageWindowTests: XCTestCase {
         XCTAssertEqual(AgentUsageWindow.modelDisplayName("GLM-5.3"), "GLM-5.3")
         XCTAssertEqual(AgentUsageWindow.modelDisplayName("glm-5.2"), "glm-5.2")
     }
+
+    // MARK: 四桶 + 缓存倍率(agent-tab/06,tokscale 对齐)
+
+    func testProjectsBucketsAndCacheMultiplier() {
+        let now = Date()
+        let projectRows = [
+            AgentProjectUsageRow(
+                day: dayKey(0, from: now), source: .claude, project: "pulse",
+                inputTokens: 30, outputTokens: 70, cacheReadTokens: 900, cacheWriteTokens: 10,
+                totalTokens: 1000, requestCount: 4
+            ),
+            AgentProjectUsageRow(
+                day: dayKey(1, from: now), source: .zcode, project: "pulse",
+                inputTokens: 10, outputTokens: 10, cacheReadTokens: 100, cacheWriteTokens: 0,
+                totalTokens: 120, requestCount: 2
+            ),
+            // 净 IO 全零(cache-only 形状):倍率 nil,不造 ∞。
+            AgentProjectUsageRow(
+                day: dayKey(0, from: now), source: .claude, project: "cacheOnly",
+                inputTokens: 0, outputTokens: 0, cacheReadTokens: 500, cacheWriteTokens: 0,
+                totalTokens: 500
+            ),
+        ]
+        let projects = AgentUsageWindow.projects(
+            projectRows: projectRows,
+            modelRows: [],
+            days: 7,
+            calendar: calendar,
+            now: now
+        )
+        let pulse = projects.first { $0.project == "pulse" }
+        XCTAssertEqual(pulse?.inputTokens, 40)
+        XCTAssertEqual(pulse?.outputTokens, 80)
+        XCTAssertEqual(pulse?.cacheReadTokens, 1000)
+        XCTAssertEqual(pulse?.cacheWriteTokens, 10)
+        // 1000 ÷ (40+80) = 8.33…
+        XCTAssertEqual(pulse?.cacheMultiplier ?? 0, 1000.0 / 120, accuracy: 1e-9)
+        XCTAssertNil(projects.first { $0.project == "cacheOnly" }?.cacheMultiplier)
+    }
+
+    // MARK: 会话数合成(agent-tab/06,现存口径)
+
+    func testSessionCountsFoldSlugAndWorktree() {
+        let counts = AgentUsageWindow.sessionCounts(
+            claude: [
+                "-Users-x-pulse": 5,
+                "-Users-x-pulse-.worktrees-lab": 3, // slug 含 worktree 段 → 折主仓
+            ],
+            zcode: [
+                "/Users/x/pulse/.worktrees/t2": 4, // 真路径折叠
+                "/Users/x/sage": 7,
+            ]
+        )
+        XCTAssertEqual(counts["pulse"], 5 + 3 + 4) // 两家 worktree 都折回主仓名
+        XCTAssertEqual(counts["sage"], 7)
+    }
+
+    /// slug 末词对不上账本项目名时唯一尾段归并(octok-client ← client);
+    /// 不传 knownProjects 则保留原名(如实多一项)。
+    func testSessionCountsMergeSlugTailIntoKnownProject() {
+        let claude = ["-Users-aa-Documents-Antalpha-octok-client": 2]
+        let merged = AgentUsageWindow.sessionCounts(
+            claude: claude,
+            zcode: [:],
+            knownProjects: ["pulse", "octok-client"]
+        )
+        XCTAssertEqual(merged["octok-client"], 2)
+
+        let unmerged = AgentUsageWindow.sessionCounts(claude: claude, zcode: [:])
+        XCTAssertEqual(unmerged["client"], 2)
+    }
 }

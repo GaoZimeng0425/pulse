@@ -58,42 +58,57 @@ struct MetricTabStack<Ranking: View>: View {
             })
             builder.groupRanking()
         case .agents:
-            // 智能体页(agent-tab/01):Claude 用量 / Claude Code 会话 / ZCode 会话
-            // + 从总览迁入的开发服务(迁出后总览回归纯系统指标)。
+            // 智能体页三子 tab(agent-tab/06,用户拍板):消耗(账本)/ 会话
+            // (在跑)/ 开发服务——清理页子药丸同款模式,默认落「消耗」;子页
+            // 切换状态在 DashboardModel(切 tab 不丢)。
             let snapshot = monitor.agentSessions.snapshot
-            builder.card("claude-usage", ClaudeUsageCardView(usage: snapshot.usage, isCompact: isCompact))
             builder.card(
-                "claude-sessions",
-                ClaudeSessionsCardView(sessions: snapshot.claudeSessions, isCompact: isCompact)
+                "agent-subtabs",
+                AgentSubTabBar(selection: Binding(
+                    get: { model.agentSubTab },
+                    set: { model.agentSubTab = $0 }
+                ))
             )
-            // 每日消耗(agent-tab/02;05 定稿原型重排 + 模型 / harness 维度):
-            // 数字卡排 → 热力墙 → Charts 走势 → 项目大卡;「重新扫描」= 全量档
-            // 手动触发(补漏天)。在跑数从会话快照按项目名匹配(组装时传入)。
-            builder.card(
-                "agent-usage",
-                AgentUsageCardView(
-                    rows: monitor.agentUsage.rows,
-                    projectRows: monitor.agentUsage.projectRows,
-                    modelRows: monitor.agentUsage.modelRows,
-                    liveProjectCounts: AgentUsageWindow.liveProjectCounts(
-                        claudeSessions: snapshot.claudeSessions,
-                        zcodeSessions: snapshot.zcodeSessions
-                    ),
-                    isCompact: isCompact,
-                    isScanning: monitor.agentUsage.isScanning,
-                    onRescan: { monitor.agentUsage.requestFullRescan() }
+            switch model.agentSubTab {
+            case .usage:
+                // 消耗子页:拆壳平级四卡(数字卡排含用量 / 日历图+走势双列 /
+                // 项目宽卡);在跑数从会话快照按项目名匹配,组装时传入。
+                builder.card(
+                    "agent-usage-pane",
+                    AgentUsagePaneView(
+                        rows: monitor.agentUsage.rows,
+                        projectRows: monitor.agentUsage.projectRows,
+                        modelRows: monitor.agentUsage.modelRows,
+                        sessionCounts: monitor.agentUsage.sessionCounts,
+                        usage: snapshot.usage,
+                        liveProjectCounts: AgentUsageWindow.liveProjectCounts(
+                            claudeSessions: snapshot.claudeSessions,
+                            zcodeSessions: snapshot.zcodeSessions
+                        ),
+                        isCompact: isCompact,
+                        isScanning: monitor.agentUsage.isScanning,
+                        onRescan: { monitor.agentUsage.requestFullRescan() }
+                    )
                 )
-            )
-            builder.card(
-                "zcode-sessions",
-                ZCodeSessionsCardView(sessions: snapshot.zcodeSessions, isCompact: isCompact)
-            )
-            sectionTitle("开发服务", into: &builder)
-            // dev server 卡(工单 p1-history/08):全部停止只上抛请求,确认对话框
-            // (KillRequestFlow 关口)把关后才发信号。
-            builder.card("dev-servers", DevServerCardView(servers: monitor.devServers.servers, isCompact: isCompact) {
-                model.requestStopAllDevServers(monitor.devServers.servers)
-            })
+            case .sessions:
+                builder.card(
+                    "claude-sessions",
+                    ClaudeSessionsCardView(sessions: snapshot.claudeSessions, isCompact: isCompact)
+                )
+                builder.card(
+                    "zcode-sessions",
+                    ZCodeSessionsCardView(sessions: snapshot.zcodeSessions, isCompact: isCompact)
+                )
+            case .servers:
+                // dev server 卡(工单 p1-history/08):全部停止只上抛请求,确认对话框
+                // (KillRequestFlow 关口)把关后才发信号。节标题撤——子药丸已是身份。
+                builder.card(
+                    "dev-servers",
+                    DevServerCardView(servers: monitor.devServers.servers, isCompact: isCompact) {
+                        model.requestStopAllDevServers(monitor.devServers.servers)
+                    }
+                )
+            }
         case .cpu:
             builder.card("main", MetricMainCardView(model: model.cpuModel, isCompact: isCompact))
             builder.groupRanking()
@@ -313,5 +328,6 @@ private enum AdaptiveCardGridMetrics {
     /// 单卡最小宽(DESIGN.md `layout.overview-card-min-width`)。
     static let minimumCardWidth: CGFloat = 340
     static let spacing: CGFloat = 16
-    static let maximumColumns = 4
+    /// 列数上限(agent-tab/06 用户拍板:最多 3 列,不再出 4 列)。
+    static let maximumColumns = 3
 }

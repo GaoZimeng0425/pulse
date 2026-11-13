@@ -140,6 +140,58 @@ struct LiveAgentUsageReader: AgentUsageReading {
         try? Data(contentsOf: home.appendingPathComponent(".claude/stats-cache.json"))
     }
 
+    /// 现存会话数(agent-tab/06):Claude = projects/<slug>/ 下 jsonl 文件数
+    /// (只列文件名零读内容;30 天滚动删,口径 = 现存);ZCode = db 按 workspace
+    /// 数不同 session_id(有账全史)。归组键合成项目计数在 AgentUsageWindow。
+    func agentSessionCounts() -> (claude: [String: Int], zcode: [String: Int]) {
+        var claude: [String: Int] = [:]
+        let projectsRoot = home.appendingPathComponent(".claude/projects")
+        if let slugs = try? FileManager.default.contentsOfDirectory(
+            at: projectsRoot,
+            includingPropertiesForKeys: [.isDirectoryKey]
+        ) {
+            for slug in slugs where (try? slug.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
+                let sessions = (try? FileManager.default.contentsOfDirectory(
+                    at: slug,
+                    includingPropertiesForKeys: nil
+                )) ?? []
+                let count = sessions.filter { $0.pathExtension == "jsonl" }.count
+                if count > 0 {
+                    claude[slug.lastPathComponent] = count
+                }
+            }
+        }
+
+        var zcode: [String: Int] = [:]
+        let dbURL = home.appendingPathComponent(".zcode/cli/db/db.sqlite")
+        if FileManager.default.fileExists(atPath: dbURL.path) {
+            var configuration = Configuration()
+            configuration.prepareDatabase { db in
+                try db.execute(sql: "PRAGMA query_only = 1")
+            }
+            configuration.busyMode = .timeout(3)
+            if let database = try? DatabaseQueue(path: dbURL.path, configuration: configuration),
+               (try? database.read { db in try db.tableExists("model_usage") }) == true {
+                // workspace 取 session 表 directory/path(与用量查询同源);NULL
+                // workspace 的会话归不了组,如实不计。
+                _ = try? database.read { db in
+                    for row in try Row.fetchAll(db, sql: """
+                    SELECT COALESCE(NULLIF(s.directory, ''), NULLIF(s.path, '')) AS workspace,
+                           COUNT(DISTINCT model_usage.session_id) AS sessions
+                    FROM model_usage LEFT JOIN session s ON s.id = model_usage.session_id
+                    GROUP BY workspace
+                    """) {
+                        if let workspace = row["workspace"] as String?, !workspace.isEmpty,
+                           let sessions: Int = row["sessions"], sessions > 0 {
+                            zcode[workspace] = sessions
+                        }
+                    }
+                }
+            }
+        }
+        return (claude, zcode)
+    }
+
     /// 64KB 分块流式逐行(大 jsonl 不整文件进内存;半行留在缓冲跨块拼接,
     /// 尾行无换行也喂)。
     private func readFileLines(_ url: URL, consume: (String) -> Void) {

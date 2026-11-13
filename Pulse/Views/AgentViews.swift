@@ -45,55 +45,34 @@ func agentCountText(_ count: Int) -> String {
     return "\(count)"
 }
 
-/// Claude 用量限额卡:5 小时窗 / 本周两条读数行(meter + 百分比)+ 窗口重置注记。
-/// 快照是账户级(全部实例共享),单窗缺失如实少一行。
-struct ClaudeUsageCardView: View {
-    let usage: ClaudeUsageSnapshot?
-    /// 弹窗紧凑档。
-    var isCompact = false
+/// 智能体页子 tab(agent-tab/06,用户拍板三页;状态在 DashboardModel)。
+enum AgentSubTab: Hashable {
+    /// 消耗(token 账:数字卡排 / 日历图+走势 / 项目宽卡)。
+    case usage
+    /// 会话(现在在跑什么:两家会话卡)。
+    case sessions
+    /// 开发服务(dev server)。
+    case servers
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            CardHeader(symbolName: "speedometer", title: "Claude 用量", tint: agentsAccent)
-            if let usage {
-                VStack(alignment: .leading, spacing: RowMetrics.cardRowSpacing(compact: isCompact)) {
-                    if let fiveHour = usage.fiveHour {
-                        windowRow("5 小时窗口", window: fiveHour)
-                    }
-                    if let sevenDay = usage.sevenDay {
-                        windowRow("本周", window: sevenDay)
-                    }
-                    if let resetsIn = usage.fiveHour?.resetsAt.map(\.timeIntervalSinceNow),
-                       resetsIn > 0 {
-                        CardReadingRow(
-                            label: "窗口重置",
-                            meter: nil,
-                            value: "\(PulseFormat.duration(seconds: resetsIn))后",
-                            valueMinWidth: CardRowWidth.quantityValue,
-                            valueStyle: .secondary,
-                            compact: isCompact
-                        )
-                    }
-                }
-            } else {
-                CardEmptyState(
-                    title: "未读到用量快照",
-                    detail: "Claude Code 写入用量快照后,这里显示 5 小时窗与本周的限额占用"
-                )
-            }
+    var title: String {
+        switch self {
+        case .usage: "消耗"
+        case .sessions: "会话"
+        case .servers: "开发服务"
         }
-        .cardShell(compact: isCompact)
     }
 
-    private func windowRow(_ label: String, window: ClaudeUsageSnapshot.Window) -> some View {
-        CardReadingRow(
-            label: label,
-            meter: (fraction: min(max(Double(window.usedPercentage) / 100, 0), 1), tint: agentsAccent),
-            value: "\(window.usedPercentage)%",
-            valueMinWidth: CardRowWidth.percentValue,
-            valueStyle: .primary,
-            compact: isCompact
-        )
+    static let all: [AgentSubTab] = [.usage, .sessions, .servers]
+}
+
+/// 智能体页子药丸条(清理页子页条同款 `PillTabBar` comfortable 档 + 页指标色)。
+struct AgentSubTabBar: View {
+    @Binding var selection: AgentSubTab
+
+    var body: some View {
+        PillTabBar(AgentSubTab.all, selection: $selection, size: .comfortable) { tab in
+            PillTabItem(title: tab.title, symbol: nil, tint: agentsAccent)
+        }
     }
 }
 
@@ -232,11 +211,7 @@ struct ZCodeSessionsCardView: View {
     }
 }
 
-#Preview("智能体三卡") {
-    let usage = ClaudeUsageSnapshot(
-        fiveHour: .init(usedPercentage: 17, resetsAt: Date().addingTimeInterval(9780)),
-        sevenDay: .init(usedPercentage: 54, resetsAt: nil)
-    )
+#Preview("会话子页") {
     let claudeSessions = [
         ClaudeAgentSessionStatus(
             pid: 65825, sessionId: "b175530f", projectName: "octok-client",
@@ -261,8 +236,6 @@ struct ZCodeSessionsCardView: View {
         ),
     ]
     return VStack(spacing: 16) {
-        ClaudeUsageCardView(usage: usage)
-        ClaudeUsageCardView(usage: nil)
         ClaudeSessionsCardView(sessions: claudeSessions)
         ZCodeSessionsCardView(sessions: zcodeSessions)
         ZCodeSessionsCardView(sessions: [])

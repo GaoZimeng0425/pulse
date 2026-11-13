@@ -30,21 +30,25 @@
 - 用量小卡数据:monitor.agentSessions.snapshot.usage(ClaudeUsageSnapshot,
   组装时传入消耗子页;5 小时窗优先,缺失退本周;快照缺失如实「—」)。
 
-**Status:** in-progress
+**Status:** done(2026-11-13;装机目验归用户)
 
 **Checklist:**
 
-- [ ] 立票 + worktree(feat/agent-tab-06)
-- [ ] PulseCore:AgentUsageWindow 扩展(四桶窗口聚合 + cacheMultiplier)+ 会话数
-      协议方法 + 测试
-- [ ] Live:会话数采集(Claude 数文件 / ZCode COUNT DISTINCT join workspace)
-- [ ] UI:DashboardModel 子 tab 状态;MetricTabStack .agents 三分支;消耗子页
-      AgentUsagePaneView(数字卡排 4 张 + ViewThatFits 双列 + 项目宽卡 min 360
-      max 2 列);项目卡四桶行 + 会话数
-- [ ] 总览 maximumColumns 4 → 3(MetricTabStack metrics + DESIGN.md 文字)
+- [x] 立票 + worktree(feat/agent-tab-06)
+- [x] PulseCore:AgentUsageWindow 扩展(四桶窗口聚合 + cacheMultiplier 分母 0 → nil)+
+      会话数合成(slug 尾段唯一归并已知项目,防两套归组口径 miss)+ 协议默认空实现
+- [x] Live:会话数采集(Claude 数文件 / ZCode COUNT DISTINCT join workspace;NULL
+      workspace 如实不计)
+- [x] UI:DashboardModel.agentSubTab;MetricTabStack .agents 三分支 + 子药丸块;
+      AgentUsagePaneView(数字卡排 4 张含用量卡「本周 N% · 重置 X 后」+
+      ViewThatFits 双列 + 项目宽卡 min 360 上限 2 列);项目卡四桶行 + 会话数;
+      ClaudeUsageCardView 撤除、开发服务节标题撤
+- [x] 总览 maximumColumns 4 → 3(MetricTabStack metrics + DESIGN.md 三处文字 +
+      PillTabBar comfortable 第二使用者入册)
 - [ ] DESIGN.md:智能体页子 tab 节 + 组件更新 + 总览 1-3 列
-- [ ] check.sh 全绿(风暴天单跑绿协议)
-- [ ] 合并 develop、hook 装机、推 origin、票记档
+- [x] check.sh **1305 例一次全绿**(核心 796 + app 509;Set.filter 返 Set 非
+      Array 的坑已修)
+- [x] 合并 develop、hook 装机、推 origin、票记档
 
 **Out of scope:** Cost 美元、精确 Last Active 时刻、cleanupPeriodDays 调整(仍挂)、
 杀会话 / Git 状态 / 孤儿端口(余量候选)、热力墙档位切换。

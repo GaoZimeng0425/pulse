@@ -54,6 +54,17 @@ public struct AgentProjectSummary: Equatable, Sendable, Identifiable {
     public let liveSessions: Int
     /// 距最后活跃日的天数(0 = 今天;日粒度账本派不出小时)。
     public let idleDays: Int
+    /// 窗口四桶合计(tokscale 对齐行,agent-tab/06;账本五桶现成)。
+    public let inputTokens: Int
+    public let outputTokens: Int
+    public let cacheReadTokens: Int
+    public let cacheWriteTokens: Int
+    /// 缓存倍率 = 缓存读 ÷ 净(输入+输出);分母 0 → nil(tokscale「Cache×」,
+    /// 衡量缓存吃掉多少重复读取)。
+    public let cacheMultiplier: Double?
+    /// 现存会话数(Claude≈近 30 天未删的会话文件 + ZCode 有账以来;扫描现数
+    /// 传入,不落库)。
+    public let sessions: Int
 
     public var id: String {
         project
@@ -156,7 +167,8 @@ public enum AgentUsageWindow {
         days: Int,
         calendar: Calendar = .current,
         now: Date = Date(),
-        liveCounts: [String: Int] = [:]
+        liveCounts: [String: Int] = [:],
+        sessionCounts: [String: Int] = [:]
     ) -> [AgentProjectSummary] {
         let today = calendar.startOfDay(for: now)
         func keys(firstDaysAgo: Int) -> Set<String> {
@@ -177,6 +189,11 @@ public enum AgentUsageWindow {
             var zcodeTotal = 0
             var activeDays: Set<String> = []
             var lastActiveDaysAgo = Int.max
+            // 四桶窗口合计(agent-tab/06,tokscale 对齐行)。
+            var input = 0
+            var output = 0
+            var cacheRead = 0
+            var cacheWrite = 0
         }
         var byProject: [String: ProjectAggregate] = [:]
         for row in projectRows
@@ -184,6 +201,10 @@ public enum AgentUsageWindow {
             var aggregate = byProject[row.project] ?? ProjectAggregate()
             aggregate.total += row.totalTokens
             aggregate.requests += row.requestCount
+            aggregate.input += row.inputTokens
+            aggregate.output += row.outputTokens
+            aggregate.cacheRead += row.cacheReadTokens
+            aggregate.cacheWrite += row.cacheWriteTokens
             switch row.source {
             case .claude: aggregate.claudeTotal += row.totalTokens
             case .zcode: aggregate.zcodeTotal += row.totalTokens
@@ -213,6 +234,11 @@ public enum AgentUsageWindow {
             .map { project, aggregate -> AgentProjectSummary in
                 let shares = (modelTotals[project] ?? [:])
                     .map { (name: $0.key, total: $0.value) }
+                // 缓存倍率:缓存读 ÷ 净(输入+输出);净读写为零 → nil(不造 ∞)。
+                let netIO = aggregate.input + aggregate.output
+                let cacheMultiplier = netIO > 0
+                    ? Double(aggregate.cacheRead) / Double(netIO)
+                    : nil
                 return AgentProjectSummary(
                     project: project,
                     total: aggregate.total,
@@ -230,10 +256,50 @@ public enum AgentUsageWindow {
                     liveSessions: liveCounts[project] ?? 0,
                     idleDays: aggregate.lastActiveDaysAgo == .max
                         ? days
-                        : aggregate.lastActiveDaysAgo
+                        : aggregate.lastActiveDaysAgo,
+                    inputTokens: aggregate.input,
+                    outputTokens: aggregate.output,
+                    cacheReadTokens: aggregate.cacheRead,
+                    cacheWriteTokens: aggregate.cacheWrite,
+                    cacheMultiplier: cacheMultiplier,
+                    sessions: sessionCounts[project] ?? 0
                 )
             }
             .sorted { $0.total > $1.total }
+    }
+
+    // MARK: 会话数(现存,不落库)
+
+    /// 归组键计数 → 项目会话数合计:Claude 键 = projects 子目录 slug(slug 反解,
+    /// 含 - 项目名取末词的限制依旧);ZCode 键 = workspace 真路径(worktree 折叠)。
+    /// 口径 = 现存(Claude 30 天滚动删 / ZCode 被 purge 的数不到),如实不追历史。
+    /// `knownProjects` = 账本项目名集合(cwd 归组保真):slug 末词对不上但唯一
+    /// 尾段命中已知项目时归并(octok-client ← client),防会话数因两套归组口径
+    /// miss;零/多命中保留原名(如实多一项,不虚并)。
+    public static func sessionCounts(
+        claude: [String: Int],
+        zcode: [String: Int],
+        knownProjects: Set<String> = []
+    ) -> [String: Int] {
+        func resolve(_ name: String) -> String {
+            if knownProjects.contains(name) {
+                return name
+            }
+            let suffixMatches = knownProjects.filter { $0.hasSuffix("-\(name)") }
+            return suffixMatches.count == 1 ? suffixMatches.first! : name
+        }
+        var counts: [String: Int] = [:]
+        for (slug, count) in claude {
+            if let project = AgentWorkspaceResolution.projectName(fromSlug: slug) {
+                counts[resolve(project), default: 0] += count
+            }
+        }
+        for (workspace, count) in zcode {
+            if let project = AgentWorkspaceResolution.projectName(fromPath: workspace) {
+                counts[resolve(project), default: 0] += count
+            }
+        }
+        return counts
     }
 
     /// 模型 top3:按量降序,≤3 项原样;>3 项取前二 + 剩余并「其他」
