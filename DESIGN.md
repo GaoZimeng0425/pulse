@@ -610,8 +610,10 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
     5 小时窗% 优先缺失退本周,副行「本周 N% · 重置 X 后」,快照缺失「—」不伪造);
     lift 小卡规格同下;②**日历图 + 走势一排两列**(`ViewThatFits` 媒体查询语义:
     容器不够宽上下排)——「重新扫描」在日历图卡头(与「年」占位药丸并排);
-    ③**项目大卡恒单列满宽**(VStack:用户实报两列 ~410 无呼吸感 + 窄窗 min 960
-    溢出裁剪两度实报后终态;卡宽恒 = 容器宽,窄窗/弹窗不裁)。
+    ③**项目大卡响应式网格**(三度修正终态,`AgentProjectCardGrid`):单卡保底
+    520、上限 3 列,列数按容器实宽算;**行内 HStack 等高**、末行不满自动满宽;
+    不用 GridItem minimum(flexible 硬下限窄容器溢出,前案)——容器多窄单列
+    都 100% 宽。同规则适用日历图+走势双列与数字卡排:同行卡片一律等高。
   - **数字卡排**:等宽 lift 小卡(`{colors.surface-card-high}` 底 +
     `{rounded.card-compact}` 12 + 内距 8×12 + 卡间 `{spacing.gap}` 8):标签
     `{typography.micro}` secondary → 数值 `{typography.figure-stat}` 28(今日消耗
