@@ -31,6 +31,9 @@ struct AgentUsagePaneView: View {
     /// 「重新扫描」动作(日历图卡头按钮的唯一触发源)。
     var onRescan: () -> Void
 
+    /// 项目默认展示上限(超出走展开/收起;用户拍板 2026-11-14)。
+    private static let projectLimit = 10
+
     /// 走势 / 项目的范围切换(数字卡排随档位联动)。
     enum Range: Hashable {
         case week
@@ -56,6 +59,8 @@ struct AgentUsagePaneView: View {
     }
 
     @State private var range: Range = .week
+    /// 项目超过上限时的展开态(切 7/30 保持;重进子页回默认收起)。
+    @State private var projectsExpanded = false
 
     var body: some View {
         if rows.isEmpty {
@@ -295,7 +300,20 @@ struct AgentUsagePaneView: View {
                 // 排布——行内卡 .frame(maxHeight:.infinity) 等高、末行不满自动满宽;
                 // 不用 LazyVGrid(行内不拉齐高度)也不用 GridItem minimum(硬下限,
                 // 窄容器溢出裁剪,前案实锤),容器多窄单列都 100% 宽。
-                AgentProjectCardGrid(projects: projects, windowDays: range.days)
+                // 默认前 10 张 + 末行展开/收起(用户拍板 2026-11-14,排行截断同款
+                // 交互;上限 = {layout.agent-project-limit})。
+                AgentProjectCardGrid(
+                    projects: projectsExpanded ? projects : Array(projects.prefix(Self.projectLimit)),
+                    windowDays: range.days
+                )
+                if projects.count > Self.projectLimit {
+                    AgentProjectOverflowRow(
+                        isExpanded: projectsExpanded,
+                        hiddenCount: projects.count - Self.projectLimit
+                    ) {
+                        projectsExpanded.toggle()
+                    }
+                }
             }
         }
         .cardShell(compact: isCompact)
@@ -514,6 +532,40 @@ struct AgentTrendChart: View {
         }
         .frame(minHeight: 96, maxHeight: .infinity) // 双列等高时吃满行内剩余
         .accessibilityHidden(true) // 数值由数字卡排承载
+    }
+}
+
+/// 项目展开/收起末行:排行截断末行(`RankingOverflowRow`)同款视觉配方
+/// (11 medium secondary + chevron + 悬停 primary 5% 圆角 8),文案按项目口径
+/// (「另 N 个项目」/「只看前 10 个」)。
+private struct AgentProjectOverflowRow: View {
+    let isExpanded: Bool
+    let hiddenCount: Int
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Text(label)
+                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+            }
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 9)
+            .background(isHovering ? Color.primary.opacity(0.05) : Color.clear, in: .rect(cornerRadius: 8))
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .help(isExpanded ? "收起,只看前 10 个项目" : "展开全部项目")
+    }
+
+    private var label: String {
+        isExpanded ? "收起,只看前 10 个" : "显示全部(另 \(hiddenCount) 个项目)"
     }
 }
 
