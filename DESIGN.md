@@ -201,7 +201,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.row-meter-compact}` | 44pt | ~~行内电量条宽(紧凑档,蓝牙设备行)~~ **superseded**(ui-unify 追改 2026-11-09)→ `RowMetrics.meterWidth` 52 |
 | `{layout.row-meter}` | 64pt | ~~行内电量条宽(全尺寸档,蓝牙设备行)~~ **superseded**(ui-unify 追改 2026-11-09)→ `RowMetrics.meterWidth` 120 |
 | `{layout.row-host-icon}` | 14pt | 下钻进程行宿主 App 徽标图标边长(project-visibility/02;徽标文字随行 `{typography.caption}` secondary,图标-文字间距 `{spacing.inline}`) |
-| `{layout.overview-card-min-width}` | 340pt | 总览卡自适应网格的单卡最小宽(主窗口列数 1–4 由它派生:列数 = 内容宽容纳的最多列,340 + 列距 16,上限 4) |
+| `{layout.overview-card-min-width}` | 340pt | 总览卡自适应网格的单卡最小宽(主窗口列数 1–3 由它派生:列数 = 内容宽容纳的最多列,340 + 列距 16,上限 3;4 列上限已废,agent-tab/06 用户拍板) |
 | `{layout.module-card-min-width}` | 340pt | 清理总览模块大卡自适应网格的单卡最小宽(p6-cleaner/03):列数 = min(2, 内容宽容纳列数)——720 最小窗 1 列、默认窗 880 起 2 列、**上限 2 列**(品类只有六卡,不随 ultrawide 拉列);列距 `{spacing.group-gap}` 12 |
 | `{layout.ranking-limit}` | 20 行 | 各排行(弹窗与主窗口同规则)只列前 20 名,超出补末行:弹窗「查看全部(另 N 项)」跳主窗口并落地即展开,主窗口「显示全部(另 N 项)」原地展开 / 「收起」(ranking-limit/01,2026-11-02 用户拍板;原 11-01 `popover-ranking-limit` 只截弹窗)。主窗口搜索命中不截 |
 | `{layout.sheet-width}` | 460pt | 确认清单 sheet 定宽(清理页「清理…」,p4-cleaner/04;原型 B 变体同值) |
@@ -215,8 +215,9 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 
 窗口:主窗口最小 **720×560**(spec 钉死),默认 880×620;弹窗面板 **360×648 定尺寸**
 (`{layout.popover-size}`,内容撑满、不随内容伸缩)。工具栏内容必须按 720 最小窗宽预算(见 §Do's and Don'ts)。
-主窗口总览网格是**响应式**的(用户拍板 2026-10-24):列数随窗宽自适应 1–4
-(720 最小宽下 1 列、744 起两列、约 1104 三列、约 1456 四列;`AdaptiveCardGrid`)。
+主窗口总览网格是**响应式**的(用户拍板 2026-10-24;上限 1–3 为 agent-tab/06
+用户拍板,不再出 4 列):列数随窗宽自适应 1–3
+(720 最小宽下 1 列、744 起两列、约 1104 三列;`AdaptiveCardGrid`)。
 
 ## Elevation & Depth
 
@@ -290,7 +291,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   面积线特例,不再特殊化)。
 - **总览模块卡网格**(用户拍板 2026-10-17;列数 2026-10-24 改自适应):CPU/内存/
   GPU/磁盘/网络/电池六卡(电池卡随有无内建电池),点卡跳对应 tab;主窗口列数
-  **自适应 1–4**(单卡最小宽 `{layout.overview-card-min-width}` 340,卡间距 16),
+  **自适应 1–3**(单卡最小宽 `{layout.overview-card-min-width}` 340,卡间距 16;上限 4 → 3 = agent-tab/06 用户拍板),
   弹窗 compact 定宽 360 固定 2 列、间距 8。
 - **MetricMainCardView**:左列 200pt(标签 / 44pt 数字 / chip / 2×2 统计)+
   右列 56 点面积图,卡高 176pt。compact(弹窗)竖排:数字行 / 64pt 面积图 / 四列统计;
@@ -539,9 +540,9 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   切换动画 0.2s snappy(选中文字自图标侧展开、胶囊生长、其余药丸滑移让位)。
   两档尺寸:`.regular`(默认 = 现状:callout 12 medium + 内距 9×5,高≈24,
   工具栏/历史页用)与 `.comfortable`(13.5→**14.5 medium** + 内距 14×8,高≈34;
-  2026-11-05 用户拍板清理页整体升「舒适密度」,唯清理页子页条用此档)。
+  2026-11-05 用户拍板清理页整体升「舒适密度」;清理页子页条与智能体页子页条(agent-tab/06)用此档)。
   两种文字形态:`.selectedOnly`(未选中纯图标 / 选中图标+文字;图标-only 必带
-  a11y label + help)与 `.always`(文字恒显)。五处用法同一组件:主窗口工具栏
+  a11y label + help)与 `.always`(文字恒显)。六处用法同一组件:主窗口工具栏
   tab(`MetricPillTabBar` 薄封装 = `.selectedOnly` + ←/→ 键盘 + 首尾再留 4pt
   与系统玻璃底的间距;选中才展开文字是用户拍板 2026-10-16 的宽度根治法)、
   历史页指标条(同工具栏形态:五项各指标色 + 与主窗口 tab 同符号,系统负载取
@@ -549,7 +550,8 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   只在有分项的指标——温度、功率——出现,挂在指标条正下方,`.always` 无图标,一次
   看一条线不叠加;各项取分项色——功率单域取五路功率卡域配色 `PowerDomain.tint`,
   一个出处;间距沿用页面竖排间距 8 / 12,不另立数值)、历史页范围条(`.always` 无
-  图标,色调随所选指标 / 分项)、空间地图形态切换(space-map-forms/02:
+  图标,色调随所选指标 / 分项)、智能体页子页条(agent-tab/06:「消耗|会话|开发服务」,页指标色)、
+  空间地图形态切换(space-map-forms/02:
   `.selectedOnly` 双项图标「方块 square.grid.3x3 / 旭日 chart.pie」,卡头内,
   原 segmented 非标准件已废)。
   玻璃外裹(用户拍板 2026-10-22:历史页要同款包裹):工具栏胶囊是 macOS 26
@@ -594,21 +596,27 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   同色文字),两态语言(✓正常 / 高负载),阈值在 `StatusBadgeRules`(组 >100%、
   系统 <30% / >70%)。现役用法 = 指标卡大数字旁(系统负载);排行行不挂"高负载"
   文字 chip,组高负载 = 数值红字 + 最忙进程名 chip(见排行列表条,2026-10-30 用户拍板)。
-- **每日消耗卡 v2**(agent-tab/05,定稿原型 `.scratch/agent-tab/prototype-daily-usage.html`
-  是唯一视觉真相,JS 坐标数学直译;原型非 4pt 网格值按下表收编):卡头**无徽章**
-  (用户拍板:只留标题文字 + 右「重新扫描」,CardHeader 徽章可选化),四段
-  **顺序** = 数字卡排 →「Token 消耗」热力墙 →「走势」→「项目」。
-  - **数字卡排**:三张等宽 lift 小卡(`{colors.surface-card-high}` 底 +
-    `{rounded.card-compact}` 12 + 内距 8×12[原型 10×14×9 收网格] + 卡间
-    `{spacing.gap}` 8):标签 `{typography.micro}` secondary → 数值
-    `{typography.figure-stat}` 28(今日消耗取页 accent 色;弹窗超宽读数
-    `minimumScaleFactor` 兜底)→ 副行 micro(环比 ▲=`{colors.state-positive}` /
-    ▼=`{colors.state-negative}` / 无基准 tertiary;日均副行是峰值不是环比)。
-    三卡随 7/30 档位联动(N 天合计 / 日均(N 天))。
-  - **图表区统一外包装**:lift 卡(cardHigh + 12 圆角 + 内距 12[原型 12×14×13 收编]
-    + 区间 `{spacing.group-gap}` 12)× 标题行 = 左标题 `{typography.card-title}`
-    secondary + 右时间筛选药丸(`PillTabBar` 7/30;热力墙右侧恒放单选项「年」
-    占位——时间筛选位置恒定)+ 头-图距 `{spacing.gap}` 8[原型 10 收编]。
+- **智能体页三子 tab**(agent-tab/06,用户拍板「token/会话/dev server 分页」;
+  定稿骨架 `.scratch/agent-tab/wireframe-agents-page.html` 是唯一视觉真相,纯线稿
+  约定见票):子药丸条 = `PillTabBar` comfortable 档 + 页指标色(`AgentSubTabBar`,
+  清理页子页条之后第二个使用者),状态在 `DashboardModel.agentSubTab`(切 tab
+  不丢),默认落「消耗」。**「每日消耗」外壳拆掉,四块平级成卡**(用户拍板);
+  Claude 用量卡撤(用量并入数字卡排第 4 张)。三子页 = **消耗**(下条)/ **会话**
+  (Claude Code 会话卡 + ZCode 会话卡)/ **开发服务**(dev server 卡,原节标题撤
+  ——子药丸已是身份)。
+  - **消耗子页**(agent-tab/05 视觉细节全保留,agent-tab/06 只改结构与归属):
+    ①数字卡排 = **四张一排**(今日消耗 / N 天合计 / 日均 / **Claude 用量**——
+    5 小时窗% 优先缺失退本周,副行「本周 N% · 重置 X 后」,快照缺失「—」不伪造);
+    lift 小卡规格同下;②**日历图 + 走势一排两列**(`ViewThatFits` 媒体查询语义:
+    容器不够宽上下排)——「重新扫描」在日历图卡头(与「年」占位药丸并排);
+    ③**项目宽卡**(用户拍板加宽:`AdaptiveCardGrid` 单卡 min 360 / 上限 2 列,
+    主窗默认内容宽两列各 ~410、680 视口一列满宽)。
+  - **数字卡排**:等宽 lift 小卡(`{colors.surface-card-high}` 底 +
+    `{rounded.card-compact}` 12 + 内距 8×12 + 卡间 `{spacing.gap}` 8):标签
+    `{typography.micro}` secondary → 数值 `{typography.figure-stat}` 28(今日消耗
+    取页 accent 色;弹窗超宽读数 `minimumScaleFactor` 兜底)→ 副行 micro(环比
+    ▲=`{colors.state-positive}` / ▼=`{colors.state-negative}` / 无基准 tertiary;
+    日均副行是峰值不是环比)。随 7/30 档位联动(N 天合计 / 日均(N 天))。
   - **热力墙**(自封装小组件,生态空白:专项库无 LICENSE / DGCharts 无此形态 /
     官方 RectangleMark 像素失控):正方格边 14、间距 `{spacing.unit}` 4、52 列
     (一年 364 天,最新在右)、内容宽 932 超宽由外层横向滚动(开卡锚到最右
@@ -620,15 +628,19 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
     单图):y 轴三档 0/半值/峰值 + 网格线、域顶留 15% 头寸;x 轴 7 天图每 3 天 /
     30 天图每 6 天(「今天」在右);线 2pt 页 accent、末点圆点、缺天画 0、
     图区 6% accent 底;轴字 `{typography.micro}` tertiary[原型 9.5 收五档]。
-  - **项目大卡**:`AdaptiveCardGrid`(单卡 min 240 / max 340 / 列距
-    `{spacing.group-gap}` 12、单列满宽);卡 = cardHigh 底 + `{rounded.inner}` 10 +
-    内距 12。四层:头(项目名 14.5 semibold + 占比 micro tertiary)→ 主数值
-    `{typography.figure-card}` 24 + 环比 micro → 模型分段条(高 4 圆角 2,分段色
-    `{colors.agent-model-*}` 按序,占比前二 + 剩余并「其他」;色点图例 6×6 圆角 2 +
-    micro)→ harness 分段条 + 底行(claude/zcode 占比 micro tertiary;「● 在跑 N」
-    `{colors.state-positive}` / 「静了 N 天」)+ 活跃行(活跃 N/窗口 天 · 请求数)。
-    层间分隔 = hairline divider(卡内层界,不是卡描边)。分段条轨道 =
-    `{colors.ink-tertiary}` 14%[原型 rgba(128,128,128,.14) 收编]。
+  - **项目大卡**(agent-tab/06 对齐 tokscale 参数):卡 = cardHigh 底 +
+    `{rounded.inner}` 10 + 内距 12。层序:头(项目名 14.5 semibold + 占比 micro
+    tertiary)→ 主数值 `{typography.figure-card}` 24 + 环比 micro → **四桶 +
+    缓存倍率行**(Input / Output / Cache R / Cache W / Cache× 五格等分,标签
+    micro tertiary + 值 12 semibold 等宽;倍率 = 缓存读 ÷ 净(输入+输出),
+    分母 0 →「—」)→ 模型分段条(高 4 圆角 2,分段色 `{colors.agent-model-*}`
+    按序,占比前二 + 剩余并「其他」;色点图例 6×6 圆角 2 + micro)→ harness
+    分段条 + 底行(claude/zcode 占比 micro tertiary;「● 在跑 N」
+    `{colors.state-positive}` / 「静了 N 天」)→ 活跃行(活跃 N/窗口 天 ·
+    **现存会话数**(Claude≈近 30 天未删文件 + ZCode 有账全史,扫描现数不落库;
+    slug 末词与账本项目名做唯一尾段归并)· 请求数)。层间分隔 = hairline
+    divider(卡内层界,不是卡描边)。分段条轨道 = `{colors.ink-tertiary}`
+    14%。Cost 美元与精确 Last Active = 用户点名不做。
 
 ## Do's and Don'ts
 

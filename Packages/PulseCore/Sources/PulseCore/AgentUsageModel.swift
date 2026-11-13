@@ -878,6 +878,17 @@ public protocol AgentUsageReading: Sendable {
     func claudeStatsCacheData() -> Data?
 }
 
+public extension AgentUsageReading {
+    /// 现存会话数按归组键(agent-tab/06;默认空 = 能力缺席,假实现与 Inert 桩
+    /// 免改):Claude 键 = projects 子目录 slug、值 = 该目录下会话 jsonl 文件数
+    /// (≈近 30 天未删);ZCode 键 = workspace 真路径、值 = db 中该工作区的
+    /// 不同 session_id 数(有账全史;被 purge 的数不到)。合成项目计数走
+    /// `AgentUsageWindow.sessionCounts`。
+    func agentSessionCounts() -> (claude: [String: Int], zcode: [String: Int]) {
+        ([:], [:])
+    }
+}
+
 // MARK: - 编排器
 
 /// 双档刷新编排(纯值内核,IO 与落库经参数注入):

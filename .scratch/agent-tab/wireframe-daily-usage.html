@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Pulse · 每日消耗 · 骨架原型(纯线稿)</title>
+<style>
+  /* scoped:根节点真挂前缀类(实犯两次的坑) */
+  .wf-root * { margin: 0; padding: 0; box-sizing: border-box; }
+  .wf-root {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #fff; color: #222; padding: 28px 24px 80px;
+  }
+  .wf-root .hint { font-size: 12px; color: #888; margin-bottom: 22px; line-height: 1.7; }
+
+  .wf-root .scheme { margin-bottom: 36px; }
+  .wf-root .scheme-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .wf-root .scheme-note { font-size: 11px; color: #999; margin-bottom: 10px; }
+
+  /* 线稿卡:只描边不填色 */
+  .wf-root .card {
+    width: 680px; border: 1.5px solid #444; padding: 12px;
+  }
+  .wf-root .cardhead {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 10px;
+  }
+  .wf-root .cardhead .t { font-size: 12px; }
+  .wf-root .cardhead .btn {
+    font-size: 11px; border: 1px solid #999; padding: 2px 8px; color: #666;
+  }
+
+  /* 模块块:外框 + 左上模块名 + 线段示意 */
+  .wf-root .blk { border: 1px solid #aaa; padding: 8px 10px 10px; margin-bottom: 8px; }
+  .wf-root .blk:last-child { margin-bottom: 0; }
+  .wf-root .blk .tag {
+    font-size: 10.5px; color: #777; margin-bottom: 6px;
+    display: flex; justify-content: space-between;
+  }
+  .wf-root .blk .tag .r { color: #aaa; }
+
+  .wf-root .line { height: 0; border-top: 1px solid #bbb; margin: 7px 0; }
+  .wf-root .line.w60 { width: 60%; }
+  .wf-root .line.w40 { width: 40%; }
+  .wf-root .line.w80 { width: 80%; }
+
+  /* 数字卡排:三个等宽小框 */
+  .wf-root .numrow { display: flex; gap: 8px; }
+  .wf-root .numrow .n { flex: 1; border: 1px solid #bbb; padding: 6px 8px; }
+  .wf-root .numrow .n .line { margin: 5px 0; }
+
+  /* 年墙:小方格阵 + 虚线延伸(示意横向滚动) */
+  .wf-root .heatrow { display: flex; align-items: center; gap: 6px; }
+  .wf-root .cells { display: grid; grid-template-columns: repeat(12, 9px); gap: 3px; }
+  .wf-root .cells i { width: 9px; height: 9px; border: 1px solid #999; }
+  .wf-root .dots { flex: 1; border-top: 1px dashed #ccc; position: relative; }
+  .wf-root .dots::after {
+    content: "⟶ 一年 52 列 · 横向滚动"; position: absolute; right: 0; top: -7px;
+    font-size: 9.5px; color: #aaa; background: #fff; padding-left: 4px;
+  }
+
+  /* 走势:一条折线 + 底刻度 */
+  .wf-root .trend svg { display: block; width: 100%; height: 64px; }
+
+  /* 项目:两列小框 */
+  .wf-root .projrow { display: flex; gap: 12px; margin-bottom: 8px; }
+  .wf-root .projrow:last-child { margin-bottom: 0; }
+  .wf-root .projrow .p { flex: 1; border: 1px solid #bbb; padding: 6px 8px; }
+  .wf-root .seg { display: flex; height: 3px; margin: 7px 0; }
+  .wf-root .seg i { border-top: 2px solid #999; }
+  .wf-root .seg .a { width: 62%; }
+  .wf-root .seg .b { width: 26%; border-top-style: dashed; }
+</style>
+</head>
+<body class="wf-root">
+<div class="hint">
+  骨架原型 = 纯线稿:只定「从上到下有哪些模块、多高、什么顺序」,不定样式配色。
+  四张同一组模块、不同顺序。模块四种:数字卡排 / Token 消耗(年墙)/ 走势 / 项目。
+</div>
+
+<!-- 现状 -->
+<div class="scheme">
+  <div class="scheme-title">现状(你现在看到的)</div>
+  <div class="scheme-note">数字卡 → 年墙 → 走势 → 项目:年墙占第二位,把高频的走势/项目压到下面</div>
+  <div class="card">
+    <div class="cardhead"><span class="t">每日消耗</span><span class="btn">重新扫描</span></div>
+    <div class="blk">
+      <div class="tag"><span>① 数字卡排</span><span class="r">今日 / N 天合计 / 日均</span></div>
+      <div class="numrow"><div class="n"><div class="line w40"></div><div class="line w60"></div></div><div class="n"><div class="line w40"></div><div class="line w60"></div></div><div class="n"><div class="line w40"></div><div class="line w60"></div></div></div>
+    </div>
+    <div class="blk">
+      <div class="tag"><span>② Token 消耗</span><span class="r">年</span></div>
+      <div class="heatrow"><div class="cells"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="dots"></div></div>
+      <div class="line w40" style="margin-top:12px"></div>
+    </div>
+    <div class="blk trend">
+      <div class="tag"><span>③ 走势</span><span class="r">7 天 | 30 天</span></div>
+      <svg viewBox="0 0 640 64" preserveAspectRatio="none">
+        <polyline points="0,50 90,42 180,46 270,28 360,34 450,20 540,24 640,10"
+          fill="none" stroke="#666" stroke-width="1.5"/>
+        <line x1="0" y1="62" x2="30" y2="62" stroke="#bbb"/>
+        <line x1="300" y1="62" x2="340" y2="62" stroke="#bbb"/>
+        <line x1="600" y1="62" x2="640" y2="62" stroke="#bbb"/>
+      </svg>
+    </div>
+    <div class="blk">
+      <div class="tag"><span>④ 项目</span><span class="r">7 天 | 30 天</span></div>
+      <div class="projrow"><div class="p"><div class="line w40"></div><div class="line w80"></div><div class="seg"><i class="a"></i><i class="b"></i></div><div class="line w60"></div></div><div class="p"><div class="line w40"></div><div class="line w80"></div><div class="seg"><i class="a"></i><i class="b"></i></div><div class="line w60"></div></div></div>
+      <div class="projrow"><div class="p"><div class="line w40"></div><div class="line w80"></div><div class="seg"><i class="a"></i><i class="b"></i></div><div class="line w60"></div></div><div class="p"><div class="line w40"></div><div class="line w80"></div><div class="seg"><i class="a"></i><i class="b"></i></div><div class="line w60"></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 方案 A -->
+<div class="scheme">
+  <div class="scheme-title">方案 A(推荐):数字卡 → 走势 → 项目 → 年墙</div>
+  <div class="scheme-note">第一屏全是 7/30 高频信息,年墙殿后收尾;代价:最有辨识度的格子墙沉底</div>
+  <div class="card">
+    <div class="cardhead"><span class="t">每日消耗</span><span class="btn">重新扫描</span></div>
+    <div class="blk">
+      <div class="tag"><span>① 数字卡排</span><span class="r">今日 / N 天合计 / 日均</span></div>
+      <div class="numrow"><div class="n"><div class="line w40"></div><div class="line w60"></div></div><div class="n"><div class="line w40"></div><div class="line w60"></div></div><div class="n"><div class="line w40"></div><div class="line w60"></div></div></div>
+    </div>
+    <div class="blk trend">
+      <div class="tag"><span>② 走势</span><span class="r">7 天 | 30 天</span></div>
+      <svg viewBox="0 0 640 64" preserveAspectRatio="none">
+        <polyline points="0,50 90,42 180,46 270,28 360,34 450,20 540,24 640,10"
+          fill="none" stroke="#666" stroke-width="1.5"/>
+        <line x1="0" y1="62" x2="30" y2="62" stroke="#bbb"/>
+        <line x1="300" y1="62" x2="340" y2="62" stroke="#bbb"/>
+        <line x1="600" y1="62" x2="640" y2="62" stroke="#bbb"/>
+      </svg>
+    </div>
+    <div class="blk">
+      <div class="tag"><span>③ 项目</span><span class="r">7 天 | 30 天</span></div>
+      <div class="projrow"><div class="p"><div class="line w40"></div><div class="line w80"></div><div class="seg"><i class="a"></i><i class="b"></i></div><div class="line w60"></div></div><div class="p"><div class="line w40"></div><div class="line w80"></div><div class="seg"><i class="a"></i><i class="b"></i></div><div class="line w60"></div></div></div>
+      <div class="projrow"><div class="p"><div class="line w40"></div><div class="line w80"></div><div class="seg"><i class="a"></i><i class="b"></i></div><div class="line w60"></div></div><div class="p"><div class="line w40"></div><div class="line w80"></div><div class="seg"><i class="a"></i><i class="b"></i></div><div class="line w60"></div></div></div>
+    </div>
+    <div class="blk">
+      <div class="tag"><span>④ Token 消耗</span><span class="r">年</span></div>
+      <div class="heatrow"><div class="cells"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="dots"></div></div>
+      <div class="line w40" style="margin-top:12px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 方案 B -->
+<div class="scheme">
+  <div class="scheme-title">方案 B:数字卡 → 走势 → 年墙 → 项目</div>
+  <div class="scheme-note">走势提前,项目做压轴明细;代价:7/30 与「年」两种尺度挨着,节奏跳跃</div>
+  <div class="card">
+    <div class="cardhead"><span class="t">每日消耗</span><span class="btn">重新扫描</span></div>
+    <div class="blk">
+      <div class="tag"><span>① 数字卡排</span><span class="r">今日 / N 天合计 / 日均</span></div>
+      <div class="numrow"><div class="n"><div class="line w40"></div><div class="line w60"></div></div><div class="n"><div class="line w40"></div><div class="line w60"></div></div><div class="n"><div class="line w40"></div><div class="line w60"></div></div></div>
+    </div>
+    <div class="blk trend">
+      <div class="tag"><span>② 走势</span><span class="r">7 天 | 30 天</span></div>
+      <svg viewBox="0 0 640 64" preserveAspectRatio="none">
+        <polyline points="0,50 90,42 180,46 270,28 360,34 450,20 540,24 640,10"
+          fill="none" stroke="#666" stroke-width="1.5"/>
+        <line x1="0" y1="62" x2="30" y2="62" stroke="#bbb"/>
+        <line x1="300" y1="62" x2="340" y2="62" stroke="#bbb"/>
+        <line x1="600" y1="62" x2="640" y2="62" stroke="#bbb"/>
+      </svg>
+    </div>
+    <div class="blk">
+      <div class="tag"><span>③ Token 消耗</span><span class="r">年</span></div>
+      <div class="heatrow"><div class="cells"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="dots"></div></div>
+      <div class="line w40" style="margin-top:12px"></div>
+    </div>
+    <div class="blk">
+      <div class="tag"><span>④ 项目</span><span class="r">7 天 | 30 天</span></div>
+      <div class="projrow"><div class="p"><div class="line w40"></div><div class="line w80"></div><div class="seg"><i class="a"></i><i class="b"></i></div><div class="line w60"></div></div><div class="p"><div class="line w40"></div><div class="line w80"></div><div class="seg"><i class="a"></i><i class="b"></i></div><div class="line w60"></div></div></div>
+      <div class="projrow"><div class="p"><div class="line w40"></div><div class="line w80"></div><div class="seg"><i class="a"></i><i class="b"></i></div><div class="line w60"></div></div><div class="p"><div class="line w40"></div><div class="line w80"></div><div class="seg"><i class="a"></i><i class="b"></i></div><div class="line w60"></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 方案 C -->
+<div class="scheme">
+  <div class="scheme-title">方案 C:数字卡 → 项目 → 走势 → 年墙</div>
+  <div class="scheme-note">总量 → 分解紧挨着,「哪个项目花得多」最先看到;代价:走势被项目大卡推远</div>
+  <div class="card">
+    <div class="cardhead"><span class="t">每日消耗</span><span class="btn">重新扫描</span></div>
+    <div class="blk">
+      <div class="tag"><span>① 数字卡排</span><span class="r">今日 / N 天合计 / 日均</span></div>
+      <div class="numrow"><div class="n"><div class="line w40"></div><div class="line w60"></div></div><div class="n"><div class="line w40"></div><div class="line w60"></div></div><div class="n"><div class="line w40"></div><div class="line w60"></div></div></div>
+    </div>
+    <div class="blk">
+      <div class="tag"><span>② 项目</span><span class="r">7 天 | 30 天</span></div>
+      <div class="projrow"><div class="p"><div class="line w40"></div><div class="line w80"></div><div class="seg"><i class="a"></i><i class="b"></i></div><div class="line w60"></div></div><div class="p"><div class="line w40"></div><div class="line w80"></div><div class="seg"><i class="a"></i><i class="b"></i></div><div class="line w60"></div></div></div>
+      <div class="projrow"><div class="p"><div class="line w40"></div><div class="line w80"></div><div class="seg"><i class="a"></i><i class="b"></i></div><div class="line w60"></div></div><div class="p"><div class="line w40"></div><div class="line w80"></div><div class="seg"><i class="a"></i><i class="b"></i></div><div class="line w60"></div></div></div>
+    </div>
+    <div class="blk trend">
+      <div class="tag"><span>③ 走势</span><span class="r">7 天 | 30 天</span></div>
+      <svg viewBox="0 0 640 64" preserveAspectRatio="none">
+        <polyline points="0,50 90,42 180,46 270,28 360,34 450,20 540,24 640,10"
+          fill="none" stroke="#666" stroke-width="1.5"/>
+        <line x1="0" y1="62" x2="30" y2="62" stroke="#bbb"/>
+        <line x1="300" y1="62" x2="340" y2="62" stroke="#bbb"/>
+        <line x1="600" y1="62" x2="640" y2="62" stroke="#bbb"/>
+      </svg>
+    </div>
+    <div class="blk">
+      <div class="tag"><span>④ Token 消耗</span><span class="r">年</span></div>
+      <div class="heatrow"><div class="cells"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="dots"></div></div>
+      <div class="line w40" style="margin-top:12px"></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -18,6 +18,8 @@ final class AgentUsageFeature: MonitorFeature {
     private(set) var projectRows: [AgentProjectUsageRow] = []
     /// 模型轨全表(agent-tab/05):项目卡模型分段条按窗口聚合。
     private(set) var modelRows: [AgentModelUsageRow] = []
+    /// 项目现存会话数(agent-tab/06;全量档/引导时现数,不落库)。
+    private(set) var sessionCounts: [String: Int] = [:]
     /// 全量扫描进行中(UI 转圈与禁用重入)。
     private(set) var isScanning = false
 
@@ -58,10 +60,13 @@ final class AgentUsageFeature: MonitorFeature {
             let result = catalog.fullRescan(reader: reader, store: store!, now: .now)
             let projects = (try? store!.projectRows()) ?? []
             let models = (try? store!.modelRows()) ?? []
+            let knownProjects = Set(((try? store!.projectRows()) ?? []).map(\.project))
+            let sessions = Self.countSessions(reader: reader, knownProjects: knownProjects)
             await MainActor.run { [weak self] in
                 self?.rows = result
                 self?.projectRows = projects
                 self?.modelRows = models
+                self?.sessionCounts = sessions
                 self?.isScanning = false
             }
         }
@@ -81,13 +86,30 @@ final class AgentUsageFeature: MonitorFeature {
             let result = (try? store.rows()) ?? []
             let projects = (try? store.projectRows()) ?? []
             let models = (try? store.modelRows()) ?? []
+            let knownProjects = Set(((try? store.projectRows()) ?? []).map(\.project))
+            let sessions = Self.countSessions(reader: reader, knownProjects: knownProjects)
             await MainActor.run { [weak self] in
                 self?.rows = result
                 self?.projectRows = projects
                 self?.modelRows = models
+                self?.sessionCounts = sessions
                 self?.isScanning = false
             }
         }
+    }
+
+    /// 会话数现数(全量档/引导时机;定时档不放大这个 IO)。纯函数,脱离
+    /// MainActor 在后台线程执行。knownProjects = 账本项目名(slug 末词归并用)。
+    private nonisolated static func countSessions(
+        reader: any AgentUsageReading,
+        knownProjects: Set<String>
+    ) -> [String: Int] {
+        let raw = reader.agentSessionCounts()
+        return AgentUsageWindow.sessionCounts(
+            claude: raw.claude,
+            zcode: raw.zcode,
+            knownProjects: knownProjects
+        )
     }
 
     /// 定时档:后台重算今天并读回全表。IO/聚合失败保持上次 rows(下轮再试)。

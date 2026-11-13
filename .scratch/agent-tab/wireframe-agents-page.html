@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Pulse · 智能体页 · 整页骨架 v3(子 tab:消耗/会话/开发服务,纯线稿)</title>
+<style>
+  /* scoped:根节点真挂前缀类(实犯两次的坑) */
+  .wf-root * { margin: 0; padding: 0; box-sizing: border-box; }
+  .wf-root {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #fff; color: #222; padding: 28px 24px 80px;
+  }
+  .wf-root .hint { font-size: 12px; color: #888; margin-bottom: 22px; line-height: 1.7; }
+  .wf-root b { font-weight: 600; }
+
+  .wf-root .scheme { margin-bottom: 44px; }
+  .wf-root .scheme-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .wf-root .scheme-note { font-size: 11px; color: #999; margin-bottom: 10px; line-height: 1.6; }
+
+  .wf-root .page { width: 680px; }
+
+  .wf-root .pagehead {
+    border: 1px dashed #bbb; padding: 4px 10px; font-size: 11px; color: #888;
+    margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;
+  }
+
+  /* 子药丸行(选中一枚用实线框) */
+  .wf-root .subtabs { display: flex; gap: 8px; margin-bottom: 12px; }
+  .wf-root .subtabs .pill {
+    font-size: 11px; border: 1px solid #999; padding: 3px 14px; color: #777;
+  }
+  .wf-root .subtabs .pill.on { border: 1.5px solid #444; color: #222; font-weight: 600; }
+
+  .wf-root .card { border: 1.5px solid #444; padding: 10px; margin-bottom: 12px; }
+  .wf-root .cardhead {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+  }
+  .wf-root .cardhead .t { font-size: 11.5px; }
+  .wf-root .cardhead .pills { font-size: 10.5px; border: 1px solid #999; padding: 1px 7px; color: #666; }
+
+  .wf-root .line { height: 0; border-top: 1px solid #bbb; margin: 6px 0; }
+  .wf-root .line.w30 { width: 30%; }
+  .wf-root .line.w50 { width: 50%; }
+  .wf-root .line.w70 { width: 70%; }
+
+  .wf-root .numrow { display: flex; gap: 8px; }
+  .wf-root .numrow .n { flex: 1; border: 1px solid #bbb; padding: 6px 8px; }
+  .wf-root .numrow .n .line { margin: 5px 0; }
+
+  .wf-root .heatrow { display: flex; align-items: center; gap: 6px; }
+  .wf-root .cells { display: grid; grid-template-columns: repeat(12, 9px); gap: 3px; }
+  .wf-root .cells i { width: 9px; height: 9px; border: 1px solid #999; }
+  .wf-root .dots { flex: 1; border-top: 1px dashed #ccc; position: relative; }
+  .wf-root .dots::after {
+    content: "⟶ 52 列 · 横向滚动"; position: absolute; right: 0; top: -7px;
+    font-size: 9.5px; color: #aaa; background: #fff; padding-left: 4px;
+  }
+
+  .wf-root .trend svg { display: block; width: 100%; height: 56px; }
+
+  /* 日历图 + 走势双列;媒体查询演示:窗口不够宽(≤760)上下排成一列 */
+  .wf-root .duo { display: flex; gap: 12px; }
+  .wf-root .duo .card { flex: 1; margin-bottom: 12px; }
+  @media (max-width: 760px) { .wf-root .duo { flex-direction: column; } }
+
+  /* 项目宽卡:窄/中窗口一列满宽(骨架演示);更宽窗口两列 */
+  .wf-root .projrow.wide { display: block; }
+
+  /* 四桶 + 缓存倍率一行 */
+  .wf-root .buckets { display: flex; gap: 12px; margin: 7px 0; }
+  .wf-root .buckets .bk { flex: 1; }
+  .wf-root .buckets .bk span { font-size: 9px; color: #aaa; }
+
+  .wf-root .projrow { display: flex; gap: 12px; margin-bottom: 8px; }
+  .wf-root .projrow:last-child { margin-bottom: 0; }
+  .wf-root .projrow .p { flex: 1; border: 1px solid #bbb; padding: 6px 8px; }
+  .wf-root .seg { display: flex; height: 3px; margin: 7px 0; }
+  .wf-root .seg i { border-top: 2px solid #999; }
+  .wf-root .seg .a { width: 62%; }
+  .wf-root .seg .b { width: 26%; border-top-style: dashed; }
+
+  .wf-root .reading { display: flex; align-items: center; gap: 8px; margin: 9px 0; }
+  .wf-root .reading .lbl { width: 64px; }
+  .wf-root .reading .meter { flex: 1; border-top: 3px solid #999; }
+  .wf-root .reading .val { width: 40px; border-top: 1px solid #666; }
+
+  .wf-root .sessrow { display: flex; align-items: center; gap: 8px; margin: 9px 0; }
+  .wf-root .sessrow .ico { width: 18px; height: 18px; border: 1px solid #999; flex: none; }
+  .wf-root .sessrow .mid { flex: 1; }
+  .wf-root .sessrow .mid .sub { margin-top: 5px; }
+
+  .wf-root .ghost {
+    border: 1px dashed #ccc; padding: 22px 10px; text-align: center;
+    font-size: 10.5px; color: #aaa; margin-bottom: 12px;
+  }
+</style>
+</head>
+<body class="wf-root">
+<div class="hint">
+  v3 按你的提议:<b>智能体页内分三个子 tab「消耗 | 会话 | 开发服务」</b>(清理页五子药丸同款模式)。<br>
+  「重新扫描」挪进消耗子页(它只重扫账本);「Claude 用量」归消耗子页(也是账:限额余量,
+  也可以 argue 归会话——待你拍);默认落地子页待拍(骨架画的是进「消耗」)。
+</div>
+
+<!-- 子页一:消耗 -->
+<div class="scheme">
+  <div class="scheme-title">子页一 · 消耗(token 账)</div>
+  <div class="scheme-note">
+    ① 数字卡排 = <b>四张一排</b>:今日消耗 / N 天合计 / 日均 / Claude 用量(用量并入数字卡,副行放窗口重置)。<br>
+    ② 日历图 + 走势 <b>一排两列</b>(媒体查询:窗口不够宽就上下排成一列;缩窄浏览器可见切换)。<br>
+    ③ 项目卡<b>加宽</b>:此 680 视口下一列满宽;更宽的窗口两列(媒体查询),更窄也一列。
+  </div>
+  <div class="page">
+    <div class="pagehead"><span>页头 · 智能体</span></div>
+    <div class="subtabs"><span class="pill on">消耗</span><span class="pill">会话</span><span class="pill">开发服务</span></div>
+    <div class="card">
+      <div class="cardhead"><span class="t">① 数字卡排(四张一排)</span></div>
+      <div class="numrow">
+        <div class="n"><div class="line" style="width:40%"></div><div class="line" style="width:60%"></div><div class="line" style="width:50%"></div></div>
+        <div class="n"><div class="line" style="width:40%"></div><div class="line" style="width:60%"></div><div class="line" style="width:50%"></div></div>
+        <div class="n"><div class="line" style="width:40%"></div><div class="line" style="width:60%"></div><div class="line" style="width:50%"></div></div>
+        <div class="n"><div class="line" style="width:40%"></div><div class="line" style="width:60%"></div><div class="line" style="width:50%"></div></div>
+      </div>
+      <div class="line w70" style="margin-top:6px;border-top-style:dotted"></div>
+      <div style="font-size:9.5px;color:#aaa;margin-top:4px">第 4 张 = Claude 用量(5 小时窗%;副行「重置 xx 后」;本周数值放第二副行或悬停)</div>
+    </div>
+    <div class="duo">
+      <div class="card">
+        <div class="cardhead"><span class="t">② Token 消耗(日历图)</span><span><span class="pills">年</span> <span class="pills">重新扫描</span></span></div>
+        <div class="heatrow"><div class="cells"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="dots"></div></div>
+        <div class="line w30" style="margin-top:12px"></div>
+      </div>
+      <div class="card trend">
+        <div class="cardhead"><span class="t">③ 走势</span><span class="pills">7 天 | 30 天</span></div>
+        <svg viewBox="0 0 300 56" preserveAspectRatio="none">
+          <polyline points="0,44 45,36 90,40 135,24 180,30 225,16 270,20 300,8" fill="none" stroke="#666" stroke-width="1.5"/>
+          <line x1="0" y1="54" x2="20" y2="54" stroke="#bbb"/><line x1="140" y1="54" x2="170" y2="54" stroke="#bbb"/><line x1="280" y1="54" x2="300" y2="54" stroke="#bbb"/>
+        </svg>
+      </div>
+    </div>
+    <div class="card">
+      <div class="cardhead"><span class="t">④ 项目(卡加宽;媒体查询定列数)</span><span class="pills">7 天 | 30 天</span></div>
+      <!-- 一张项目宽卡的内层结构(骨架放大样) -->
+      <div class="projrow wide">
+        <div class="p">
+          <div class="line w30"></div>
+          <div class="line w50"></div>
+          <!-- 四桶 + 缓存倍率一行(tokscale 对齐,库内现成数据) -->
+          <div class="buckets">
+            <div class="bk"><span>Input</span><div class="line"></div></div>
+            <div class="bk"><span>Output</span><div class="line"></div></div>
+            <div class="bk"><span>Cache R</span><div class="line"></div></div>
+            <div class="bk"><span>Cache W</span><div class="line"></div></div>
+            <div class="bk"><span>Cache×</span><div class="line"></div></div>
+          </div>
+          <div class="seg"><i class="a"></i><i class="b"></i></div>
+          <div class="line w30"></div>
+          <!-- 会话数并入活跃行 -->
+          <div class="line w50"></div>
+        </div>
+      </div>
+      <div style="font-size:9.5px;color:#aaa;margin:4px 0 10px">↑ 一张项目卡的内层:头(名/占比)→ 主数值+环比 → <b>四桶+倍率一行</b> → 模型分段条+图例 → harness 行 → 活跃行(活跃 N/窗口 · <b>会话 M</b> · 请求数)</div>
+      <div class="projrow wide"><div class="p"><div class="line w30"></div><div class="line w50"></div><div class="buckets"><div class="bk"><span>Input</span><div class="line"></div></div><div class="bk"><span>Output</span><div class="line"></div></div><div class="bk"><span>Cache R</span><div class="line"></div></div><div class="bk"><span>Cache W</span><div class="line"></div></div><div class="bk"><span>Cache×</span><div class="line"></div></div></div><div class="seg"><i class="a"></i><i class="b"></i></div><div class="line w30"></div><div class="line w50"></div></div></div>
+      <div class="projrow wide"><div class="p"><div class="line w30"></div><div class="line w50"></div><div class="buckets"><div class="bk"><span>Input</span><div class="line"></div></div><div class="bk"><span>Output</span><div class="line"></div></div><div class="bk"><span>Cache R</span><div class="line"></div></div><div class="bk"><span>Cache W</span><div class="line"></div></div><div class="bk"><span>Cache×</span><div class="line"></div></div></div><div class="seg"><i class="a"></i><i class="b"></i></div><div class="line w30"></div><div class="line w50"></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 子页二:会话 -->
+<div class="scheme">
+  <div class="scheme-title">子页二 · 会话(现在在跑什么)</div>
+  <div class="scheme-note">Claude Code 会话 → ZCode 会话;实时秒级刷新的两张列表卡。未来「杀会话 / Git 状态」候选也归这里。</div>
+  <div class="page">
+    <div class="pagehead"><span>页头 · 智能体</span></div>
+    <div class="subtabs"><span class="pill">消耗</span><span class="pill on">会话</span><span class="pill">开发服务</span></div>
+    <div class="card">
+      <div class="cardhead"><span class="t">① Claude Code 会话</span></div>
+      <div class="sessrow"><div class="ico"></div><div class="mid"><div class="line w50"></div><div class="line w70 sub"></div></div><div class="line w30"></div></div>
+      <div class="sessrow"><div class="ico"></div><div class="mid"><div class="line w50"></div><div class="line w70 sub"></div></div><div class="line w30"></div></div>
+      <div class="sessrow"><div class="ico"></div><div class="mid"><div class="line w50"></div><div class="line w70 sub"></div></div><div class="line w30"></div></div>
+    </div>
+    <div class="card">
+      <div class="cardhead"><span class="t">② ZCode 会话</span></div>
+      <div class="sessrow"><div class="ico"></div><div class="mid"><div class="line w50"></div><div class="line w70 sub"></div></div><div class="line w30"></div></div>
+      <div class="sessrow"><div class="ico"></div><div class="mid"><div class="line w50"></div><div class="line w70 sub"></div></div><div class="line w30"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 子页三:开发服务 -->
+<div class="scheme">
+  <div class="scheme-title">子页三 · 开发服务(dev server)</div>
+  <div class="scheme-note">就一张 dev server 卡(子页偏空但主题纯净;未来孤儿端口检测等候选也归这里)。<br>
+  对照变体:dev server 并进「会话」子页(两页制)——少一页,但"会话"页混进非 agent 的基础设施,主题稀释。</div>
+  <div class="page">
+    <div class="pagehead"><span>页头 · 智能体</span></div>
+    <div class="subtabs"><span class="pill">消耗</span><span class="pill">会话</span><span class="pill on">开发服务</span></div>
+    <div class="card">
+      <div class="cardhead"><span class="t">dev server 卡</span><span class="pills">全部停止</span></div>
+      <div class="sessrow"><div class="ico"></div><div class="mid"><div class="line w50"></div><div class="line w70 sub"></div></div><div class="line w30"></div></div>
+      <div class="sessrow"><div class="ico"></div><div class="mid"><div class="line w50"></div><div class="line w70 sub"></div></div><div class="line w30"></div></div>
+    </div>
+    <div class="ghost">(子页只有一张卡,后续候选:孤儿端口检测 · dev server 历史)</div>
+  </div>
+</div>
+</body>
+</html>

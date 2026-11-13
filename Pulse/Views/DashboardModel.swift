@@ -20,6 +20,8 @@ final class DashboardModel {
     var expandedRankingIDs: Set<String> = []
     /// 展开详情的进程(跨组唯一):下钻期间进程退出时详情安静收起。
     var selectedProcessID: pid_t?
+    /// 智能体页子 tab(agent-tab/06 三子页;切 tab 不丢,默认「消耗」)。
+    var agentSubTab: AgentSubTab = .usage
     /// 处置结果汇总(工单 08):**有失败才弹**;全成功保持安静。
     var killFailureReport: KillReport?
 
