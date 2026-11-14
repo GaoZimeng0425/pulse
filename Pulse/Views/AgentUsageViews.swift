@@ -362,44 +362,98 @@ private struct AgentDeltaText: View {
     }
 }
 
-// MARK: - 热力墙(自封装小组件,agent-tab/05)
+// MARK: - 热力墙(自封装小组件;agent-tab/05 起,06f 按用户拍板改等比)
 
-/// 一年 52 列贡献图式格子墙(正方格边 14、间距 4、内容宽 932 超宽横向滚动、
-/// 开卡锚到最右「今」)。四档色阶按窗口峰值归一(≤8% 灰档),底部每 8 周刻度
-/// +「今」;坐标数学直译自定稿原型 drawHeat()。
+/// 一年 52 列格子墙(2026-11-14 用户拍板:**等比缩放、不滚动、每月一刻度**,
+/// 推翻 05 时代「固定边 14 + 横向滚动 + 每 8 周刻度」)。格子边长 =
+/// (容器宽 − 51×间距)÷ 52,随窗口等比缩放;四档色阶按一年峰值归一
+/// (≤8% 灰档);悬停 = 命中格高亮描边 + 左上浮层胶囊(日期 · 当日用量),
+/// 命中一律坐标反算、不依赖形状 hit test(空间地图同款纪律)。
 struct AgentHeatWall: View {
     static let weeks = 52
-    private static let side: CGFloat = 14
-    private static let gap: CGFloat = 4
+    private static let gap: CGFloat = 3
+    private static let axisHeight: CGFloat = 18
 
     /// 旧 → 新的逐天合计(weeks × 7 条;天数固定,缺天 0)。
     let totals: [AgentDayTotal]
 
+    @State private var width: CGFloat = 640
+    @State private var hoverIndex: Int?
+
+    private var step: CGFloat {
+        Self.gap + side
+    }
+
+    /// 等比格子边长(容器宽容纳 52 列;窄到弹窗也只是格小,不滚动)。
+    private var side: CGFloat {
+        max((width - Self.gap * CGFloat(Self.weeks - 1)) / CGFloat(Self.weeks), 1)
+    }
+
+    private var gridHeight: CGFloat {
+        side * 7 + Self.gap * 6
+    }
+
+    /// 逐天日期(与 totals 同序;轻量解析,每次 body 重算可忽略)。
+    private var dates: [Date] {
+        totals.compactMap { agentDate($0.day) }
+    }
+
     var body: some View {
-        let step = Self.side + Self.gap
-        let contentWidth = CGFloat(Self.weeks) * step - Self.gap
-        ScrollView(.horizontal, showsIndicators: true) {
-            Canvas { context, _ in
-                draw(in: &context, step: step)
-            }
-            .frame(width: contentWidth, height: Self.axisHeight(step: step))
+        Canvas { context, _ in
+            draw(in: &context)
         }
-        .defaultScrollAnchor(.trailing) // 开卡锚「今」(最新在右)
-        .accessibilityHidden(true) // 数值由下方注记行承载
+        .frame(height: gridHeight + Self.axisHeight)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { newValue in
+            if abs(newValue - width) > 0.5 {
+                width = newValue
+            }
+        }
+        .contentShape(.rect)
+        .onContinuousHover(coordinateSpace: .local) { phase in
+            switch phase {
+            case let .active(location):
+                hoverIndex = hitTest(location)
+            case .ended:
+                hoverIndex = nil
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            if let hoverIndex {
+                hoverLabel(for: hoverIndex)
+                    .padding(8)
+                    .allowsHitTesting(false)
+            }
+        }
     }
 
-    /// 图高 = 7 行格子 + 12 刻度行(原型 axisY = gridH + 12)。
-    private static func axisHeight(step: CGFloat) -> CGFloat {
-        7 * step - gap + 12 + 4
+    /// 悬停命中:坐标 → 列/行 → 天序号(旧 → 新,列主序同 05 版映射)。
+    private func hitTest(_ point: CGPoint) -> Int? {
+        let column = Int(point.x / step)
+        let row = Int(point.y / step)
+        guard column >= 0, column < Self.weeks,
+              row >= 0, row < 7,
+              point.y <= gridHeight,
+              column * 7 + row < totals.count else { return nil }
+        return column * 7 + row
     }
 
-    private func draw(in context: inout GraphicsContext, step: CGFloat) {
-        let gridHeight = 7 * step - Self.gap
-        let contentWidth = CGFloat(Self.weeks) * step - Self.gap
+    /// 左上浮层胶囊:日期 · 当日用量(空间地图悬停读数位同款配方)。
+    private func hoverLabel(for index: Int) -> some View {
+        Text("\(totals[index].day) · \(agentTokenText(totals[index].total))")
+            .font(.system(size: 10.5, weight: .semibold))
+            .monospacedDigit()
+            .foregroundStyle(.primary)
+            .padding(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+            .background(Surface.cardHigh.opacity(0.9), in: .rect(cornerRadius: 8))
+    }
+
+    private func draw(in context: inout GraphicsContext) {
+        let gridHeight = gridHeight
+        let step = step
 
         // 图区底(灰 6%,圆角 8,原型同款)。
         context.fill(
-            Path(roundedRect: CGRect(x: 0, y: 0, width: contentWidth, height: gridHeight), cornerRadius: 8),
+            Path(roundedRect: CGRect(x: 0, y: 0, width: width, height: gridHeight), cornerRadius: 8),
             with: .color(Color.primary.opacity(0.06))
         )
 
@@ -408,12 +462,12 @@ struct AgentHeatWall: View {
         for index in 0 ..< min(cells, totals.count) {
             let column = index / 7
             let row = index % 7
-            let value = Double(totals[totals.count - cells + index].total)
+            let value = Double(totals[index].total)
             let rect = CGRect(
                 x: CGFloat(column) * step,
                 y: CGFloat(row) * step,
-                width: Self.side,
-                height: Self.side
+                width: side,
+                height: side
             )
             // 四档:值/峰值 ×4 向上取整;≤8% 与零值归灰档。
             let normalized = maxValue > 0 ? value / Double(maxValue) : 0
@@ -422,86 +476,102 @@ struct AgentHeatWall: View {
                 ? Surface.cardHigh
                 : agentsAccent.opacity([0, 0.25, 0.5, 0.75, 1][level])
             context.fill(
-                Path(roundedRect: rect, cornerRadius: 3),
+                Path(roundedRect: rect, cornerRadius: min(3, side / 3)),
                 with: .color(color)
             )
+            if index == hoverIndex {
+                // 悬停高亮:描边圈出命中格(不遮色)。
+                context.stroke(
+                    Path(roundedRect: rect.insetBy(dx: -1, dy: -1), cornerRadius: min(3, side / 3)),
+                    with: .color(agentsAccent),
+                    lineWidth: 1.5
+                )
+            }
         }
 
-        // 底部周数刻度:每 8 周一标(51周/43周/…/3周)+ 最右「今」。
-        let axisFont = Font.system(size: 10.5)
-        for column in stride(from: 0, to: Self.weeks, by: 8) {
-            let weeksAgo = Self.weeks - 1 - column
-            let label = weeksAgo == 0 ? "今" : "\(weeksAgo)周"
-            drawAxis(label, at: CGFloat(column) * step + Self.side / 2, in: &context, font: axisFont)
+        // 月刻度(2026-11-14 用户拍板,替代每 8 周刻度):某列首日的月份与前列
+        // 不同 → 该列是新月起点,标「N 月」;首列恒标。
+        let axisY = gridHeight + Self.axisHeight / 2 + 2
+        var lastMonth = -1
+        for column in 0 ..< Self.weeks {
+            let dayIndex = column * 7
+            guard dayIndex < dates.count else { break }
+            let month = Calendar.current.component(.month, from: dates[dayIndex])
+            if month != lastMonth {
+                lastMonth = month
+                context.draw(
+                    Text("\(month)月")
+                        .font(.system(size: 10.5))
+                        .monospacedDigit()
+                        .foregroundStyle(.tertiary),
+                    at: CGPoint(x: CGFloat(column) * step, y: axisY),
+                    anchor: .leading
+                )
+            }
         }
-        drawAxis(
-            "今",
-            at: CGFloat(Self.weeks - 1) * step + Self.side / 2,
-            in: &context,
-            font: axisFont
-        )
-    }
-
-    private func drawAxis(_ label: String, at x: CGFloat, in context: inout GraphicsContext, font: Font) {
-        let step = Self.side + Self.gap
-        let y = 7 * step - Self.gap + 12
-        context.draw(
-            Text(label)
-                .font(font)
-                .monospacedDigit()
-                .foregroundStyle(.tertiary),
-            at: CGPoint(x: x, y: y),
-            anchor: .center
-        )
     }
 }
 
-// MARK: - 走势(官方 Swift Charts,agent-tab/05 首次引入)
+// MARK: - 走势(官方 Swift Charts,agent-tab/05 引入;06f 日期轴 + 左 y 轴 + 悬停)
 
-/// 近 N 天合计折线 + xy 坐标轴:y 三档(0/半值/峰值)网格线、x 每 3/6 天
-/// (「今天」在右);域顶留 15% 头寸、线 2pt 圆头、末点圆点、缺天画 0、图区
-/// 6% accent 底。缺天画 0 = 账本无行即当日无记录,不猜。
+/// 近 N 天合计折线(2026-11-14 用户拍板:y 轴在**左**、x 轴 **MM-DD 每天一格**
+/// ——30 天图标签 -45° 斜排防重叠,替代「N 天前」抽样刻度;悬停 = 最近日竖线 +
+/// 顶部浮层「日期 · 用量」)。y 三档 0/半值/峰值、域顶 15% 头寸、线 2pt 圆头、
+/// 末点圆点、缺天画 0(账本无行即当日无记录,不猜)、图区 6% accent 底。
 struct AgentTrendChart: View {
     let totals: [AgentDayTotal]
 
     private struct Point: Identifiable {
-        let index: Int
+        let date: Date
         let value: Double
-        var id: Int {
-            index
+
+        var id: Date {
+            date
         }
     }
 
-    var body: some View {
-        let points = totals.enumerated().map { Point(index: $0.offset, value: Double($0.element.total)) }
-        let rawMax = max(points.map(\.value).max() ?? 0, 1)
-        let domainMax = rawMax * 1.15 // 域顶头寸,峰不顶格(原型 ×1.15 同款)
-        let stepDays = points.count <= 7 ? 3 : 6
-        let xMarks = stride(from: points.count - 1, through: 0, by: -stepDays).map(Double.init)
+    @State private var hoverIndex: Int?
 
-        Chart {
+    var body: some View {
+        let points: [Point] = totals.compactMap { total in
+            agentDate(total.day).map { Point(date: $0, value: Double(total.total)) }
+        }
+        guard let first = points.first, let last = points.last else {
+            return AnyView(EmptyView())
+        }
+        let rawMax = max(points.map(\.value).max() ?? 0, 1)
+        let domainMax = rawMax * 1.15 // 域顶头寸,峰不顶格
+        // 首末点内缩半天,贴边不裁(原型 -0.5 档同义)。
+        let calendar = Calendar.current
+        let xLow = calendar.date(byAdding: .hour, value: -12, to: first.date) ?? first.date
+        let xHigh = calendar.date(byAdding: .hour, value: 12, to: last.date) ?? last.date
+        let rotateLabels = points.count > 7
+
+        return AnyView(Chart {
             ForEach(points) { point in
                 LineMark(
-                    x: .value("天", Double(point.index)),
+                    x: .value("日期", point.date, unit: .day),
                     y: .value("Token", point.value)
                 )
                 .foregroundStyle(agentsAccent)
                 .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
             }
-            if let last = points.last {
-                PointMark(
-                    x: .value("天", Double(last.index)),
-                    y: .value("Token", last.value)
-                )
-                .foregroundStyle(agentsAccent)
-                .symbolSize(30)
+            PointMark(
+                x: .value("日期", last.date, unit: .day),
+                y: .value("Token", last.value)
+            )
+            .foregroundStyle(agentsAccent)
+            .symbolSize(30)
+            if let hoverIndex {
+                RuleMark(x: .value("日期", points[hoverIndex].date, unit: .day))
+                    .foregroundStyle(agentsAccent.opacity(0.4))
             }
         }
-        .chartXScale(domain: -0.5 ... Double(max(points.count - 1, 1)) + 0.5)
+        .chartXScale(domain: xLow ... xHigh)
         .chartYScale(domain: 0 ... domainMax)
         .chartYAxis {
-            // y 三档:0 / 半值 / 峰值(峰值不顶格,域顶有头寸)。
-            AxisMarks(values: [0.0, rawMax / 2, rawMax]) { value in
+            // y 轴在左(2026-11-14 用户拍板;三档 0/半值/峰值)。
+            AxisMarks(position: .leading, values: [0.0, rawMax / 2, rawMax]) { value in
                 AxisGridLine()
                     .foregroundStyle(Color.primary.opacity(0.08))
                 AxisValueLabel {
@@ -515,14 +585,16 @@ struct AgentTrendChart: View {
             }
         }
         .chartXAxis {
-            AxisMarks(values: xMarks) { value in
+            // 每天一格 MM-DD;30 天标签斜排防重叠(标签 view 上 rotationEffect,
+            // Charts 无 rotation modifier)。
+            AxisMarks(position: .bottom, values: points.map(\.date)) { value in
                 AxisValueLabel {
-                    if let index = value.as(Double.self).map(Int.init) {
-                        let ago = points.count - 1 - index
-                        Text(ago == 0 ? "今天" : "\(ago) 天前")
+                    if let date = value.as(Date.self) {
+                        Text(agentShortDate(date))
                             .font(.system(size: 10.5))
                             .monospacedDigit()
                             .foregroundStyle(.tertiary)
+                            .rotationEffect(.degrees(rotateLabels ? -45 : 0))
                     }
                 }
             }
@@ -531,9 +603,65 @@ struct AgentTrendChart: View {
             plot.background(agentsAccent.opacity(0.06), in: .rect(cornerRadius: 8))
         }
         .frame(minHeight: 96, maxHeight: .infinity) // 双列等高时吃满行内剩余
-        .accessibilityHidden(true) // 数值由数字卡排承载
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                if let hoverIndex, let x = proxy.position(forX: points[hoverIndex].date) {
+                    // 悬停竖线(全高,图内)。
+                    Rectangle()
+                        .fill(agentsAccent.opacity(0.35))
+                        .frame(width: 1)
+                        .position(x: x, y: geo.size.height / 2)
+                    // 顶部浮层:日期 · 用量(水平钳制不出界)。
+                    hoverLabel(for: points[hoverIndex])
+                        .position(x: min(max(x, 56), geo.size.width - 56), y: 14)
+                }
+                Color.clear
+                    .contentShape(.rect)
+                    .onContinuousHover(coordinateSpace: .local) { phase in
+                        switch phase {
+                        case let .active(location):
+                            hoverIndex = nearestIndex(
+                                atX: location.x, proxy: proxy, points: points
+                            )
+                        case .ended:
+                            hoverIndex = nil
+                        }
+                    }
+            }
+        })
+    }
+
+    /// 光标 x → 最近数据日(整列悬停,y 不参与)。
+    private func nearestIndex(
+        atX x: CGFloat,
+        proxy: ChartProxy,
+        points: [Point]
+    ) -> Int? {
+        guard let date = proxy.value(atX: x, as: Date.self), !points.isEmpty else { return nil }
+        var best = 0
+        var bestGap = TimeInterval.greatestFiniteMagnitude
+        for (index, point) in points.enumerated() {
+            let gap = abs(point.date.timeIntervalSince(date))
+            if gap < bestGap {
+                bestGap = gap
+                best = index
+            }
+        }
+        return best
+    }
+
+    /// 悬停浮层胶囊(热力墙 hoverLabel 同款配方)。
+    private func hoverLabel(for point: Point) -> some View {
+        Text("\(agentShortDate(point.date)) · \(agentTokenText(Int(point.value)))")
+            .font(.system(size: 10.5, weight: .semibold))
+            .monospacedDigit()
+            .foregroundStyle(.primary)
+            .padding(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+            .background(Surface.cardHigh.opacity(0.9), in: .rect(cornerRadius: 8))
     }
 }
+
+// MARK: - 项目展开/收起(agent-tab/06;排行截断同款)
 
 /// 项目展开/收起末行:排行截断末行(`RankingOverflowRow`)同款视觉配方
 /// (11 medium secondary + chevron + 悬停 primary 5% 圆角 8),文案按项目口径

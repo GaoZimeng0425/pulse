@@ -82,3 +82,14 @@
   {layout.agent-project-limit} 10)。验证夜机器整夜负载风暴(load 32→110),
   LiveCoreTickSourceSmoke 又被饿挂——按 06b 案判定链放行(diff 面纯 UI 零采集
   关联 + 该用例 develop 基线昨日三连绿)。
+- 图表四连改(2026-11-14 用户实报):①走势 y 轴挪左(AxisMarks position
+  .leading);②x 轴改 MM-DD 每天一格(30 天标签 rotationEffect -45° 斜排——
+  Charts 无 rotation modifier,旋转加在标签 view 上);③热力墙推翻 05 拍板:
+  等比缩放(边长=(容器宽−51×3)/52)、不滚动、月刻度(列首日换月即标);
+  ④两图悬停读数:走势 = chartOverlay + onContinuousHover(HoverPhase 是
+  .active(CGPoint)/.ended,非 .location/.empty——macOS 27 实测)竖线+顶部
+  浮层;热力墙 = 坐标反算命中格 + accent 描边 + 左上浮层胶囊。验证:静息态
+  smoke 又被风暴饿挂,同码单跑第二轮绿(load 21.6)放行。
+- 工程序教训:heredoc 单引号下 python 里 "\\n" 是字面反斜杠 n 不是换行,
+  整文件被 join 毁成一行(git checkout 救回);SwiftFormat --fix 会先重排
+  代码,锚点替换脚本必须先跑后 lint,反了就断言失败。

@@ -621,17 +621,20 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
     取页 accent 色;弹窗超宽读数 `minimumScaleFactor` 兜底)→ 副行 micro(环比
     ▲=`{colors.state-positive}` / ▼=`{colors.state-negative}` / 无基准 tertiary;
     日均副行是峰值不是环比)。随 7/30 档位联动(N 天合计 / 日均(N 天))。
-  - **热力墙**(自封装小组件,生态空白:专项库无 LICENSE / DGCharts 无此形态 /
-    官方 RectangleMark 像素失控):正方格边 14、间距 `{spacing.unit}` 4、52 列
-    (一年 364 天,最新在右)、内容宽 932 超宽由外层横向滚动(开卡锚到最右
-    「今」)、底刻度每 8 周(51周/43周/…/3周/今,`{typography.micro}` tertiary)、
-    四档色阶(值/窗口峰值 ×4 向上取整,≤8% 灰档 `{colors.surface-card-high}`;
-    accent 透明度 0.25/0.5/0.75/1)、图区底 6% accent。
+  - **热力墙**(自封装小组件;05 时代「固定边 14 + 横向滚动 + 每 8 周刻度」
+    被 2026-11-14 用户实报推翻,终态 = **等比缩放、不滚动、每月一刻度**):
+    格子边长 = (容器宽 − 51×间距 3)÷ 52,随窗口等比;52 列一年 364 天最新
+    在右;月刻度 = 列首日月份与前列不同的列标「N 月」;四档色阶(值/年峰值
+    ×4 向上取整,≤8% 灰档 `{colors.surface-card-high}`;accent 透明度
+    0.25/0.5/0.75/1)、图区底 6% 灰;**悬停读数** = 命中格 accent 描边 +
+    左上浮层胶囊「日期 · 当日用量」(cardHigh 90%,坐标反算不依赖形状
+    hit test,空间地图同款纪律)。
   - **走势** = 官方 Swift Charts(`LineMark` + 自定 `AxisMarks`;agent-tab/05
-    首次引入——StripChartView 避开它的是"组卡多每卡一图"高频重绘场景,本卡
-    单图):y 轴三档 0/半值/峰值 + 网格线、域顶留 15% 头寸;x 轴 7 天图每 3 天 /
-    30 天图每 6 天(「今天」在右);线 2pt 页 accent、末点圆点、缺天画 0、
-    图区 6% accent 底;轴字 `{typography.micro}` tertiary[原型 9.5 收五档]。
+    首次引入):**y 轴在左**三档 0/半值/峰值 + 网格线、域顶留 15% 头寸;
+    **x 轴 MM-DD 每天一格**(30 天图标签 -45° 斜排防重叠;2026-11-14 用户
+    拍板,替代「N 天前」抽样刻度);**悬停读数** = 最近日竖线 + 顶部浮层
+    「MM-DD · 用量」(chartOverlay + onContinuousHover);线 2pt 页 accent、
+    末点圆点、缺天画 0、图区 6% accent 底;轴字 `{typography.micro}` tertiary。
   - **项目大卡**(agent-tab/06 对齐 tokscale 参数;间距 = 同日追补令牌档):卡 =
     cardHigh 底 + `{rounded.inner}` 10 + 内距 `{spacing.card-padding}` 16、层间距
     `{spacing.group-gap}` 12(首版 12/8 是两列窄卡时代收编,单列大卡下过密,作废)。层序:头(项目名 14.5 semibold + 占比 micro
