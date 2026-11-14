@@ -205,6 +205,8 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.module-card-min-width}` | 340pt | 清理总览模块大卡自适应网格的单卡最小宽(p6-cleaner/03):列数 = min(2, 内容宽容纳列数)——720 最小窗 1 列、默认窗 880 起 2 列、**上限 2 列**(品类只有六卡,不随 ultrawide 拉列);列距 `{spacing.group-gap}` 12 |
 | `{layout.agent-project-card-min-width}` | ~~960pt~~ | **superseded**(agent-tab/06 二度修正):SwiftUI `GridItem(.flexible(minimum:))` 的 min 是硬下限,容器再窄不缩——960 在窄窗/弹窗把内容撑出容器右缘被裁(与 CSS min-width 会被轨道压缩不同)。项目大卡终态 = **恒单列满宽 VStack**,无网格参数 |
 | `{layout.agent-project-limit}` | 10 个 | 智能体页消耗子页项目默认展示上限(agent-tab/06,2026-11-14 用户拍板):超出末行「显示全部(另 N 个项目)⌄ / 收起,只看前 10 个⌃」,排行截断末行(`RankingOverflowRow`)同款交互与视觉 |
+| `{layout.agent-chart-two-column-min-width}` | 1232pt | 智能体页消耗子页「日历图 + 走势」并排断点(agent-tab/07,2026-11-14 用户拍板「1280 变为一列」):子页内容宽 ≥ 1232(= 窗宽 1280 − 两侧 `{spacing.window-padding}` 24)两列并排等高,否则上下一列;弹窗恒一列。替代 06 的 `ViewThatFits`(按弹性子视图理想宽判定,切换点不可控) |
+| `{layout.agent-trend-height}` | 180pt / 120pt | 走势图单列时定高(主窗口 / 弹窗紧凑档);并排时弹性(下限 140)吃满行高 |
 | `{layout.ranking-limit}` | 20 行 | 各排行(弹窗与主窗口同规则)只列前 20 名,超出补末行:弹窗「查看全部(另 N 项)」跳主窗口并落地即展开,主窗口「显示全部(另 N 项)」原地展开 / 「收起」(ranking-limit/01,2026-11-02 用户拍板;原 11-01 `popover-ranking-limit` 只截弹窗)。主窗口搜索命中不截 |
 | `{layout.sheet-width}` | 460pt | 确认清单 sheet 定宽(清理页「清理…」,p4-cleaner/04;原型 B 变体同值) |
 | `{layout.sheet-list-max-height}` | 220pt | 确认清单 sheet 内逐行列表的最大高(超出滚动,总量与按钮恒在视口内) |
@@ -609,8 +611,12 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   - **消耗子页**(agent-tab/05 视觉细节全保留,agent-tab/06 只改结构与归属):
     ①数字卡排 = **四张一排**(今日消耗 / N 天合计 / 日均 / **Claude 用量**——
     5 小时窗% 优先缺失退本周,副行「本周 N% · 重置 X 后」,快照缺失「—」不伪造);
-    lift 小卡规格同下;②**日历图 + 走势一排两列**(`ViewThatFits` 媒体查询语义:
-    容器不够宽上下排)——「重新扫描」在日历图卡头(与「年」占位药丸并排);
+    lift 小卡规格同下;②**日历图 + 走势**:内容宽 ≥ `{layout.agent-chart-two-column-min-width}`
+    1232(窗宽 1280)一排两列等高,否则上下一列(agent-tab/07 替代 `ViewThatFits`)
+    ——「重新扫描」在日历图卡头(与「年」占位药丸并排;**卡头文字按钮配方** =
+    `arrow.clockwise` + 文字,borderless 12 semibold secondary,扫描中换 mini 转圈 +
+    「扫描中」禁用;07 收编 06 的 `.bordered` 小号系统按钮,与空间地图「在 Finder 中
+    显示」同款);
     ③**项目大卡响应式网格**(三度修正终态,`AgentProjectCardGrid`):单卡保底
     520、上限 3 列,列数按容器实宽算;**行内 HStack 等高**、末行不满自动满宽;
     不用 GridItem minimum(flexible 硬下限窄容器溢出,前案)——容器多窄单列
@@ -629,29 +635,49 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
     (折算下限 6h 防凌晨虚高)——进行中的天与完整天直接比天然吃亏,11-14
     实报「今天没色」:16 点 152M ÷ 年峰 1.94B = 7.9% 恰卡灰档线下 `{colors.surface-card-high}`;accent 透明度
     0.25/0.5/0.75/1)、图区底 6% 灰;**悬停读数** = 命中格 accent 描边 +
-    左上浮层胶囊「日期 · 当日用量」(cardHigh 90%,坐标反算不依赖形状
-    hit test,空间地图同款纪律)。
+    格正上方**图表浮层**(下条;锚定命中格,放不下翻下方——07 废「跟随光标
+    像素」,逐格吸附更稳;坐标反算不依赖形状 hit test,空间地图同款纪律)。
+  - **图表浮层 `AgentChartTooltip`**(agent-tab/07,两图共用,11-14 实报「tooltip
+    不好看」):两行——日期 micro secondary(「今天 · 11月14日」/「11月13日 周四」,
+    跨年补年)+ 8×8 圆角 2 色块 + 读数 `{typography.body}` 12 semibold 等宽;底 =
+    系统 `.regularMaterial`(浮层交给系统材质、不自绘阴影)、`{rounded.chip}` 8、
+    内距 6×8;定位走 PulseCore `ChartHoverGeometry`(锚点正上方居中、间距 6、
+    实测尺寸水平钳位,首帧未量到尺寸前隐藏)。06 的单行 cardHigh 90% 胶囊在
+    卡底上对比不足、宽度硬编码估算,作废。
   - **走势** = 官方 Swift Charts(`LineMark` + 自定 `AxisMarks`;agent-tab/05
     首次引入):**y 轴在左**三档 0/半值/峰值 + 网格线、域顶留 15% 头寸;
     **x 轴 MM-DD 每天一格**(30 天图标签 -45° 斜排防重叠;2026-11-14 用户
-    拍板,替代「N 天前」抽样刻度);**悬停读数** = 光标精确竖线(高度钳绘图区,Anchor plotFrame)+ 吸附日
-    高亮点 + 跟随光标浮层「MM-DD · 用量」(竖线不画在吸附日上——7 天图
-    半天吸附偏差可达 ±45pt,11-14 实报「跟鼠标对不上」);线 2pt 页 accent、
-    末点圆点、缺天画 0、图区 6% accent 底;轴字 `{typography.micro}` tertiary。
-  - **项目大卡**(agent-tab/06 对齐 tokscale 参数;间距 = 同日追补令牌档):卡 =
-    cardHigh 底 + `{rounded.inner}` 10 + 内距 `{spacing.card-padding}` 16、层间距
-    `{spacing.group-gap}` 12(首版 12/8 是两列窄卡时代收编,单列大卡下过密,作废)。层序:头(项目名 14.5 semibold + 占比 micro
-    tertiary)→ 主数值 `{typography.figure-card}` 24 + 环比 micro → **四桶 +
-    缓存倍率行**(Input / Output / Cache R / Cache W / Cache× 五格等分,标签
-    micro tertiary + 值 12 semibold 等宽,五格间距 16;倍率 = 缓存读 ÷ 净
-    (输入+输出),分母 0 →「—」)→ 模型分段条(高 4 圆角 2,分段色 `{colors.agent-model-*}`
-    按序,占比前二 + 剩余并「其他」;色点图例 6×6 圆角 2 + micro)→ harness
-    分段条 + 底行(claude/zcode 占比 micro tertiary;「● 在跑 N」
-    `{colors.state-positive}` / 「静了 N 天」)→ 活跃行(活跃 N/窗口 天 ·
-    **现存会话数**(Claude≈近 30 天未删文件 + ZCode 有账全史,扫描现数不落库;
-    slug 末词与账本项目名做唯一尾段归并)· 请求数)。层间分隔 = hairline
-    divider(卡内层界,不是卡描边)。分段条轨道 = `{colors.ink-tertiary}`
-    14%。Cost 美元与精确 Last Active = 用户点名不做。
+    拍板,替代「N 天前」抽样刻度);**悬停读数** = 吸附日 `RuleMark` 竖线 + 高亮点 + 点正上方图表浮层(07
+    根因修正后吸附即精确,竖线回到数据点上;06g/06h「竖线贴光标」是绕开症状)。
+    **07 根因**:①`.value(_, date, unit: .day)` 让 Charts 把点画在当天区间
+    中点(+12h),刻度与吸附按零点,三者差半天,且旧域 first−12h…last+12h
+    使首点离左缘一整天——**日期轴一律不带 unit,域 = 首…末日零点**,线贴绘图区
+    左右缘;②`proxy.value(atX:)` 吃**绘图区坐标**,overlay 本地坐标须先减
+    plotFrame 原点(漏减 = y 标签宽的系统性右偏);③x 标签 `rotationEffect`
+    不参与布局(斜字仍互压、伸出图外)——**每天一刻度保留,标签按宽抽稀横排**
+    (单签 ≥44pt,从今天倒数、末点恒标;`AxisValueLabel(centered: false, anchor:,
+    horizontalSpacing: 0)` 中间居中、首左末右锚,默认左锚会把末签挤出被丢弃);
+    线 2pt 页 accent + 单调插值、**线下渐变面积 32%→0**(11-14 用户要「带背景、
+    上浓下淡」,同 AreaTrendChartView 配方,替代图区 6% 平底)、末点圆点、缺天画 0;轴字 `{typography.micro}` tertiary。
+  - **项目大卡**(agent-tab/07 重设计,11-14 用户实报「有点丑」;06 版五层四条
+    分隔线 + 两条独立分段条 + 满屏 micro 灰字、无主次,作废):卡 = cardHigh 底 +
+    `{rounded.inner}` 10 + 内距 `{spacing.card-padding}` 16,**段间 16、段内 8**,
+    四段:①头 = `folder.fill` 12(在跑 / 今天活跃取页 accent,静了取
+    `{colors.state-inactive}`)+ 项目名 14.5 semibold + 在跑时 `ChipView.inline`
+    「在跑 N」`{colors.state-positive}`;右「占 N%」caption 11 secondary;下接主数值
+    `{typography.figure-card}` 24 + 环比 micro。②五格读数(Input / Output /
+    Cache R / Cache W / Cache× 等分,标签 micro tertiary + **值 14.5 semibold
+    等宽**——06 的 12 与标签层级太近;倍率 = 缓存读 ÷ 净(输入+输出),分母 0 →
+    「—」)。③构成两行「模型 / 来源」:左标签列 `{layout.row-label-short}` 36
+    (caption secondary)+ 右分段条(**高 6 圆角 3、段间 2pt 缝**,轨道
+    `{colors.ink-tertiary}` 14%;模型色 `{colors.agent-model-*}` 按序、占比前二 +
+    「其他」;来源 Claude / ZCode = 前两色)+ 图例(6×6 圆角 2 色点 + 名 secondary +
+    占比 tertiary,micro;份额 0 不进图例)。④**全卡唯一一条 hairline**,下接元信息
+    尾行:SF 符号引导三项(calendar 活跃 N/窗口 天 · bubble 现存会话数 · 箭头
+    请求数,caption 11 secondary,符号 tertiary,项间 16)+ 右「今天活跃 / 静了 N 天」
+    tertiary。**现存会话数**口径不变(Claude≈近 30 天未删文件 + ZCode 有账全史,
+    扫描现数不落库;slug 末词与账本项目名做唯一尾段归并)。Cost 美元与精确
+    Last Active = 用户点名不做。
 
 ## Do's and Don'ts
 
