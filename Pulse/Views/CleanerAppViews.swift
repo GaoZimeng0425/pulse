@@ -262,36 +262,16 @@ struct AppListSection: View {
     }
 
     /// 搜索 + 排序 + 操作提示(Q5:默认占用降序,可切按名;子页内过滤)。
-    /// 2026-11-08 归一:搜索换系统原生输入框(roundedBorder + 放大镜/清空内嵌),
-    /// 不再手绘灰底盒;排序 seg 与垃圾页「大小|新旧」同款(两字标签、regular、
-    /// tint 强调色、自然宽)。
+    /// 搜索框(agent-tab/08 改):11-08 换的系统 roundedBorder 输入框实测画出
+    /// 26pt(边框画在框外)vs 分段控件 24pt,且内嵌放大镜被原生框底盖住看不见
+    /// ——用户实报「input 高度不对,没和右侧切换对齐」。改走工具栏搜索框
+    /// (`MainSearchField`)同配方:放大镜 + 无边框输入 + primary 6% 底,
+    /// **定高 24 = 分段控件 regular 实测高**,圆角 7 与分段轨道同形。
     private var controlsBar: some View {
         @Bindable var model = model
         return HStack(spacing: 8) {
-            TextField("搜索应用", text: $model.searchQuery)
-                .textFieldStyle(.roundedBorder)
+            CleanerSearchField(prompt: "搜索应用", text: $model.searchQuery)
                 .frame(width: 220)
-                .overlay(alignment: .leading) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
-                        .padding(.leading, 7)
-                        .allowsHitTesting(false)
-                }
-                .overlay(alignment: .trailing) {
-                    if !model.searchQuery.isEmpty {
-                        Button {
-                            model.searchQuery = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.tertiary)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.trailing, 6)
-                        .help("清空搜索")
-                    }
-                }
 
             Picker("排序", selection: $model.sortOrder) {
                 Text("占用").tag(AppSortOrder.sizeDescending)
@@ -780,5 +760,44 @@ private struct AppUninstallConfirmSheet: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
+    }
+}
+
+// MARK: - 子页内搜索框
+
+/// 清理页子页搜索框:与同排分段控件(regular,实测 24pt)等高、同圆角;
+/// 视觉配方同主窗口工具栏搜索框(放大镜 secondary + plain 输入 12 + 清空钮)。
+struct CleanerSearchField: View {
+    /// 分段控件 regular 实测高(NSHostingView 离屏量得;两者必须相等才对齐)。
+    static let height: CGFloat = 24
+
+    let prompt: String
+    @Binding var text: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            TextField(prompt, text: $text)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12))
+                .onExitCommand { text = "" }
+            if !text.isEmpty {
+                Button {
+                    text = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("清空搜索")
+                .accessibilityLabel("清空搜索")
+            }
+        }
+        .padding(.horizontal, 8)
+        .frame(height: Self.height)
+        .background(Color.primary.opacity(0.06), in: .rect(cornerRadius: 7))
     }
 }

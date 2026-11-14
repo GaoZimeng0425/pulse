@@ -401,6 +401,10 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   数值 14.5 semibold 等宽**定宽列**(同法按 14.5pt 量最宽现实读数 "999.9 GB" + 2)/
   行内距 14(左右)×**10(上下)** / 勾选框 `.controlSize(.large)`;安全档 chip =
   `ChipView.regular`(11 semibold、内距 10×3);
+  **子页搜索框 `CleanerSearchField`**(agent-tab/08):放大镜 + plain 输入 12 +
+  清空钮、primary 6% 底、圆角 7、**定高 24 = 同排分段控件 regular 实测高**
+  (11-08 换的系统 roundedBorder 实测画 26pt 且内嵌放大镜被原生框底盖住,与分段
+  控件上下不齐,作废;配方同主窗口工具栏搜索框);
   组头 14.5 bold + 总量 12;子页 tab 药丸 = `PillTabBar.comfortable`;**动作按钮与
   「大小|新旧」segmented 一律 B 档**(按钮 `.controlSize(.large)`、seg 默认 regular
   不再 mini);项目子组行 = 14.5 bold、上下距 10、**无背景**(权重靠字号与内距)。
@@ -602,11 +606,12 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   文字 chip,组高负载 = 数值红字 + 最忙进程名 chip(见排行列表条,2026-10-30 用户拍板)。
 - **智能体页三子 tab**(agent-tab/06,用户拍板「token/会话/dev server 分页」;
   定稿骨架 `.scratch/agent-tab/wireframe-agents-page.html` 是唯一视觉真相,纯线稿
-  约定见票):子药丸条 = `PillTabBar` comfortable 档 + 页指标色(`AgentSubTabBar`,
+  约定见票):子药丸条 = `PillTabBar` comfortable 档 + 页指标色 + **玻璃外裹
+  `isGlassContainer`**(08 补:06 漏传,与清理页子页条外观不一致)(`AgentSubTabBar`,
   清理页子页条之后第二个使用者),状态在 `DashboardModel.agentSubTab`(切 tab
   不丢),默认落「消耗」。**「每日消耗」外壳拆掉,四块平级成卡**(用户拍板);
   Claude 用量卡撤(用量并入数字卡排第 4 张)。三子页 = **消耗**(下条)/ **会话**
-  (Claude Code 会话卡 + ZCode 会话卡)/ **开发服务**(dev server 卡,原节标题撤
+  (Claude Code 会话卡 + ZCode 会话卡;agent-tab/08 重设计见下「会话子页」)/ **开发服务**(dev server 卡,原节标题撤
   ——子药丸已是身份)。
   - **消耗子页**(agent-tab/05 视觉细节全保留,agent-tab/06 只改结构与归属):
     ①数字卡排 = **四张一排**(今日消耗 / N 天合计 / 日均 / **Claude 用量**——
@@ -659,6 +664,20 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
     horizontalSpacing: 0)` 中间居中、首左末右锚,默认左锚会把末签挤出被丢弃);
     线 2pt 页 accent + 单调插值、**线下渐变面积 32%→0**(11-14 用户要「带背景、
     上浓下淡」,同 AreaTrendChartView 配方,替代图区 6% 平底)、末点圆点、缺天画 0;轴字 `{typography.micro}` tertiary。
+  - **token 读数格式**(agent-tab/08):唯一出处 PulseCore `AgentTokenFormat`
+    (app 层 `agentTokenText` / `agentTokenFigure` 仅转发)——999 / 556k / 6.9M /
+    **≥1000M 进 B**(1.9B,一位小数;M 档四舍五入到 1000.0M 时直接升 B)。
+  - **会话子页**(agent-tab/08 重设计,11-14 实报「不好看;23% 看不懂;6/10 6.9M
+    看不懂」——06 沿用实体行,右侧裸数字无标签无单位):每会话一块 lift 小块
+    (cardHigh 底、`{rounded.inner}` 10、内距 12 / 弹窗 10,块间 8);左 = 图标 +
+    名(row-name semibold)+ 状态 `ChipView.inline`(Claude 忙 = 页 accent、其余
+    ink-tertiary;ZCode 在跑 / 空闲)→ 摘要(row-sub secondary:Claude 任务摘要 /
+    ZCode 更新于 N 前)→ 元信息 micro tertiary(Claude 模型 · 运行时长 · 子代理 N ·
+    pid;ZCode 会话短 id);右 = **带标签读数块**(右对齐:标签 micro tertiary +
+    读数 row-value semibold → `MeterBar` 定宽 `RowMetrics.meterWidth` → 注脚 micro
+    tertiary):Claude「上下文 N%」+「已用 / 窗口上限」(无读数「—」+「尚无请求」),
+    ZCode「子代理在跑 a / b」+「累计 N tokens」。卡头右计数「N 个实例」/「近一天
+    N 个会话」caption secondary。读数一律自带口径与单位,不出裸数字。
   - **项目大卡**(agent-tab/07 重设计,11-14 用户实报「有点丑」;06 版五层四条
     分隔线 + 两条独立分段条 + 满屏 micro 灰字、无主次,作废):卡 = cardHigh 底 +
     `{rounded.inner}` 10 + 内距 `{spacing.card-padding}` 16,**段间 16、段内 8**,
@@ -666,7 +685,8 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
     `{colors.state-inactive}`)+ 项目名 14.5 semibold + 在跑时 `ChipView.inline`
     「在跑 N」`{colors.state-positive}`;右「占 N%」caption 11 secondary;下接主数值
     `{typography.figure-card}` 24 + 环比 micro。②五格读数(Input / Output /
-    Cache R / Cache W / Cache× 等分,标签 micro tertiary + **值 14.5 semibold
+    Cache R / Cache W / Cache× **两端对齐等间距**(08:首格贴左、末格贴右且
+    内部右对齐,格间 Spacer 均分;07 等宽列让末格悬在中段),标签 micro tertiary + **值 14.5 semibold
     等宽**——06 的 12 与标签层级太近;倍率 = 缓存读 ÷ 净(输入+输出),分母 0 →
     「—」)。③构成两行「模型 / 来源」:左标签列 `{layout.row-label-short}` 36
     (caption secondary)+ 右分段条(**高 6 圆角 3、段间 2pt 缝**,轨道
