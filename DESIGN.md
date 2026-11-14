@@ -670,9 +670,13 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   - **会话子页**(agent-tab/08 重设计,11-14 实报「不好看;23% 看不懂;6/10 6.9M
     看不懂」——06 沿用实体行,右侧裸数字无标签无单位):每会话一块 lift 小块
     (cardHigh 底、`{rounded.inner}` 10、内距 12 / 弹窗 10,块间 8);左 = 图标 +
-    名(row-name semibold)+ 状态 `ChipView.inline`(Claude 忙 = 页 accent、其余
+    **项目名**(row-name semibold;09:工作目录经 PulseCore `AgentSessionLocation`
+    折回主仓名,worktree 另挂 `ChipView.inline` ink-tertiary +
+    `arrow.triangle.branch`「⑂ slug」——11-14 实报「看不出是哪个项目」)+ 状态 `ChipView.inline`(Claude 忙 = 页 accent、其余
     ink-tertiary;ZCode 在跑 / 空闲)→ 摘要(row-sub secondary:Claude 任务摘要 /
-    ZCode 更新于 N 前)→ 元信息 micro tertiary(Claude 模型 · 运行时长 · 子代理 N ·
+    ZCode 更新于 N 前)→ **路径行**(09:`folder` + home 缩写 `~` 的工作目录,
+    micro tertiary,中段截断,help 显全路径)→ 元信息 micro tertiary(Claude
+    会话名「…」(与项目 / worktree 同名不写)· 模型 · 运行时长 · 子代理 N ·
     pid;ZCode 会话短 id);右 = **带标签读数块**(右对齐:标签 micro tertiary +
     读数 row-value semibold → `MeterBar` 定宽 `RowMetrics.meterWidth` → 注脚 micro
     tertiary):Claude「上下文 N%」+「已用 / 窗口上限」(无读数「—」+「尚无请求」),
