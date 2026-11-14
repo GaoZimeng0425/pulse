@@ -45,6 +45,24 @@ func agentCountText(_ count: Int) -> String {
     return "\(count)"
 }
 
+/// 账本日键 "yyyy-MM-dd" → Date(走 Calendar 分量,免 DateFormatter 线程坑;
+/// agent-tab/06f 日期轴与悬停读数用)。
+func agentDate(_ day: String) -> Date? {
+    let parts = day.split(separator: "-").compactMap { Int($0) }
+    guard parts.count == 3 else { return nil }
+    var components = DateComponents()
+    components.year = parts[0]
+    components.month = parts[1]
+    components.day = parts[2]
+    return Calendar.current.date(from: components)
+}
+
+/// 日期短型 "MM-DD"(轴刻度与悬停浮层;不随区域漂移,手拼)。
+func agentShortDate(_ date: Date) -> String {
+    let components = Calendar.current.dateComponents([.month, .day], from: date)
+    return String(format: "%02d-%02d", components.month ?? 0, components.day ?? 0)
+}
+
 /// 智能体页子 tab(agent-tab/06,用户拍板三页;状态在 DashboardModel)。
 enum AgentSubTab: Hashable {
     /// 消耗(token 账:数字卡排 / 日历图+走势 / 项目宽卡)。
