@@ -161,18 +161,32 @@ struct AgentProjectCardView: View {
     // MARK: 段 2:五格读数(tokscale 对齐)
 
     /// 倍率 = 缓存读 ÷ 净(输入+输出),衡量缓存吃掉多少重复读取。
+    /// 08:五格**两端对齐、等间距**(首格贴左、末格贴右,格间 Spacer 均分;用户
+    /// 实报 07 的等宽列让末格「Cache×」悬在中段不靠右)。末格内部右对齐。
     private var bucketsRow: some View {
-        HStack(alignment: .top, spacing: 16) {
+        HStack(alignment: .top, spacing: 0) {
             bucket("Input", agentTokenText(project.inputTokens))
+            Spacer(minLength: 12)
             bucket("Output", agentTokenText(project.outputTokens))
+            Spacer(minLength: 12)
             bucket("Cache R", agentTokenText(project.cacheReadTokens))
+            Spacer(minLength: 12)
             bucket("Cache W", agentTokenText(project.cacheWriteTokens))
-            bucket("Cache×", project.cacheMultiplier.map { String(format: "%.1fx", $0) } ?? "—")
+            Spacer(minLength: 12)
+            bucket(
+                "Cache×",
+                project.cacheMultiplier.map { String(format: "%.1fx", $0) } ?? "—",
+                alignment: .trailing
+            )
         }
     }
 
-    private func bucket(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+    private func bucket(
+        _ label: String,
+        _ value: String,
+        alignment: HorizontalAlignment = .leading
+    ) -> some View {
+        VStack(alignment: alignment, spacing: 2) {
             Text(label)
                 .font(.system(size: 10.5))
                 .foregroundStyle(.tertiary)
@@ -182,7 +196,6 @@ struct AgentProjectCardView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: 段 3:构成(模型 / 来源两行,标签列对齐)
