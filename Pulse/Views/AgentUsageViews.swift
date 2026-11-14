@@ -372,6 +372,9 @@ private struct AgentDeltaText: View {
 struct AgentHeatWall: View {
     static let weeks = 52
     private static let gap: CGFloat = 3
+    /// 墙四周留白(2026-11-14 用户实报「块间有间距、和外层没有」)——与格间
+    /// 距同源,墙与图区底边缘之间不贴边。
+    private static let inset: CGFloat = 3
     private static let axisHeight: CGFloat = 18
 
     /// 旧 → 新的逐天合计(weeks × 7 条;天数固定,缺天 0)。
@@ -379,18 +382,23 @@ struct AgentHeatWall: View {
 
     @State private var width: CGFloat = 640
     @State private var hoverIndex: Int?
+    /// 悬停光标位置(浮层跟随鼠标,2026-11-14 用户拍板;Charts 不内置
+    /// tooltip,自绘浮层定位自由在手里)。
+    @State private var hoverLocation: CGPoint?
 
     private var step: CGFloat {
         Self.gap + side
     }
 
-    /// 等比格子边长(容器宽容纳 52 列;窄到弹窗也只是格小,不滚动)。
+    /// 等比格子边长(容器宽容纳 52 列;窄到弹窗也只是格小,不滚动)。宽和高
+    /// 两个方向都先扣掉两端 inset,墙四周与外层之间留同间距。
     private var side: CGFloat {
-        max((width - Self.gap * CGFloat(Self.weeks - 1)) / CGFloat(Self.weeks), 1)
+        let horizontal = (width - Self.inset * 2 - Self.gap * CGFloat(Self.weeks - 1)) / CGFloat(Self.weeks)
+        return max(horizontal, 1)
     }
 
     private var gridHeight: CGFloat {
-        side * 7 + Self.gap * 6
+        Self.inset * 2 + side * 7 + Self.gap * 6
     }
 
     /// 逐天日期(与 totals 同序;轻量解析,每次 body 重算可忽略)。
@@ -413,26 +421,48 @@ struct AgentHeatWall: View {
             switch phase {
             case let .active(location):
                 hoverIndex = hitTest(location)
+                hoverLocation = location
             case .ended:
                 hoverIndex = nil
+                hoverLocation = nil
             }
         }
         .overlay(alignment: .topLeading) {
-            if let hoverIndex {
+            if let hoverIndex, let hoverLocation {
                 hoverLabel(for: hoverIndex)
-                    .padding(8)
+                    // 跟随光标:右下偏移(不压格子),贴右/下缘翻到另一侧。
+                    .offset(
+                        x: hoverLocation.x + (flipX ? -labelWidth - 12 : 12),
+                        y: hoverLocation.y + (flipY ? -34 : 12)
+                    )
                     .allowsHitTesting(false)
             }
         }
     }
 
+    /// 浮层翻面:光标靠右/靠下时翻到左/上,不裁出墙外。
+    private var flipX: Bool {
+        guard let hoverLocation else { return false }
+        return hoverLocation.x > width - labelWidth - 12
+    }
+
+    private var flipY: Bool {
+        guard let hoverLocation else { return false }
+        return hoverLocation.y > gridHeight - 34
+    }
+
+    /// 浮层估算宽("yyyy-MM-dd · 999.9B" ≈ 132;翻面钳位用,不追求精确)。
+    private var labelWidth: CGFloat {
+        132
+    }
+
     /// 悬停命中:坐标 → 列/行 → 天序号(旧 → 新,列主序同 05 版映射)。
     private func hitTest(_ point: CGPoint) -> Int? {
-        let column = Int(point.x / step)
-        let row = Int(point.y / step)
+        let column = Int((point.x - Self.inset) / step)
+        let row = Int((point.y - Self.inset) / step)
         guard column >= 0, column < Self.weeks,
               row >= 0, row < 7,
-              point.y <= gridHeight,
+              point.y - Self.inset <= side * 7 + Self.gap * 6,
               column * 7 + row < totals.count else { return nil }
         return column * 7 + row
     }
@@ -464,8 +494,8 @@ struct AgentHeatWall: View {
             let row = index % 7
             let value = Double(totals[index].total)
             let rect = CGRect(
-                x: CGFloat(column) * step,
-                y: CGFloat(row) * step,
+                x: Self.inset + CGFloat(column) * step,
+                y: Self.inset + CGFloat(row) * step,
                 width: side,
                 height: side
             )
@@ -504,7 +534,7 @@ struct AgentHeatWall: View {
                         .font(.system(size: 10.5))
                         .monospacedDigit()
                         .foregroundStyle(.tertiary),
-                    at: CGPoint(x: CGFloat(column) * step, y: axisY),
+                    at: CGPoint(x: Self.inset + CGFloat(column) * step, y: axisY),
                     anchor: .leading
                 )
             }
@@ -531,6 +561,8 @@ struct AgentTrendChart: View {
     }
 
     @State private var hoverIndex: Int?
+    /// 悬停光标 y(浮层跟随鼠标;Charts 不内置 tooltip,自绘定位)。
+    @State private var hoverY: CGFloat?
 
     var body: some View {
         let points: [Point] = totals.compactMap { total in
@@ -606,14 +638,14 @@ struct AgentTrendChart: View {
         .chartOverlay { proxy in
             GeometryReader { geo in
                 if let hoverIndex, let x = proxy.position(forX: points[hoverIndex].date) {
-                    // 悬停竖线(全高,图内)。
-                    Rectangle()
-                        .fill(agentsAccent.opacity(0.35))
-                        .frame(width: 1)
-                        .position(x: x, y: geo.size.height / 2)
-                    // 顶部浮层:日期 · 用量(水平钳制不出界)。
+                    // 浮层跟随光标(右上偏移,贴右缘翻左);悬停竖线只留 Chart 内
+                    // 的 RuleMark(数据层,天然钳在图区)——此前叠加浮层全高
+                    // Rectangle 造成双线且伸出图区,已删(2026-11-14 用户实报)。
                     hoverLabel(for: points[hoverIndex])
-                        .position(x: min(max(x, 56), geo.size.width - 56), y: 14)
+                        .offset(
+                            x: x > geo.size.width - 140 ? x - 132 : x + 8,
+                            y: (hoverY ?? 0) - 24
+                        )
                 }
                 Color.clear
                     .contentShape(.rect)
@@ -623,8 +655,10 @@ struct AgentTrendChart: View {
                             hoverIndex = nearestIndex(
                                 atX: location.x, proxy: proxy, points: points
                             )
+                            hoverY = location.y
                         case .ended:
                             hoverIndex = nil
+                            hoverY = nil
                         }
                     }
             }
