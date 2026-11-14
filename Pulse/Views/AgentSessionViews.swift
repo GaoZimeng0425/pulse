@@ -46,12 +46,16 @@ private struct AgentSessionMetric: View {
     }
 }
 
-/// 会话 lift 小块骨架:左图标 + 三行文字(名行 / 摘要 / 元信息),右读数块。
+/// 会话 lift 小块骨架:左图标 + 文字列(项目名 + ⑂ worktree + 状态 / 摘要 /
+/// 路径 / 元信息),右读数块。09:标题恒为项目名(worktree 折回主仓),worktree
+/// 另挂标签、补缩写路径——用户实报「会话看不出是哪个项目」。
 private struct AgentSessionTile<Badge: View, Metric: View>: View {
     let systemImage: String
     let tint: Color
     let name: String
+    var worktree: String?
     let summary: String?
+    var path: String?
     let meta: String?
     let compact: Bool
     @ViewBuilder var badge: () -> Badge
@@ -70,6 +74,15 @@ private struct AgentSessionTile<Badge: View, Metric: View>: View {
                         .font(.system(size: RowMetrics.nameFontSize(compact: compact), weight: .semibold))
                         .lineLimit(1)
                         .truncationMode(.middle)
+                    if let worktree {
+                        ChipView(
+                            text: worktree,
+                            tint: Surface.inkTertiary,
+                            profile: .inline,
+                            systemImage: "arrow.triangle.branch",
+                            help: "在 worktree「\(worktree)」里运行"
+                        )
+                    }
                     badge()
                 }
                 if let summary {
@@ -78,6 +91,17 @@ private struct AgentSessionTile<Badge: View, Metric: View>: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
+                }
+                if let path {
+                    Label {
+                        Text(path)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    } icon: {
+                        Image(systemName: "folder")
+                    }
+                    .labelStyle(AgentSessionPathLabelStyle())
+                    .help(path)
                 }
                 if let meta {
                     Text(meta)
@@ -95,6 +119,24 @@ private struct AgentSessionTile<Badge: View, Metric: View>: View {
         .background(Surface.cardHigh, in: .rect(cornerRadius: 10))
         .accessibilityElement(children: .combine)
     }
+}
+
+/// 路径行:folder 图标 + 路径(micro tertiary,图标-文字 4)。
+private struct AgentSessionPathLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 4) {
+            configuration.icon
+            configuration.title
+        }
+        .font(.system(size: 10.5))
+        .foregroundStyle(.tertiary)
+    }
+}
+
+/// 工作目录 → 位置(home 缩写 `~`;解析失败 nil,调用方退回旧名)。
+private func agentSessionLocation(_ path: String?) -> AgentSessionLocation? {
+    guard let path, !path.isEmpty else { return nil }
+    return AgentSessionLocation.resolve(path: path, home: NSHomeDirectory())
 }
 
 /// 卡头右侧计数:「2 个实例」。
@@ -143,12 +185,15 @@ struct ClaudeSessionsCardView: View {
     }
 
     private func tile(_ session: ClaudeAgentSessionStatus) -> some View {
-        AgentSessionTile(
+        let location = agentSessionLocation(session.cwd)
+        return AgentSessionTile(
             systemImage: "ant",
             tint: agentsAccent,
-            name: session.name ?? session.projectName,
+            name: location?.project ?? session.projectName,
+            worktree: location?.worktree,
             summary: session.taskSummary,
-            meta: meta(session),
+            path: location?.displayPath,
+            meta: meta(session, location: location),
             compact: isCompact
         ) {
             if let label = session.statusLabel {
@@ -170,9 +215,13 @@ struct ClaudeSessionsCardView: View {
         }
     }
 
-    /// 元信息:模型 · 运行时长 · 子代理 N · pid(缺失项省略,不占位)。
-    private func meta(_ session: ClaudeAgentSessionStatus) -> String {
+    /// 元信息:会话名(与项目 / worktree 不同才写)· 模型 · 运行时长 · 子代理 N ·
+    /// pid(缺失项省略,不占位)。
+    private func meta(_ session: ClaudeAgentSessionStatus, location: AgentSessionLocation?) -> String {
         var parts: [String] = []
+        if let name = session.name, name != location?.project, name != location?.worktree {
+            parts.append("会话「\(name)」")
+        }
         if let model = session.model {
             parts.append(AgentUsageWindow.modelDisplayName(model))
         }
@@ -232,11 +281,14 @@ struct ZCodeSessionsCardView: View {
 
     private func tile(_ session: ZCodeSessionStatus) -> some View {
         let running = session.activeAgents > 0
+        let location = agentSessionLocation(session.workspaceRoot)
         return AgentSessionTile(
             systemImage: "chevron.left.forwardslash.chevron.right",
             tint: running ? agentsAccent : Surface.inactive,
-            name: session.workspaceName ?? shortSessionID(session.sessionId),
+            name: location?.project ?? session.workspaceName ?? shortSessionID(session.sessionId),
+            worktree: location?.worktree,
             summary: session.updatedAgoSeconds.map { "更新于 \(PulseFormat.duration(seconds: $0))前" },
+            path: location?.displayPath,
             meta: "会话 \(shortSessionID(session.sessionId))",
             compact: isCompact
         ) {
