@@ -489,10 +489,23 @@ struct AgentHeatWall: View {
 
         let cells = Self.weeks * 7
         let maxValue = totals.map(\.total).max() ?? 0
+        // 进行中的「今天」按时刻折算成全天等效量再分档(2026-11-14 用户实报
+        // 「今天没色」:四档按 值/年峰值,今天 16 点扫到 152M ÷ 1.94B = 7.9%,
+        // 卡在 8% 灰档线下——进行中的天天然吃亏,扫描本身没问题);折算下限
+        // 6 小时,防凌晨小量被放大虚高。
+        let calendar = Calendar.current
+        let now = Date()
+        var todayElapsedFloor: TimeInterval?
+        if let today = dates.last {
+            todayElapsedFloor = max(now.timeIntervalSince(calendar.startOfDay(for: today)), 6 * 3600)
+        }
         for index in 0 ..< min(cells, totals.count) {
             let column = index / 7
             let row = index % 7
-            let value = Double(totals[index].total)
+            var value = Double(totals[index].total)
+            if index == totals.count - 1, let elapsed = todayElapsedFloor, elapsed > 0 {
+                value = value * 86400 / elapsed
+            }
             let rect = CGRect(
                 x: Self.inset + CGFloat(column) * step,
                 y: Self.inset + CGFloat(row) * step,
@@ -561,8 +574,8 @@ struct AgentTrendChart: View {
     }
 
     @State private var hoverIndex: Int?
-    /// 悬停光标 y(浮层跟随鼠标;Charts 不内置 tooltip,自绘定位)。
-    @State private var hoverY: CGFloat?
+    /// 悬停光标位置(浮层与竖线都贴光标;Charts 不内置 tooltip,自绘定位)。
+    @State private var hoverLocation: CGPoint?
 
     var body: some View {
         let points: [Point] = totals.compactMap { total in
@@ -595,8 +608,15 @@ struct AgentTrendChart: View {
             .foregroundStyle(agentsAccent)
             .symbolSize(30)
             if let hoverIndex {
-                RuleMark(x: .value("日期", points[hoverIndex].date, unit: .day))
-                    .foregroundStyle(agentsAccent.opacity(0.4))
+                // 吸附日高亮点(竖线不再画在吸附日上——进行中天的半天吸附偏差在
+                // 7 天图上可达 ±45pt,用户实报「跟鼠标对不上」;竖线改为浮层里
+                // 精确贴光标,见 chartOverlay)。
+                PointMark(
+                    x: .value("日期", points[hoverIndex].date, unit: .day),
+                    y: .value("Token", points[hoverIndex].value)
+                )
+                .foregroundStyle(agentsAccent.opacity(0.25))
+                .symbolSize(90)
             }
         }
         .chartXScale(domain: xLow ... xHigh)
@@ -637,14 +657,22 @@ struct AgentTrendChart: View {
         .frame(minHeight: 96, maxHeight: .infinity) // 双列等高时吃满行内剩余
         .chartOverlay { proxy in
             GeometryReader { geo in
-                if let hoverIndex, let x = proxy.position(forX: points[hoverIndex].date) {
-                    // 浮层跟随光标(右上偏移,贴右缘翻左);悬停竖线只留 Chart 内
-                    // 的 RuleMark(数据层,天然钳在图区)——此前叠加浮层全高
-                    // Rectangle 造成双线且伸出图区,已删(2026-11-14 用户实报)。
+                if let hoverIndex, let location = hoverLocation {
+                    // 竖线精确贴光标 x;高度钳在绘图区,不再伸出图区盖住轴标签
+                    // ——此前「吸附日 RuleMark + 全高 Rectangle」双线与半天吸附
+                    // 漂移均为实报,2026-11-14 一并修。plotFrame 在 macOS 27 SDK
+                    // 是 Anchor<CGRect> 属性,经 geo[anchor] 解析。
+                    let plot = proxy.plotFrame.map { geo[$0] } ?? geo.frame(in: .local)
+                    Rectangle()
+                        .fill(agentsAccent.opacity(0.35))
+                        .frame(width: 1)
+                        .frame(height: plot.height)
+                        .position(x: location.x, y: plot.midY)
+                    // 浮层跟随光标(右上偏移,贴右缘翻到左侧)。
                     hoverLabel(for: points[hoverIndex])
                         .offset(
-                            x: x > geo.size.width - 140 ? x - 132 : x + 8,
-                            y: (hoverY ?? 0) - 24
+                            x: location.x > geo.size.width - 140 ? location.x - 132 : location.x + 8,
+                            y: location.y - 24
                         )
                 }
                 Color.clear
@@ -655,10 +683,10 @@ struct AgentTrendChart: View {
                             hoverIndex = nearestIndex(
                                 atX: location.x, proxy: proxy, points: points
                             )
-                            hoverY = location.y
+                            hoverLocation = location
                         case .ended:
                             hoverIndex = nil
-                            hoverY = nil
+                            hoverLocation = nil
                         }
                     }
             }
