@@ -203,27 +203,22 @@ struct AgentUsagePaneView: View {
     /// 上下一列。06 的 `ViewThatFits` 按子视图理想宽判定,而热力墙 / Charts 都是
     /// 弹性宽、理想宽不可预期——何时切换不可控,是「别扭」的来源之一。弹窗恒一列。
     static let chartTwoColumnMinWidth: CGFloat = 1232
-    /// 单列时走势定高(`{layout.agent-trend-height}`;弹窗紧凑档 120)。
-    private var trendHeight: CGFloat {
-        isCompact ? 120 : 180
-    }
+    /// 弹窗紧凑档走势绘图区定高(热力墙在 330 宽下只有 ~45 高,不跟随)。
+    private static let compactTrendPlotHeight: CGFloat = 100
 
     private var chartRow: some View {
         Group {
             if chartColumns == 2 {
-                // 并排两卡等高(用户拍板 2026-11-13):fixedSize 先量两卡理想高取大者,
-                // 再按该高回传——热力墙卡被拉高、页脚压底,走势图弹性吃满。
+                // 并排两卡**结构同构**(agent-tab/10):卡头 → 图区(同宽同式等高)→
+                // 18pt 日期轴带 → 页脚,两卡天然等高、图区上下缘与日期标签基线逐行对齐。
                 HStack(alignment: .top, spacing: 16) {
                     heatCard
-                        .frame(maxHeight: .infinity, alignment: .top)
-                    trendCard(height: nil)
-                        .frame(maxHeight: .infinity, alignment: .top)
+                    trendCard
                 }
-                .fixedSize(horizontal: false, vertical: true)
             } else {
                 VStack(alignment: .leading, spacing: 16) {
                     heatCard
-                    trendCard(height: trendHeight)
+                    trendCard
                 }
             }
         }
@@ -255,19 +250,27 @@ struct AgentUsagePaneView: View {
                 }
             }
             AgentHeatWall(totals: totals)
-            Spacer(minLength: 0) // 并排被拉高时页脚压底;单列无效
-            HStack {
-                Text("Claude 与 ZCode 合计")
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.tertiary)
-                Spacer()
-                Text("最多一天 \(agentTokenText(totals.map(\.total).max() ?? 0))")
-                    .font(.system(size: 10.5))
-                    .monospacedDigit()
-                    .foregroundStyle(.tertiary)
-            }
+            chartFooter(
+                leading: "Claude 与 ZCode 合计",
+                trailing: "最多一天 \(agentTokenText(totals.map(\.total).max() ?? 0))"
+            )
         }
         .cardShell(compact: isCompact)
+    }
+
+    /// 两图卡共用页脚(micro tertiary,左说明右峰值;两卡同构等高的一部分)。
+    private func chartFooter(leading: String, trailing: String) -> some View {
+        HStack {
+            Text(leading)
+                .font(.system(size: 10.5))
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
+            Spacer()
+            Text(trailing)
+                .font(.system(size: 10.5))
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
+        }
     }
 
     /// 重新扫描 = 卡头文字按钮(07 收编:06 用 `.bordered` 小号系统按钮,与全 app
@@ -294,14 +297,21 @@ struct AgentUsagePaneView: View {
         .help("全量重扫 Claude 与 ZCode 的本地记录,补齐漏记的日子")
     }
 
-    private func trendCard(height: CGFloat?) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private var trendCard: some View {
+        let totals = AgentUsageWindow.dayTotals(rows: rows, days: range.days)
+        let values = totals.map(\.total)
+        let average = values.isEmpty ? 0 : values.reduce(0, +) / values.count
+        return VStack(alignment: .leading, spacing: 12) {
             CardHeader(symbolName: nil, title: "走势", tint: agentsAccent) {
                 rangePills
             }
             AgentTrendChart(
-                totals: AgentUsageWindow.dayTotals(rows: rows, days: range.days),
-                height: height
+                totals: totals,
+                plotHeight: isCompact ? Self.compactTrendPlotHeight : nil
+            )
+            chartFooter(
+                leading: "近 \(range.days) 天 · 日均 \(agentTokenText(average))",
+                trailing: "最多一天 \(agentTokenText(values.max() ?? 0))"
             )
         }
         .cardShell(compact: isCompact)

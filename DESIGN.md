@@ -206,7 +206,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.agent-project-card-min-width}` | ~~960pt~~ | **superseded**(agent-tab/06 二度修正):SwiftUI `GridItem(.flexible(minimum:))` 的 min 是硬下限,容器再窄不缩——960 在窄窗/弹窗把内容撑出容器右缘被裁(与 CSS min-width 会被轨道压缩不同)。项目大卡终态 = **恒单列满宽 VStack**,无网格参数 |
 | `{layout.agent-project-limit}` | 10 个 | 智能体页消耗子页项目默认展示上限(agent-tab/06,2026-11-14 用户拍板):超出末行「显示全部(另 N 个项目)⌄ / 收起,只看前 10 个⌃」,排行截断末行(`RankingOverflowRow`)同款交互与视觉 |
 | `{layout.agent-chart-two-column-min-width}` | 1232pt | 智能体页消耗子页「日历图 + 走势」并排断点(agent-tab/07,2026-11-14 用户拍板「1280 变为一列」):子页内容宽 ≥ 1232(= 窗宽 1280 − 两侧 `{spacing.window-padding}` 24)两列并排等高,否则上下一列;弹窗恒一列。替代 06 的 `ViewThatFits`(按弹性子视图理想宽判定,切换点不可控) |
-| `{layout.agent-trend-height}` | 180pt / 120pt | 走势图单列时定高(主窗口 / 弹窗紧凑档);并排时弹性(下限 140)吃满行高 |
+| `{layout.agent-trend-height}` | ~~180pt / 120pt~~ | **superseded**(agent-tab/10,11-15 用户实报「两个 chart 高度应该一致,坐标水平对齐」):走势绘图区高 = `AgentHeatWall.gridHeight(forWidth:)`(与热力墙同宽同式,一列 / 两列都等高,下限 60);仅弹窗紧凑档定高 100 |
 | `{layout.ranking-limit}` | 20 行 | 各排行(弹窗与主窗口同规则)只列前 20 名,超出补末行:弹窗「查看全部(另 N 项)」跳主窗口并落地即展开,主窗口「显示全部(另 N 项)」原地展开 / 「收起」(ranking-limit/01,2026-11-02 用户拍板;原 11-01 `popover-ranking-limit` 只截弹窗)。主窗口搜索命中不截 |
 | `{layout.sheet-width}` | 460pt | 确认清单 sheet 定宽(清理页「清理…」,p4-cleaner/04;原型 B 变体同值) |
 | `{layout.sheet-list-max-height}` | 220pt | 确认清单 sheet 内逐行列表的最大高(超出滚动,总量与按钮恒在视口内) |
@@ -642,6 +642,14 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
     0.25/0.5/0.75/1)、图区底 6% 灰;**悬停读数** = 命中格 accent 描边 +
     格正上方**图表浮层**(下条;锚定命中格,放不下翻下方——07 废「跟随光标
     像素」,逐格吸附更稳;坐标反算不依赖形状 hit test,空间地图同款纪律)。
+  - **两图同构**(agent-tab/10,11-15 实报「两个 chart 高度应该一致,左右坐标
+    水平对齐」):两卡结构 = 卡头 → 图区(primary 6% 圆角 8 底)→ **共用自绘日期
+    轴带 `AgentChartAxis`**(定高 18,标签 micro tertiary、中线距图区底 11,两图同一
+    绘制函数)→ 页脚 micro tertiary(热力墙「Claude 与 ZCode 合计 / 最多一天」、
+    走势「近 N 天 · 日均 / 最多一天」)。走势绘图区高 = 热力墙同宽图区高、Charts
+    自带 x 轴隐藏、y 标签挪进图内左上(只留网格线,绘图区铺满卡宽、左右缘与热力墙
+    齐);并排不再靠 fixedSize 拉伸,同构即等高。热力墙月签相邻不足 32pt 丢前一个
+    (首列残月与下月挤成「11月12月」)。
   - **图表浮层 `AgentChartTooltip`**(agent-tab/07,两图共用,11-14 实报「tooltip
     不好看」):两行——日期 micro secondary(「今天 · 11月14日」/「11月13日 周四」,
     跨年补年)+ 8×8 圆角 2 色块 + 读数 `{typography.body}` 12 semibold 等宽;底 =
