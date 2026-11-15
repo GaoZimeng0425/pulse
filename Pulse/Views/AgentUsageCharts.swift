@@ -62,6 +62,34 @@ func agentTooltipDate(_ date: Date, now: Date = Date()) -> String {
     return sameYear ? "\(monthDay) 周\(weekday)" : "\(parts.year ?? 0)年\(monthDay) 周\(weekday)"
 }
 
+// MARK: - 共享日期轴带
+
+/// 两图共用的日期轴带(agent-tab/10,用户实报「两个 chart 高度应该一致,左右的
+/// 坐标应该水平对齐」):图区下方定高 18,标签 micro tertiary、中线距图区底 11。
+/// 热力墙与走势都用这一个函数画标签——同高同基线由构造保证,不靠两套布局碰巧对齐。
+enum AgentChartAxis {
+    static let height: CGFloat = 18
+    /// 标签垂直中线距图区底边的距离(热力墙 06 原值 = height/2 + 2)。
+    static let labelCenterOffset: CGFloat = 11
+
+    static func drawLabel(
+        _ text: String,
+        x: CGFloat,
+        plotBottom: CGFloat,
+        anchor: UnitPoint,
+        in context: inout GraphicsContext
+    ) {
+        context.draw(
+            Text(text)
+                .font(.system(size: 10.5))
+                .monospacedDigit()
+                .foregroundStyle(.tertiary),
+            at: CGPoint(x: x, y: plotBottom + labelCenterOffset),
+            anchor: anchor
+        )
+    }
+}
+
 // MARK: - 热力墙
 
 /// 一年 52 列格子墙(2026-11-14 用户拍板:**等比缩放、不滚动、每月一刻度**)。
@@ -73,7 +101,6 @@ struct AgentHeatWall: View {
     private static let gap: CGFloat = 3
     /// 墙四周留白(与格间距同源,墙与图区底边缘不贴边)。
     private static let inset: CGFloat = 3
-    private static let axisHeight: CGFloat = 18
 
     /// 旧 → 新的逐天合计(weeks × 7 条;天数固定,缺天 0)。
     let totals: [AgentDayTotal]
@@ -93,7 +120,14 @@ struct AgentHeatWall: View {
     }
 
     private var gridHeight: CGFloat {
-        Self.inset * 2 + side * 7 + Self.gap * 6
+        Self.gridHeight(forWidth: width)
+    }
+
+    /// 图区高(格墙 + 上下 inset;不含轴带)。走势图按同宽套同式取绘图区高,
+    /// 两图并排 / 上下排时绘图区恒等高(agent-tab/10)。
+    static func gridHeight(forWidth width: CGFloat) -> CGFloat {
+        let side = max((width - inset * 2 - gap * CGFloat(weeks - 1)) / CGFloat(weeks), 1)
+        return inset * 2 + side * 7 + gap * 6
     }
 
     private var dates: [Date] {
@@ -105,7 +139,7 @@ struct AgentHeatWall: View {
         Canvas { context, _ in
             draw(in: &context, levels: levels)
         }
-        .frame(height: gridHeight + Self.axisHeight)
+        .frame(height: gridHeight + AgentChartAxis.height)
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { newValue in
             if abs(newValue - width) > 0.5 {
                 width = newValue
@@ -208,7 +242,6 @@ struct AgentHeatWall: View {
         }
 
         // 月刻度:某列首日的月份与前列不同 → 该列是新月起点,标「N月」。
-        let axisY = gridHeight + Self.axisHeight / 2 + 2
         var lastMonth = -1
         for column in 0 ..< Self.weeks {
             let dayIndex = column * 7
@@ -216,13 +249,12 @@ struct AgentHeatWall: View {
             let month = Calendar.current.component(.month, from: dates[dayIndex])
             if month != lastMonth {
                 lastMonth = month
-                context.draw(
-                    Text("\(month)月")
-                        .font(.system(size: 10.5))
-                        .monospacedDigit()
-                        .foregroundStyle(.tertiary),
-                    at: CGPoint(x: Self.inset + CGFloat(column) * step, y: axisY),
-                    anchor: .leading
+                AgentChartAxis.drawLabel(
+                    "\(month)月",
+                    x: Self.inset + CGFloat(column) * step,
+                    plotBottom: gridHeight,
+                    anchor: .leading,
+                    in: &context
                 )
             }
         }
@@ -231,14 +263,16 @@ struct AgentHeatWall: View {
 
 // MARK: - 走势(官方 Swift Charts)
 
-/// 近 N 天合计折线 + 线下渐变面积(07:用户要「带背景、上浓下淡」,同
-/// AreaTrendChartView 配方 32%→0,替代 06 的图区 6% 平底)。y 轴在左三档
-/// 0/半值/峰值、域顶 15% 头寸;x 轴每天一刻度、MM-DD 标签按宽抽稀;悬停 =
-/// 吸附日竖线 + 高亮点 + 点上方浮层(根因修正后吸附即精确,竖线回到数据点上)。
+/// 近 N 天合计折线 + 线下渐变面积(07:同 AreaTrendChartView 配方 32%→0)。
+/// 10 起与热力墙**同构**:绘图区高 = `AgentHeatWall.gridHeight(forWidth:)`(同宽同
+/// 高)、图区底同为 primary 6% 圆角 8、下接同一条 `AgentChartAxis` 自绘日期轴带
+/// (Charts 自带 x 轴隐藏);y 轴标签挪进图内左上(只留网格线),绘图区铺满卡宽、
+/// 左右缘与热力墙齐。日期标签按宽抽稀(从今天倒数,首左末右锚、中间居中);
+/// 悬停 = 吸附日竖线 + 高亮点 + 点上方浮层。
 struct AgentTrendChart: View {
     let totals: [AgentDayTotal]
-    /// nil = 弹性高(双列时吃满行高);否则定高(单列)。
-    var height: CGFloat?
+    /// nil = 与热力墙等高(按自身宽套同式);弹窗紧凑档传定高。
+    var plotHeight: CGFloat?
 
     private struct Point: Identifiable {
         let date: Date
@@ -251,8 +285,8 @@ struct AgentTrendChart: View {
 
     /// 单个 MM-DD 标签至少分到的宽(10.5pt 五字符 ≈ 30 + 两侧呼吸)。
     private static let labelMinSpacing: CGFloat = 44
-    /// 左 y 轴标签区估宽(抽稀步长用,不追求精确)。
-    private static let yAxisAllowance: CGFloat = 44
+    /// 绘图区高下限(窄宽时热力墙很矮,折线不至于压成一条线)。
+    private static let minimumPlotHeight: CGFloat = 60
 
     @State private var hoverIndex: Int?
     @State private var chartWidth: CGFloat = 0
@@ -265,9 +299,46 @@ struct AgentTrendChart: View {
         if points.isEmpty {
             EmptyView()
         } else {
-            chart(points)
-                .frame(minHeight: height ?? 140, maxHeight: height ?? .infinity)
-                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { chartWidth = $0 }
+            let height = plotHeight
+                ?? max(AgentHeatWall.gridHeight(forWidth: chartWidth), Self.minimumPlotHeight)
+            VStack(spacing: 0) {
+                chart(points)
+                    .frame(height: height)
+                axisStrip(points)
+                    .frame(height: AgentChartAxis.height)
+            }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { chartWidth = $0 }
+        }
+    }
+
+    /// x 位置 = 日期在域内的线性占比 × 宽(绘图区铺满宽,与 Charts 刻度同式)。
+    private func xPosition(_ date: Date, first: Date, last: Date, width: CGFloat) -> CGFloat {
+        let span = last.timeIntervalSince(first)
+        guard span > 0 else { return width / 2 }
+        return CGFloat(date.timeIntervalSince(first) / span) * width
+    }
+
+    private func axisStrip(_ points: [Point]) -> some View {
+        let first = points[0].date
+        let last = points[points.count - 1].date
+        let stride = ChartHoverGeometry.labelStride(
+            count: points.count,
+            width: chartWidth,
+            minSpacing: Self.labelMinSpacing
+        )
+        let indices = ChartHoverGeometry.labelIndices(count: points.count, stride: stride)
+        return Canvas { context, size in
+            for index in indices {
+                let date = points[index].date
+                let anchor: UnitPoint = index == 0 ? .leading : (index == points.count - 1 ? .trailing : .center)
+                AgentChartAxis.drawLabel(
+                    agentShortDate(date),
+                    x: xPosition(date, first: first, last: last, width: size.width),
+                    plotBottom: 0,
+                    anchor: anchor,
+                    in: &context
+                )
+            }
         }
     }
 
@@ -279,17 +350,12 @@ struct AgentTrendChart: View {
         let domain = first < last
             ? first ... last
             : first.addingTimeInterval(-43200) ... last.addingTimeInterval(43200)
-        let stride = ChartHoverGeometry.labelStride(
-            count: points.count,
-            width: chartWidth - Self.yAxisAllowance,
-            minSpacing: Self.labelMinSpacing
-        )
-        let labelDates = ChartHoverGeometry.labelIndices(count: points.count, stride: stride).map { points[$0].date }
         let fill = LinearGradient(
             colors: [agentsAccent.opacity(0.32), agentsAccent.opacity(0)],
             startPoint: .top,
             endPoint: .bottom
         )
+        let focus = hoverIndex.map { points[$0] } ?? points[points.count - 1]
 
         return Chart {
             ForEach(points) { point in
@@ -309,60 +375,34 @@ struct AgentTrendChart: View {
                     .foregroundStyle(agentsAccent.opacity(0.25))
                     .symbolSize(120)
             }
-            PointMark(
-                x: .value("日期", (hoverIndex.map { points[$0] } ?? points[points.count - 1]).date),
-                y: .value("Token", (hoverIndex.map { points[$0] } ?? points[points.count - 1]).value)
-            )
-            .foregroundStyle(agentsAccent)
-            .symbolSize(36)
+            PointMark(x: .value("日期", focus.date), y: .value("Token", focus.value))
+                .foregroundStyle(agentsAccent)
+                .symbolSize(36)
         }
         .chartXScale(domain: domain)
         .chartYScale(domain: 0 ... rawMax * 1.15)
+        .chartXAxis(.hidden)
         .chartYAxis {
-            AxisMarks(position: .leading, values: [0.0, rawMax / 2, rawMax]) { value in
+            // 只留网格线;标签在 overlay 里画进图内左侧(绘图区铺满宽)。
+            AxisMarks(values: [rawMax / 2, rawMax]) { _ in
                 AxisGridLine()
                     .foregroundStyle(Color.primary.opacity(0.08))
-                AxisValueLabel {
-                    if let amount = value.as(Double.self) {
-                        Text(agentTokenText(Int(amount)))
-                            .font(.system(size: 10.5))
-                            .monospacedDigit()
-                            .foregroundStyle(.tertiary)
-                    }
-                }
             }
         }
-        .chartXAxis {
-            // 每天一刻度(拍板「每天一格」保留);标签另一组按宽抽稀、横排。
-            AxisMarks(position: .bottom, values: points.map(\.date)) { _ in
-                AxisTick(length: 3)
-                    .foregroundStyle(Color.primary.opacity(0.15))
-            }
-            // 日期轴标签默认左锚在刻度上,末点(今天)伸出绘图区被 Charts 丢弃——
-            // 改为居中,首末两枚分别左/右锚收进图内。
-            AxisMarks(position: .bottom, values: labelDates) { value in
-                let date = value.as(Date.self)
-                let anchor: UnitPoint = date == first ? .topLeading : (date == last ? .topTrailing : .top)
-                AxisValueLabel(centered: false, anchor: anchor, horizontalSpacing: 0) {
-                    if let date = value.as(Date.self) {
-                        Text(agentShortDate(date))
-                            .font(.system(size: 10.5))
-                            .monospacedDigit()
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-            }
+        .chartPlotStyle { plot in
+            plot.background(Color.primary.opacity(0.06), in: .rect(cornerRadius: 8))
         }
         .chartOverlay { proxy in
             GeometryReader { geo in
                 let plot = proxy.plotFrame.map { geo[$0] } ?? .zero
                 ZStack(alignment: .topLeading) {
+                    yLabels(rawMax: rawMax, proxy: proxy, plot: plot)
                     Color.clear
                         .contentShape(.rect)
                         .onContinuousHover(coordinateSpace: .local) { phase in
                             switch phase {
                             case let .active(location):
-                                // 绘图区坐标 = 本地坐标 − plotFrame 原点(06 漏减 = 系统性右偏)。
+                                // 绘图区坐标 = 本地坐标 − plotFrame 原点。
                                 guard let date: Date = proxy.value(atX: location.x - plot.minX) else { return }
                                 hoverIndex = ChartHoverGeometry.nearestIndex(
                                     of: date.timeIntervalSinceReferenceDate,
@@ -384,6 +424,23 @@ struct AgentTrendChart: View {
                 }
             }
         }
+    }
+
+    /// y 标签(半值 / 峰值)贴各自网格线上方、图内左侧 6pt。
+    private func yLabels(rawMax: Double, proxy: ChartProxy, plot: CGRect) -> some View {
+        ZStack(alignment: .topLeading) {
+            ForEach([rawMax / 2, rawMax], id: \.self) { value in
+                if let y = proxy.position(forY: value) {
+                    Text(agentTokenText(Int(value)))
+                        .font(.system(size: 10.5))
+                        .monospacedDigit()
+                        .foregroundStyle(.tertiary)
+                        .fixedSize()
+                        .offset(x: plot.minX + 6, y: plot.minY + y - 15)
+                }
+            }
+        }
+        .allowsHitTesting(false)
     }
 
     private func tooltip(for point: Point, anchor: CGRect, bounds: CGSize) -> some View {
