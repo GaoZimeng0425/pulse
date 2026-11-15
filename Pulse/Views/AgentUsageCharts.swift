@@ -101,6 +101,8 @@ struct AgentHeatWall: View {
     private static let gap: CGFloat = 3
     /// 墙四周留白(与格间距同源,墙与图区底边缘不贴边)。
     private static let inset: CGFloat = 3
+    /// 相邻月签最小间距(「12月」10.5pt ≈ 24 + 呼吸)。
+    private static let monthLabelMinGap: CGFloat = 32
 
     /// 旧 → 新的逐天合计(weeks × 7 条;天数固定,缺天 0)。
     let totals: [AgentDayTotal]
@@ -242,6 +244,9 @@ struct AgentHeatWall: View {
         }
 
         // 月刻度:某列首日的月份与前列不同 → 该列是新月起点,标「N月」。
+        // 相邻两签不足 `monthLabelMinGap` 时丢前一个(首列常是残月,只占一两列,
+        // 与下月签挤成「11月12月」——10 修)。
+        var marks: [(x: CGFloat, month: Int)] = []
         var lastMonth = -1
         for column in 0 ..< Self.weeks {
             let dayIndex = column * 7
@@ -249,14 +254,20 @@ struct AgentHeatWall: View {
             let month = Calendar.current.component(.month, from: dates[dayIndex])
             if month != lastMonth {
                 lastMonth = month
-                AgentChartAxis.drawLabel(
-                    "\(month)月",
-                    x: Self.inset + CGFloat(column) * step,
-                    plotBottom: gridHeight,
-                    anchor: .leading,
-                    in: &context
-                )
+                marks.append((Self.inset + CGFloat(column) * step, month))
             }
+        }
+        for (index, mark) in marks.enumerated() {
+            if index + 1 < marks.count, marks[index + 1].x - mark.x < Self.monthLabelMinGap {
+                continue
+            }
+            AgentChartAxis.drawLabel(
+                "\(mark.month)月",
+                x: mark.x,
+                plotBottom: gridHeight,
+                anchor: .leading,
+                in: &context
+            )
         }
     }
 }
