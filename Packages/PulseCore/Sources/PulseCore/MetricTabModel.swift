@@ -13,6 +13,10 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
     case sensors
     case peripherals
     case disk
+    /// 清理页(p4-cleaner/03):主窗口专属——弹窗不入列(spec「菜单栏徽标与弹窗不动」,
+    /// `popoverAxis` 排除;主窗口轴 `displayAxis` 含它)。tab-regroup/02 挪到磁盘紧后:
+    /// 「看满载」与「动手清」相邻,同族概念(清理 tab 强调色本取磁盘令牌)。
+    case cleaner
     case network
     /// 服务页(tab-regroup/01,2026-11-16 拍板):本机跑着的服务盘点——dev server 卡
     /// (自智能体页迁回,p1-history/08)+ 容器卡(p2-sensors/07)同页;前身是独立容器页。
@@ -21,9 +25,6 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
     /// dev server 卡已迁服务页(tab-regroup/01)。弹窗与主窗口同轴。
     case agents
     case battery
-    /// 清理页(p4-cleaner/03):主窗口专属——弹窗不入列(spec「菜单栏徽标与弹窗不动」,
-    /// `popoverAxis` 排除;主窗口轴 `displayAxis` 含它,排在电池后、历史前)。
-    case cleaner
     case history
 
     public var id: String {
