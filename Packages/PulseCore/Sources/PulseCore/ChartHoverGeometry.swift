@@ -21,6 +21,22 @@ public enum ChartHoverGeometry {
         return CGPoint(x: x, y: y)
     }
 
+    /// 侧放浮层(agent-tab/11 热力墙按周:锚点是整列、上下都没空间):锚点右侧
+    /// 垂直居中,右侧放不下翻左侧;两侧都放不下时水平钳位进界内。
+    public static func sideTooltipOrigin(
+        anchor: CGRect,
+        size: CGSize,
+        bounds: CGSize,
+        gap: CGFloat
+    ) -> CGPoint {
+        let right = anchor.maxX + gap
+        let left = anchor.minX - gap - size.width
+        let maxX = max(bounds.width - size.width, 0)
+        let x = right + size.width <= bounds.width ? right : (left >= 0 ? left : min(max(left, 0), maxX))
+        let y = min(max(anchor.midY - size.height / 2, 0), max(bounds.height - size.height, 0))
+        return CGPoint(x: x, y: y)
+    }
+
     /// 轴标签抽稀步长:每个标签至少分到 `minSpacing` 宽;放得下全标则 1。
     /// 宽度退化(≤0)时只标一个(步长 = count)。
     public static func labelStride(count: Int, width: CGFloat, minSpacing: CGFloat) -> Int {

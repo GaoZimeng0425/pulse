@@ -246,7 +246,7 @@ public struct SpaceScanEngine: Sendable {
 
     static func norm(_ p: String) -> String {
         var s = p
-        while s.count > 1 && s.hasSuffix("/") {
+        while s.count > 1, s.hasSuffix("/") {
             s.removeLast()
         }
         return s == "" ? "/" : s
