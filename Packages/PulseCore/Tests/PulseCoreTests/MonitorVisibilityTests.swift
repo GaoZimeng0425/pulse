@@ -60,7 +60,7 @@ final class MonitorVisibilityTests: XCTestCase {
         XCTAssertTrue(MonitorVisibility(mainWindowTab: .sensors).shows(.smc))
         XCTAssertFalse(MonitorVisibility(mainWindowTab: .sensors).shows(.gpu))
         XCTAssertTrue(MonitorVisibility(popoverTab: .peripherals).shows(.bluetooth))
-        XCTAssertTrue(MonitorVisibility(popoverTab: .containers).shows(.containers))
+        XCTAssertTrue(MonitorVisibility(popoverTab: .services).shows(.containers))
     }
 
     func testEitherWindowShowingFamilyOpensGate() {
@@ -88,9 +88,10 @@ final class MonitorVisibilityTests: XCTestCase {
         XCTAssertEqual(MetricTab.gpu.displayedFamilies, [.gpu, .power])
         XCTAssertEqual(MetricTab.sensors.displayedFamilies, [.smc])
         XCTAssertEqual(MetricTab.peripherals.displayedFamilies, [.bluetooth])
-        XCTAssertEqual(MetricTab.containers.displayedFamilies, [.containers])
+        // 服务页承接容器家族(tab-regroup/01 合页,门控跟着页走)。
+        XCTAssertEqual(MetricTab.services.displayedFamilies, [.containers])
         // 无家族内容的 tab:排行与主卡数据走心跳/低频档,不经家族闸。
-        for tab: MetricTab in [.cpu, .memory, .disk, .network, .battery, .history] {
+        for tab: MetricTab in [.cpu, .memory, .disk, .network, .agents, .battery, .cleaner, .history] {
             XCTAssertTrue(tab.displayedFamilies.isEmpty, "\(tab) 不该展示传感器家族")
         }
     }

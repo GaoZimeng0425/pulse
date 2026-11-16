@@ -349,6 +349,8 @@ final class AlertEngineTests: XCTestCase {
         // p4-uninstaller/06 拍板 Q8:容量类点开跳清理页(动手清 > 看数字)。
         XCTAssertEqual(AlertKind.diskAvailable.route.tab, .cleaner)
         XCTAssertEqual(AlertKind.newGroupMemory.route.tab, .memory)
+        // tab-regroup/01:dev server 卡迁服务页,闲置告警落点跟卡走。
+        XCTAssertEqual(AlertKind.devServerIdle.route.tab, .services)
     }
 
     // MARK: - 预设默认值(与 spec 逐项钉死)

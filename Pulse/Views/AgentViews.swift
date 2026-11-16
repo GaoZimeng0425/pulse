@@ -51,24 +51,22 @@ func agentShortDate(_ date: Date) -> String {
     return String(format: "%02d-%02d", components.month ?? 0, components.day ?? 0)
 }
 
-/// 智能体页子 tab(agent-tab/06,用户拍板三页;状态在 DashboardModel)。
+/// 智能体页子 tab(agent-tab/06 三子页被 tab-regroup/01 缩编为两页——dev server
+/// 迁服务页;状态在 DashboardModel)。
 enum AgentSubTab: Hashable {
     /// 消耗(token 账:数字卡排 / 日历图+走势 / 项目宽卡)。
     case usage
     /// 会话(现在在跑什么:两家会话卡)。
     case sessions
-    /// 开发服务(dev server)。
-    case servers
 
     var title: String {
         switch self {
         case .usage: "消耗"
         case .sessions: "会话"
-        case .servers: "开发服务"
         }
     }
 
-    static let all: [AgentSubTab] = [.usage, .sessions, .servers]
+    static let all: [AgentSubTab] = [.usage, .sessions]
 }
 
 /// 智能体页子药丸条(清理页子页条同款 `PillTabBar` comfortable 档 + 页指标色 +
