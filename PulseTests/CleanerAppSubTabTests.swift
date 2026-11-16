@@ -40,7 +40,10 @@ final class CleanerAppSubTabTests: XCTestCase {
         }
 
         let mainWindowIDs = diskBlockIDs(compact: false)
-        XCTAssertEqual(mainWindowIDs.last, "disk-spacemap", "主窗口磁盘页应以空间地图收尾")
+        // 块序 = 主卡 → 空间地图 → 各卷+快照 → 读写排行(2026-11-16 用户目验改序:
+        // 地图紧跟主卡折线图之下,容量总览与占用地图同族相邻)。
+        XCTAssertEqual(mainWindowIDs.first, "disk-main")
+        XCTAssertEqual(mainWindowIDs.dropFirst().first, "disk-spacemap", "空间地图应紧跟磁盘主卡")
         XCTAssertFalse(diskBlockIDs(compact: true).contains("disk-spacemap"), "弹窗磁盘页不画空间地图(tab-regroup/03 拍板例外)")
     }
 

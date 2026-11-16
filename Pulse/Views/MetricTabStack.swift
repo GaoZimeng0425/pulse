@@ -186,20 +186,10 @@ struct MetricTabStack<Ranking: View>: View {
                 )
             ))
         case .disk:
-            // 磁盘页(工单 p1-history/05 + tab-regroup/03):主卡 + 各卷对账明细 +
-            // 快照列表 + 读写最多排行 + 空间地图(自清理页迁入,读清理扫描管线)。
+            // 磁盘页(工单 p1-history/05 + tab-regroup/03):主卡 + 空间地图(紧跟主卡
+            // 折线图之下,2026-11-16 用户目验改序——容量总览与占用地图同族相邻)+ 各卷
+            // 对账明细 + 快照列表 + 读写最多排行(地图自清理页迁入,读清理扫描管线)。
             builder.card("main", MetricMainCardView(model: model.diskModel, isCompact: isCompact))
-            builder.card("pair", pair {
-                DiskVolumeBreakdownView(capacity: monitor.disk.capacity, isCompact: isCompact)
-                DiskSnapshotsCardView(listing: monitor.disk.capacity?.snapshots, isCompact: isCompact)
-            })
-            builder.moduleRanking("disk", ModuleRankingSpec(
-                title: "读写最多",
-                valueLabel: "读写",
-                rows: monitor.rankings.diskRows,
-                accent: Metric.disk.accentColor,
-                cadenceNote: "30 秒一档"
-            ))
             // 弹窗例外:360pt 塞不下旭日图,磁盘页地图只在主窗口画(tab-regroup/03
             // 拍板默认细节,传感器页「弹窗只放派生卡」p2-review/04 同款先例)。
             if !isCompact, let cleanerModel {
@@ -224,6 +214,17 @@ struct MetricTabStack<Ranking: View>: View {
                     )
                 )
             }
+            builder.card("pair", pair {
+                DiskVolumeBreakdownView(capacity: monitor.disk.capacity, isCompact: isCompact)
+                DiskSnapshotsCardView(listing: monitor.disk.capacity?.snapshots, isCompact: isCompact)
+            })
+            builder.moduleRanking("disk", ModuleRankingSpec(
+                title: "读写最多",
+                valueLabel: "读写",
+                rows: monitor.rankings.diskRows,
+                accent: Metric.disk.accentColor,
+                cadenceNote: "30 秒一档"
+            ))
         case .network:
             // 网络页(工单 p1-history/06):主卡 + 流量累计明细 + 每进程流量排行(nettop 归组)。
             builder.card("main", MetricMainCardView(model: model.networkModel, isCompact: isCompact))
