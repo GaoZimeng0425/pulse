@@ -22,6 +22,13 @@ final class DashboardModel {
     var selectedProcessID: pid_t?
     /// 智能体页子 tab(agent-tab/06 三子页 → tab-regroup/01 缩编两子页;切 tab 不丢,默认「消耗」)。
     var agentSubTab: AgentSubTab = .usage
+    /// 磁盘页空间地图的下钻位置(tab-regroup/03,地图自清理页迁入):挂这里切 tab
+    /// 再回来不丢——原清理页壳层 @State 的既定语义(07)随迁上提。
+    var spaceMapDrillPath: String?
+    var spaceMapTreeIndex = 0
+    /// 跨页轻桥(tab-regroup/03):磁盘页地图「这块能清」→ 清理页全部清单定位组;
+    /// `CleanerTabView` 进页消费后自清(与它壳层 pendingJunkGroup 同语义,只是跨页)。
+    var pendingCleanerJunkGroup: JunkGroup?
     /// 处置结果汇总(工单 08):**有失败才弹**;全成功保持安静。
     var killFailureReport: KillReport?
 

@@ -279,19 +279,25 @@ struct MainWindowView: View {
     /// 带搜索过滤与可排序进程表。
     @ViewBuilder
     private var tabBody: some View {
+        @Bindable var model = model
         // 清理页(p4-cleaner/03):整页自持(按需扫描,无 MonitorFeatures 卡片栈),
         // 不进 MetricTabStack;弹窗侧不会走到(popoverAxis 已排除)。
         if tabSelection.current == .cleaner {
-            CleanerTabView(model: cleanerModel, uninstallModel: uninstallModel)
-                // flex:1(用户拍板 2026-11-05):title 顶格,content 吃满剩余——
-                // 沿链路逐层传 .infinity,任何一层断了整列回退「按内容自适应」。
-                .frame(maxHeight: .infinity)
+            CleanerTabView(
+                model: cleanerModel,
+                uninstallModel: uninstallModel,
+                pendingCrossPageJunkGroup: $model.pendingCleanerJunkGroup
+            )
+            // flex:1(用户拍板 2026-11-05):title 顶格,content 吃满剩余——
+            // 沿链路逐层传 .infinity,任何一层断了整列回退「按内容自适应」。
+            .frame(maxHeight: .infinity)
         } else {
             MetricTabStack(
                 tab: tabSelection.current,
                 isCompact: false,
                 monitor: monitor,
                 model: model,
+                cleanerModel: cleanerModel,
                 content: content,
                 onSelectTab: { tabSelection.current = $0 },
                 overflowPolicy: .expandInPlace

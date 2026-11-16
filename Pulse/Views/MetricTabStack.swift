@@ -20,6 +20,9 @@ struct MetricTabStack<Ranking: View>: View {
     let isCompact: Bool
     let monitor: SystemMonitor
     let model: DashboardModel
+    /// 清理扫描模型(tab-regroup/03):磁盘页空间地图块的数据源;弹窗不画地图
+    /// (360pt 塞不下旭日,传感器页「弹窗只放派生卡」同款拍板例外)→ 弹窗宿主传 nil。
+    let cleanerModel: CleanerModel?
     /// 当前 tab 的展示内容(内存分段等,DashboardModel.content 折叠)。
     let content: MetricTabContent
     /// 总览卡点击跳转。
@@ -183,7 +186,8 @@ struct MetricTabStack<Ranking: View>: View {
                 )
             ))
         case .disk:
-            // 磁盘页(工单 p1-history/05):主卡 + 各卷对账明细 + 快照列表 + 读写最多排行。
+            // 磁盘页(工单 p1-history/05 + tab-regroup/03):主卡 + 各卷对账明细 +
+            // 快照列表 + 读写最多排行 + 空间地图(自清理页迁入,读清理扫描管线)。
             builder.card("main", MetricMainCardView(model: model.diskModel, isCompact: isCompact))
             builder.card("pair", pair {
                 DiskVolumeBreakdownView(capacity: monitor.disk.capacity, isCompact: isCompact)
@@ -196,6 +200,30 @@ struct MetricTabStack<Ranking: View>: View {
                 accent: Metric.disk.accentColor,
                 cadenceNote: "30 秒一档"
             ))
+            // 弹窗例外:360pt 塞不下旭日图,磁盘页地图只在主窗口画(tab-regroup/03
+            // 拍板默认细节,传感器页「弹窗只放派生卡」p2-review/04 同款先例)。
+            if !isCompact, let cleanerModel {
+                builder.card(
+                    "spacemap",
+                    DiskSpaceMapSection(
+                        model: cleanerModel,
+                        drillPath: Binding(
+                            get: { model.spaceMapDrillPath },
+                            set: { model.spaceMapDrillPath = $0 }
+                        ),
+                        treeIndex: Binding(
+                            get: { model.spaceMapTreeIndex },
+                            set: { model.spaceMapTreeIndex = $0 }
+                        ),
+                        onGoToJunk: { group in
+                            // 跨页轻桥:记路由态 + 切清理 tab;CleanerTabView 进页
+                            // 消费(落全部清单 + 定位组),「这块能清」动线不因迁页断。
+                            model.pendingCleanerJunkGroup = group
+                            onSelectTab(.cleaner)
+                        }
+                    )
+                )
+            }
         case .network:
             // 网络页(工单 p1-history/06):主卡 + 流量累计明细 + 每进程流量排行(nettop 归组)。
             builder.card("main", MetricMainCardView(model: model.networkModel, isCompact: isCompact))
