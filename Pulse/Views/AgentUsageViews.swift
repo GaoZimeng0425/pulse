@@ -53,12 +53,9 @@ struct AgentUsagePaneView: View {
         }
     }
 
-    /// 日历图「年」占位单选项(时间筛选位置恒定;档位切换是未来功能)。
-    enum HeatSpan: Hashable {
-        case year
-    }
-
     @State private var range: Range = .week
+    /// 日历图粒度(agent-tab/11:天 / 周;替代 06 的「年」占位单选药丸)。
+    @State private var heatGranularity: AgentHeatGranularity = .day
     /// 项目超过上限时的展开态(切 7/30 保持;重进子页回默认收起)。
     @State private var projectsExpanded = false
     /// 日历图 + 走势列数(按子页内容宽 ≥ `chartTwoColumnMinWidth` 判定)。
@@ -244,18 +241,25 @@ struct AgentUsagePaneView: View {
             CardHeader(symbolName: nil, title: "Token 消耗", tint: agentsAccent) {
                 HStack(spacing: 12) {
                     rescanButton
-                    PillTabBar([HeatSpan.year], selection: .constant(HeatSpan.year)) { span in
-                        PillTabItem(title: span == .year ? "年" : "", symbol: nil, tint: agentsAccent)
+                    PillTabBar([AgentHeatGranularity.day, .week], selection: $heatGranularity) { item in
+                        PillTabItem(title: item.title, symbol: nil, tint: agentsAccent)
                     }
                 }
             }
-            AgentHeatWall(totals: totals)
-            chartFooter(
-                leading: "Claude 与 ZCode 合计",
-                trailing: "最多一天 \(agentTokenText(totals.map(\.total).max() ?? 0))"
-            )
+            AgentHeatWall(totals: totals, granularity: heatGranularity)
+            chartFooter(leading: "Claude 与 ZCode 合计", trailing: heatPeakText(totals))
         }
         .cardShell(compact: isCompact)
+    }
+
+    /// 日历图页脚峰值:按天「最多一天」/ 按周「最多一周」。
+    private func heatPeakText(_ totals: [AgentDayTotal]) -> String {
+        switch heatGranularity {
+        case .day:
+            "最多一天 \(agentTokenText(totals.map(\.total).max() ?? 0))"
+        case .week:
+            "最多一周 \(agentTokenText(AgentHeatScale.weeks(totals).map(\.total).max() ?? 0))"
+        }
     }
 
     /// 两图卡共用页脚(micro tertiary,左说明右峰值;两卡同构等高的一部分)。

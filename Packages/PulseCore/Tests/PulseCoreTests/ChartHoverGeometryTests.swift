@@ -10,6 +10,25 @@ final class ChartHoverGeometryTests: XCTestCase {
 
     // MARK: 浮层定位
 
+    func testSideTooltipSitsRightOfAnchorVerticallyCentered() {
+        let anchor = CGRect(x: 100, y: 0, width: 10, height: 200)
+        let origin = ChartHoverGeometry.sideTooltipOrigin(anchor: anchor, size: size, bounds: bounds, gap: 6)
+        XCTAssertEqual(origin, CGPoint(x: 116, y: 80)) // maxX 110 + 6;midY 100 − 20
+    }
+
+    func testSideTooltipFlipsLeftNearRightEdge() {
+        let anchor = CGRect(x: 380, y: 0, width: 10, height: 200)
+        let origin = ChartHoverGeometry.sideTooltipOrigin(anchor: anchor, size: size, bounds: bounds, gap: 6)
+        XCTAssertEqual(origin.x, 274) // minX 380 − 6 − 100
+    }
+
+    func testSideTooltipClampsWhenNeitherSideFits() {
+        let narrow = CGSize(width: 150, height: 200)
+        let anchor = CGRect(x: 60, y: 0, width: 10, height: 200)
+        let origin = ChartHoverGeometry.sideTooltipOrigin(anchor: anchor, size: size, bounds: narrow, gap: 6)
+        XCTAssertEqual(origin.x, 0)
+    }
+
     func testTooltipSitsCenteredAboveAnchor() {
         let anchor = CGRect(x: 190, y: 100, width: 20, height: 20)
         let origin = ChartHoverGeometry.tooltipOrigin(anchor: anchor, size: size, bounds: bounds, gap: 8)

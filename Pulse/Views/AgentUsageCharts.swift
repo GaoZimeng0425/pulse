@@ -62,6 +62,28 @@ func agentTooltipDate(_ date: Date, now: Date = Date()) -> String {
     return sameYear ? "\(monthDay) 周\(weekday)" : "\(parts.year ?? 0)年\(monthDay) 周\(weekday)"
 }
 
+/// 按周浮层标题:「近 7 天 · 11月8日 – 11月14日」/「11月1日 – 11月7日」;跨年补年份。
+func agentTooltipWeek(first: Date, last: Date, now: Date = Date()) -> String {
+    let calendar = Calendar.current
+    func monthDay(_ date: Date) -> String {
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        let text = "\(parts.month ?? 0)月\(parts.day ?? 0)日"
+        return calendar.component(.year, from: now) == parts.year ? text : "\(parts.year ?? 0)年\(text)"
+    }
+    let range = "\(monthDay(first)) – \(monthDay(last))"
+    return calendar.isDate(last, inSameDayAs: now) ? "近 7 天 · \(range)" : range
+}
+
+/// 热力墙粒度(agent-tab/11):按天 = 一格一天;按周 = 一列 7 天同色、悬停读一周合计。
+enum AgentHeatGranularity: Hashable {
+    case day
+    case week
+
+    var title: String {
+        self == .day ? "天" : "周"
+    }
+}
+
 // MARK: - 共享日期轴带
 
 /// 两图共用的日期轴带(agent-tab/10,用户实报「两个 chart 高度应该一致,左右的
@@ -106,8 +128,11 @@ struct AgentHeatWall: View {
 
     /// 旧 → 新的逐天合计(weeks × 7 条;天数固定,缺天 0)。
     let totals: [AgentDayTotal]
+    /// 按天 / 按周(11:按周时一列同色,悬停命中整列)。
+    var granularity: AgentHeatGranularity = .day
 
     @State private var width: CGFloat = 640
+    /// 悬停命中:按天 = 天序号;按周 = 列序号。
     @State private var hoverIndex: Int?
     /// 浮层实测尺寸(钳位用;首帧为 0 时隐藏,免一帧跳位)。
     @State private var tooltipSize: CGSize = .zero
@@ -148,6 +173,7 @@ struct AgentHeatWall: View {
             }
         }
         .contentShape(.rect)
+        .onChange(of: granularity) { hoverIndex = nil }
         .onContinuousHover(coordinateSpace: .local) { phase in
             switch phase {
             case let .active(location):
@@ -158,27 +184,57 @@ struct AgentHeatWall: View {
         }
         .overlay(alignment: .topLeading) {
             if let hoverIndex {
-                tooltip(for: hoverIndex, level: levels[hoverIndex])
+                tooltip(for: hoverIndex, levels: levels)
             }
         }
     }
 
-    private func tooltip(for index: Int, level: Int) -> some View {
-        let origin = ChartHoverGeometry.tooltipOrigin(
-            anchor: cellRect(index),
-            size: tooltipSize,
-            bounds: CGSize(width: width, height: gridHeight),
-            gap: 6
-        )
-        let date = index < dates.count ? dates[index] : nil
+    private func tooltip(for index: Int, levels: [Int]) -> some View {
+        let bounds = CGSize(width: width, height: gridHeight)
+        // 按周锚点是整列(上下没空间)→ 侧放;按天锚点是单格 → 格上方。
+        let origin = granularity == .week
+            ? ChartHoverGeometry.sideTooltipOrigin(anchor: hoverRect(index), size: tooltipSize, bounds: bounds, gap: 6)
+            : ChartHoverGeometry.tooltipOrigin(anchor: hoverRect(index), size: tooltipSize, bounds: bounds, gap: 6)
+        let content: (title: String, total: Int, level: Int) = switch granularity {
+        case .day:
+            (
+                index < dates.count ? agentTooltipDate(dates[index]) : totals[index].day,
+                totals[index].total,
+                levels[index]
+            )
+        case .week:
+            weekTooltip(column: index, levels: levels)
+        }
         return AgentChartTooltip(
-            title: date.map { agentTooltipDate($0) } ?? totals[index].day,
-            value: "\(agentTokenText(totals[index].total)) tokens",
-            swatch: Self.color(level: level)
+            title: content.title,
+            value: "\(agentTokenText(content.total)) tokens",
+            swatch: Self.color(level: content.level)
         )
         .onGeometryChange(for: CGSize.self) { $0.size } action: { tooltipSize = $0 }
         .opacity(tooltipSize == .zero ? 0 : 1)
         .offset(x: origin.x, y: origin.y)
+    }
+
+    private func weekTooltip(column: Int, levels: [Int]) -> (title: String, total: Int, level: Int) {
+        let week = AgentHeatScale.weeks(totals)[column]
+        let title = if let first = agentDate(week.firstDay), let last = agentDate(week.lastDay) {
+            agentTooltipWeek(first: first, last: last)
+        } else {
+            "\(week.firstDay) – \(week.lastDay)"
+        }
+        return (title, week.total, levels[column * 7])
+    }
+
+    /// 悬停描边 / 浮层锚点:按天 = 命中格;按周 = 整列(首格到末格的外包框)。
+    private func hoverRect(_ index: Int) -> CGRect {
+        switch granularity {
+        case .day:
+            return cellRect(index)
+        case .week:
+            let first = index * 7
+            let last = min(first + 6, totals.count - 1)
+            return cellRect(first).union(cellRect(last))
+        }
     }
 
     private func cellRect(_ index: Int) -> CGRect {
@@ -190,33 +246,27 @@ struct AgentHeatWall: View {
         )
     }
 
-    /// 悬停命中:坐标 → 列/行 → 天序号(旧 → 新,列主序)。
+    /// 悬停命中:坐标 → 列/行 → 天序号(旧 → 新,列主序);按周返回列序号。
     private func hitTest(_ point: CGPoint) -> Int? {
         let column = Int((point.x - Self.inset) / step)
         let row = Int((point.y - Self.inset) / step)
         guard point.x >= Self.inset, point.y >= Self.inset,
               column < Self.weeks, row < 7,
               column * 7 + row < totals.count else { return nil }
-        return column * 7 + row
+        return granularity == .week ? column : column * 7 + row
     }
 
-    /// 逐格色阶(0 = 灰档,1…4 = accent 0.25…1)。进行中的「今天」按时刻折算成
-    /// 全天等效量再分档(11-14 实报「今天没色」;折算下限 6h 防凌晨虚高)。
+    /// 逐格色阶(0 = 灰档,1…4 = accent 0.25…1;量化式在 PulseCore `AgentHeatScale`)。
+    /// 进行中的「今天」按时刻折算成全天等效量再分档(11-14 实报「今天没色」;折算
+    /// 下限 6h 防凌晨虚高)。按周:一列 7 格取同一档(按周峰值归一)。
     private var levels: [Int] {
-        let maxValue = Double(totals.map(\.total).max() ?? 0)
-        guard maxValue > 0 else { return totals.map { _ in 0 } }
-        var todayElapsed: TimeInterval?
-        if let today = dates.last {
-            let start = Calendar.current.startOfDay(for: today)
-            todayElapsed = max(Date().timeIntervalSince(start), 6 * 3600)
-        }
-        return totals.indices.map { index in
-            var value = Double(totals[index].total)
-            if index == totals.count - 1, let elapsed = todayElapsed {
-                value = value * 86400 / elapsed
-            }
-            let normalized = value / maxValue
-            return normalized <= 0.08 ? 0 : min(4, Int(ceil(normalized * 4)))
+        let elapsed = dates.last.map { Date().timeIntervalSince(Calendar.current.startOfDay(for: $0)) }
+        switch granularity {
+        case .day:
+            return AgentHeatScale.dayLevels(totals, todayElapsed: elapsed)
+        case .week:
+            let weekLevels = AgentHeatScale.weekLevels(totals, todayElapsed: elapsed)
+            return totals.indices.map { weekLevels[$0 / 7] }
         }
     }
 
@@ -234,13 +284,13 @@ struct AgentHeatWall: View {
         for index in 0 ..< min(Self.weeks * 7, totals.count) {
             let rect = cellRect(index)
             context.fill(Path(roundedRect: rect, cornerRadius: corner), with: .color(Self.color(level: levels[index])))
-            if index == hoverIndex {
-                context.stroke(
-                    Path(roundedRect: rect.insetBy(dx: -1, dy: -1), cornerRadius: corner),
-                    with: .color(agentsAccent),
-                    lineWidth: 1.5
-                )
-            }
+        }
+        if let hoverIndex {
+            context.stroke(
+                Path(roundedRect: hoverRect(hoverIndex).insetBy(dx: -1, dy: -1), cornerRadius: corner),
+                with: .color(agentsAccent),
+                lineWidth: 1.5
+            )
         }
 
         // 月刻度:某列首日的月份与前列不同 → 该列是新月起点,标「N月」。
