@@ -81,7 +81,8 @@ struct SpaceMapSection: View {
     let model: CleanerModel
     @Binding var drillPath: String?
     @Binding var treeIndex: Int
-    /// 命中白名单的块「去清理清单」动作(壳层切子药丸 + 定位组)。
+    /// 命中白名单的块「去清理清单」动作(tab-regroup/03 起地图住磁盘页:宿主经
+    /// DashboardModel 跨页轻桥切清理页并定位组)。
     let onGoToJunk: (JunkGroup) -> Void
 
     @AppStorage("settings.spaceMapForm") private var formRaw = SpaceMapForm.treemap.rawValue

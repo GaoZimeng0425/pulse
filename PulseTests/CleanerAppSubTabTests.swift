@@ -1,19 +1,47 @@
 @testable import Pulse
 import PulseCore
+import SwiftUI
 import XCTest
 
-/// 清理页子药丸登记面(p4-uninstaller/01 建、02 改序;p6-cleaner/03 总览居首):
-/// 五子药丸、apps 在轴、标题。登记面结构性断言(CODING_STANDARDS:直调 smoke 不背书
-/// 装配可达性;p2-audit 教训——容器 registry 漏登,功能上线即死而测试全绿)。
+/// 清理页子药丸登记面(p4-uninstaller/01 建、02 改序;p6-cleaner/03 总览居首;
+/// tab-regroup/03 空间地图迁磁盘页后缩编四项):子药丸、apps 在轴、标题 + 磁盘页
+/// 地图块登记。登记面结构性断言(CODING_STANDARDS:直调 smoke 不背书装配可达性;
+/// p2-audit 教训——容器 registry 漏登,功能上线即死而测试全绿)。
 final class CleanerAppSubTabTests: XCTestCase {
-    func testFiveSubTabsOnAxis() {
+    func testFourSubTabsOnAxis() {
         // 顺序 = 2026-11-04 拍板 Q13(动手门在前、档案门殿后)+ p6-cleaner/03 总览居首
-        // (丙案 v2:进清理页先看"能省多少")。顺序漂移会破坏用户肌肉记忆。
+        // (丙案 v2:进清理页先看"能省多少");tab-regroup/03 空间地图迁磁盘页,余序不动。
+        // 顺序漂移会破坏用户肌肉记忆。
         XCTAssertEqual(
             CleanerSubTab.allCases,
-            [.overview, .junk, .map, .apps, .history],
+            [.overview, .junk, .apps, .history],
             "子页顺序漂移会破坏用户肌肉记忆"
         )
+    }
+
+    /// 磁盘页空间地图块(tab-regroup/03):主窗口在轴且殿后(主卡 → 卷+快照 →
+    /// 读写排行 → 地图);弹窗不画(360pt 塞不下旭日,传感器页派生卡例外同款)。
+    @MainActor
+    func testDiskPageSpaceMapBlockIsMainWindowOnly() {
+        let monitor = SystemMonitor.preview()
+        let model = DashboardModel(monitor: monitor)
+
+        func diskBlockIDs(compact: Bool) -> [String] {
+            MetricTabStack(
+                tab: .disk,
+                isCompact: compact,
+                monitor: monitor,
+                model: model,
+                cleanerModel: compact ? nil : CleanerModel(),
+                content: MetricTabContent.build(groups: [], tab: .disk),
+                onSelectTab: { _ in },
+                overflowPolicy: .expandInPlace
+            ) { EmptyView() }.blocks.map(\.id)
+        }
+
+        let mainWindowIDs = diskBlockIDs(compact: false)
+        XCTAssertEqual(mainWindowIDs.last, "disk-spacemap", "主窗口磁盘页应以空间地图收尾")
+        XCTAssertFalse(diskBlockIDs(compact: true).contains("disk-spacemap"), "弹窗磁盘页不画空间地图(tab-regroup/03 拍板例外)")
     }
 
     func testOverviewTitle() {

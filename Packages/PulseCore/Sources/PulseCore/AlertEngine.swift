@@ -65,10 +65,12 @@ public enum AlertKind: String, CaseIterable, Codable, Identifiable, Sendable {
     /// 点通知直达的视图(spec:系统负载→总览、组 CPU→CPU 页;新组内存落内存页)。
     /// 磁盘容量不足 → **清理页**(p4-uninstaller/06 拍板 Q8):那个时刻用户的
     /// 下一步永远是「动手清」而不是「看数字」;吞吐类磁盘告警目前不存在,
-    /// 将来若加仍落磁盘页。
+    /// 将来若加仍落磁盘页。dev server 闲置 → **服务页**(tab-regroup/01):
+    /// 卡在哪、落点在哪,点开通知直接看到闲置的那台服务。
     public var route: AlertRoute {
         switch self {
-        case .systemLoad, .devServerIdle: .overview
+        case .systemLoad: .overview
+        case .devServerIdle: .services
         case .groupCPU: .cpu
         case .newGroupMemory: .memory
         case .diskAvailable: .cleaner
@@ -243,6 +245,8 @@ public enum AlertRoute: String, Sendable {
     case memory
     case disk
     case cleaner
+    /// dev server 闲置告警的落点(tab-regroup/01):服务页(dev server 卡所在)。
+    case services
 
     public var tab: MetricTab {
         switch self {
@@ -251,6 +255,7 @@ public enum AlertRoute: String, Sendable {
         case .memory: .memory
         case .disk: .disk
         case .cleaner: .cleaner
+        case .services: .services
         }
     }
 }

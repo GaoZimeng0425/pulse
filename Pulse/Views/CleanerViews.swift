@@ -7,16 +7,16 @@ import SwiftUI
 // 子页内容:总览 = CleanerOverviewSection(p6-cleaner/03,Hero + 模块大卡 + 废纸篓卡)、
 // 全部清单(旧名「可清理」,更旧名「开发者垃圾」;2026-11-08 / p6-cleaner/03 两次改名,
 // 内部标识 `CleanerSubTab.junk` 不动)= JunkListSection(04,CleanerJunkViews.swift)、
-// 空间地图 = 03 的扫描状态卡 + 结果摘要卡(旭日图 07 票接入 `mapSection`)、清理历史 =
-// CleanHistorySection(04 列表 + 明细)、应用 = AppListSection(p4-uninstaller/01,清单只读;
-// 残留 / 卸载动作 02/03 票)。空态一律走 CardEmptyState(DESIGN.md 卡片家族,不手写空态)。
+// 清理历史 = CleanHistorySection(04 列表 + 明细)、应用 = AppListSection(p4-uninstaller/01,
+// 清单只读;残留 / 卸载动作 02/03 票)。空间地图子页已整体迁磁盘页(tab-regroup/03,
+// 现为 `DiskSpaceMapSection`)。空态一律走 CardEmptyState(DESIGN.md 卡片家族,不手写空态)。
 
 enum CleanerSubTab: String, CaseIterable, Hashable {
-    // 顺序 = 2026-11-04 拍板 Q13(三个动手门在前、档案门殿后)+ p6-cleaner/03 总览居首
-    // (丙案 v2:进清理页先看"能省多少",清单 / 地图 / 应用是动手门,历史殿后)。
+    // 顺序 = 2026-11-04 拍板 Q13(动手门在前、档案门殿后)+ p6-cleaner/03 总览居首
+    // (丙案 v2:进清理页先看"能省多少");tab-regroup/03 缩编四子页——空间地图迁磁盘页,
+    // 余序不动。
     case overview
     case junk
-    case map
     case apps
     case history
 
@@ -24,7 +24,6 @@ enum CleanerSubTab: String, CaseIterable, Hashable {
         switch self {
         case .overview: "总览"
         case .junk: "全部清单"
-        case .map: "空间地图"
         case .apps: "应用"
         case .history: "清理历史"
         }
@@ -112,13 +111,14 @@ struct CleanerTabView: View {
     /// 应用卸载器模型(p4-uninstaller/01):无常驻采集,由 AppListSection 的
     /// task/onDisappear 驱动装载与取消;壳层只负责传递。
     let uninstallModel: UninstallModel
+    /// 跨页轻桥(tab-regroup/03):磁盘页空间地图「这块能清」落下的组;进页消费
+    /// 后自清。地图迁磁盘页后唯一跨页入口,同页内轻桥仍是壳层 pendingJunkGroup。
+    @Binding var pendingCrossPageJunkGroup: JunkGroup?
     /// 默认落在总览(丙案 v2:先看"能省多少"再动手)。
     @State private var subTab: CleanerSubTab = .overview
-    /// 空间地图的导航态放在壳层(07):切子药丸再回来不丢下钻位置。
-    @State private var mapDrillPath: String?
-    @State private var mapTreeIndex = 0
     /// 轻桥(p4-uninstaller/05):地图「这块能清」→ 切垃圾子页并定位的组;
-    /// JunkListSection 消费后自清。切走再回来地图下钻位置不丢(壳层既有态)。
+    /// JunkListSection 消费后自清。(地图已迁磁盘页 tab-regroup/03,本桥保留
+    /// 供跨页落点投递。)
     @State private var pendingJunkGroup: JunkGroup?
     /// 总览下钻(p6-cleaner/03):点模块大卡 → 全部清单按品类过滤(nil = 全量)。
     /// 勾选存模型层,过滤切换天然不丢;返回 / 药丸直切清空(见 pillSelection)。
@@ -153,7 +153,7 @@ struct CleanerTabView: View {
                     subTab = .junk
                     model.selectAllSafeAndRequestClean()
                 }
-                // 同 map:空态/扫描卡贴顶,不悬中。
+                // 空态卡贴顶,不悬中。
                 .frame(maxHeight: .infinity, alignment: .top)
             case .junk:
                 JunkListSection(
@@ -166,13 +166,9 @@ struct CleanerTabView: View {
                     }
                 )
                 .frame(maxHeight: .infinity)
-            case .map:
-                mapSection
-                    // 2026-11-08 实报:flex 层不带对齐,空态/扫描卡(抱内容)悬中——补 .top。
-                    .frame(maxHeight: .infinity, alignment: .top)
             case .apps:
                 AppListSection(model: uninstallModel)
-                    // 同 map:装载中/空态卡贴顶,不悬中。
+                    // 装载中/空态卡贴顶,不悬中。
                     .frame(maxHeight: .infinity, alignment: .top)
             case .history:
                 CleanHistorySection(model: model)
@@ -181,7 +177,17 @@ struct CleanerTabView: View {
         .frame(maxHeight: .infinity, alignment: .top)
         // 进清理页即试装载落盘缓存(p4-cleaner/11):空态且无在跑扫描才读盘
         // (后台解码),已有结果 / 扫描中 / 无缓存都零动作;常驻稳态零成本。
-        .task { model.loadCachedScan() }
+        // 同拍消费跨页轻桥(tab-regroup/03):磁盘页地图点「这块能清」切过来时,
+        // 落全部清单 + 定位组 + 清过滤(轻桥定位 = 全量清单里的组,非总览下钻态)。
+        .task {
+            model.loadCachedScan()
+            if let group = pendingCrossPageJunkGroup {
+                junkFilter = nil
+                subTab = .junk
+                pendingJunkGroup = group
+                pendingCrossPageJunkGroup = nil
+            }
+        }
         .sheet(isPresented: trashSheetPresented) {
             if case let .confirming(inventory) = model.trashPhase {
                 TrashEmptyConfirmSheet(inventory: inventory) {
@@ -373,48 +379,52 @@ struct CleanerTabView: View {
     }
 
     // MARK: 子页
+}
 
-    /// 空间地图子页(07 = 旭日图 + 03 的结果摘要;两卡读同一次扫描)。
-    /// 上下堆叠(space-map-forms/08,用户拍板「应该是上下布局,不是两列」——
-    /// 07 两列版废);旭日直径 = min(卡内容宽, 图表区高),见 CleanerSpaceMapView。
-    /// 子页自带滚动(space-map-forms/10,用户实报「点开旭日文字都被顶上去,没加
-    /// scroll」):清理页是全 app 唯一不进主窗口外层 ScrollView 的 tab(f9bc5d5
-    /// 为可清理页 CTA 钉底剥的),旭日图表区钳死高度不可压缩,定高页放不下就把
-    /// 文字顶出去。本子页无底部 action bar、无内层滚动列表,自滚不踩当年嵌套
-    /// 滚动的坑(那是可清理列表页的约束)。
-    private var mapSection: some View {
-        ScrollView {
-            switch model.phase {
-            case .idle:
-                CardEmptyState(
-                    title: "还没扫描过",
-                    detail: "点右上「扫描整台 Mac」——约 1 分钟,随时可取消",
-                    actionTitle: "开始扫描",
-                    action: { model.startScan() }
-                )
-                .cardShell(compact: false)
-            case let .scanning(stats):
-                scanningCard(stats)
-            case let .finished(result):
-                VStack(spacing: 12) {
-                    spaceMapCard
-                    summaryCard(result)
-                }
-            }
-        }
+// MARK: - 磁盘页空间地图块(tab-regroup/03,自清理页子页整卡迁入)
+
+/// 磁盘页的空间地图块:读清理扫描的同一条管线(CleanerModel),按扫描态切三形状——
+/// 空态引导(就地「扫描整台 Mac」,本页无页头按钮)/ 扫描中(进度卡)/ 完成
+/// (地图卡 + 结果摘要卡,上下堆叠 = space-map-forms/08 拍板原样)。
+/// 与原清理页子页的两处差异:①不套子页 ScrollView——磁盘页卡片流本就在主窗口外层
+/// 滚动里,嵌套滚动是 space-map-forms/10 前的旧坑(图表区高度仍按滚动视口钳制,
+/// `containerRelativeFrame` 语义不变);②「这块能清」变跨页轻桥——经
+/// `DashboardModel.pendingCleanerJunkGroup` 落到清理页全部清单定位,下钻位置
+/// 同样挂 DashboardModel(切 tab 不丢)。
+struct DiskSpaceMapSection: View {
+    let model: CleanerModel
+    @Binding var drillPath: String?
+    @Binding var treeIndex: Int
+    /// 「这块能清」跨页轻桥:宿主(MetricTabStack)记路由态并切清理 tab。
+    let onGoToJunk: (JunkGroup) -> Void
+
+    private var accent: Color {
+        Surface.cleanAccent
     }
 
-    private var spaceMapCard: some View {
-        SpaceMapSection(
-            model: model,
-            drillPath: $mapDrillPath,
-            treeIndex: $mapTreeIndex,
-            onGoToJunk: { group in
-                subTab = .junk
-                junkFilter = nil // 地图轻桥定位 = 全量清单里的组,不是总览下钻态。
-                pendingJunkGroup = group
+    var body: some View {
+        switch model.phase {
+        case .idle:
+            CardEmptyState(
+                title: "还没扫描过",
+                detail: "扫描整台 Mac——约 1 分钟,随时可取消;清单与清理历史在「清理」页",
+                actionTitle: "扫描整台 Mac",
+                action: { model.startScan() }
+            )
+            .cardShell(compact: false)
+        case let .scanning(stats):
+            scanningCard(stats)
+        case let .finished(result):
+            VStack(spacing: 12) {
+                SpaceMapSection(
+                    model: model,
+                    drillPath: $drillPath,
+                    treeIndex: $treeIndex,
+                    onGoToJunk: onGoToJunk
+                )
+                summaryCard(result)
             }
-        )
+        }
     }
 
     private func scanningCard(_ stats: ScanStats) -> some View {

@@ -13,15 +13,18 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
     case sensors
     case peripherals
     case disk
+    /// 清理页(p4-cleaner/03):主窗口专属——弹窗不入列(spec「菜单栏徽标与弹窗不动」,
+    /// `popoverAxis` 排除;主窗口轴 `displayAxis` 含它)。tab-regroup/02 挪到磁盘紧后:
+    /// 「看满载」与「动手清」相邻,同族概念(清理 tab 强调色本取磁盘令牌)。
+    case cleaner
     case network
-    case containers
-    /// 智能体页(agent-tab/01):AI 编码助手(Claude Code / ZCode)会话与用量限额,
-    /// dev server 卡从总览迁入;弹窗与主窗口同轴。
+    /// 服务页(tab-regroup/01,2026-11-16 拍板):本机跑着的服务盘点——dev server 卡
+    /// (自智能体页迁回,p1-history/08)+ 容器卡(p2-sensors/07)同页;前身是独立容器页。
+    case services
+    /// 智能体页(agent-tab/01):AI 编码助手(Claude Code / ZCode)会话与用量限额;
+    /// dev server 卡已迁服务页(tab-regroup/01)。弹窗与主窗口同轴。
     case agents
     case battery
-    /// 清理页(p4-cleaner/03):主窗口专属——弹窗不入列(spec「菜单栏徽标与弹窗不动」,
-    /// `popoverAxis` 排除;主窗口轴 `displayAxis` 含它,排在电池后、历史前)。
-    case cleaner
     case history
 
     public var id: String {
@@ -39,7 +42,7 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .peripherals: "外设"
         case .disk: "磁盘"
         case .network: "网络"
-        case .containers: "容器"
+        case .services: "服务"
         case .agents: "智能体"
         case .battery: "电池"
         case .cleaner: "清理"
@@ -58,7 +61,8 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .peripherals: "headphones"
         case .disk: "internaldrive"
         case .network: "network"
-        case .containers: "cube.box.fill"
+        // 服务页沿用容器页图标(tab-regroup/01):页的主体仍是容器盘点,dev server 并入不换身份符号。
+        case .services: "cube.box.fill"
         // 智能体换 brain(2026-11-16 用户点名换掉 person.2.fill——双人像像「共享/多人」,
         // 不达 AI 语义;sparkles 已被清理页占用)。
         case .agents: "brain"
@@ -82,7 +86,8 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .peripherals: .bluetooth
         case .disk: .disk
         case .network: .network
-        case .containers: .containers
+        // 服务页强调色沿用 containers 品类令牌(tab-regroup/01):页面前身是容器页,色身份不换。
+        case .services: .containers
         // 智能体页取蓝牙青:清理品类令牌里 ai=蓝牙青(junk-ai),AI 身份色全 app 一致;
         // 与外设页共用是既有先例(总览/CPU 同取 cpu)。
         case .agents: .bluetooth
@@ -184,7 +189,8 @@ public extension MetricTab {
         case .gpu: [.gpu, .power]
         case .sensors: [.smc]
         case .peripherals: [.bluetooth]
-        case .containers: [.containers]
+        // 服务页的容器家族(tab-regroup/01 合页,门控跟着页走;dev server 无家族)
+        case .services: [.containers]
         case .cpu, .memory, .disk, .network, .agents, .battery, .cleaner, .history: []
         }
     }
@@ -264,7 +270,7 @@ public struct MetricTabContent: Equatable, Sendable {
         let ranked: [ProcessGroup]
         let metric: GroupCardMetric
         switch tab {
-        case .overview, .cpu, .gpu, .sensors, .peripherals, .disk, .network, .containers, .agents, .battery, .cleaner,
+        case .overview, .cpu, .gpu, .sensors, .peripherals, .disk, .network, .services, .agents, .battery, .cleaner,
              .history:
             ranked = Leaderboard.ranked(groups, by: \.cpuPercent, id: \.id)
             metric = .cpu

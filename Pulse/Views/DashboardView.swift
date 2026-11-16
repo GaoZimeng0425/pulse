@@ -100,6 +100,7 @@ struct DashboardView: View {
                     isCompact: true,
                     monitor: monitor,
                     model: model,
+                    cleanerModel: nil,
                     content: content,
                     onSelectTab: { tabSelection.current = $0 },
                     overflowPolicy: overflowPolicy
@@ -130,6 +131,7 @@ struct DashboardView: View {
             isCompact: true,
             monitor: monitor,
             model: model,
+            cleanerModel: nil,
             content: content,
             onSelectTab: { tabSelection.current = $0 },
             overflowPolicy: overflowPolicy

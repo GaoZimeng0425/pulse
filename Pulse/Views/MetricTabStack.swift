@@ -20,6 +20,9 @@ struct MetricTabStack<Ranking: View>: View {
     let isCompact: Bool
     let monitor: SystemMonitor
     let model: DashboardModel
+    /// 清理扫描模型(tab-regroup/03):磁盘页空间地图块的数据源;弹窗不画地图
+    /// (360pt 塞不下旭日,传感器页「弹窗只放派生卡」同款拍板例外)→ 弹窗宿主传 nil。
+    let cleanerModel: CleanerModel?
     /// 当前 tab 的展示内容(内存分段等,DashboardModel.content 折叠)。
     let content: MetricTabContent
     /// 总览卡点击跳转。
@@ -58,9 +61,9 @@ struct MetricTabStack<Ranking: View>: View {
             })
             builder.groupRanking()
         case .agents:
-            // 智能体页三子 tab(agent-tab/06,用户拍板):消耗(账本)/ 会话
-            // (在跑)/ 开发服务——清理页子药丸同款模式,默认落「消耗」;子页
-            // 切换状态在 DashboardModel(切 tab 不丢)。
+            // 智能体页两子 tab(agent-tab/06 三子页结构被 tab-regroup/01 缩编:
+            // 消耗(账本)/ 会话(在跑)——dev server 卡迁服务页):清理页子药丸
+            // 同款模式,默认落「消耗」;子页切换状态在 DashboardModel(切 tab 不丢)。
             let snapshot = monitor.agentSessions.snapshot
             builder.card(
                 "agent-subtabs",
@@ -98,15 +101,6 @@ struct MetricTabStack<Ranking: View>: View {
                 builder.card(
                     "zcode-sessions",
                     ZCodeSessionsCardView(sessions: snapshot.zcodeSessions, isCompact: isCompact)
-                )
-            case .servers:
-                // dev server 卡(工单 p1-history/08):全部停止只上抛请求,确认对话框
-                // (KillRequestFlow 关口)把关后才发信号。节标题撤——子药丸已是身份。
-                builder.card(
-                    "dev-servers",
-                    DevServerCardView(servers: monitor.devServers.servers, isCompact: isCompact) {
-                        model.requestStopAllDevServers(monitor.devServers.servers)
-                    }
                 )
             }
         case .cpu:
@@ -155,9 +149,17 @@ struct MetricTabStack<Ranking: View>: View {
                 MetricMainCardView(model: model.aneModel, isCompact: isCompact)
                 PowerDomainsCardView(reading: monitor.power.reading, isCompact: isCompact)
             })
-        case .containers:
-            // 容器页(p2-sensors/07):docker.sock 单发快照表;数据卷占用行
-            // 刻意不做(未拍板,spec Out of Scope)。
+        case .services:
+            // 服务页(tab-regroup/01,2026-11-16 拍板):dev server 卡(自智能体页迁回)
+            // + 容器卡(p2-sensors/07,docker.sock 单发快照表;数据卷占用行刻意不做,
+            // 未拍板 Out of Scope 维持)——都是「本机跑着的服务」盘点。全部停止只上抛
+            // 请求,确认对话框(KillRequestFlow 关口)把关后才发信号。
+            builder.card(
+                "dev-servers",
+                DevServerCardView(servers: monitor.devServers.servers, isCompact: isCompact) {
+                    model.requestStopAllDevServers(monitor.devServers.servers)
+                }
+            )
             builder.card("containers", ContainersCardView(reading: monitor.containers.reading, isCompact: isCompact))
         case .battery:
             // 电池页(工单 p1-history/02):六项读数主卡 + 能耗影响排行
@@ -184,7 +186,8 @@ struct MetricTabStack<Ranking: View>: View {
                 )
             ))
         case .disk:
-            // 磁盘页(工单 p1-history/05):主卡 + 各卷对账明细 + 快照列表 + 读写最多排行。
+            // 磁盘页(工单 p1-history/05 + tab-regroup/03):主卡 + 各卷对账明细 +
+            // 快照列表 + 读写最多排行 + 空间地图(自清理页迁入,读清理扫描管线)。
             builder.card("main", MetricMainCardView(model: model.diskModel, isCompact: isCompact))
             builder.card("pair", pair {
                 DiskVolumeBreakdownView(capacity: monitor.disk.capacity, isCompact: isCompact)
@@ -197,6 +200,30 @@ struct MetricTabStack<Ranking: View>: View {
                 accent: Metric.disk.accentColor,
                 cadenceNote: "30 秒一档"
             ))
+            // 弹窗例外:360pt 塞不下旭日图,磁盘页地图只在主窗口画(tab-regroup/03
+            // 拍板默认细节,传感器页「弹窗只放派生卡」p2-review/04 同款先例)。
+            if !isCompact, let cleanerModel {
+                builder.card(
+                    "spacemap",
+                    DiskSpaceMapSection(
+                        model: cleanerModel,
+                        drillPath: Binding(
+                            get: { model.spaceMapDrillPath },
+                            set: { model.spaceMapDrillPath = $0 }
+                        ),
+                        treeIndex: Binding(
+                            get: { model.spaceMapTreeIndex },
+                            set: { model.spaceMapTreeIndex = $0 }
+                        ),
+                        onGoToJunk: { group in
+                            // 跨页轻桥:记路由态 + 切清理 tab;CleanerTabView 进页
+                            // 消费(落全部清单 + 定位组),「这块能清」动线不因迁页断。
+                            model.pendingCleanerJunkGroup = group
+                            onSelectTab(.cleaner)
+                        }
+                    )
+                )
+            }
         case .network:
             // 网络页(工单 p1-history/06):主卡 + 流量累计明细 + 每进程流量排行(nettop 归组)。
             builder.card("main", MetricMainCardView(model: model.networkModel, isCompact: isCompact))

@@ -342,8 +342,9 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   环境值 `rankingRowsInList` 拆成卡头 / 每行 / 卡尾各一行,底色按段 `cardSlice` 切开拼回整卡
   (真机触控板滚动 LazyVStack 36–43%,sample 一半在每帧重出绘制指令、四分之一在重布局)。
   卡外 8pt 间距 = 首尾段底色外各 4 透明边,不用 listRowInsets 的 bottom(macOS 上被忽略)。
-- **清理页子页命名**:五个子药丸 = **「总览 | 全部清单 | 空间地图 | 应用 | 清理历史」**
-  (p6-cleaner/03,丙案 v2;总览居首且为默认落地子页)。清单子页标题 = **「全部清单」**
+- **清理页子页命名**:四个子药丸 = **「总览 | 全部清单 | 应用 | 清理历史」**
+  (p6-cleaner/03,丙案 v2;总览居首且为默认落地子页;tab-regroup/03 空间地图迁磁盘页,
+  五子药丸缩编,余序不动)。清单子页标题 = **「全部清单」**
   (2026-11-08 首改名「开发者垃圾」→「可清理」;p6-cleaner/03 再改「全部清单」——总览
   已承担"能回收多少"的第一眼,清单页名回归"它是什么:一张全量清单";组名不变;内部标识
   `CleanerSubTab.junk` 两次都不动,改名只是文案层,先例 p4-uninstaller/08)。
@@ -469,33 +470,39 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   目录图标 + 路径 + 减号删除,与排除行同款);**与「项目根目录」页的归组配置两套
   独立、零共享**(用户拍板)。页脚说明文案钉死两条口径:项目 = 扫描根直接子目录、
   在用项目永不进清理且每次清理前重查。
-- **空间地图卡**(p4-cleaner/07 + space-map-forms/01,`CleanerSpaceMapView.swift`):
+- **空间地图卡**(p4-cleaner/07 + space-map-forms/01,`CleanerSpaceMapView.swift`;
+  **tab-regroup/03 起住磁盘页**——自清理页子页整卡迁入,为磁盘页第五块
+  「主卡 / 各卷 / 快照 / 读写排行 / 空间地图」,读清理扫描同一条管线,卡带就地
+  「扫描整台 Mac / 重新扫描」按钮(与清理页头同一管线,一处开扫两处同步);
+  清理页子药丸缩编为四项;**弹窗磁盘页不画地图**(360pt 塞不下旭日——传感器页
+  「弹窗只放派生卡」p2-review/04 同款拍板例外)):
   **双形态、同一画法**(用户拍板 2026-11-09:两种都要 Canvas 绘制,不要两种
   方案)——单个 SwiftUI Canvas 一次 draw call,命中一律坐标反算、不依赖形状
   hit test(方块 = rect.contains;旭日 = atan2 角度 + sqrt 半径)。形态切换 =
   卡头 `PillTabBar` `.selectedOnly` 双项图标(「方块」square.grid.3x3 /
   「旭日」chart.pie;space-map-forms/02——原 segmented 非标准件已废),
   `settings.spaceMapForm` @AppStorage 记住
-  上次;切换不重置下钻位置(下钻 / 面包屑由 CleanerTabView 持有,切子药丸不丢)。
-  **版面纪律(ui-unify 追改,2026-11-09 用户实报三修,两形态同守)**:①**空间
-  地图子页自带 ScrollView**(space-map-forms/10,用户实报「点开旭日文字都被顶
-  上去,没加 scroll」)——清理页是全 app 唯一不进主窗口外层滚动的 tab(f9bc5d5
-  为可清理页 CTA 钉底剥的,那是列表页的约束;本子页无 action bar 无内层列表,
-  自滚不踩嵌套滚动的坑);两形态图表区高**同式** = **clamp(子页视口 ×
+  上次;切换不重置下钻位置(下钻 / 面包屑由 DashboardModel 持有——tab-regroup/03
+  随迁上提,切 tab / 切页都不丢)。
+  **版面纪律(ui-unify 追改,2026-11-09 用户实报三修,两形态同守)**:①地图块
+  住在磁盘页外层页面滚动里(清理页时代的子页自带 ScrollView 已随迁页废弃——
+  磁盘页卡片流本就整页滚,嵌套滚动是旧坑;space-map-forms/10「点开旭日文字都被
+  顶上去」由外层滚动兜住);两形态图表区高**同式** = **clamp(滚动视口 ×
   `{layout.spacemap-sunburst-viewport-share}` 0.8, 形态下限, 上限
   `{layout.spacemap-sunburst-max-side}` 520)**(下限:方块
   `{layout.spacemap-chart-min-height}` 220 / 旭日
-  `{layout.spacemap-sunburst-min-side}` 360;`containerRelativeFrame` 量子页
-  滚动视口),旭日直径 = min(卡内容宽, 图表区高)、卡内居中(08 拍板「跟随宽高
+  `{layout.spacemap-sunburst-min-side}` 360;`containerRelativeFrame` 量滚动
+  视口),旭日直径 = min(卡内容宽, 图表区高)、卡内居中(08 拍板「跟随宽高
   中小的那个值」+ 09 上限;弹性 maxHeight 在滚动里塌最小高、07 前清理页无滚动
   靠弹性区吸收压缩两案皆废)。
   历代已废:03/04 固定直径 340/400(宽卡里太小)、04 aspectRatio(ScrollView
   里不可靠)、05 测图表自身宽(与内容宽正反馈撑爆)、06 边长 = 卡宽(= 窗口宽,
   顶天立地)、07 两列(用户拍板「应该是上下布局」)、09 前无子页滚动(定高页
-  放不下,文字被顶出);②**悬停零重排**——卡内不出现 /
+  放不下,文字被顶出)、tab-regroup/03 前清理页子页自滚形态;②**悬停零重排**——
+  卡内不出现 /
   消失任何占行元素(原卡顶悬停信息行已废),悬停信息与按钮一律浮在图表内;
   ③密封 / 叶子 / 「其他」点击解释 = 图表左上角浮层胶囊(cardHigh 90%,单行截断,
-  不吃点击),不占卡内一行;④**子页上下堆叠**(地图卡在上、扫描摘要卡在下;
+  不吃点击),不占卡内一行;④**上下堆叠**(地图卡在上、扫描摘要卡在下;
   07 两列版废;摘要卡统计行 `ViewThatFits` 折行保留——全宽首选整行,放不下折
   2+2 / 2+1)。
   - **方块(treemap,默认形态)**:squarify(`TreemapLayout`),块内 名字 + 实际
@@ -558,7 +565,8 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   只在有分项的指标——温度、功率——出现,挂在指标条正下方,`.always` 无图标,一次
   看一条线不叠加;各项取分项色——功率单域取五路功率卡域配色 `PowerDomain.tint`,
   一个出处;间距沿用页面竖排间距 8 / 12,不另立数值)、历史页范围条(`.always` 无
-  图标,色调随所选指标 / 分项)、智能体页子页条(agent-tab/06:「消耗|会话|开发服务」,页指标色)、
+  图标,色调随所选指标 / 分项)、智能体页子页条(agent-tab/06「消耗|会话|开发服务」;
+  tab-regroup/01 dev server 迁服务页后为「消耗|会话」,页指标色)、
   空间地图形态切换(space-map-forms/02:
   `.selectedOnly` 双项图标「方块 square.grid.3x3 / 旭日 chart.pie」,卡头内,
   原 segmented 非标准件已废)。
@@ -578,9 +586,10 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   历史页弹窗不放」):每个 tab 的卡片组成与顺序只在 `MetricTabStack` 一处定义,两处
   只差排版档——弹窗卡用紧凑档、主窗口并排的两卡改上下排、节标题不画;组排行卡的
   交互深度(主窗口搜索 + 可排序进程表)由宿主给。新增卡片只改 `MetricTabStack`。
-  **唯一拍板例外**(p2-review/04 A,2026-10-24;spec Story 17):传感器 tab 弹窗只放
-  派生读数卡(Average/Hottest + 最快风扇),风扇卡与温度明细卡只在主窗口——逐核明细
-  会把 360pt 弹窗撑得不可用的高。
+  **拍板例外**(两处):传感器 tab 弹窗只放派生读数卡(Average/Hottest + 最快风扇),
+  风扇卡与温度明细卡只在主窗口——逐核明细会把 360pt 弹窗撑得不可用的高
+  (p2-review/04 A,2026-10-24;spec Story 17);磁盘 tab 弹窗不画空间地图——旭日
+  下限 360pt 起,弹窗塞不下(tab-regroup/03,2026-11-16;传感器例外同款)。
 - **传感器卡文案与风扇条**(p2-review/08):风扇转速 rpm 0 写「停转」(真读数,不写
   「0 rpm」,也不是读失败的「—」);读不到 / 无风扇写「—」。风扇 meter 按该扇上下限归一
   (rpm−min)/(max−min) 钳 0…1,上下限不可用(max ≤ min)给空条;上下限标注
@@ -607,15 +616,19 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   同色文字),两态语言(✓正常 / 高负载),阈值在 `StatusBadgeRules`(组 >100%、
   系统 <30% / >70%)。现役用法 = 指标卡大数字旁(系统负载);排行行不挂"高负载"
   文字 chip,组高负载 = 数值红字 + 最忙进程名 chip(见排行列表条,2026-10-30 用户拍板)。
-- **智能体页三子 tab**(agent-tab/06,用户拍板「token/会话/dev server 分页」;
-  定稿骨架 `.scratch/agent-tab/wireframe-agents-page.html` 是唯一视觉真相,纯线稿
-  约定见票):子药丸条 = `PillTabBar` comfortable 档 + 页指标色 + **玻璃外裹
+- **智能体页两子 tab**(agent-tab/06 三子页,tab-regroup/01 缩编——dev server 卡
+  迁服务页;定稿骨架 `.scratch/agent-tab/wireframe-agents-page.html` 是唯一视觉真相,
+  纯线稿约定见票):子药丸条 = `PillTabBar` comfortable 档 + 页指标色 + **玻璃外裹
   `isGlassContainer`**(08 补:06 漏传,与清理页子页条外观不一致)(`AgentSubTabBar`,
   清理页子页条之后第二个使用者),状态在 `DashboardModel.agentSubTab`(切 tab
   不丢),默认落「消耗」。**「每日消耗」外壳拆掉,四块平级成卡**(用户拍板);
-  Claude 用量卡撤(用量并入数字卡排第 4 张)。三子页 = **消耗**(下条)/ **会话**
-  (Claude Code 会话卡 + ZCode 会话卡;agent-tab/08 重设计见下「会话子页」)/ **开发服务**(dev server 卡,原节标题撤
-  ——子药丸已是身份)。
+  Claude 用量卡撤(用量并入数字卡排第 4 张)。两子页 = **消耗**(下条)/ **会话**
+  (Claude Code 会话卡 + ZCode 会话卡;agent-tab/08 重设计见下「会话子页」)。
+- **服务页**(tab-regroup/01,2026-11-16 拍板):前身容器页(p2-sensors/07),
+  标题「服务」、图标沿用 cube.box.fill、强调色沿用 containers 品类令牌——页的
+  主体仍是容器盘点。两卡上下堆叠:上 = dev server 卡(p1-history/08 配方原样,
+  自智能体页迁回,「全部停止」流不动;dev server 闲置告警落点跟卡走 → 本页),
+  下 = 容器卡(docker.sock 单发快照表,数据卷占用行维持不做)。
   - **消耗子页**(agent-tab/05 视觉细节全保留,agent-tab/06 只改结构与归属):
     ①数字卡排 = **四张一排**(今日消耗 / N 天合计 / 日均 / **Claude 用量**——
     5 小时窗% 优先缺失退本周,副行「本周 N% · 重置 X 后」,快照缺失「—」不伪造);
