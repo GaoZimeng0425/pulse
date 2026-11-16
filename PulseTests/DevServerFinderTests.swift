@@ -315,7 +315,7 @@ final class DevServerFinderTests: XCTestCase {
         XCTAssertEqual(occurrence?.subjectKey, AlertEngine.devServerSubjectKey(pid: 300))
         XCTAssertEqual(occurrence?.subjectName, "vite")
         XCTAssertEqual(occurrence?.value, 25 * 3600)
-        XCTAssertEqual(occurrence?.kind.route, .overview, "点通知直达总览(dev server 卡所在页)")
+        XCTAssertEqual(occurrence?.kind.route, .services, "点通知直达服务页(dev server 卡所在页,tab-regroup/01)")
 
         // 未闲置的 server(闲置秒 nil)不喂——喂进去的只有确认闲置的读数。
 
