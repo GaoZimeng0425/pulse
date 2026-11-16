@@ -59,7 +59,9 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .disk: "internaldrive"
         case .network: "network"
         case .containers: "cube.box.fill"
-        case .agents: "person.2.fill"
+        // 智能体换 brain(2026-11-16 用户点名换掉 person.2.fill——双人像像「共享/多人」,
+        // 不达 AI 语义;sparkles 已被清理页占用)。
+        case .agents: "brain"
         case .battery: "battery.100percent"
         case .cleaner: "sparkles"
         case .history: "clock.arrow.circlepath"

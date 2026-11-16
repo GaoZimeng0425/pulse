@@ -103,9 +103,9 @@ struct MainWindowView: View {
             // 窗口矮时页头 shrink-0(layoutPriority):高度紧张只压缩 tabBody 的弹性区
             // (清理页地图最小高兜底),页头「清理」标题不再被挤得上移/晃动
             // (2026-11-09 用户实报两轮:第一轮只保了卡内标题,漏了页头)。
+            // 触发中告警走页头右侧小条(AlertHeaderIndicator,2026-11-16 用户实报
+            // 「横幅在页头下方把内容推下移」)——页头下方不再铺横幅,告警出没内容不动。
             pageHeader
-                .layoutPriority(1)
-            AlertBannerView(center: monitor.alerts)
                 .layoutPriority(1)
             tabBody
         }
@@ -267,9 +267,11 @@ struct MainWindowView: View {
     @ViewBuilder
     private var pageHeader: some View {
         if tabSelection.current == .cleaner {
-            CleanerPageHeader(model: cleanerModel)
+            CleanerPageHeader(model: cleanerModel, alerts: monitor.alerts)
         } else {
-            PageHeader(tab: tabSelection.current, style: .full)
+            PageHeader(tab: tabSelection.current, style: .full) {
+                AlertHeaderIndicator(center: monitor.alerts)
+            }
         }
     }
 

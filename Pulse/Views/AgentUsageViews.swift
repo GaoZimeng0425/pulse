@@ -6,7 +6,7 @@ import SwiftUI
 
 //
 // 「每日消耗」外壳拆掉、四块平级成卡(用户拍板):数字卡排(四张一排,含
-// Claude 用量)→ 日历图 + 走势(≥1280 窗宽两列,否则一列;07)→ 项目宽卡
+// Claude 用量)→ 日历图 + 走势(≥1920 窗宽两列,否则一列;07 立 1280,11-16 修订)→ 项目宽卡
 // (媒体查询列数)。range(7/30)子页内共享,数字卡排随档位联动;「重新扫描」
 // 在日历图卡头(全量档手动触发,补漏天)。项目卡对齐 tokscale 参数:四桶 +
 // 缓存倍率 + 会话数(Cost / 精确 Last Active 用户点名不做)。数据派生全走
@@ -193,13 +193,13 @@ struct AgentUsagePaneView: View {
         return parts.joined(separator: " · ")
     }
 
-    // MARK: 卡 2/3:日历图 + 走势(≥1280 窗宽一排两列,否则一列)
+    // MARK: 卡 2/3:日历图 + 走势(≥1920 窗宽一排两列,否则一列)
 
-    /// 双列断点(agent-tab/07,2026-11-14 用户拍板「1280 变为一列」):子页内容宽
-    /// ≥ 1232(= 窗宽 1280 − 两侧 `{spacing.window-padding}` 24)才并排,否则
+    /// 双列断点(agent-tab/07 立于 1280;2026-11-16 用户修订「1920 才变一行」):子页内容宽
+    /// ≥ 1872(= 窗宽 1920 − 两侧 `{spacing.window-padding}` 24)才并排,否则
     /// 上下一列。06 的 `ViewThatFits` 按子视图理想宽判定,而热力墙 / Charts 都是
     /// 弹性宽、理想宽不可预期——何时切换不可控,是「别扭」的来源之一。弹窗恒一列。
-    static let chartTwoColumnMinWidth: CGFloat = 1232
+    static let chartTwoColumnMinWidth: CGFloat = 1872
     /// 弹窗紧凑档走势绘图区定高(热力墙在 330 宽下只有 ~45 高,不跟随)。
     private static let compactTrendPlotHeight: CGFloat = 100
 

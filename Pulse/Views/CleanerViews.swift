@@ -37,12 +37,15 @@ enum CleanerSubTab: String, CaseIterable, Hashable {
 /// 大标题(用户 2026-11-02 实见)。
 struct CleanerPageHeader: View {
     let model: CleanerModel
+    /// 触发中告警(2026-11-16):与其它 tab 同一页头小条配件,出现/消失不推内容下移。
+    let alerts: AlertCenter
 
     var body: some View {
         PageHeader(title: MetricTab.cleaner.title, subtitle: subtitle, style: .full) {
             // 页头动作按钮 B 档 .large(2026-11-05 清理页密度拍板)。「清空废纸篓」
             // 已随 p6-cleaner/03 迁到总览废纸篓卡(页头按钮撤除,入口随读数走)。
             HStack(spacing: 8) {
+                AlertHeaderIndicator(center: alerts)
                 if model.isScanning {
                     Button("取消扫描") { model.cancelScan() }
                         .buttonStyle(.borderedProminent)

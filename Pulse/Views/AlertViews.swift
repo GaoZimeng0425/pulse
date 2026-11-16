@@ -9,17 +9,17 @@ import SwiftUI
 // 数据源 = AlertCenter.activeAlerts(@Observable,每轮引擎评估驱动)。UI 层
 // 不单测,spec 测试决策(P0 既定:预览 + 真机走查)。
 
-/// 紧凑告警横幅:弹窗(footer 上方)与主窗口(内容头下方)共用。
+/// 紧凑告警横幅:弹窗(footer 上方)专用。主窗口 2026-11-16 起改走页头小条
+/// `AlertHeaderIndicator`(用户实报:横幅在页头下方铺开,出现/消失把内容推下移),
+/// 大字号形态随之收编,只留弹窗紧凑档。
 /// 无触发中告警时整体不渲染(零占用)。
 struct AlertBannerView: View {
     /// 告警编排(读 activeAlerts 与授权状态)。
     let center: AlertCenter
-    /// 紧凑形态(弹窗):字号更小。
-    var isCompact = false
 
     var body: some View {
         if !center.activeAlerts.isEmpty {
-            VStack(alignment: .leading, spacing: isCompact ? 4 : 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 ForEach(center.activeAlerts, id: \.self) { occurrence in
                     row(occurrence)
                 }
@@ -47,8 +47,8 @@ struct AlertBannerView: View {
                     .font(.system(size: 11))
                 }
             }
-            .padding(.horizontal, isCompact ? 10 : 12)
-            .padding(.vertical, isCompact ? 6 : 8)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
             // 语义警示色淡底({colors.state-warning}),{rounded.inner} 10;无描边(DESIGN.md)。
             .background(Surface.warning.opacity(0.12), in: .rect(cornerRadius: 10))
@@ -65,16 +65,69 @@ struct AlertBannerView: View {
                 .foregroundStyle(Surface.warning)
             VStack(alignment: .leading, spacing: 1) {
                 Text(AlertNotificationContent.title(for: occurrence))
-                    .font(.system(size: isCompact ? 11 : 12, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                 Text(AlertNotificationContent.body(
                     for: occurrence,
                     offender: center.offenders[occurrence.offenderKey] ?? .none
                 ))
-                .font(.system(size: isCompact ? 10.5 : 11))
+                .font(.system(size: 10.5))
                 .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
         }
+    }
+}
+
+/// 页头告警小条(2026-11-16 用户拍板):主窗口页头右侧配件槽的单行提示——
+/// 铃铛 + 首条标题(多条「系统负载过高 等 N 项」),告警出没不再推内容下移;
+/// 每条的读数与归因「谁在吃」进悬停提示(副文与系统通知同源
+/// `AlertNotificationContent.body`,弹窗横幅同口径)。授权异常只在悬停里注明,
+/// 深链入口随弹窗横幅与设置页。无触发中告警时整体不渲染(零占用)。
+struct AlertHeaderIndicator: View {
+    /// 告警编排(读 activeAlerts 与授权状态)。
+    let center: AlertCenter
+
+    var body: some View {
+        if !center.activeAlerts.isEmpty {
+            HStack(spacing: 6) {
+                Image(systemName: "bell.badge.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Surface.warning)
+                Text(headline)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            // 与弹窗横幅同配方:{colors.state-warning} 淡底 + {rounded.inner} 10,无描边。
+            .background(Surface.warning.opacity(0.12), in: .rect(cornerRadius: 10))
+            .help(tooltip)
+        }
+    }
+
+    /// 一条 = 标题;多条 = 首条 + 计数,恒一行。
+    private var headline: String {
+        let alerts = center.activeAlerts
+        guard alerts.count > 1 else { return AlertNotificationContent.title(for: alerts[0]) }
+        return "\(AlertNotificationContent.title(for: alerts[0])) 等 \(alerts.count) 项"
+    }
+
+    /// 悬停列全部:每条「标题 · 归因」一行;授权异常加尾行(主窗口无深链按钮,指路弹窗/设置)。
+    private var tooltip: String {
+        var lines = center.activeAlerts.map { occurrence in
+            let body = AlertNotificationContent.body(
+                for: occurrence,
+                offender: center.offenders[occurrence.offenderKey] ?? .none
+            )
+            return "\(AlertNotificationContent.title(for: occurrence)) · \(body)"
+        }
+        if center.authorizationDenied {
+            lines.append("系统通知已被拒绝,告警仅在应用内提示(可在设置中打开)。")
+        }
+        if center.authorizationRequestFailed {
+            lines.append("系统通知授权未完成,告警仅在应用内提示。")
+        }
+        return lines.joined(separator: "\n")
     }
 }
 
@@ -99,9 +152,10 @@ struct AlertBannerView: View {
             firedAt: Date()
         ),
     ]
-    return VStack(spacing: 16) {
+    return VStack(alignment: .leading, spacing: 16) {
+        AlertHeaderIndicator(center: center)
+        Divider()
         AlertBannerView(center: center)
-        AlertBannerView(center: center, isCompact: true)
     }
     .padding(24)
 }

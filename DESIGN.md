@@ -111,7 +111,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{colors.ink-tertiary}` | `Surface.inkTertiary` | 三级墨色(缓存段、最弱文字) |
 | `{colors.accent-cpu}` … `{colors.accent-battery}`、`{colors.accent-gpu}`、`{colors.accent-sound}`、`{colors.accent-bluetooth}`、`{colors.accent-containers}` | `Metric.accentColor` | 每指标一色:tab、图表、徽章、大数字(GPU 入表 p2-sensors/02;Neural 与 Memory 同色,03 票再议;Sound/Bluetooth 入表 p2-sensors/05、Containers 取 §1.1 Projects 行(p2-sensors/07),均现成行零发明,外设页 tab 强调取 Bluetooth 青) |
 | `{colors.state-positive}` | `Surface.positive` | ✓正常、充电中 |
-| `{colors.state-warning}` | `Surface.warning`(= Disk 指标色别名) | 压力偏高、优化充电介入、触发中告警横幅(琥珀语义) |
+| `{colors.state-warning}` | `Surface.warning`(= Disk 指标色别名) | 压力偏高、优化充电介入、触发中告警提示(琥珀语义;主窗口页头小条 / 弹窗横幅两形态) |
 | `{colors.state-caution}` | `Surface.caution` | 清理档位「先检查」chip(p4-uninstaller/08 立项:清理页 accent 即磁盘金,warning 别名与它全页撞色,故独立琥珀橙;不用于负载/告警) |
 | `{colors.accent-clean}` | `Surface.cleanAccent` | 清理页专属强调(2026-11-06 用户拍板 Teal;此前借磁盘金被评丑、指标色是 tab 身份色不跨页借):清理页主按钮 / 排序选中段 / 勾选框选中 / 选中条目卡底 / 子页药丸统一取此 |
 | `{colors.category-*}` | `GroupCategory.identityColor` | 非 App 组的图标瓦片底色;孤儿另作组行强调色(见下) |
@@ -205,7 +205,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.module-card-min-width}` | 340pt | 清理总览模块大卡自适应网格的单卡最小宽(p6-cleaner/03):列数 = min(2, 内容宽容纳列数)——720 最小窗 1 列、默认窗 880 起 2 列、**上限 2 列**(品类只有六卡,不随 ultrawide 拉列);列距 `{spacing.group-gap}` 12 |
 | `{layout.agent-project-card-min-width}` | ~~960pt~~ | **superseded**(agent-tab/06 二度修正):SwiftUI `GridItem(.flexible(minimum:))` 的 min 是硬下限,容器再窄不缩——960 在窄窗/弹窗把内容撑出容器右缘被裁(与 CSS min-width 会被轨道压缩不同)。项目大卡终态 = **恒单列满宽 VStack**,无网格参数 |
 | `{layout.agent-project-limit}` | 10 个 | 智能体页消耗子页项目默认展示上限(agent-tab/06,2026-11-14 用户拍板):超出末行「显示全部(另 N 个项目)⌄ / 收起,只看前 10 个⌃」,排行截断末行(`RankingOverflowRow`)同款交互与视觉 |
-| `{layout.agent-chart-two-column-min-width}` | 1232pt | 智能体页消耗子页「日历图 + 走势」并排断点(agent-tab/07,2026-11-14 用户拍板「1280 变为一列」):子页内容宽 ≥ 1232(= 窗宽 1280 − 两侧 `{spacing.window-padding}` 24)两列并排等高,否则上下一列;弹窗恒一列。替代 06 的 `ViewThatFits`(按弹性子视图理想宽判定,切换点不可控) |
+| `{layout.agent-chart-two-column-min-width}` | 1872pt | 智能体页消耗子页「日历图 + 走势」并排断点(agent-tab/07 立于窗宽 1280,2026-11-16 用户修订「1920 才变一行」):子页内容宽 ≥ 1872(= 窗宽 1920 − 两侧 `{spacing.window-padding}` 24)两列并排等高,否则上下一列;弹窗恒一列。替代 06 的 `ViewThatFits`(按弹性子视图理想宽判定,切换点不可控) |
 | `{layout.agent-trend-height}` | ~~180pt / 120pt~~ | **superseded**(agent-tab/10,11-15 用户实报「两个 chart 高度应该一致,坐标水平对齐」):走势绘图区高 = `AgentHeatWall.gridHeight(forWidth:)`(与热力墙同宽同式,一列 / 两列都等高,下限 60);仅弹窗紧凑档定高 100 |
 | `{layout.ranking-limit}` | 20 行 | 各排行(弹窗与主窗口同规则)只列前 20 名,超出补末行:弹窗「查看全部(另 N 项)」跳主窗口并落地即展开,主窗口「显示全部(另 N 项)」原地展开 / 「收起」(ranking-limit/01,2026-11-02 用户拍板;原 11-01 `popover-ranking-limit` 只截弹窗)。主窗口搜索命中不截 |
 | `{layout.sheet-width}` | 460pt | 确认清单 sheet 定宽(清理页「清理…」,p4-cleaner/04;原型 B 变体同值) |
@@ -593,8 +593,11 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   `{typography.caption}` 11 secondary;行距 `{spacing.micro}` 2。**副标题「本机一行」(芯片 ·
   核数 · 内存,`hostSummary`)只有总览带**,其余 tab 只有标题——判据在 `PageHeader.init(tab:)`
   单点,两窗不许各写一份;清理页副标题 = 扫描状态、配件 = 扫描 / 取消按钮(`CleanerPageHeader`,
-  由主窗口页头槽位画,`CleanerTabView` 本体不画标题)。**每个 tab 恰一个标题**:tab 内容
-  (卡片 / 子页)不得再画与页名同级的大标题。
+  由主窗口页头槽位画,`CleanerTabView` 本体不画标题)。**主窗口配件槽含告警小条
+  `AlertHeaderIndicator`**(2026-11-16 用户实报:横幅在页头下方铺开、出现/消失把内容推
+  下移):单行「铃铛 + 首条标题(多条『… 等 N 项』)」,明细与归因进悬停;清理页与扫描按钮
+  同槽并排;弹窗仍走底部横幅 `AlertBannerView`(紧凑档,主窗口大字号形态已收编)。
+  **每个 tab 恰一个标题**:tab 内容(卡片 / 子页)不得再画与页名同级的大标题。
 - **弹窗 DashboardView**:面板 `{layout.popover-size}` 360×648 定尺寸;底部操作"开窗靠左、设置+退出靠右"
   (退出 = 纯图标,用户拍板)。顶部图标 tab 槽位**单行满宽均分**(P2 扩到
   11 枚后 32pt 定宽槽超出 332pt 内容区、右端裁切;均分只收窄不溢出,与主窗口
@@ -617,7 +620,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
     ①数字卡排 = **四张一排**(今日消耗 / N 天合计 / 日均 / **Claude 用量**——
     5 小时窗% 优先缺失退本周,副行「本周 N% · 重置 X 后」,快照缺失「—」不伪造);
     lift 小卡规格同下;②**日历图 + 走势**:内容宽 ≥ `{layout.agent-chart-two-column-min-width}`
-    1232(窗宽 1280)一排两列等高,否则上下一列(agent-tab/07 替代 `ViewThatFits`)
+    1872(窗宽 1920,2026-11-16 修订,原 1280)一排两列等高,否则上下一列(agent-tab/07 替代 `ViewThatFits`)
     ——「重新扫描」在日历图卡头(与「天 / 周」粒度药丸并排——agent-tab/11 替代 06 的「年」占位单选;**卡头文字按钮配方** =
     `arrow.clockwise` + 文字,borderless 12 semibold secondary,扫描中换 mini 转圈 +
     「扫描中」禁用;07 收编 06 的 `.bordered` 小号系统按钮,与空间地图「在 Finder 中
