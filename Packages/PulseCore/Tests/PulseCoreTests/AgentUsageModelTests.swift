@@ -200,6 +200,14 @@ final class AgentUsageModelTests: XCTestCase {
         XCTAssertNil(ClaudeTranscriptUsageParser.parse(line: "not json"))
     }
 
+    /// 预筛只是快路:含 "assistant" 字面量但非 assistant 记录的行,仍由后续
+    /// JSON 判定 nil(预筛不放松语义)。
+    func testClaudeLinePrefilterKeepsStrictSemantics() {
+        XCTAssertNil(ClaudeTranscriptUsageParser.parse(
+            line: #"{"type":"user","timestamp":"2026-11-10T12:00:00.000Z","message":{"content":"the assistant replied"}}"#
+        ))
+    }
+
     // MARK: stats-cache 解析
 
     func testStatsCacheDailyTotals() {
