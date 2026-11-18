@@ -1,3 +1,4 @@
+import CryptoKit
 import GRDB
 @testable import Pulse
 import PulseCore
@@ -188,46 +189,120 @@ final class AgentUsageReaderTests: XCTestCase {
 
     // MARK: Claude jsonl 与 stats-cache
 
-    /// 流式逐行 + mtime 过滤:今天档只喂今天有改动的文件。
-    func testClaudeTranscriptsStreamAndFilter() throws {
+    /// 库存只列 jsonl 正规文件;key = <slug>/<file>;size/mtime 如实。
+    func testClaudeInventory() throws {
         try write(
-            """
-            {"type":"user","timestamp":"2026-11-12T03:00:00.000Z","content":"hi"}
-            {"type":"assistant","timestamp":"2026-11-12T03:00:01.000Z","message":{"id":"m1","usage":{"input_tokens":1,"output_tokens":2}}}
-            """,
+            "x\ny\n",
             relativePath: ".claude/projects/-Users-x-pulse/s1.jsonl"
         )
-        // 旧文件(mtime 拨回昨天):今天档不喂。
-        try write(
-            #"{"type":"assistant","timestamp":"2026-11-11T03:00:00.000Z","message":{"id":"m2","usage":{"input_tokens":9,"output_tokens":9}}}"# +
-                "\n",
-            relativePath: ".claude/projects/-Users-x-pulse/s2.jsonl"
-        )
-        let oldFile = home.appendingPathComponent(".claude/projects/-Users-x-pulse/s2.jsonl")
-        try FileManager.default.setAttributes(
-            [.modificationDate: Date().addingTimeInterval(-86400)],
-            ofItemAtPath: oldFile.path
-        )
+        try write("{}", relativePath: ".claude/projects/-Users-x-pulse/s1.key")
 
+        let inventory = LiveAgentUsageReader(home: home).claudeFileInventory()
+        XCTAssertEqual(inventory.count, 1)
+        XCTAssertEqual(inventory.first?.key, "-Users-x-pulse/s1.jsonl")
+        XCTAssertEqual(inventory.first?.sizeBytes, 4)
+        XCTAssertNotNil(inventory.first?.modifiedAt)
+    }
+
+    /// 增量读全量档:只喂完整行(无换行尾行不喂),offset 停在行边界,
+    /// SHA-256 覆盖 [0, offset)。
+    func testClaudeIncrementalFullRead() throws {
+        let line1 = #"{"type":"user","timestamp":"2026-11-12T03:00:00.000Z","content":"hi"}"#
+        let line2 = #"{"type":"assistant","timestamp":"2026-11-12T03:00:01.000Z","message":{"id":"m1","usage":{"input_tokens":1,"output_tokens":2}}}"#
+        // 尾行无换行:不消费。
+        try write(line1 + "\n" + line2, relativePath: ".claude/projects/-Users-x-pulse/s1.jsonl")
+
+        let ref = try XCTUnwrap(LiveAgentUsageReader(home: home).claudeFileInventory().first)
+        var lines: [String] = []
+        let outcome = LiveAgentUsageReader(home: home).readClaudeFileIncremental(ref, checkpoint: nil) {
+            lines.append($0)
+        }
+        guard case let .advanced(offset, sha) = outcome else {
+            return XCTFail("expected advanced, got \(outcome)")
+        }
+        XCTAssertEqual(lines, [line1])
+        XCTAssertEqual(offset, UInt64(line1.utf8.count + 1))
+        // SHA 用 CryptoKit 独立复算。
+        var hasher = SHA256()
+        hasher.update(data: Data((line1 + "\n").utf8))
+        XCTAssertEqual(sha, Data(hasher.finalize()))
+    }
+
+    /// 续扫:未追加 → unchanged;追加 → 只喂新行,offset/SHA 前进;改写 → rewritten。
+    func testClaudeIncrementalResumeAndRewrite() throws {
+        let path = ".claude/projects/-Users-x-pulse/s1.jsonl"
+        let line1 = #"{"type":"assistant","timestamp":"2026-11-12T03:00:00.000Z","message":{"id":"m1","usage":{"input_tokens":1,"output_tokens":2}}}"#
+        try write(line1 + "\n", relativePath: path)
         let reader = LiveAgentUsageReader(home: home)
 
-        // 今天档(模拟「今天 0 点」:取一分钟前,刚写的文件都算新):只有 s1
-        // 的两行(user 行也喂——解析过滤是内核职责);相对路径 <slug>/<file>。
-        var todayLines: [String] = []
-        reader.readClaudeTranscripts(modifiedSince: Date().addingTimeInterval(-60)) { _, line in
-            todayLines.append(line)
+        var lines: [String] = []
+        let first = try reader.readClaudeFileIncremental(
+            XCTUnwrap(reader.claudeFileInventory().first),
+            checkpoint: nil
+        ) {
+            lines.append($0)
         }
-        XCTAssertEqual(todayLines.count, 2)
+        guard case let .advanced(offset, sha) = first else {
+            return XCTFail("expected advanced")
+        }
+        XCTAssertEqual(lines.count, 1)
 
-        // 全量档:三个文件都喂(尾行无换行也喂);首段 = slug。
-        var allPaths: [String] = []
-        var allLines: [String] = []
-        reader.readClaudeTranscripts(modifiedSince: nil) { path, line in
-            allPaths.append(path)
-            allLines.append(line)
+        // 未追加(同库存引用):unchanged。
+        let unchanged = try reader.readClaudeFileIncremental(
+            XCTUnwrap(reader.claudeFileInventory().first),
+            checkpoint: (offset, sha)
+        ) { _ in }
+        XCTAssertEqual(unchanged, .unchanged)
+
+        // 追加新行:只喂新行,offset 前进。
+        try append(
+            line2: #"{"type":"assistant","timestamp":"2026-11-12T03:05:00.000Z","message":{"id":"m2","usage":{"input_tokens":3,"output_tokens":4}}}"#,
+            relativePath: path
+        )
+        var resumed: [String] = []
+        let second = try reader.readClaudeFileIncremental(
+            XCTUnwrap(reader.claudeFileInventory().first),
+            checkpoint: (offset, sha)
+        ) {
+            resumed.append($0)
         }
-        XCTAssertEqual(allLines.count, 3)
-        XCTAssertTrue(allPaths.allSatisfy { $0 == "-Users-x-pulse/s1.jsonl" || $0 == "-Users-x-pulse/s2.jsonl" })
+        guard case let .advanced(offset2, _) = second else {
+            return XCTFail("expected advanced after append")
+        }
+        XCTAssertEqual(resumed.count, 1)
+        XCTAssertTrue(resumed[0].contains("\"m2\""))
+        XCTAssertGreaterThan(offset2, offset)
+
+        // 改写前缀(原地重写第一行):rewritten。
+        try write(
+            #"{"type":"assistant","timestamp":"2026-11-12T03:00:00.000Z","message":{"id":"m0","usage":{"input_tokens":9,"output_tokens":9}}}"# +
+                "\n",
+            relativePath: path
+        )
+        let rewritten = try reader.readClaudeFileIncremental(
+            XCTUnwrap(reader.claudeFileInventory().first),
+            checkpoint: (offset2, sha),
+            consume: { _ in }
+        )
+        XCTAssertEqual(rewritten, .rewritten)
+
+        // 文件变小(< offset):rewritten。
+        try write("{}", relativePath: path)
+        let shrunk = try reader.readClaudeFileIncremental(
+            XCTUnwrap(reader.claudeFileInventory().first),
+            checkpoint: (offset2, sha),
+            consume: { _ in }
+        )
+        XCTAssertEqual(shrunk, .rewritten)
+    }
+
+    /// 追加一行(保留原内容)。
+    private func append(line2: String, relativePath: String) throws {
+        let url = home.appendingPathComponent(relativePath)
+        let handle = try FileHandle(forWritingTo: url)
+        defer { try? handle.close() }
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data((line2 + "\n").utf8))
     }
 
     /// stats-cache 原样读回;缺失 nil。

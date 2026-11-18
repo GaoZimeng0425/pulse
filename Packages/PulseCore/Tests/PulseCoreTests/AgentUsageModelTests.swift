@@ -3,47 +3,6 @@ import XCTest
 
 // MARK: - 每日 token 账本测试(agent-tab/02;夹具形状取自本机实测 + tokscale zcode.rs)
 
-/// 记录调用参数的假 reader(catalog 断言「今天档只拉今天」用)。
-/// 只在单线程测试里使用,夹具可变存储故 @unchecked。
-private final class FakeUsageReader: AgentUsageReading, @unchecked Sendable {
-    var zcode: [ZCodeUsageSample] = []
-    var legacySchema = false
-    /// 文件级 mtime(Live 侧同职责:今天档只喂今天有改动的文件)。
-    var claudeFiles: [(key: String, modifiedAt: Date, lines: [String])] = []
-    var statsCache: Data?
-
-    private(set) var capturedSinceMs: Int64?
-    private(set) var capturedModifiedSince: Date?
-
-    func zcodeUsageSamples(sinceStartedAtMs: Int64?) -> (
-        samples: [ZCodeUsageSample], legacySchema: Bool
-    ) {
-        capturedSinceMs = sinceStartedAtMs
-        let filtered: [ZCodeUsageSample] = if let since = sinceStartedAtMs {
-            zcode.filter { ($0.startedAtMs ?? 0) >= since }
-        } else {
-            zcode
-        }
-        return (filtered, legacySchema)
-    }
-
-    func readClaudeTranscripts(
-        modifiedSince: Date?,
-        consume: (_ relativePath: String, _ line: String) -> Void
-    ) {
-        capturedModifiedSince = modifiedSince
-        for file in claudeFiles where modifiedSince == nil || file.modifiedAt >= modifiedSince! {
-            for line in file.lines {
-                consume(file.key, line)
-            }
-        }
-    }
-
-    func claudeStatsCacheData() -> Data? {
-        statsCache
-    }
-}
-
 /// 本地正午的毫秒时间戳(任何合理时区偏移下都留在同一天;跨午夜不是被测对象)。
 private func noonMs(_ year: Int, _ month: Int, _ day: Int) -> Int64 {
     var components = DateComponents()
@@ -352,149 +311,6 @@ final class AgentUsageModelTests: XCTestCase {
         XCTAssertTrue(try store.hasAnyRow())
     }
 
-    // MARK: 编排器
-
-    /// 定时档:节流内跳过;只拉今天(ZCode since = 今天 0 点、Claude 只扫今天
-    /// 有改动的文件);结果 upsert 今天行。
-    func testRefreshTodayThrottlesAndScopesToToday() throws {
-        let store = try AgentUsageStore(database: HistoryDatabase.openInMemory())
-        let reader = FakeUsageReader()
-        let now = Date()
-        let yesterday = now.addingTimeInterval(-86400)
-        // 夹具日期相对 now 动态取(硬编码日期 + 真实 now = 午夜后必挂)。
-        reader.zcode = [
-            ZCodeUsageSample(
-                id: "today",
-                startedAtMs: nowMs(now),
-                inputTokens: 10,
-                outputTokens: 5,
-                computedTotalTokens: 15
-            ),
-            ZCodeUsageSample(
-                id: "yesterday",
-                startedAtMs: nowMs(yesterday),
-                inputTokens: 10,
-                outputTokens: 5,
-                computedTotalTokens: 15
-            ),
-        ]
-        reader.claudeFiles = [
-            (key: "s1.jsonl", modifiedAt: now, lines: [claudeLine(id: "m1", timestamp: isoUtc(now))]),
-            // 昨天的文件:今天档不喂(文件级 mtime 过滤是 Live 侧职责,fake 同口径)。
-            (
-                key: "s2.jsonl",
-                modifiedAt: yesterday,
-                lines: [claudeLine(id: "m2", timestamp: isoUtc(yesterday))]
-            ),
-        ]
-        var catalog = AgentUsageCatalog()
-
-        let first = catalog.refreshToday(reader: reader, store: store, now: now)
-        XCTAssertNotNil(first)
-        XCTAssertNotNil(reader.capturedSinceMs)
-        XCTAssertNotNil(reader.capturedModifiedSince)
-        // 只剩今天两行(claude + zcode 各一),昨天的数据定时档不碰。
-        XCTAssertEqual(first?.count, 2)
-        XCTAssertFalse(first?.contains { $0.day == localDayKey(yesterday) } ?? true)
-
-        // 节流窗内:跳过(nil)。
-        XCTAssertNil(catalog.refreshToday(reader: reader, store: store, now: now.addingTimeInterval(60)))
-    }
-
-    /// 回归(2026-11-18 实案):今天改动的文件里装着昨天的记录(跨午夜会话),
-    /// 它只是昨天全量的子集——定时档不得用它覆盖库中完整的昨天行;合计/项目/
-    /// 模型三轨同守。历史修正只走全量档。
-    func testRefreshTodayDoesNotOverwritePastDaysWithTodaySubset() throws {
-        let store = try AgentUsageStore(database: HistoryDatabase.openInMemory())
-        let now = Date()
-        let yesterdayDate = now.addingTimeInterval(-86400)
-        let yesterday = localDayKey(yesterdayDate)
-        // 库里已有完整的昨天行(昨天 23:55 定时档写下)。
-        try store.upsert([
-            AgentDailyUsageRow(day: yesterday, source: .claude, origin: .jsonl, totalTokens: 5000),
-        ])
-        try store.upsertProjects([
-            AgentProjectUsageRow(day: yesterday, source: .claude, project: "pulse", totalTokens: 5000),
-        ])
-
-        let reader = FakeUsageReader()
-        // 今天改动的文件(跨午夜会话):前半段记录时间戳是昨天。
-        reader.claudeFiles = [
-            (
-                key: "s1.jsonl",
-                modifiedAt: now,
-                lines: [
-                    claudeLine(
-                        id: "m1",
-                        timestamp: isoUtc(yesterdayDate),
-                        cwd: "/Users/x/pulse",
-                        model: "claude-opus-5-5"
-                    ),
-                    claudeLine(
-                        id: "m2",
-                        timestamp: isoUtc(now),
-                        cwd: "/Users/x/pulse",
-                        model: "claude-opus-5-5"
-                    ),
-                ]
-            ),
-        ]
-        var catalog = AgentUsageCatalog()
-        let rows = catalog.refreshToday(reader: reader, store: store, now: now)
-
-        // 昨天行原样 5000(不被子集的 360 覆盖);今天行照写。
-        XCTAssertEqual(rows?.first { $0.day == yesterday }?.totalTokens, 5000)
-        XCTAssertEqual(rows?.first { $0.day == localDayKey(now) }?.totalTokens, 360)
-        XCTAssertEqual(try store.projectRows().first { $0.day == yesterday }?.totalTokens, 5000)
-        // 模型轨:昨天本无行,子集记录也不得凭空造出昨天的模型行。
-        XCTAssertFalse(try store.modelRows().contains { $0.day == yesterday })
-    }
-
-    /// 全量档:三源全拉;cache 只填缺天、不覆盖 jsonl 已有行、不填今天。
-    /// 「今天」相对 now 动态取(硬编码日期 + 真实 now = 午夜后必挂)。
-    func testFullRescanBackfillsCacheGaps() throws {
-        let store = try AgentUsageStore(database: HistoryDatabase.openInMemory())
-        // 库里已有 11-01 的 jsonl 行(模拟此前扫过)。
-        try store.upsert([
-            AgentDailyUsageRow(day: "2026-11-01", source: .claude, origin: .jsonl, totalTokens: 100),
-        ])
-
-        let now = Date()
-        let today = localDayKey(now)
-        let reader = FakeUsageReader()
-        reader.zcode = [
-            ZCodeUsageSample(
-                id: "u1",
-                startedAtMs: nowMs(now),
-                inputTokens: 100,
-                outputTokens: 50,
-                computedTotalTokens: 150
-            ),
-        ]
-        reader.claudeFiles = [
-            (key: "s1.jsonl", modifiedAt: now, lines: [claudeLine(id: "m1", timestamp: isoUtc(now))]),
-        ]
-        reader.statsCache = """
-        {"dailyModelTokens":[
-          {"date":"2026-11-01","tokensByModel":{"m":500}},
-          {"date":"2026-11-04","tokensByModel":{"m":700}},
-          {"date":"\(today)","tokensByModel":{"m":999}}
-        ]}
-        """.data(using: .utf8)
-
-        var catalog = AgentUsageCatalog()
-        let rows = catalog.fullRescan(reader: reader, store: store, now: now)
-
-        // 11-01 仍是 jsonl 100(cache 500 不覆盖);11-04 补 cache 700;
-        // 今天 cache 不填(999 不出现;今天只有 jsonl/zcode 实扫行)。
-        XCTAssertEqual(rows.first { $0.day == "2026-11-01" }?.origin, .jsonl)
-        XCTAssertEqual(rows.first { $0.day == "2026-11-01" }?.totalTokens, 100)
-        XCTAssertEqual(rows.first { $0.day == "2026-11-04" }?.origin, .cache)
-        XCTAssertEqual(rows.first { $0.day == "2026-11-04" }?.totalTokens, 700)
-        XCTAssertFalse(rows.contains { $0.day == today && $0.origin == .cache })
-        XCTAssertEqual(rows.first { $0.day == today && $0.source == .zcode }?.totalTokens, 150)
-    }
-
     // MARK: 工作区归组与项目轨(agent-tab/04)
 
     /// 归组三形态:worktree 折主仓、.git/worktrees 折主仓、普通取末段;退化输入 nil。
@@ -583,34 +399,6 @@ final class AgentUsageModelTests: XCTestCase {
         let rows = try store.projectRows()
         XCTAssertEqual(rows.count, 2)
         XCTAssertEqual(rows.first { $0.source == .claude }?.totalTokens, 260)
-    }
-
-    /// 全量档产出项目轨行(编排器 upsertProjects 接线)。
-    func testFullRescanWritesProjectRows() throws {
-        let store = try AgentUsageStore(database: HistoryDatabase.openInMemory())
-        let reader = FakeUsageReader()
-        reader.zcode = [
-            ZCodeUsageSample(
-                id: "u1", startedAtMs: noonMs(2026, 11, 12),
-                inputTokens: 100, outputTokens: 50, computedTotalTokens: 150,
-                workspacePath: "/Users/x/pulse/.worktrees/agent-project"
-            ),
-        ]
-        reader.claudeFiles = [
-            (
-                key: "-Users-x-pulse/s1.jsonl",
-                modifiedAt: Date(),
-                lines: [claudeLine(id: "m1", timestamp: "2026-11-12T12:00:00.000Z")]
-            ),
-        ]
-
-        var catalog = AgentUsageCatalog()
-        _ = catalog.fullRescan(reader: reader, store: store, now: Date())
-
-        let projects = try store.projectRows()
-        // 两家都归到 pulse(claude slug 末段 = pulse)。
-        XCTAssertEqual(projects.count, 2)
-        XCTAssertTrue(projects.allSatisfy { $0.project == "pulse" })
     }
 
     // MARK: 模型轨(agent-tab/05)
@@ -722,26 +510,5 @@ final class AgentUsageModelTests: XCTestCase {
         let rows = try store.modelRows()
         XCTAssertEqual(rows.count, 2)
         XCTAssertEqual(rows.first { $0.model == "claude-opus-5-5" }?.totalTokens, 260)
-    }
-
-    /// 全量档产出模型轨行(编排器 upsertModels 接线)。
-    func testFullRescanWritesModelRows() throws {
-        let store = try AgentUsageStore(database: HistoryDatabase.openInMemory())
-        let reader = FakeUsageReader()
-        reader.zcode = [
-            ZCodeUsageSample(
-                id: "u1", startedAtMs: nowMs(Date()),
-                inputTokens: 100, outputTokens: 50, computedTotalTokens: 150,
-                workspacePath: "/Users/x/pulse/.worktrees/agent-project",
-                modelId: "GLM-5.3"
-            ),
-        ]
-        var catalog = AgentUsageCatalog()
-        _ = catalog.fullRescan(reader: reader, store: store, now: Date())
-
-        let models = try store.modelRows()
-        XCTAssertEqual(models.count, 1)
-        XCTAssertEqual(models.first?.model, "GLM-5.3")
-        XCTAssertEqual(models.first?.project, "pulse")
     }
 }

@@ -406,6 +406,31 @@ public enum HistoryDatabase {
             try db.execute(sql: "CREATE INDEX agent_daily_model_usage_day ON agent_daily_model_usage(day)")
         }
 
+        // Claude jsonl 增量检查点两表(agent-tab/12):每文件已消费偏移 + 前缀
+        // SHA-256 + 对账本的完整贡献(day × project × model 五桶);全局
+        // message-id 去重状态。读写在 AgentCheckpointStore。只加表不改旧表;
+        // 老库升级后首轮全量扫描自动补齐检查点。
+        migrator.registerMigration(agentCheckpointMigrationID) { db in
+            try db.execute(sql: """
+            CREATE TABLE agent_file_checkpoints (
+                file_key        TEXT    NOT NULL PRIMARY KEY,
+                consumed_offset INTEGER NOT NULL,
+                prefix_sha256   BLOB    NOT NULL,
+                buckets_json    BLOB    NOT NULL,
+                saved_at_mtime  REAL    NOT NULL,
+                saved_at_size   INTEGER NOT NULL
+            )
+            """)
+            try db.execute(sql: """
+            CREATE TABLE agent_seen_messages (
+                message_id TEXT NOT NULL PRIMARY KEY,
+                file_key   TEXT NOT NULL,
+                day        TEXT NOT NULL
+            )
+            """)
+            try db.execute(sql: "CREATE INDEX agent_seen_messages_file ON agent_seen_messages(file_key)")
+        }
+
         return migrator
     }
 
@@ -417,6 +442,9 @@ public enum HistoryDatabase {
 
     /// 账本模型轨迁移标识(agent-tab/05)。
     static let agentModelUsageMigrationID = "agent-tab-05-model-usage"
+
+    /// Claude 增量检查点两表迁移标识(agent-tab/12)。
+    static let agentCheckpointMigrationID = "agent-tab-12-checkpoints"
 
     /// 清理历史迁移标识(p4-cleaner/04)。
     static let cleanHistoryMigrationID = "p4-cleaner-04-clean-history"
@@ -435,5 +463,6 @@ public enum HistoryDatabase {
         "clean_run", "clean_item",
         "alert_event", "dev_server_state",
         "agent_daily_usage", "agent_daily_project_usage", "agent_daily_model_usage",
+        "agent_file_checkpoints", "agent_seen_messages",
     ]
 }

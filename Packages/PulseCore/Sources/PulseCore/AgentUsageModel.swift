@@ -869,14 +869,19 @@ public protocol AgentUsageReading: Sendable {
         samples: [ZCodeUsageSample], legacySchema: Bool
     )
 
-    /// 逐行喂 `~/.claude/projects/` 下会话 jsonl(`modifiedSince` nil = 全部
-    /// 文件;文件级 mtime 过滤)。`relativePath` = 相对 projects 的
-    /// `<slug>/<sessionId>.jsonl`(项目归组从 slug 反解,agent-tab/04);consume
-    /// 在调用线程同步逐行执行(非逃逸语义),不跨线程。
-    func readClaudeTranscripts(
-        modifiedSince: Date?,
-        consume: (_ relativePath: String, _ line: String) -> Void
-    )
+    /// Claude 会话文件库存(stat 不打开):`~/.claude/projects/` 下全部 jsonl。
+    /// `key` = `<slug>/<sessionId>.jsonl`(项目归组从 slug 反解,agent-tab/04)。
+    func claudeFileInventory() -> [ClaudeFileRef]
+
+    /// 增量读一个文件(agent-tab/12):检查点 nil = 从 0 全量;有检查点先校验
+    /// 前缀哈希(只读不解析),失配/变小返回 `.rewritten`(调用方清 seen 后
+    /// 以 nil 检查点重读)。consume 只喂**完整行**(含换行才算消费;无换行
+    /// 尾巴留在未消费区下轮重读),同步逐行、非逃逸。
+    func readClaudeFileIncremental(
+        _ file: ClaudeFileRef,
+        checkpoint: (offset: UInt64, prefixSha256: Data)?,
+        consume: (_ line: String) -> Void
+    ) -> ClaudeFileReadOutcome
 
     /// `~/.claude/stats-cache.json` 内容;缺失返回 nil。
     func claudeStatsCacheData() -> Data?
@@ -895,114 +900,7 @@ public extension AgentUsageReading {
 
 // MARK: - 编排器
 
-/// 双档刷新编排(纯值内核,IO 与落库经参数注入):
-/// - **定时档** `refreshToday`:按 `refreshInterval` 节流,只重算今天
-///   (用户拍板:只算一天,跨午夜偏差接受)——ZCode 增量(今天 0 点起)、
-///   Claude 只扫今天有改动的文件,upsert 今天行。
-/// - **全量档** `fullRescan`:ZCode 全表 + Claude 全部 jsonl + stats-cache
-///   回填;细粒度覆盖、cache 只填缺天。手动触发,库空时首次自动跑。
-public struct AgentUsageCatalog {
-    /// 定时档节流(分钟级——不进秒级心跳档;弹窗开 1s 不放大 IO)。
-    public static let defaultRefreshInterval: TimeInterval = 300
-
-    private var lastRefreshAt: Date?
-    private let refreshInterval: TimeInterval
-
-    public init(refreshInterval: TimeInterval = AgentUsageCatalog.defaultRefreshInterval) {
-        self.refreshInterval = refreshInterval
-    }
-
-    /// 定时档:节流内返回 nil(调用方无事发生);只 upsert **今天**的行(历史行
-    /// 不被今天子集覆盖);刷新后返回全表账本行。
-    @discardableResult
-    public mutating func refreshToday(
-        reader: any AgentUsageReading,
-        store: AgentUsageStore,
-        calendar: Calendar = .current,
-        now: Date
-    ) -> [AgentDailyUsageRow]? {
-        if let lastRefreshAt, now.timeIntervalSince(lastRefreshAt) < refreshInterval {
-            return nil
-        }
-        lastRefreshAt = now
-
-        let startOfToday = calendar.startOfDay(for: now)
-        var aggregator = AgentDailyAggregator()
-        let samples = reader.zcodeUsageSamples(
-            sinceStartedAtMs: Int64(startOfToday.timeIntervalSince1970 * 1000)
-        )
-        for sample in samples.samples {
-            aggregator.addZCode(sample, legacySchema: samples.legacySchema)
-        }
-        reader.readClaudeTranscripts(modifiedSince: startOfToday) { relativePath, line in
-            guard let sample = ClaudeTranscriptUsageParser.parse(line: line) else { return }
-            // 捕获聚合器:去重集跨文件累积,不能每次调用新建。
-            aggregator.addClaude(
-                sample,
-                slug: AgentWorkspaceResolution.slug(fromRelativePath: relativePath)
-            )
-        }
-
-        // 只覆盖写「今天」的行:今天改动的文件里翻出的旧日期记录(跨午夜会话)
-        // 只是该天子集,upsert 会把库中完整的昨天行覆盖缩水(2026-11-18 实案:
-        // 11-16/17 的 Claude 行 564M/795M 被砍到只剩活会话的 65M/256M)。
-        // 历史修正只走全量档;三轨同守。
-        let today = aggregator.dayKey(now)
-        try? store.upsert(aggregator.rows(scannedAt: now).filter { $0.day == today })
-        try? store.upsertProjects(aggregator.projectRows(scannedAt: now).filter { $0.day == today })
-        try? store.upsertModels(aggregator.modelRows(scannedAt: now).filter { $0.day == today })
-        return try? store.rows()
-    }
-
-    /// 全量档:全源重扫 + stats-cache 回填缺天;返回全表账本行。
-    @discardableResult
-    public mutating func fullRescan(
-        reader: any AgentUsageReading,
-        store: AgentUsageStore,
-        calendar: Calendar = .current,
-        now: Date
-    ) -> [AgentDailyUsageRow] {
-        lastRefreshAt = now
-
-        var aggregator = AgentDailyAggregator()
-        let samples = reader.zcodeUsageSamples(sinceStartedAtMs: nil)
-        for sample in samples.samples {
-            aggregator.addZCode(sample, legacySchema: samples.legacySchema)
-        }
-        reader.readClaudeTranscripts(modifiedSince: nil) { relativePath, line in
-            guard let sample = ClaudeTranscriptUsageParser.parse(line: line) else { return }
-            aggregator.addClaude(
-                sample,
-                slug: AgentWorkspaceResolution.slug(fromRelativePath: relativePath)
-            )
-        }
-        for backfill in ClaudeStatsCacheParser.dailyTotals(from: reader.claudeStatsCacheData()) {
-            aggregator.addStatsCacheDay(backfill.day, totalTokens: backfill.totalTokens)
-        }
-
-        let today = aggregator.dayKey(now)
-        let all = aggregator.rows(scannedAt: now)
-        let detailed = all.filter { $0.origin != .cache }
-        let cacheRows = all.filter { $0.origin == .cache }
-        let knownDays = (try? store.knownClaudeDays()) ?? []
-        let merged = AgentUsageMerge.merge(
-            freshDetailed: detailed,
-            cacheBackfill: cacheRows,
-            knownClaudeDays: knownDays,
-            today: today
-        )
-        try? store.upsert(merged.upserts)
-        try? store.insertIfAbsent(merged.insertsIfAbsent)
-        // 项目轨:细粒度源全量覆盖(cache 无项目维度,不进此表);模型轨同口径。
-        try? store.upsertProjects(aggregator.projectRows(scannedAt: now))
-        try? store.upsertModels(aggregator.modelRows(scannedAt: now))
-        return (try? store.rows()) ?? []
-    }
-}
-
-extension AgentDailyAggregator {
-    /// 单点日键(全量档判「今天」用;internal 供编排器)。
-    func dayKey(_ date: Date) -> String {
-        dayFormatter.string(from: date)
-    }
-}
+//
+// 双档编排自 agent-tab/12 起由 `AgentUsageScan`(AgentIncrementalModel.swift)
+// 承担:Claude 走检查点增量 + Σ 落账,ZCode 原路径合入,stats-cache 回填
+// 全量档保留。旧 `AgentUsageCatalog`(每轮全量重读)已删。
