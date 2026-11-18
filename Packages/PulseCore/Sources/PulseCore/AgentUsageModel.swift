@@ -908,7 +908,8 @@ public struct AgentUsageCatalog {
         self.refreshInterval = refreshInterval
     }
 
-    /// 定时档:节流内返回 nil(调用方无事发生);刷新后返回全表账本行。
+    /// 定时档:节流内返回 nil(调用方无事发生);只 upsert **今天**的行(历史行
+    /// 不被今天子集覆盖);刷新后返回全表账本行。
     @discardableResult
     public mutating func refreshToday(
         reader: any AgentUsageReading,
@@ -938,9 +939,14 @@ public struct AgentUsageCatalog {
             )
         }
 
-        try? store.upsert(aggregator.rows(scannedAt: now))
-        try? store.upsertProjects(aggregator.projectRows(scannedAt: now))
-        try? store.upsertModels(aggregator.modelRows(scannedAt: now))
+        // 只覆盖写「今天」的行:今天改动的文件里翻出的旧日期记录(跨午夜会话)
+        // 只是该天子集,upsert 会把库中完整的昨天行覆盖缩水(2026-11-18 实案:
+        // 11-16/17 的 Claude 行 564M/795M 被砍到只剩活会话的 65M/256M)。
+        // 历史修正只走全量档;三轨同守。
+        let today = aggregator.dayKey(now)
+        try? store.upsert(aggregator.rows(scannedAt: now).filter { $0.day == today })
+        try? store.upsertProjects(aggregator.projectRows(scannedAt: now).filter { $0.day == today })
+        try? store.upsertModels(aggregator.modelRows(scannedAt: now).filter { $0.day == today })
         return try? store.rows()
     }
 
