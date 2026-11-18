@@ -109,7 +109,11 @@ extension SystemMonitor {
                 ),
                 devServers: DevServerFeature(portScanner: LiveDevServerPortScanner()),
                 agentSessions: AgentSessionFeature(reader: LiveAgentSessionReader()),
-                agentUsage: AgentUsageFeature(reader: LiveAgentUsageReader(), store: history.agentUsageStore),
+                agentUsage: AgentUsageFeature(
+                    reader: LiveAgentUsageReader(),
+                    store: history.agentUsageStore,
+                    checkpoints: history.agentCheckpointStore
+                ),
                 rankings: RankingsFeature(nettopSource: LiveNettopCSVSource()),
                 history: history,
                 disk: DiskFeature(

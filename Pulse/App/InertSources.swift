@@ -273,10 +273,17 @@ struct InertAgentUsageReader: AgentUsageReading {
         ([], false)
     }
 
-    func readClaudeTranscripts(
-        modifiedSince: Date?,
-        consume: (_ relativePath: String, _ line: String) -> Void
-    ) {}
+    func claudeFileInventory() -> [ClaudeFileRef] {
+        []
+    }
+
+    func readClaudeFileIncremental(
+        _ file: ClaudeFileRef,
+        checkpoint: (offset: UInt64, prefixSha256: Data)?,
+        consume: (_ line: String) -> Void
+    ) -> ClaudeFileReadOutcome {
+        .unchanged
+    }
 
     func claudeStatsCacheData() -> Data? {
         nil

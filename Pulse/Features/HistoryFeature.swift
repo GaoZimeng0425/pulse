@@ -37,6 +37,8 @@ final class HistoryFeature: MonitorFeature {
     /// 每日 token 账本(agent-tab/02):AgentUsageFeature 的落库口,同库同队列。
     /// 引擎缺席 → nil:用量功能安静禁用(无历史库可写)。
     let agentUsageStore: AgentUsageStore?
+    /// Claude 增量检查点两表(agent-tab/12):同库同队列。
+    let agentCheckpointStore: AgentCheckpointStore?
     @ObservationIgnored private var feed = HistoryFeed()
     /// 串行写入流的一笔:轮次落库,或项目根对账(改根迁移组身份)——同一条流保证
     /// 对账与落库按发生次序生效。
@@ -58,6 +60,7 @@ final class HistoryFeature: MonitorFeature {
         alertHistory = engine?.database.map { AlertEventStore(database: $0) }
         devServerHistory = engine?.database.map { DevServerStateStore(database: $0) }
         agentUsageStore = engine?.database.map { AgentUsageStore(database: $0) }
+        agentCheckpointStore = engine?.database.map { AgentCheckpointStore(database: $0) }
     }
 
     // MARK: - MonitorFeature

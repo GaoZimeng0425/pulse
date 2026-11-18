@@ -1,8 +1,9 @@
+import CryptoKit
 import Foundation
 import GRDB
 import PulseCore
 
-// MARK: - 每日 token 账本 Live 读取(agent-tab/02)
+// MARK: - 每日 token 账本 Live 读取(agent-tab/02;Claude 增量化 agent-tab/12)
 
 //
 // 三源的真 IO(路径注入 home,可测;同 LiveAgentSessionReader 惯例):
@@ -12,10 +13,12 @@ import PulseCore
 //   不能用 SQLite readonly 模式);busy 3 秒防 ZCode 大事务写入瞬间偶发繁忙。
 //   2.8GB 大头是对话正文(part/message),用量表 33MB——增量 WHERE 走
 //   (started_at, …) 索引。
-// - Claude `~/.claude/projects/**/*.jsonl` 文件枚举 + 64KB 分块流式逐行
-//   (mtime 过滤交给调用档位:今天档只喂今天有改动的文件)。
+// - Claude `~/.claude/projects/**/*.jsonl` **增量检查点读**(agent-tab/12):
+//   库存只 stat;读时按检查点偏移先哈希校验旧前缀(只读不解析),再解析
+//   新增字节,消费只推进到完整行边界。
 //   `~/.claude/transcripts/`(wrapper 转录,实测行无 message.usage)不扫。
 // - `~/.claude/stats-cache.json` 只读 Data。
+//
 
 /// 每日账本三源 Live 读取。
 struct LiveAgentUsageReader: AgentUsageReading {
@@ -103,46 +106,116 @@ struct LiveAgentUsageReader: AgentUsageReading {
         return (samples, legacySchema)
     }
 
-    func readClaudeTranscripts(
-        modifiedSince: Date?,
-        consume: (_ relativePath: String, _ line: String) -> Void
-    ) {
+    // MARK: Claude 增量读(agent-tab/12)
+
+    func claudeFileInventory() -> [ClaudeFileRef] {
         let projectsRoot = home.appendingPathComponent(".claude/projects")
-        let manager = FileManager.default
-        guard let enumerator = manager.enumerator(
+        guard let enumerator = FileManager.default.enumerator(
             at: projectsRoot,
-            includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
+            includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey, .fileSizeKey],
             options: [.skipsHiddenFiles]
-        ) else { return }
+        ) else { return [] }
+        var refs: [ClaudeFileRef] = []
         for case let url as URL in enumerator {
             guard url.pathExtension == "jsonl",
                   let values = try? url.resourceValues(
-                      forKeys: [.contentModificationDateKey, .isRegularFileKey]
+                      forKeys: [.contentModificationDateKey, .isRegularFileKey, .fileSizeKey]
                   ),
                   values.isRegularFile == true,
-                  modifiedSince == nil
-                  || (values.contentModificationDate ?? .distantPast) >= modifiedSince!
+                  let modified = values.contentModificationDate,
+                  let size = values.fileSize
             else { continue }
-            // 相对路径 <slug>/<sessionId>.jsonl:项目归组的输入(agent-tab/04)。
-            // 取「父目录名 + 文件名」拼——enumerator 会把 URL 解析成 symlink 后的
-            // 绝对拼写(实测 /var → /private/var,且 resolvingSymlinksInPath 还原
-            // 不出 enumerator 的拼写),任何绝对前缀匹配都不可靠;projects 布局
-            // 恒为 slug 一层,父目录名即 slug。
+            // 相对路径 <slug>/<sessionId>.jsonl:取「父目录名 + 文件名」拼——
+            // enumerator 会把 URL 解析成 symlink 后的绝对拼写(实测 /var →
+            // /private/var,且 resolvingSymlinksInPath 还原不出 enumerator 的
+            // 拼写),任何绝对前缀匹配都不可靠;projects 布局恒为 slug 一层。
             let relativePath = url.deletingLastPathComponent().lastPathComponent
                 + "/" + url.lastPathComponent
-            readFileLines(url) { line in
-                consume(relativePath, line)
+            refs.append(
+                ClaudeFileRef(
+                    key: relativePath,
+                    modifiedAt: modified,
+                    sizeBytes: UInt64(max(0, size))
+                )
+            )
+        }
+        return refs
+    }
+
+    func readClaudeFileIncremental(
+        _ file: ClaudeFileRef,
+        checkpoint: (offset: UInt64, prefixSha256: Data)?,
+        consume: (_ line: String) -> Void
+    ) -> ClaudeFileReadOutcome {
+        let url = home.appendingPathComponent(".claude/projects").appendingPathComponent(file.key)
+        guard let handle = try? FileHandle(forReadingFrom: url) else {
+            // 打不开(inventory 与读之间的竞态):保守当未变,保住检查点;
+            // 文件真消失走调用方的 vanished 分支。
+            return .unchanged
+        }
+        defer { try? handle.close() }
+
+        let fileSize = (try? handle.seekToEnd()).map { UInt64($0) } ?? 0
+        var hasher = SHA256()
+        var consumed: UInt64 = 0
+
+        // 阶段一(有检查点):校验旧前缀 [0, offset)——只读只哈希零解析。
+        if let checkpoint {
+            guard fileSize >= checkpoint.offset else { return .rewritten }
+            try? handle.seek(toFileOffset: 0)
+            var remaining = checkpoint.offset
+            while remaining > 0 {
+                guard let chunk = try? handle.read(upToCount: Int(min(remaining, UInt64(Self.chunkBytes)))),
+                      !chunk.isEmpty
+                else { return .rewritten }
+                hasher.update(data: chunk)
+                remaining -= UInt64(chunk.count)
+                consumed += UInt64(chunk.count)
+            }
+            // SHA256 是值类型:复制一份出摘要,本体保留累积态继续盖新行。
+            var verifyHasher = hasher
+            if Data(verifyHasher.finalize()) != checkpoint.prefixSha256 {
+                return .rewritten
+            }
+            if fileSize == checkpoint.offset {
+                return .unchanged
+            }
+        } else {
+            try? handle.seek(toFileOffset: 0)
+        }
+
+        // 阶段二:解析新增字节;哈希同步推进到完整行边界(含换行),无换行
+        // 尾巴留在未消费区下轮重读。
+        var buffer = Data()
+        var lineEnd = consumed
+        while true {
+            let chunk = (try? handle.read(upToCount: Self.chunkBytes)) ?? Data()
+            if chunk.isEmpty {
+                break
+            }
+            buffer.append(chunk)
+            while let newline = buffer.firstIndex(of: 0x0A) {
+                let lineData = buffer.subdata(in: buffer.startIndex ..< newline)
+                hasher.update(data: buffer.subdata(in: buffer.startIndex ..< newline + 1))
+                buffer.removeSubrange(buffer.startIndex ... newline)
+                lineEnd += UInt64(lineData.count) + 1
+                if !lineData.isEmpty, let line = String(data: lineData, encoding: .utf8) {
+                    consume(line)
+                }
             }
         }
+        return .advanced(consumedOffset: lineEnd, prefixSha256: Data(hasher.finalize()))
     }
 
     func claudeStatsCacheData() -> Data? {
         try? Data(contentsOf: home.appendingPathComponent(".claude/stats-cache.json"))
     }
 
-    /// 现存会话数(agent-tab/06):Claude = projects/<slug>/ 下 jsonl 文件数
-    /// (只列文件名零读内容;30 天滚动删,口径 = 现存);ZCode = db 按 workspace
-    /// 数不同 session_id(有账全史)。归组键合成项目计数在 AgentUsageWindow。
+    // MARK: 会话数(agent-tab/06)
+
+    /// 现存会话数:Claude = projects/<slug>/ 下 jsonl 文件数(只列文件名零读
+    /// 内容;30 天滚动删,口径 = 现存);ZCode = db 按 workspace 数不同
+    /// session_id(有账全史)。归组键合成项目计数在 AgentUsageWindow。
     func agentSessionCounts() -> (claude: [String: Int], zcode: [String: Int]) {
         var claude: [String: Int] = [:]
         let projectsRoot = home.appendingPathComponent(".claude/projects")
@@ -190,33 +263,5 @@ struct LiveAgentUsageReader: AgentUsageReading {
             }
         }
         return (claude, zcode)
-    }
-
-    /// 64KB 分块流式逐行(大 jsonl 不整文件进内存;半行留在缓冲跨块拼接,
-    /// 尾行无换行也喂)。
-    private func readFileLines(_ url: URL, consume: (String) -> Void) {
-        guard let handle = try? FileHandle(forReadingFrom: url) else { return }
-        defer { try? handle.close() }
-
-        var buffer = Data()
-        while true {
-            let chunk = (try? handle.read(upToCount: Self.chunkBytes)) ?? Data()
-            if !chunk.isEmpty {
-                buffer.append(chunk)
-            }
-            while let newline = buffer.firstIndex(of: 0x0A) {
-                let lineData = buffer.subdata(in: buffer.startIndex ..< newline)
-                buffer.removeSubrange(buffer.startIndex ... newline)
-                if !lineData.isEmpty, let line = String(data: lineData, encoding: .utf8) {
-                    consume(line)
-                }
-            }
-            if chunk.isEmpty {
-                break
-            }
-        }
-        if !buffer.isEmpty, let line = String(data: buffer, encoding: .utf8) {
-            consume(line)
-        }
     }
 }
