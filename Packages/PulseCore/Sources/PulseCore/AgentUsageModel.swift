@@ -439,9 +439,13 @@ public enum ZCodeTokenNormalization {
 /// projects jsonl 单行 → usage 样本。只认 assistant 行且 `message.usage` 五项
 /// 非全零;user / tool / 半行安静返回 nil。timestamp 顶层 ISO8601,缺失跳过。
 public enum ClaudeTranscriptUsageParser {
-    /// 一行(已 trim);解析不出样本返回 nil。
+    /// 一行(已 trim);解析不出样本返回 nil。`"assistant"` 字面量预筛在 JSON
+    /// 之前——真 assistant 行必含该字面量(type 值),2.9GB 全量重扫时跳过
+    /// ~七成非 assistant 行的整行 JSON 解析(2026-11-18「重新扫描」卡顿实案,
+    /// 负载 60+ 下解析是主耗时);后续 JSON 判断仍是权威,误筛进来的行照旧 nil。
     public static func parse(line: String) -> ClaudeUsageSample? {
         guard line.hasPrefix("{"),
+              line.contains("\"assistant\""),
               let data = line.data(using: .utf8),
               let record = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               (record["type"] as? String) == "assistant",
