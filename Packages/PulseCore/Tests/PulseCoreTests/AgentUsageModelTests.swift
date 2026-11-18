@@ -393,6 +393,55 @@ final class AgentUsageModelTests: XCTestCase {
         XCTAssertNil(catalog.refreshToday(reader: reader, store: store, now: now.addingTimeInterval(60)))
     }
 
+    /// 回归(2026-11-18 实案):今天改动的文件里装着昨天的记录(跨午夜会话),
+    /// 它只是昨天全量的子集——定时档不得用它覆盖库中完整的昨天行;合计/项目/
+    /// 模型三轨同守。历史修正只走全量档。
+    func testRefreshTodayDoesNotOverwritePastDaysWithTodaySubset() throws {
+        let store = try AgentUsageStore(database: HistoryDatabase.openInMemory())
+        let now = Date()
+        let yesterdayDate = now.addingTimeInterval(-86400)
+        let yesterday = localDayKey(yesterdayDate)
+        // 库里已有完整的昨天行(昨天 23:55 定时档写下)。
+        try store.upsert([
+            AgentDailyUsageRow(day: yesterday, source: .claude, origin: .jsonl, totalTokens: 5000),
+        ])
+        try store.upsertProjects([
+            AgentProjectUsageRow(day: yesterday, source: .claude, project: "pulse", totalTokens: 5000),
+        ])
+
+        let reader = FakeUsageReader()
+        // 今天改动的文件(跨午夜会话):前半段记录时间戳是昨天。
+        reader.claudeFiles = [
+            (
+                key: "s1.jsonl",
+                modifiedAt: now,
+                lines: [
+                    claudeLine(
+                        id: "m1",
+                        timestamp: isoUtc(yesterdayDate),
+                        cwd: "/Users/x/pulse",
+                        model: "claude-opus-5-5"
+                    ),
+                    claudeLine(
+                        id: "m2",
+                        timestamp: isoUtc(now),
+                        cwd: "/Users/x/pulse",
+                        model: "claude-opus-5-5"
+                    ),
+                ]
+            ),
+        ]
+        var catalog = AgentUsageCatalog()
+        let rows = catalog.refreshToday(reader: reader, store: store, now: now)
+
+        // 昨天行原样 5000(不被子集的 360 覆盖);今天行照写。
+        XCTAssertEqual(rows?.first { $0.day == yesterday }?.totalTokens, 5000)
+        XCTAssertEqual(rows?.first { $0.day == localDayKey(now) }?.totalTokens, 360)
+        XCTAssertEqual(try store.projectRows().first { $0.day == yesterday }?.totalTokens, 5000)
+        // 模型轨:昨天本无行,子集记录也不得凭空造出昨天的模型行。
+        XCTAssertFalse(try store.modelRows().contains { $0.day == yesterday })
+    }
+
     /// 全量档:三源全拉;cache 只填缺天、不覆盖 jsonl 已有行、不填今天。
     /// 「今天」相对 now 动态取(硬编码日期 + 真实 now = 午夜后必挂)。
     func testFullRescanBackfillsCacheGaps() throws {
