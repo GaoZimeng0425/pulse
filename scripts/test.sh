@@ -173,9 +173,42 @@ if [ "$status" != 0 ]; then
   echo "   完整日志: $log"
   echo "   重跑单个: sh scripts/test.sh --only <TestClass>"
   if grep -q "hung before establishing connection" "$log"; then
+    # 双挂自动退路(test-hang-cure/01,2026-11-19):Debug 换 Apple 开发证书后
+    # 此链理论已断,这里是兜其它环境故障的双保险。证据先拷 /tmp(worktree
+    # 删除会连证据一起带走,2026-11-18 实案);工作区有未提交改动不代跑旧代码;
+    # PULSE_TEST_FALLBACK=1 防递归(退路里再挂就认了,树保留排查)。
+    if [ "${PULSE_TEST_FALLBACK:-0}" = "1" ]; then
+      echo ""
+      echo "   ↩ /tmp 退路内仍挂起——树保留排查,挂起证据在 /tmp/pulse-hang-evidence/"
+      exit $status
+    fi
+    mkdir -p /tmp/pulse-hang-evidence
+    cp "$root"/build/Logs/Test/hang-evidence-*.txt /tmp/pulse-hang-evidence/ 2>/dev/null || true
     echo ""
-    echo "   ↩ 两次皆挂起(环境级 flake)。/tmp 退路(先提交代码!):"
-    echo "     git worktree add --detach /tmp/pulse-<slug> <branch> && cd /tmp/pulse-<slug> && sh scripts/check.sh"
+    if [ -n "$(git -C "$root" status --porcelain 2>/dev/null)" ]; then
+      echo "   ↩ 两次皆挂起(环境级 flake)。工作区有未提交改动,自动退路不跑旧代码——先提交后手动执行:"
+      echo "     git worktree add --detach /tmp/pulse-hosted-fallback HEAD && cd /tmp/pulse-hosted-fallback && sh scripts/test.sh$([ -n "$only" ] && printf ' --only %s' "$only")"
+      exit $status
+    fi
+    echo "   ↩ 两次皆挂起(环境级 flake)——自动转 /tmp 退路续跑(test-hang-cure/01)"
+    fallback_root="/tmp/pulse-hosted-fallback"
+    rm -rf "$fallback_root"
+    if git -C "$root" worktree add --detach "$fallback_root" HEAD > /dev/null 2>&1; then
+      if [ -n "$only" ]; then
+        (cd "$fallback_root" && xcodegen generate > /dev/null 2>&1 && PULSE_TEST_FALLBACK=1 sh scripts/test.sh --only "$only")
+      else
+        (cd "$fallback_root" && xcodegen generate > /dev/null 2>&1 && PULSE_TEST_FALLBACK=1 sh scripts/test.sh)
+      fi
+      fallback_status=$?
+      if [ "$fallback_status" -eq 0 ]; then
+        git -C "$root" worktree remove --force "$fallback_root" 2>/dev/null || rm -rf "$fallback_root"
+        echo "   ✅ /tmp 退路全绿(挂起证据已存 /tmp/pulse-hang-evidence/)"
+        exit 0
+      fi
+      echo "   ❌ /tmp 退路也失败——树保留在 $fallback_root,挂起证据在 /tmp/pulse-hang-evidence/"
+    else
+      echo "   ❌ /tmp 退路树创建失败;挂起证据已存 /tmp/pulse-hang-evidence/"
+    fi
   fi
   exit $status
 fi
