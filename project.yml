@@ -55,8 +55,14 @@ targets:
         # Debug(含单测宿主、worktree 开发运行)用独立 bundle id:不与 /Applications 的
         # Release 版共用通知授权、偏好域与 LaunchServices 身份(2026-10-19:同一 id 的
         # 46 条 ad-hoc 注册曾让系统通知授权错乱、设置列表里找不到 Pulse)。
+        # Debug 签名换 Apple 开发证书(test-hang-cure/01,2026-11-19 拍板):ad-hoc/自签
+        # 每次全新构建都进 AMFI→syspolicyd 评估链,高负载下偶发「放行不来」= hosted
+        # 测试宿主 6 分钟挂死(2026-11-18 双挂实案,统一日志实证含 Release 自签同吃
+        # -423);苹果证书链系统信任,不进该链。Release 不动(build.sh 自签重签语义不变)。
         Debug:
           PRODUCT_BUNDLE_IDENTIFIER: com.gaozimeng.pulse.debug
+          CODE_SIGN_IDENTITY: "Apple Development"
+          DEVELOPMENT_TEAM: YHT8FN67G3
   PulseTests:
     type: bundle.unit-test
     platform: macOS
@@ -69,6 +75,10 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.gaozimeng.pulse.tests
+        # 测试包同签名(宿主同款理由,test-hang-cure/01):测试 dylib 的加载同样
+        # 走 AMFI 准入,ad-hoc 会把宿主换证书省掉的评估链在注入环节再吃回来。
+        CODE_SIGN_IDENTITY: "Apple Development"
+        DEVELOPMENT_TEAM: YHT8FN67G3
     dependencies:
       - target: Pulse
       - package: PulseCore
