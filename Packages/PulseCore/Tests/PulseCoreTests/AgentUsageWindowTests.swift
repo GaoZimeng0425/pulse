@@ -310,4 +310,71 @@ final class AgentUsageWindowTests: XCTestCase {
         let unmerged = AgentUsageWindow.sessionCounts(claude: claude, zcode: [:])
         XCTAssertEqual(unmerged["client"], 2)
     }
+
+    /// 分派回归(2026-11-19 实锤案):agentSessionCounts 必须是协议**正式要求**
+    /// ——只放扩展时,`any AgentUsageReading` 调用静态绑定默认空实现,Live 真
+    /// 实现上线即死,所有项目会话数恒 0。桩经 `any` 调用必须取到桩值;要求若被
+    /// 降回扩展,桩值取不到即失败。未实现该要求的桩仍取默认空值(假实现免改)。
+    func testAgentSessionCountsDispatchesThroughExistential() {
+        final class CountingReader: AgentUsageReading, @unchecked Sendable {
+            func zcodeUsageSamples(sinceStartedAtMs: Int64?) -> (
+                samples: [ZCodeUsageSample], legacySchema: Bool
+            ) {
+                ([], false)
+            }
+
+            func claudeFileInventory() -> [ClaudeFileRef] {
+                []
+            }
+
+            func readClaudeFileIncremental(
+                _ file: ClaudeFileRef,
+                checkpoint: (offset: UInt64, prefixSha256: Data)?,
+                consume: (_ line: String) -> Void
+            ) -> ClaudeFileReadOutcome {
+                .unchanged
+            }
+
+            func claudeStatsCacheData() -> Data? {
+                nil
+            }
+
+            func agentSessionCounts() -> (claude: [String: Int], zcode: [String: Int]) {
+                (["-slug-x": 1], ["/ws/x": 2])
+            }
+        }
+
+        let reader: any AgentUsageReading = CountingReader()
+        let counts = reader.agentSessionCounts()
+        XCTAssertEqual(counts.claude["-slug-x"], 1, "经 any 调用必须落到真实现,不是扩展默认空值")
+        XCTAssertEqual(counts.zcode["/ws/x"], 2, "经 any 调用必须落到真实现,不是扩展默认空值")
+
+        final class BareReader: AgentUsageReading, @unchecked Sendable {
+            func zcodeUsageSamples(sinceStartedAtMs: Int64?) -> (
+                samples: [ZCodeUsageSample], legacySchema: Bool
+            ) {
+                ([], false)
+            }
+
+            func claudeFileInventory() -> [ClaudeFileRef] {
+                []
+            }
+
+            func readClaudeFileIncremental(
+                _ file: ClaudeFileRef,
+                checkpoint: (offset: UInt64, prefixSha256: Data)?,
+                consume: (_ line: String) -> Void
+            ) -> ClaudeFileReadOutcome {
+                .unchanged
+            }
+
+            func claudeStatsCacheData() -> Data? {
+                nil
+            }
+        }
+
+        let bare: any AgentUsageReading = BareReader()
+        let empty = bare.agentSessionCounts()
+        XCTAssertTrue(empty.claude.isEmpty && empty.zcode.isEmpty, "未实现的桩走扩展默认空值(假实现免改)")
+    }
 }

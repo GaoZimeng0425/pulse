@@ -885,14 +885,19 @@ public protocol AgentUsageReading: Sendable {
 
     /// `~/.claude/stats-cache.json` 内容;缺失返回 nil。
     func claudeStatsCacheData() -> Data?
+
+    /// 现存会话数按归组键(agent-tab/06):Claude 键 = projects 子目录 slug、
+    /// 值 = 该目录下会话 jsonl 文件数(≈近 30 天未删);ZCode 键 = workspace
+    /// 真路径、值 = db 中该工作区的不同 session_id 数(有账全史;被 purge 的
+    /// 数不到)。合成项目计数走 `AgentUsageWindow.sessionCounts`。
+    /// **必须是正式要求**(2026-11-19 实锤:只放扩展时,`any AgentUsageReading`
+    /// 调用静态绑定默认空实现,真实现上线即死,全项目恒 0);默认空值在扩展里,
+    /// 假实现与 Inert 桩免改。
+    func agentSessionCounts() -> (claude: [String: Int], zcode: [String: Int])
 }
 
 public extension AgentUsageReading {
-    /// 现存会话数按归组键(agent-tab/06;默认空 = 能力缺席,假实现与 Inert 桩
-    /// 免改):Claude 键 = projects 子目录 slug、值 = 该目录下会话 jsonl 文件数
-    /// (≈近 30 天未删);ZCode 键 = workspace 真路径、值 = db 中该工作区的
-    /// 不同 session_id 数(有账全史;被 purge 的数不到)。合成项目计数走
-    /// `AgentUsageWindow.sessionCounts`。
+    /// 上条的默认实现 = 能力缺席(空计数);假实现与 Inert 桩免改。
     func agentSessionCounts() -> (claude: [String: Int], zcode: [String: Int]) {
         ([:], [:])
     }
