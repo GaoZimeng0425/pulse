@@ -13,11 +13,38 @@ public struct AgentWeekTotal: Equatable, Sendable {
     public let firstDay: String
     public let lastDay: String
     public let total: Int
+    /// 四桶合计(列内逐天累加;全为回填天 → 全 0)。
+    public let inputTokens: Int
+    public let outputTokens: Int
+    public let cacheReadTokens: Int
+    public let cacheWriteTokens: Int
 
-    public init(firstDay: String, lastDay: String, total: Int) {
+    public init(
+        firstDay: String,
+        lastDay: String,
+        total: Int,
+        inputTokens: Int = 0,
+        outputTokens: Int = 0,
+        cacheReadTokens: Int = 0,
+        cacheWriteTokens: Int = 0
+    ) {
         self.firstDay = firstDay
         self.lastDay = lastDay
         self.total = total
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.cacheReadTokens = cacheReadTokens
+        self.cacheWriteTokens = cacheWriteTokens
+    }
+
+    /// 四桶明细;列内没有任何分项 → nil,浮层照旧单行。
+    public var breakdown: AgentTokenBreakdown? {
+        inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens > 0
+            ? AgentTokenBreakdown(
+                input: inputTokens, output: outputTokens,
+                cacheRead: cacheReadTokens, cacheWrite: cacheWriteTokens
+            )
+            : nil
     }
 }
 
@@ -48,7 +75,11 @@ public enum AgentHeatScale {
             return AgentWeekTotal(
                 firstDay: chunk.first?.day ?? "",
                 lastDay: chunk.last?.day ?? "",
-                total: chunk.reduce(0) { $0 + $1.total }
+                total: chunk.reduce(0) { $0 + $1.total },
+                inputTokens: chunk.reduce(0) { $0 + $1.inputTokens },
+                outputTokens: chunk.reduce(0) { $0 + $1.outputTokens },
+                cacheReadTokens: chunk.reduce(0) { $0 + $1.cacheReadTokens },
+                cacheWriteTokens: chunk.reduce(0) { $0 + $1.cacheWriteTokens }
             )
         }
     }

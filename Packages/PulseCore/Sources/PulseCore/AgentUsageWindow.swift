@@ -71,19 +71,77 @@ public struct AgentProjectSummary: Equatable, Sendable, Identifiable {
     }
 }
 
+/// 四桶明细(输入 / 输出 / 缓存读 / 缓存写;悬停浮层展示,对齐项目卡四格)。
+public struct AgentTokenBreakdown: Equatable, Sendable {
+    public let input: Int
+    public let output: Int
+    public let cacheRead: Int
+    public let cacheWrite: Int
+
+    public init(input: Int, output: Int, cacheRead: Int, cacheWrite: Int) {
+        self.input = input
+        self.output = output
+        self.cacheRead = cacheRead
+        self.cacheWrite = cacheWrite
+    }
+}
+
 /// 一天的两家合计(折线 / 热力墙共用)。
 public struct AgentDayTotal: Equatable, Sendable {
     public let day: String
     public let total: Int
+    /// 四桶合计;粗粒度回填(origin=.cache)的天只有 total,四桶全 0。
+    public let inputTokens: Int
+    public let outputTokens: Int
+    public let cacheReadTokens: Int
+    public let cacheWriteTokens: Int
 
-    public init(day: String, total: Int) {
+    public init(
+        day: String,
+        total: Int,
+        inputTokens: Int = 0,
+        outputTokens: Int = 0,
+        cacheReadTokens: Int = 0,
+        cacheWriteTokens: Int = 0
+    ) {
         self.day = day
         self.total = total
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.cacheReadTokens = cacheReadTokens
+        self.cacheWriteTokens = cacheWriteTokens
+    }
+
+    /// 四桶明细;分项缺失(只有总数的回填天)→ nil,浮层照旧单行。
+    public var breakdown: AgentTokenBreakdown? {
+        inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens > 0
+            ? AgentTokenBreakdown(
+                input: inputTokens, output: outputTokens,
+                cacheRead: cacheReadTokens, cacheWrite: cacheWriteTokens
+            )
+            : nil
     }
 }
 
 /// 账本行 → 卡数据(全部纯函数)。
 public enum AgentUsageWindow {
+    /// dayTotals 的按天累计(总额 + 四桶)。
+    private struct DaySum {
+        var total = 0
+        var input = 0
+        var output = 0
+        var cacheRead = 0
+        var cacheWrite = 0
+
+        mutating func add(_ row: AgentDailyUsageRow) {
+            total += row.totalTokens
+            input += row.inputTokens
+            output += row.outputTokens
+            cacheRead += row.cacheReadTokens
+            cacheWrite += row.cacheWriteTokens
+        }
+    }
+
     // MARK: 逐天合计
 
     /// 近 `days` 天(含今天)逐天两家合计,旧 → 新;账本无行的天 = 0(当日无记录,不猜)。
@@ -93,15 +151,20 @@ public enum AgentUsageWindow {
         calendar: Calendar = .current,
         now: Date = Date()
     ) -> [AgentDayTotal] {
-        var byDay: [String: Int] = [:]
+        var byDay: [String: DaySum] = [:]
         for row in rows where row.totalTokens > 0 {
-            byDay[row.day, default: 0] += row.totalTokens
+            byDay[row.day, default: DaySum()].add(row)
         }
         let today = calendar.startOfDay(for: now)
         return (0 ..< days).reversed().compactMap { ago in
             calendar.date(byAdding: .day, value: -ago, to: today).map { date in
                 let key = dayKey(date, calendar: calendar)
-                return AgentDayTotal(day: key, total: byDay[key] ?? 0)
+                let sum = byDay[key] ?? DaySum()
+                return AgentDayTotal(
+                    day: key, total: sum.total,
+                    inputTokens: sum.input, outputTokens: sum.output,
+                    cacheReadTokens: sum.cacheRead, cacheWriteTokens: sum.cacheWrite
+                )
             }
         }
     }

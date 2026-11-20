@@ -34,6 +34,34 @@ final class AgentHeatScaleTests: XCTestCase {
         XCTAssertEqual(weeks[1], AgentWeekTotal(firstDay: "2026-01-08", lastDay: "2026-01-09", total: 10))
     }
 
+    func testWeeksSumBucketsAcrossDays() {
+        let mixed = [
+            AgentDayTotal(
+                day: "2026-01-01",
+                total: 100,
+                inputTokens: 30,
+                outputTokens: 10,
+                cacheReadTokens: 50,
+                cacheWriteTokens: 10
+            ),
+            AgentDayTotal(day: "2026-01-02", total: 40, inputTokens: 10, outputTokens: 10, cacheReadTokens: 20),
+            AgentDayTotal(day: "2026-01-03", total: 500), // 回填天,无分桶
+        ]
+        let weeks = AgentHeatScale.weeks(mixed)
+        XCTAssertEqual(weeks.count, 1)
+        XCTAssertEqual(weeks[0].total, 640)
+        // 列内四桶累加;回填天只进 total 不进四桶(明细照实,不虚补)。
+        XCTAssertEqual(weeks[0].breakdown, AgentTokenBreakdown(input: 40, output: 20, cacheRead: 70, cacheWrite: 10))
+    }
+
+    func testWeeksAllBackfillDaysHaveNoBreakdown() {
+        let weeks = AgentHeatScale.weeks([
+            AgentDayTotal(day: "2026-01-01", total: 100),
+            AgentDayTotal(day: "2026-01-02", total: 200),
+        ])
+        XCTAssertNil(weeks[0].breakdown)
+    }
+
     // MARK: 今天折算
 
     func testDayLevelsProjectTodayToFullDay() {
