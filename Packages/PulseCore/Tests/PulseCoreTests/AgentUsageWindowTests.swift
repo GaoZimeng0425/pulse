@@ -30,6 +30,30 @@ final class AgentUsageWindowTests: XCTestCase {
         XCTAssertEqual(totals.filter { $0.total == 0 }.count, 5) // 缺天 0
     }
 
+    func testDayTotalsAggregateBucketsAndBackfillDayHasNoBreakdown() {
+        let now = Date()
+        let rows = [
+            AgentDailyUsageRow(
+                day: dayKey(0, from: now), source: .claude, origin: .jsonl,
+                inputTokens: 100, outputTokens: 50, cacheReadTokens: 400, cacheWriteTokens: 20,
+                totalTokens: 570
+            ),
+            AgentDailyUsageRow(
+                day: dayKey(0, from: now), source: .zcode, origin: .db,
+                inputTokens: 10, outputTokens: 5, totalTokens: 15
+            ),
+            // 粗粒度回填天:只有总数,四桶全 0 → 明细不出现。
+            AgentDailyUsageRow(day: dayKey(1, from: now), source: .claude, origin: .cache, totalTokens: 800),
+        ]
+        let totals = AgentUsageWindow.dayTotals(rows: rows, days: 7, calendar: calendar, now: now)
+        XCTAssertEqual(
+            totals.last?.breakdown,
+            AgentTokenBreakdown(input: 110, output: 55, cacheRead: 400, cacheWrite: 20)
+        )
+        XCTAssertNil(totals[6 - 1].breakdown) // 回填天照旧单行
+        XCTAssertNil(totals.first?.breakdown) // 缺天(0)无明细
+    }
+
     // MARK: 数字卡排
 
     func testFiguresDeltasAndPeak() {

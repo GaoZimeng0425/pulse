@@ -18,12 +18,15 @@ import SwiftUI
 // ④ 浮层:两图共用 `AgentChartTooltip`(系统材质 + 两行层级),定位走 PulseCore
 //    `ChartHoverGeometry`(锚定命中格 / 数据点正上方,放不下翻下方、实测尺寸钳位)。
 
-/// 两图共用悬停浮层:上行日期(secondary)、下行色点 + 读数(12 semibold)。
+/// 两图共用悬停浮层:上行日期(secondary)、中行色点 + 读数(12 semibold);
+/// 该时段有分项时末尾加 2×2 四桶明细(标签层级对齐项目卡 bucketsRow)。
 /// 底 = 系统材质(DESIGN「弹出的浮层交给系统材质,不自绘阴影」)。
 struct AgentChartTooltip: View {
     let title: String
     let value: String
     let swatch: Color
+    /// 四桶明细;分项缺失(粗粒度回填天)→ nil,浮层照旧两行。
+    var breakdown: AgentTokenBreakdown?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -40,11 +43,41 @@ struct AgentChartTooltip: View {
                     .monospacedDigit()
                     .foregroundStyle(.primary)
             }
+            if let breakdown {
+                bucketsGrid(breakdown)
+                    .padding(.top, 3)
+            }
         }
         .padding(EdgeInsets(top: 6, leading: 8, bottom: 6, trailing: 8))
         .background(.regularMaterial, in: .rect(cornerRadius: 8))
         .fixedSize()
         .allowsHitTesting(false)
+    }
+
+    /// 2×2 四桶:Grid 保证两列跨行对齐(数值宽度不一,HStack+Spacer 会错列)。
+    private func bucketsGrid(_ buckets: AgentTokenBreakdown) -> some View {
+        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 2) {
+            GridRow {
+                bucket("Input", agentTokenText(buckets.input))
+                bucket("Output", agentTokenText(buckets.output))
+            }
+            GridRow {
+                bucket("Cache R", agentTokenText(buckets.cacheRead))
+                bucket("Cache W", agentTokenText(buckets.cacheWrite))
+            }
+        }
+    }
+
+    private func bucket(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(label)
+                .font(.system(size: 10.5))
+                .foregroundStyle(.tertiary)
+            Text(value)
+                .font(.system(size: 11, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+        }
     }
 }
 
@@ -195,12 +228,13 @@ struct AgentHeatWall: View {
         let origin = granularity == .week
             ? ChartHoverGeometry.sideTooltipOrigin(anchor: hoverRect(index), size: tooltipSize, bounds: bounds, gap: 6)
             : ChartHoverGeometry.tooltipOrigin(anchor: hoverRect(index), size: tooltipSize, bounds: bounds, gap: 6)
-        let content: (title: String, total: Int, level: Int) = switch granularity {
+        let content: TooltipContent = switch granularity {
         case .day:
-            (
-                index < dates.count ? agentTooltipDate(dates[index]) : totals[index].day,
-                totals[index].total,
-                levels[index]
+            TooltipContent(
+                title: index < dates.count ? agentTooltipDate(dates[index]) : totals[index].day,
+                total: totals[index].total,
+                level: levels[index],
+                breakdown: totals[index].breakdown
             )
         case .week:
             weekTooltip(column: index, levels: levels)
@@ -208,21 +242,32 @@ struct AgentHeatWall: View {
         return AgentChartTooltip(
             title: content.title,
             value: "\(agentTokenText(content.total)) tokens",
-            swatch: Self.color(level: content.level)
+            swatch: Self.color(level: content.level),
+            breakdown: content.breakdown
         )
         .onGeometryChange(for: CGSize.self) { $0.size } action: { tooltipSize = $0 }
         .opacity(tooltipSize == .zero ? 0 : 1)
         .offset(x: origin.x, y: origin.y)
     }
 
-    private func weekTooltip(column: Int, levels: [Int]) -> (title: String, total: Int, level: Int) {
+    /// 悬停内容:标题 / 总数 / 色阶档 / 四桶明细(分项缺失 = nil)。
+    private struct TooltipContent {
+        let title: String
+        let total: Int
+        let level: Int
+        let breakdown: AgentTokenBreakdown?
+    }
+
+    private func weekTooltip(column: Int, levels: [Int]) -> TooltipContent {
         let week = AgentHeatScale.weeks(totals)[column]
         let title = if let first = agentDate(week.firstDay), let last = agentDate(week.lastDay) {
             agentTooltipWeek(first: first, last: last)
         } else {
             "\(week.firstDay) – \(week.lastDay)"
         }
-        return (title, week.total, levels[column * 7])
+        return TooltipContent(
+            title: title, total: week.total, level: levels[column * 7], breakdown: week.breakdown
+        )
     }
 
     /// 悬停描边 / 浮层锚点:按天 = 命中格;按周 = 整列(首格到末格的外包框)。
@@ -338,6 +383,8 @@ struct AgentTrendChart: View {
     private struct Point: Identifiable {
         let date: Date
         let value: Double
+        /// 四桶明细;分项缺失的回填天 = nil。
+        let breakdown: AgentTokenBreakdown?
 
         var id: Date {
             date
@@ -355,7 +402,9 @@ struct AgentTrendChart: View {
 
     var body: some View {
         let points: [Point] = totals.compactMap { total in
-            agentDate(total.day).map { Point(date: $0, value: Double(total.total)) }
+            agentDate(total.day).map {
+                Point(date: $0, value: Double(total.total), breakdown: total.breakdown)
+            }
         }
         if points.isEmpty {
             EmptyView()
@@ -509,7 +558,8 @@ struct AgentTrendChart: View {
         return AgentChartTooltip(
             title: agentTooltipDate(point.date),
             value: "\(agentTokenText(Int(point.value))) tokens",
-            swatch: agentsAccent
+            swatch: agentsAccent,
+            breakdown: point.breakdown
         )
         .onGeometryChange(for: CGSize.self) { $0.size } action: { tooltipSize = $0 }
         .opacity(tooltipSize == .zero ? 0 : 1)
