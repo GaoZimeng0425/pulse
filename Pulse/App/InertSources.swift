@@ -291,27 +291,6 @@ struct InertAgentUsageReader: AgentUsageReading {
     }
 }
 
-/// 每核 tick:空样本(系统负载按 0 计,CoreTickDiffer 的退化口径)。
-struct InertCoreTickSource: CoreTickSource {
-    func sample() -> CoreTickSample {
-        CoreTickSample(busyTicks: [], totalTicks: [], takenAt: Date())
-    }
-}
-
-/// 内存构成:读不到(内存卡占位)。
-struct InertMemoryStatsSource: MemoryStatsSource {
-    func sample() -> MemoryBreakdown? {
-        nil
-    }
-}
-
-/// 网络计数:读缺失(网络页占位,历史增量 0)。
-struct InertNetworkCountersSource: NetworkCountersSource {
-    func sample() -> NetworkCounters? {
-        nil
-    }
-}
-
 /// 通知发送:系统「还没问过」、从不请求、从不投递。
 struct InertAlertNotificationSender: AlertNotificationSending {
     func requestAuthorization() async -> Bool {

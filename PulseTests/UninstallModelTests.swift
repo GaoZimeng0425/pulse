@@ -71,6 +71,14 @@ final class UninstallModelTests: XCTestCase {
                         sizeBytes: 1
                     ),
                 ]
+            },
+            // 破坏性执行器必传后(深查收账),测试 helper 显式喂无害假件——
+            // 本组测试不触删除路径,给了也不会动真文件。
+            recycle: { _ in
+                TrashRecycleOutcome()
+            },
+            deletePermanently: { _ in
+                PermanentDeletionOutcome()
             }
         )
     }

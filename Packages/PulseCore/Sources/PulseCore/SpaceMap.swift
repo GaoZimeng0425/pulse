@@ -122,10 +122,6 @@ public enum SpaceMapTree {
     /// 密封系统卷上的顶层目录(只读;折叠为单块)。/System 走「提升 + 余量折叠」特例。
     public static let sealedPaths = ["/System", "/bin", "/sbin"]
 
-    public static func buildTrees(from trees: [SpaceNode]) -> [SpaceMapNode] {
-        trees.map { build(from: $0) }
-    }
-
     public static func build(
         from root: SpaceNode,
         dataVolumePath: String = SpaceMapTree.dataVolumePath,
