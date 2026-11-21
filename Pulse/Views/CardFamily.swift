@@ -306,10 +306,12 @@ struct CardEmptyState: View {
 
 /// 自适应列数的卡片网格:列数 = 内容宽容纳的最多列(单卡最小宽 + 列距),
 /// 夹在 1…上限——比系统 `.adaptive` 多一个**上限**(ultrawide 不出更多列)。
-/// 宽度经 `onGeometryChange` 读取,只在跨档时改状态,拖拽缩放不逐帧重排。
+/// 宽度经 `onGeometryChange` 读取(挂外层普通容器——lazy 容器几何不随窗口缩放
+/// 逐帧上报,挂 LazyVGrid 自身列数会算一次就冻住,2026-11-21 用户实报总览六卡
+/// 恒 3 列),只在跨档时改状态,拖拽缩放不逐帧重排。
 /// 唯一实现(2026-11-10 合一):此前 MetricTabStack 与清理总览各有一份逐行
 /// 相同的私有副本,仅差三个数值——单卡最小宽 / 列距 / 列数上限由调用方按
-/// DESIGN.md 令牌传入(指标页 340·16·4,清理总览 340·12·2)。
+/// DESIGN.md 令牌传入(指标页 340·16·3,清理总览 340·12·2)。
 struct AdaptiveCardGrid<Card: View>: View {
     /// 初值取默认窗宽(880)的档位,首帧即正确;onGeometryChange 随后按实测纠正。
     @State private var columnCount = 2
@@ -323,17 +325,26 @@ struct AdaptiveCardGrid<Card: View>: View {
     @ViewBuilder let cards: () -> Card
 
     var body: some View {
-        LazyVGrid(
-            columns: Array(
-                repeating: GridItem(
-                    .flexible(minimum: minimumCardWidth, maximum: maximumCardWidth ?? .infinity),
-                    spacing: spacing
+        // 监听宿主 = 外层普通容器(VStack 只当卷尺,无可见内容):普通容器几何
+        // 逐帧跟窗口,LazyVGrid 自身不报——项目里三处验收过的响应式(项目卡
+        // 网格 / 双图断点 / 图表宽)全挂普通容器,同款。
+        VStack {
+            LazyVGrid(
+                columns: Array(
+                    repeating: GridItem(
+                        // 不设 minimum:flexible 的 min 是硬下限(容器再窄不缩、
+                        // 溢出右缘被裁,agent 项目卡 min 960 前案)。列数本就按
+                        // minimumCardWidth 能容纳来算,正常路径每列均分必 ≥ 它;
+                        // 列数万一再冻住,没下限只是卡被压窄,不会截断。
+                        .flexible(maximum: maximumCardWidth ?? .infinity),
+                        spacing: spacing
+                    ),
+                    count: columnCount
                 ),
-                count: columnCount
-            ),
-            spacing: spacing
-        ) {
-            cards()
+                spacing: spacing
+            ) {
+                cards()
+            }
         }
         .onGeometryChange(for: Int.self) { proxy in
             let perColumn = minimumCardWidth + spacing
