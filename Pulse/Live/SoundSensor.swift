@@ -36,17 +36,21 @@ struct LiveSoundSource: SoundSource {
     }
 
     /// 设备名(CFString);读失败 = nil(占位显示,不崩)。
+    /// kAudioObjectPropertyName 是 CFStringRef:按可选 CFString 指针读(AppAudioCA
+    /// .cfString 同款)——对象引用类型走裸 &var 的 RawPointer 传递是 ABI 侥幸
+    /// (编译器同名警告),不是正确写法。
     static func deviceName(_ device: AudioDeviceID) -> String? {
-        var name: CFString = "" as CFString
-        var size = UInt32(MemoryLayout<CFString>.size)
+        var name: CFString? = nil
+        var size = UInt32(MemoryLayout<CFString?>.size)
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioObjectPropertyName,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-        guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &name) == kAudioHardwareNoError else {
-            return nil
+        let status = withUnsafeMutablePointer(to: &name) {
+            AudioObjectGetPropertyData(device, &address, 0, nil, &size, $0)
         }
+        guard status == kAudioHardwareNoError, let name else { return nil }
         return name as String
     }
 

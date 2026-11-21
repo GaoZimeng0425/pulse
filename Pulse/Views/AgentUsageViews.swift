@@ -204,7 +204,9 @@ struct AgentUsagePaneView: View {
     private static let compactTrendPlotHeight: CGFloat = 100
 
     private var chartRow: some View {
-        Group {
+        // 断点常量先取局部(非隔离 transform 闭包不得直引 actor 隔离 static)。
+        let chartTwoColumnMinWidth = Self.chartTwoColumnMinWidth
+        return Group {
             if chartColumns == 2 {
                 // 并排两卡**结构同构**(agent-tab/10):卡头 → 图区(同宽同式等高)→
                 // 18pt 日期轴带 → 页脚,两卡天然等高、图区上下缘与日期标签基线逐行对齐。
@@ -220,7 +222,7 @@ struct AgentUsagePaneView: View {
             }
         }
         .onGeometryChange(for: Int.self) { proxy in
-            !isCompact && proxy.size.width >= Self.chartTwoColumnMinWidth ? 2 : 1
+            !isCompact && proxy.size.width >= chartTwoColumnMinWidth ? 2 : 1
         } action: { newValue in
             if newValue != chartColumns {
                 chartColumns = newValue

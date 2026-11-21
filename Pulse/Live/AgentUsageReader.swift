@@ -162,7 +162,7 @@ struct LiveAgentUsageReader: AgentUsageReading {
         // 阶段一(有检查点):校验旧前缀 [0, offset)——只读只哈希零解析。
         if let checkpoint {
             guard fileSize >= checkpoint.offset else { return .rewritten }
-            try? handle.seek(toFileOffset: 0)
+            handle.seek(toFileOffset: 0)
             var remaining = checkpoint.offset
             while remaining > 0 {
                 guard let chunk = try? handle.read(upToCount: Int(min(remaining, UInt64(Self.chunkBytes)))),
@@ -172,8 +172,9 @@ struct LiveAgentUsageReader: AgentUsageReading {
                 remaining -= UInt64(chunk.count)
                 consumed += UInt64(chunk.count)
             }
-            // SHA256 是值类型:复制一份出摘要,本体保留累积态继续盖新行。
-            var verifyHasher = hasher
+            // SHA256 值类型快照出摘要:本 SDK finalize() 非消耗,let 拷贝即可——
+            // 若 SDK 改回 consuming,let 调用会编译期响亮报错强制复核(不静默错)。
+            let verifyHasher = hasher
             if Data(verifyHasher.finalize()) != checkpoint.prefixSha256 {
                 return .rewritten
             }
@@ -181,7 +182,7 @@ struct LiveAgentUsageReader: AgentUsageReading {
                 return .unchanged
             }
         } else {
-            try? handle.seek(toFileOffset: 0)
+            handle.seek(toFileOffset: 0)
         }
 
         // 阶段二:解析新增字节;哈希同步推进到完整行边界(含换行),无换行

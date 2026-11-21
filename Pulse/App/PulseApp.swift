@@ -127,10 +127,17 @@ struct PulseApp: App {
             object: nil,
             queue: .main
         ) { note in
-            guard let window = note.object as? NSWindow,
-                  window.identifier?.rawValue == MainWindowSceneID.value || window.title == "Pulse"
-            else { return }
-            MainWindowView.repositionIfOffscreen()
+            // 观察闭包非隔离,Notification/NSWindow 均非 Sendable:从 userInfo 取
+            // NSWindowNumber(Int)过河,主 actor 侧 NSApp 反查同一窗口再复位
+            // (复位幂等,晚一拍无碍)。
+            let windowNumber = (note.userInfo?["NSWindowNumber"] as? Int) ?? -1
+            Task { @MainActor in
+                guard windowNumber >= 0,
+                      let window = NSApp.window(withWindowNumber: windowNumber),
+                      window.identifier?.rawValue == MainWindowSceneID.value || window.title == "Pulse"
+                else { return }
+                MainWindowView.repositionIfOffscreen()
+            }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             MainWindowView.repositionIfOffscreen()

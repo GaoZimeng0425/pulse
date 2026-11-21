@@ -35,9 +35,11 @@ enum ProcArgsParser {
                 index += 1
             }
             if index > start {
-                var cString = Array(buffer[start ..< index])
-                cString.append(0)
-                argv.append(String(cString: cString))
+                // [start, index) 本就止于 NUL 前,映 UInt8 后 decoding(无需补终止符)。
+                argv.append(String(
+                    decoding: buffer[start ..< index].map { UInt8(bitPattern: $0) },
+                    as: UTF8.self
+                ))
             }
             consumed += 1
             index += 1 // 跳过本条 argv 的 NUL

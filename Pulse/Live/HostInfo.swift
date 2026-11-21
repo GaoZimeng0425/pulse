@@ -23,7 +23,12 @@ struct HostInfo: Equatable, Sendable {
         guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0 else { return nil }
         var buffer = [CChar](repeating: 0, count: size)
         guard sysctlbyname(name, &buffer, &size, nil, 0) == 0 else { return nil }
-        let value = String(cString: buffer).trimmingCharacters(in: .whitespaces)
+        // sysctl 缓冲自带 NUL 终止;decoding 不在 NUL 截断,先截再映 UInt8
+        // (CChar 是 Int8,废弃的 String(cString:) 替换口径)。
+        let value = String(
+            decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) },
+            as: UTF8.self
+        ).trimmingCharacters(in: .whitespaces)
         return value.isEmpty ? nil : value
     }
 }

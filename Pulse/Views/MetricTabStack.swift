@@ -405,7 +405,9 @@ private struct AdaptiveCardPair<A: View, B: View>: View {
     @State private var isTwoColumns = false
 
     var body: some View {
-        Group {
+        // 断点常量先取局部(非隔离 transform 闭包不得直引隔离计算属性)。
+        let pairTwoColumnMinWidth = twoColumnMinWidth
+        return Group {
             if isTwoColumns {
                 HStack(alignment: .top, spacing: AdaptiveCardGridMetrics.spacing) {
                     first().frame(maxHeight: .infinity, alignment: .top)
@@ -419,7 +421,7 @@ private struct AdaptiveCardPair<A: View, B: View>: View {
             }
         }
         .onGeometryChange(for: Bool.self) { proxy in
-            proxy.size.width >= twoColumnMinWidth
+            proxy.size.width >= pairTwoColumnMinWidth
         } action: { newValue in
             if newValue != isTwoColumns {
                 isTwoColumns = newValue

@@ -244,14 +244,13 @@ private struct OverviewHeroCard: View {
     }
 
     private var caption: some View {
-        Text("可回收 · 其中 ")
-            .font(.system(size: 12))
-            .foregroundStyle(.secondary)
-            + Text(PulseFormat.memory(UInt64(max(0, overview.safeBytes))))
+        // macOS 26 弃用 Text 拼接「+」:改插值内嵌 Text,三段样式逐一保留
+        // (插值段不能换行,数值段先构局部)。
+        let safeBytes = Text(PulseFormat.memory(UInt64(max(0, overview.safeBytes))))
             .font(.system(size: 12, weight: .semibold))
             .monospacedDigit()
             .foregroundStyle(Surface.positive)
-            + Text(" 可放心清")
+        return Text("可回收 · 其中 \(safeBytes) 可放心清")
             .font(.system(size: 12))
             .foregroundStyle(.secondary)
     }

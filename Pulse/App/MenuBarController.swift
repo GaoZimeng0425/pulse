@@ -215,14 +215,18 @@ final class MenuBarController: NSObject {
         // 这里只开窗)。冷开窗时主窗口视图还不存在、收不到这条广播,带 tab / 排行卡的落点
         // 先记进路由(ranking-limit/01),主窗口出现再消费;窗口存活时它自己按广播落地,
         // 这里不记——记了没人清,下次冷开窗会重放。
+        // userInfo 键先取局部:@Sendable 观察闭包不得直引 actor 隔离 static(值类型
+        // 局部捕获无约束)。
+        let tabKey = AlertNotificationRouter.tabUserInfoKey
+        let rankingKey = AlertNotificationRouter.rankingUserInfoKey
         center.addObserver(
             forName: AlertNotificationRouter.openMainWindowNotification,
             object: nil,
             queue: .main
         ) { [weak self] note in
-            let tab = (note.userInfo?[AlertNotificationRouter.tabUserInfoKey] as? String)
+            let tab = (note.userInfo?[tabKey] as? String)
                 .flatMap(MetricTab.init(rawValue:))
-            let rankingID = note.userInfo?[AlertNotificationRouter.rankingUserInfoKey] as? String
+            let rankingID = note.userInfo?[rankingKey] as? String
             Task { @MainActor in
                 guard let self else { return }
                 if let tab, !self.monitor.mainWindowVisible {
@@ -391,12 +395,15 @@ final class KeepAliveAppDelegate: NSObject, NSApplicationDelegate {
 
     override init() {
         super.init()
+        // @Sendable 观察闭包捕获非 Sendable self 告警;本类是常驻 app 代理(进程
+        // 同寿),unsafe 强持有无泄漏语义差异,主队列回调照旧。
+        nonisolated(unsafe) let delegate = self
         observer = NotificationCenter.default.addObserver(
             forName: CleanerModel.cleanActivityNotification,
             object: nil,
             queue: .main
-        ) { [weak self] note in
-            self?.cleanRunning = (note.userInfo?["running"] as? Bool) == true
+        ) { note in
+            delegate.cleanRunning = (note.userInfo?["running"] as? Bool) == true
         }
     }
 

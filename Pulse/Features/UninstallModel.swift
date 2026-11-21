@@ -80,7 +80,7 @@ final class UninstallModel {
 
     init(
         collectFacts: @escaping @Sendable () async -> LiveAppCatalogFacts = {
-            await LiveAppCatalogSource().collectFacts()
+            LiveAppCatalogSource().collectFacts()
         },
         scanSizes: @escaping @Sendable (
             [String],
@@ -106,7 +106,7 @@ final class UninstallModel {
             await LiveBrewUninstaller().uninstall(cask: cask, zap: zap)
         },
         crossCheckCasks: @escaping @Sendable () async -> [String: String] = {
-            await LiveAppCatalogSource().collectFacts().brewAppNames
+            LiveAppCatalogSource().collectFacts().brewAppNames
         },
         // 删前复核探针(p5-cleaner/03):与 CleanRunner 的执行器探针同款 lstat(零副作用)。
         leftoverState: @escaping @Sendable (String) async -> PathSnapshot = { path in
