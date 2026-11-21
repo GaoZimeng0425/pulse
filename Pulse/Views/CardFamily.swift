@@ -304,46 +304,60 @@ struct CardEmptyState: View {
     }
 }
 
-/// 自适应列数的卡片网格:列数 = 内容宽容纳的最多列(单卡最小宽 + 列距),
-/// 夹在 1…上限——比系统 `.adaptive` 多一个**上限**(ultrawide 不出更多列)。
+/// 自适应列数的卡片网格(数据驱动):列数 = 内容宽容纳的最多列(单卡最小宽 +
+/// 列距),夹在 1…上限——比系统 `.adaptive` 多一个**上限**(ultrawide 不出更多列)。
+/// 逐行 HStack 排布:**行内等高**(每卡 `.frame(maxHeight: .infinity)` 顶对齐,
+/// 短卡背景铺满行高;用户拍板 2026-11-21「多卡一组相同高度」)、末行不满自动
+/// 满宽。不用 LazyVGrid(行内不拉齐高度)也不用 GridItem minimum(硬下限,窄容器
+/// 溢出裁剪——agent 项目卡 min 960 前案)——agent-tab/06 三度修正定稿的
+/// AgentProjectCardGrid 模式泛化而来。
 /// 宽度经 `onGeometryChange` 读取(挂外层普通容器——lazy 容器几何不随窗口缩放
 /// 逐帧上报,挂 LazyVGrid 自身列数会算一次就冻住,2026-11-21 用户实报总览六卡
 /// 恒 3 列),只在跨档时改状态,拖拽缩放不逐帧重排。
-/// 唯一实现(2026-11-10 合一):此前 MetricTabStack 与清理总览各有一份逐行
-/// 相同的私有副本,仅差三个数值——单卡最小宽 / 列距 / 列数上限由调用方按
-/// DESIGN.md 令牌传入(指标页 340·16·3,清理总览 340·12·2)。
-struct AdaptiveCardGrid<Card: View>: View {
-    /// 初值取默认窗宽(880)的档位,首帧即正确;onGeometryChange 随后按实测纠正。
-    @State private var columnCount = 2
+/// 数值由调用方按 DESIGN.md 令牌传入(指标页 340·16·3,清理总览 340·12·2)。
+struct AdaptiveCardGrid<Item: Identifiable, Card: View>: View {
+    let items: [Item]
     let minimumCardWidth: CGFloat
     let spacing: CGFloat
     let maximumColumns: Int
-    /// 单卡最大宽(nil = 不封顶;每日消耗项目大卡 340——列少时均分会超出原型
-    /// minmax(240, 340) 的封顶,agent-tab/05)。带初值 → memberwise init 默认参,
-    /// 既有调用面不动。
+    /// 单卡最大宽(nil = 不封顶;agent-tab/05 项目大卡 340 的封顶语义,现无
+    /// 调用方,参数保留)。
     var maximumCardWidth: CGFloat?
-    @ViewBuilder let cards: () -> Card
+    @ViewBuilder let card: (Item) -> Card
+
+    /// 初值取默认窗宽(880)的档位,首帧即正确;onGeometryChange 随后按实测纠正。
+    @State private var columnCount = 2
+
+    init(
+        items: [Item],
+        minimumCardWidth: CGFloat,
+        spacing: CGFloat,
+        maximumColumns: Int,
+        maximumCardWidth: CGFloat? = nil,
+        @ViewBuilder card: @escaping (Item) -> Card
+    ) {
+        self.items = items
+        self.minimumCardWidth = minimumCardWidth
+        self.spacing = spacing
+        self.maximumColumns = maximumColumns
+        self.maximumCardWidth = maximumCardWidth
+        self.card = card
+    }
 
     var body: some View {
-        // 监听宿主 = 外层普通容器(VStack 只当卷尺,无可见内容):普通容器几何
-        // 逐帧跟窗口,LazyVGrid 自身不报——项目里三处验收过的响应式(项目卡
-        // 网格 / 双图断点 / 图表宽)全挂普通容器,同款。
-        VStack {
-            LazyVGrid(
-                columns: Array(
-                    repeating: GridItem(
-                        // 不设 minimum:flexible 的 min 是硬下限(容器再窄不缩、
-                        // 溢出右缘被裁,agent 项目卡 min 960 前案)。列数本就按
-                        // minimumCardWidth 能容纳来算,正常路径每列均分必 ≥ 它;
-                        // 列数万一再冻住,没下限只是卡被压窄,不会截断。
-                        .flexible(maximum: maximumCardWidth ?? .infinity),
-                        spacing: spacing
-                    ),
-                    count: columnCount
-                ),
-                spacing: spacing
-            ) {
-                cards()
+        // 监听宿主 = 外层普通容器(VStack 即网格本体,几何逐帧跟窗口)。
+        VStack(alignment: .leading, spacing: spacing) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                HStack(alignment: .top, spacing: spacing) {
+                    ForEach(row) { item in
+                        card(item)
+                            .frame(
+                                maxWidth: maximumCardWidth,
+                                maxHeight: .infinity,
+                                alignment: .topLeading
+                            )
+                    }
+                }
             }
         }
         .onGeometryChange(for: Int.self) { proxy in
@@ -354,6 +368,14 @@ struct AdaptiveCardGrid<Card: View>: View {
             if newValue != columnCount {
                 columnCount = newValue
             }
+        }
+    }
+
+    /// 按列数分行(不足列的末行自动满宽——行内卡 maxWidth ∞ 均分行宽)。
+    private var rows: [[Item]] {
+        guard columnCount > 1 else { return items.map { [$0] } }
+        return stride(from: 0, to: items.count, by: columnCount).map {
+            Array(items[$0 ..< min($0 + columnCount, items.count)])
         }
     }
 }

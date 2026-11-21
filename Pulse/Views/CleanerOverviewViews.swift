@@ -118,16 +118,19 @@ struct CleanerOverviewSection: View {
                         onOneClickClean: onOneClickClean
                     )
                     AdaptiveCardGrid(
+                        items: overview.rows.map(OverviewCardSlot.junk) + [.trash],
                         minimumCardWidth: OverviewCardGridMetrics.minimumCardWidth,
                         spacing: OverviewCardGridMetrics.spacing,
                         maximumColumns: OverviewCardGridMetrics.maximumColumns
-                    ) {
-                        ForEach(overview.rows) { row in
+                    ) { slot in
+                        switch slot {
+                        case let .junk(row):
                             OverviewModuleCard(row: row) {
                                 onDrill(row.group)
                             }
+                        case .trash:
+                            trashCard
                         }
-                        trashCard
                     }
                 }
                 Text("点模块卡进入对应清单(与「全部清单」子页同源,勾选跨页保持);大小按实际占用口径,构成条 = 可安全清理 / 先检查 / 在用保护。")
@@ -540,4 +543,18 @@ private enum OverviewCardGridMetrics {
     /// 列距 = {spacing.group-gap}(原型 grid gap 12)。
     static let spacing: CGFloat = 12
     static let maximumColumns = 2
+}
+
+/// 网格槽位(数据驱动):品类卡 + 废纸篓卡同一数组喂 `AdaptiveCardGrid`
+/// (2026-11-21 起网格逐行等高,ViewBuilder 闭包改数据轴)。
+private enum OverviewCardSlot: Identifiable {
+    case junk(JunkOverviewGroupRow)
+    case trash
+
+    var id: String {
+        switch self {
+        case let .junk(row): row.id
+        case .trash: "trash"
+        }
+    }
 }

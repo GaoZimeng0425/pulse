@@ -206,6 +206,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.agent-project-card-min-width}` | ~~960pt~~ | **superseded**(agent-tab/06 二度修正):SwiftUI `GridItem(.flexible(minimum:))` 的 min 是硬下限,容器再窄不缩——960 在窄窗/弹窗把内容撑出容器右缘被裁(与 CSS min-width 会被轨道压缩不同)。项目大卡终态 = **恒单列满宽 VStack**,无网格参数 |
 | `{layout.agent-project-limit}` | 10 个 | 智能体页消耗子页项目默认展示上限(agent-tab/06,2026-11-14 用户拍板):超出末行「显示全部(另 N 个项目)⌄ / 收起,只看前 10 个⌃」,排行截断末行(`RankingOverflowRow`)同款交互与视觉 |
 | `{layout.agent-chart-two-column-min-width}` | 1872pt | 智能体页消耗子页「日历图 + 走势」并排断点(agent-tab/07 立于窗宽 1280,2026-11-16 用户修订「1920 才变一行」):子页内容宽 ≥ 1872(= 窗宽 1920 − 两侧 `{spacing.window-padding}` 24)两列并排等高,否则上下一列;弹窗恒一列。替代 06 的 `ViewThatFits`(按弹性子视图理想宽判定,切换点不可控) |
+| `{layout.card-pair-two-column-min-width}` | 696pt | 两卡组(`AdaptiveCardPair`,MetricTabStack 的 pair:内存双环 / 传感器派生+风扇 / GPU ANE+功率 / 磁盘卷+快照)主窗口并排断点(2026-11-21 用户拍板响应式 + 同组等高):内容宽 ≥ 696(= `{layout.overview-card-min-width}` ×2 + 列距 16,与总览网格两列同档)并排**等高**、不足上下排;弹窗恒上下排。此前写死 HStack 两列,窄窗(720)每卡 ~328pt 图例被压截断 |
 | `{layout.agent-trend-height}` | ~~180pt / 120pt~~ | **superseded**(agent-tab/10,11-15 用户实报「两个 chart 高度应该一致,坐标水平对齐」):走势绘图区高 = `AgentHeatWall.gridHeight(forWidth:)`(与热力墙同宽同式,一列 / 两列都等高,下限 60);仅弹窗紧凑档定高 100 |
 | `{layout.ranking-limit}` | 20 行 | 各排行(弹窗与主窗口同规则)只列前 20 名,超出补末行:弹窗「查看全部(另 N 项)」跳主窗口并落地即展开,主窗口「显示全部(另 N 项)」原地展开 / 「收起」(ranking-limit/01,2026-11-02 用户拍板;原 11-01 `popover-ranking-limit` 只截弹窗)。主窗口搜索命中不截 |
 | `{layout.sheet-width}` | 460pt | 确认清单 sheet 定宽(清理页「清理…」,p4-cleaner/04;原型 B 变体同值) |
@@ -295,8 +296,11 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   面积线特例,不再特殊化)。
 - **总览模块卡网格**(用户拍板 2026-10-17;列数 2026-10-24 改自适应):CPU/内存/
   GPU/磁盘/网络/电池六卡(电池卡随有无内建电池),点卡跳对应 tab;主窗口列数
-  **自适应 1–3**(单卡最小宽 `{layout.overview-card-min-width}` 340,卡间距 16;上限 4 → 3 = agent-tab/06 用户拍板),
-  弹窗 compact 定宽 360 固定 2 列、间距 8。
+  **自适应 1–3**(单卡最小宽 `{layout.overview-card-min-width}` 340,卡间距 16;上限 4 → 3 = agent-tab/06 用户拍板)
+  且**同行等高**、末行不满自动满宽(2026-11-21 用户拍板「多卡一组相同高度」;
+  `AdaptiveCardGrid` 逐行 HStack,每卡 `maxHeight ∞` 顶对齐——LazyVGrid 行内不
+  拉齐高度,不用),清理总览七卡同组件同语义;
+  弹窗 compact 定宽 360 固定 2 列、间距 8(弹窗卡单行内容天然等高,不走等高机制)。
 - **MetricMainCardView**:左列 200pt(标签 / 44pt 数字 / chip / 2×2 统计)+
   右列 56 点面积图,卡高 176pt。compact(弹窗)竖排:数字行 / 64pt 面积图 / 四列统计;
   底部走势组件 full / compact 同一(用户拍板:同一指标两处读数同观感)。
