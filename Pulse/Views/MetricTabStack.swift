@@ -57,6 +57,7 @@ struct MetricTabStack<Ranking: View>: View {
             sectionTitle("此刻", into: &builder)
             builder.card("memory-pair", pair {
                 RingCardView.memoryByType(monitor.memory, isCompact: isCompact)
+            } second: {
                 memoryByApp
             })
             builder.groupRanking()
@@ -110,6 +111,7 @@ struct MetricTabStack<Ranking: View>: View {
             builder.card("main", MetricMainCardView(model: model.memoryModel, isCompact: isCompact))
             builder.card("memory-pair", pair {
                 RingCardView.memoryByType(monitor.memory, isCompact: isCompact)
+            } second: {
                 memoryByApp
             })
             builder.groupRanking()
@@ -123,6 +125,7 @@ struct MetricTabStack<Ranking: View>: View {
             } else {
                 builder.card("pair", pair {
                     SmcDerivedCardView(reading: monitor.smc.reading, isCompact: false)
+                } second: {
                     SmcFansCardView(reading: monitor.smc.reading, isCompact: false)
                 })
                 builder.card("temps", SmcTempsDetailCardView(reading: monitor.smc.reading, isCompact: false))
@@ -147,6 +150,7 @@ struct MetricTabStack<Ranking: View>: View {
             builder.card("main", MetricMainCardView(model: model.gpuModel, isCompact: isCompact))
             builder.card("pair", pair {
                 MetricMainCardView(model: model.aneModel, isCompact: isCompact)
+            } second: {
                 PowerDomainsCardView(reading: monitor.power.reading, isCompact: isCompact)
             })
         case .services:
@@ -216,6 +220,7 @@ struct MetricTabStack<Ranking: View>: View {
             }
             builder.card("pair", pair {
                 DiskVolumeBreakdownView(capacity: monitor.disk.capacity, isCompact: isCompact)
+            } second: {
                 DiskSnapshotsCardView(listing: monitor.disk.capacity?.snapshots, isCompact: isCompact)
             })
             builder.moduleRanking("disk", ModuleRankingSpec(
@@ -249,10 +254,11 @@ struct MetricTabStack<Ranking: View>: View {
 
     /// 总览模块卡网格(用户拍板 2026-10-17:全部模块一屏可点,点卡跳对应 tab);
     /// 电池卡随有无内建电池。卡间距 full 16 / compact 8(DESIGN.md §Components)。
-    /// 主窗口列数**自适应 1–4**(用户拍板 2026-10-24):列数 = 内容宽容纳的最多列,
-    /// 单卡最小宽 340(DESIGN.md `layout.overview-card-min-width`)——720 最小窗宽
-    /// 下 1 列、744 起两列、约 1104 三列、约 1456 四列,再宽也不超过 4 列;
-    /// 弹窗定宽 360 固定 2 列。
+    /// 主窗口列数**自适应 1–3**(2026-10-24 拍板,上限 4→3 = agent-tab/06)且
+    /// **同行等高**(2026-11-21 拍板「多卡一组相同高度」):单卡最小宽 340
+    /// (DESIGN.md `layout.overview-card-min-width`)——720 最小窗宽下 1 列、744 起
+    /// 两列、约 1100 三列;弹窗定宽 360 固定 2 列(弹窗卡单行内容天然等高,不走
+    /// 等高机制)。
     @ViewBuilder
     private var overviewGrid: some View {
         let style: MetricCardView.Style = isCompact ? .compact : .full
@@ -261,29 +267,36 @@ struct MetricTabStack<Ranking: View>: View {
                 columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)],
                 spacing: 8
             ) {
-                overviewCards(style: style)
+                ForEach(overviewCardItems) { item in
+                    MetricCardView(model: item.model, style: style) { onSelectTab(item.tab) }
+                }
             }
         } else {
             AdaptiveCardGrid(
+                items: overviewCardItems,
                 minimumCardWidth: AdaptiveCardGridMetrics.minimumCardWidth,
                 spacing: AdaptiveCardGridMetrics.spacing,
                 maximumColumns: AdaptiveCardGridMetrics.maximumColumns
-            ) {
-                overviewCards(style: style)
+            ) { item in
+                MetricCardView(model: item.model, style: style) { onSelectTab(item.tab) }
             }
         }
     }
 
-    @ViewBuilder
-    private func overviewCards(style: MetricCardView.Style) -> some View {
-        MetricCardView(model: model.cpuModel, style: style) { onSelectTab(.cpu) }
-        MetricCardView(model: model.memoryModel, style: style) { onSelectTab(.memory) }
-        MetricCardView(model: model.gpuModel, style: style) { onSelectTab(.gpu) }
-        MetricCardView(model: model.diskModel, style: style) { onSelectTab(.disk) }
-        MetricCardView(model: model.networkModel, style: style) { onSelectTab(.network) }
+    /// 总览卡的数据轴(卡序 = 数组序;电池卡随有无内建电池)——两档排版共用,
+    /// 组成与顺序的单点出处。
+    private var overviewCardItems: [OverviewCardItem] {
+        var items = [
+            OverviewCardItem(model: model.cpuModel, tab: .cpu),
+            OverviewCardItem(model: model.memoryModel, tab: .memory),
+            OverviewCardItem(model: model.gpuModel, tab: .gpu),
+            OverviewCardItem(model: model.diskModel, tab: .disk),
+            OverviewCardItem(model: model.networkModel, tab: .network),
+        ]
         if monitor.battery.hasBattery {
-            MetricCardView(model: model.batteryModel, style: style) { onSelectTab(.battery) }
+            items.append(OverviewCardItem(model: model.batteryModel, tab: .battery))
         }
+        return items
     }
 
     private var memoryByApp: some View {
@@ -294,13 +307,20 @@ struct MetricTabStack<Ranking: View>: View {
         )
     }
 
-    /// 两卡一组:主窗口并排(顶对齐,卡间距 16),弹窗上下排(卡间距 8)。
+    /// 两卡一组:主窗口走 `AdaptiveCardPair`(宽够两列并排**等高**,不足上下排;
+    /// 2026-11-21 用户拍板响应式 + 同组等高),弹窗上下排(卡间距 8,360 定宽)。
     @ViewBuilder
-    private func pair(@ViewBuilder _ cards: () -> some View) -> some View {
+    private func pair(
+        @ViewBuilder _ first: @escaping () -> some View,
+        @ViewBuilder second: @escaping () -> some View
+    ) -> some View {
         if isCompact {
-            VStack(spacing: 8) { cards() }
+            VStack(spacing: 8) {
+                first()
+                second()
+            }
         } else {
-            HStack(alignment: .top, spacing: 16) { cards() }
+            AdaptiveCardPair(first: first, second: second)
         }
     }
 
@@ -358,4 +378,57 @@ private enum AdaptiveCardGridMetrics {
     static let spacing: CGFloat = 16
     /// 列数上限(agent-tab/06 用户拍板:最多 3 列,不再出 4 列)。
     static let maximumColumns = 3
+}
+
+/// 总览卡数据轴的一项:卡模型 + 点击跳的 tab(id 稳定 = tab,重组不闪)。
+private struct OverviewCardItem: Identifiable {
+    let model: MetricCardModel
+    let tab: MetricTab
+    var id: String {
+        tab.rawValue
+    }
+}
+
+/// 两卡一组(主窗口):内容宽容纳两列(DESIGN.md
+/// `{layout.card-pair-two-column-min-width}`)→ 并排**等高**(行内每卡
+/// `.frame(maxHeight: .infinity)` 顶对齐,短卡背景铺满行高,agent 页同行等高
+/// 同款机制),否则上下排。宽度监听挂外层普通容器(lazy 容器几何不随窗口缩放
+/// 逐帧上报,同 AdaptiveCardGrid 注释)。用户拍板 2026-11-21。
+private struct AdaptiveCardPair<A: View, B: View>: View {
+    @ViewBuilder let first: () -> A
+    @ViewBuilder let second: () -> B
+
+    /// 初值 false(上下排,窄安全侧):首帧任何窗口都不溢出,量宽后再并排
+    /// (agent 项目网格初值 1 列同哲学)。
+    @State private var isTwoColumns = false
+
+    var body: some View {
+        Group {
+            if isTwoColumns {
+                HStack(alignment: .top, spacing: AdaptiveCardGridMetrics.spacing) {
+                    first().frame(maxHeight: .infinity, alignment: .top)
+                    second().frame(maxHeight: .infinity, alignment: .top)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: AdaptiveCardGridMetrics.spacing) {
+                    first()
+                    second()
+                }
+            }
+        }
+        .onGeometryChange(for: Bool.self) { proxy in
+            proxy.size.width >= twoColumnMinWidth
+        } action: { newValue in
+            if newValue != isTwoColumns {
+                isTwoColumns = newValue
+            }
+        }
+    }
+
+    /// 并排断点(DESIGN.md `{layout.card-pair-two-column-min-width}` 696
+    /// = 单卡最小宽 ×2 + 列距,与总览网格两列同档;泛型 struct 不支持 static
+    /// 存储属性,计算属性承载)。
+    private var twoColumnMinWidth: CGFloat {
+        AdaptiveCardGridMetrics.minimumCardWidth * 2 + AdaptiveCardGridMetrics.spacing
+    }
 }
