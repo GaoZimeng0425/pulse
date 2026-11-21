@@ -77,6 +77,14 @@ bundleID 挂 tap + `processRestoreEnabled` 自动重挂(本期不用,按进程�
 
 ## Comments
 
+- **收批打磨(2026-11-22,@d2fa9a7/baa8df2,ub-mode 重读)**:①砍死码(曲线逆
+  函数/管线 sampleRate/Inert gain/双重 tint);②`AppVolumeScan` 扁平化,clients
+  不再双份搭乘,`AppVolumeSnapshot` 整体移除;③**图标归因跟宿主走**——浏览器
+  helper 归并行此前拿 helper bundle 查图标会查错/查空,归因条目带上宿主
+  appBundleID,新测试钉死;④测试轮询助手合一(PulseCoreTestSupport 共享
+  waitUntil,存量 6 处异构私有助手评估不动)。行为不变:核心 13 例+编排 9 例
+  +toast 6 例绿,全量 check 一次过。
+
 - **测试边界(立票拍板)**:tap/聚合引擎**不进自动化测试**——hosted 宿主里
   建 tap 会触发 TCC 弹窗,高负载下有挂死前科(test-hang-cure 教训);引擎验
   证走装机目验。核心包纯逻辑照常单测。
