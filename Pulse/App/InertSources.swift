@@ -399,10 +399,7 @@ extension SystemMonitor {
 /// 见工单 Comments)。空扫描:有输出设备、无音频客户端,卡片走「等待应用播放」空态。
 struct InertAppVolumeEngine: AppVolumeEngineProtocol {
     func scan() async -> AppVolumeScan? {
-        AppVolumeScan(
-            snapshot: AppVolumeSnapshot(outputID: 1, outputUID: "inert-output", clients: []),
-            attributed: []
-        )
+        AppVolumeScan(outputID: 1, outputUID: "inert-output", attributed: [])
     }
 
     func makePipeline(
@@ -431,17 +428,13 @@ final class InertAppAudioPipeline: AppAudioPipelineProtocol, @unchecked Sendable
         false
     }
 
-    private var gain: Float
-
-    init(processIDs: [AudioObjectID], outputID: AudioObjectID, gain: Float) {
+    init(processIDs: [AudioObjectID], outputID: AudioObjectID, gain _: Float) {
         self.processIDs = processIDs
         self.outputID = outputID
-        self.gain = gain
     }
 
-    func setGain(_ gain: Float) {
-        self.gain = gain
-    }
+    /// 桩不渲染,增益无处可用;保签名只为对齐协议。
+    func setGain(_: Float) {}
 
     func start() throws {}
     func stop() {}

@@ -198,9 +198,9 @@ struct CardEntityRow<Trailing: View>: View {
                 .scaledToFit()
                 .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
         } else {
+            // tint 统一由调用点的链尾 foregroundStyle 上(与真图标分支同一处)。
             Image(systemName: systemImage)
                 .font(.system(size: compact ? 13 : 16, weight: .medium))
-                .foregroundStyle(tint)
         }
     }
 }

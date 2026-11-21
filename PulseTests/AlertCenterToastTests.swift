@@ -226,16 +226,7 @@ final class AlertCenterToastTests: XCTestCase {
         XCTAssertEqual(system.sent.count, 1, "补发不得重发批次已送达的告警(授权链晚落地竞态)")
     }
 
-    /// 等条件成立(每 10ms 让渡,上限 2s):等的是异步链落地,不是 sleep 糊断言。
-    private func waitUntil(
-        _ condition: @autoclosure () -> Bool,
-        timeout: TimeInterval = 2
-    ) async {
-        let deadline = Date().addingTimeInterval(timeout)
-        while !condition(), Date() < deadline {
-            try? await Task.sleep(for: .milliseconds(10))
-        }
-    }
+    // 异步等待走共享 waitUntil(PulseCoreTestSupport,ub-mode 收批合一)。
 
     /// 全关:两路都不发,但应用内提示照常(activeAlerts 仍记录)。
     func testNoOutletStillRecordsActiveAlerts() async {
