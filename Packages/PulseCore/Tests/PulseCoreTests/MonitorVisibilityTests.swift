@@ -87,7 +87,8 @@ final class MonitorVisibilityTests: XCTestCase {
         XCTAssertEqual(MetricTab.overview.displayedFamilies, [.gpu])
         XCTAssertEqual(MetricTab.gpu.displayedFamilies, [.gpu, .power])
         XCTAssertEqual(MetricTab.sensors.displayedFamilies, [.smc])
-        XCTAssertEqual(MetricTab.peripherals.displayedFamilies, [.bluetooth])
+        // 外设页:蓝牙 + 每应用音量混音卡(app-volume/01:枚举轮询闸)。
+        XCTAssertEqual(MetricTab.peripherals.displayedFamilies, [.bluetooth, .sound])
         // 服务页承接容器家族(tab-regroup/01 合页,门控跟着页走)。
         XCTAssertEqual(MetricTab.services.displayedFamilies, [.containers])
         // 无家族内容的 tab:排行与主卡数据走心跳/低频档,不经家族闸。

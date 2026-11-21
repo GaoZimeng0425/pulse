@@ -3,8 +3,9 @@ import Foundation
 // MARK: - 声音传感器(p2-sensors/05,ADR-0004 SensorProvider 接缝)
 
 /// 声音原始读数(Live 交回的原始载荷,属性读取在 Live、折算在核心包):
-/// CoreAudio 默认输出设备的名称 + 主声道音量标量 + 静音位。声音是非重点家族
-/// (spec 拍板:纯展示层,不做控制交互、不做每 App 层)——载荷刻意最小。
+/// CoreAudio 默认输出设备的名称 + 主声道音量标量 + 静音位。本载荷只管设备级
+/// 读数(p2-sensors/05 原口径的折算层);每应用音量控制是另一条线
+/// (app-volume/01:AppVolumeModel + app target 的 tap 引擎),不经本载荷。
 public struct SoundRawReading: Equatable, Sendable {
     /// 默认输出设备名(kAudioObjectPropertyName),无输出设备 = nil。
     public var deviceName: String?

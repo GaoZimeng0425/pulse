@@ -170,13 +170,16 @@ public extension MetricTab {
 
 /// 5s UI 档随可见性门控的传感器家族(历史 30s 档不看闸,spec Story 24 成本纪律)。
 /// 家族与 feature 一一对应:GPU 利用率 / ANE+五路功率(同 Energy Model 订阅,
-/// 与 GPU 分立)/ SMC 温度风扇 / 蓝牙 / 容器。声音事件驱动不设家族。
+/// 与 GPU 分立)/ SMC 温度风扇 / 蓝牙 / 容器 / 每应用音量(app-volume/01:混音
+/// 卡枚举轮询 1.5s,可见才跑;已接管管线不随可见性拆)。声音**读数**仍事件驱动
+/// 不设家族——本家族只管混音卡的轮询闸。
 public enum MetricSensorFamily: String, CaseIterable, Sendable, Hashable {
     case gpu
     case power
     case smc
     case bluetooth
     case containers
+    case sound
 }
 
 public extension MetricTab {
@@ -188,7 +191,7 @@ public extension MetricTab {
         case .overview: [.gpu]
         case .gpu: [.gpu, .power]
         case .sensors: [.smc]
-        case .peripherals: [.bluetooth]
+        case .peripherals: [.bluetooth, .sound]
         // 服务页的容器家族(tab-regroup/01 合页,门控跟着页走;dev server 无家族)
         case .services: [.containers]
         case .cpu, .memory, .disk, .network, .agents, .battery, .cleaner, .history: []

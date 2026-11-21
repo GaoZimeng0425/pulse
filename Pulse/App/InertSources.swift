@@ -1,3 +1,4 @@
+import CoreAudio
 import Darwin
 import Foundation
 import PulseCore
@@ -379,6 +380,7 @@ extension SystemMonitor {
                 power: PowerFeature(source: InertPowerSource(), chipName: HostInfo.current.chipName ?? ""),
                 smc: SmcFeature(source: InertSmcSource()),
                 sound: SoundFeature(source: InertSoundSource()),
+                appVolume: .inert(),
                 bluetooth: .inert(),
                 containers: ContainerFeature(source: InertContainerSource()),
                 launchdManifest: LaunchdManifestFeature(
@@ -387,6 +389,71 @@ extension SystemMonitor {
                 // 预览:助手缺席 = 空样本(与未安装态同观感)。
                 energyImpact: EnergyImpactFeature(fetch: { ([], Date()) })
             )
+        )
+    }
+}
+
+// MARK: - 每应用音量的 Inert 桩(app-volume/01)
+
+/// 预览 / 测试桩:不碰 HAL(引擎绝不进自动化——tap 览权弹窗 + hosted 挂死前科,
+/// 见工单 Comments)。空扫描:有输出设备、无音频客户端,卡片走「等待应用播放」空态。
+struct InertAppVolumeEngine: AppVolumeEngineProtocol {
+    func scan() async -> AppVolumeScan? {
+        AppVolumeScan(
+            snapshot: AppVolumeSnapshot(outputID: 1, outputUID: "inert-output", clients: []),
+            attributed: []
+        )
+    }
+
+    func makePipeline(
+        processIDs: [AudioObjectID],
+        outputID: AudioObjectID,
+        outputUID: String,
+        gain: Float
+    ) -> AppAudioPipelineProtocol {
+        InertAppAudioPipeline(processIDs: processIDs, outputID: outputID, gain: gain)
+    }
+}
+
+/// 管线桩:永不启动、永不渲染;给预览 / 单测驱动状态用。
+final class InertAppAudioPipeline: AppAudioPipelineProtocol, @unchecked Sendable {
+    let processIDs: [AudioObjectID]
+    let outputID: AudioObjectID
+    var renderCallbacks: UInt64 {
+        0
+    }
+
+    var hasAudioSignal: Bool {
+        false
+    }
+
+    var isAlive: Bool {
+        false
+    }
+
+    private var gain: Float
+
+    init(processIDs: [AudioObjectID], outputID: AudioObjectID, gain: Float) {
+        self.processIDs = processIDs
+        self.outputID = outputID
+        self.gain = gain
+    }
+
+    func setGain(_ gain: Float) {
+        self.gain = gain
+    }
+
+    func start() throws {}
+    func stop() {}
+}
+
+extension AppVolumeFeature {
+    /// 预览 / 测试构造:Inert 引擎 + 不落盘设置。
+    static func inert() -> AppVolumeFeature {
+        AppVolumeFeature(
+            engine: InertAppVolumeEngine(),
+            store: AppVolumeSettingsStore(load: { AppVolumeSettings() }, persist: { _ in }),
+            iconProvider: { _ in nil }
         )
     }
 }

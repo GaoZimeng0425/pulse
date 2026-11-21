@@ -45,6 +45,9 @@ targets:
         # 蓝牙家族(p2-sensors/06):IOBluetooth/CoreBluetooth 读设备表与电量,
         # TCC 强制 usage description——缺键即崩(2026-10-22 测试宿主崩溃实证)。
         INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: Pulse 读取已配对蓝牙设备的连接状态与电量,用于外设页展示。
+        # 每应用音量(app-volume/01):CoreAudio 进程 tap 首次创建时 TCC 弹
+        # 「系统音频捕获」授权;滑块在 100% 时不接管,用户没调过音量就不弹。
+        INFOPLIST_KEY_NSAudioCaptureUsageDescription: Pulse 按应用调节音量时需要捕获该应用的音频并重新播放;100% 时不接管,退出后自动恢复原始音量。
         ENABLE_APP_SANDBOX: NO
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "-"

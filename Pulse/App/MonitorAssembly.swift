@@ -60,6 +60,7 @@ struct MonitorFeatures {
     let power: PowerFeature
     let smc: SmcFeature
     let sound: SoundFeature
+    let appVolume: AppVolumeFeature
     let bluetooth: BluetoothFeature
     let containers: ContainerFeature
     let launchdManifest: LaunchdManifestFeature
@@ -81,6 +82,7 @@ struct MonitorFeatures {
             power,
             smc,
             sound,
+            appVolume,
             bluetooth,
             containers,
             launchdManifest,
@@ -125,6 +127,11 @@ extension SystemMonitor {
                 power: PowerFeature(source: LiveEnergyModelSource(), chipName: HostInfo.current.chipName ?? ""),
                 smc: SmcFeature(source: LiveSmcSource()),
                 sound: SoundFeature(source: LiveSoundSource()),
+                appVolume: AppVolumeFeature(
+                    engine: LiveAppVolumeEngine(),
+                    store: AppVolumeSettingsStore(),
+                    iconProvider: LiveAppVolumeEngine.appIcon(forBundleID:)
+                ),
                 bluetooth: BluetoothFeature(source: LiveBluetoothSource()),
                 containers: ContainerFeature(source: LiveContainerSource()),
                 launchdManifest: LaunchdManifestFeature(provider: LaunchdManifestProvider()),

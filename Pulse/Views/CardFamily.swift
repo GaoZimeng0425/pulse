@@ -153,8 +153,11 @@ enum CardRowWidth {
 /// 行首类型图标 + 名称 + 可选副文(弱信号:RSSI / pid)+ 尾部自定义列(meter、数值列),
 /// 尺寸全走 `RowMetrics` 两档,与排行 / 清理列表行同语言。图标色由调用方给:
 /// 活跃态取所在页指标色,非活跃 `{colors.state-inactive}`(代替旧 6pt 状态圆点)。
+/// `image` 给真实物件图标(app 图标;app-volume/01)——有它时行首画图标本体
+/// (iconSize 见方、圆角 5 收边),无它回 SF Symbol。
 struct CardEntityRow<Trailing: View>: View {
     let systemImage: String
+    var image: NSImage?
     let tint: Color
     let name: String
     var sub: String?
@@ -163,8 +166,7 @@ struct CardEntityRow<Trailing: View>: View {
 
     var body: some View {
         HStack(spacing: RowMetrics.spacing(compact: compact)) {
-            Image(systemName: systemImage)
-                .font(.system(size: compact ? 13 : 16, weight: .medium))
+            iconView
                 .frame(width: RowMetrics.iconSize(compact: compact))
                 .frame(maxHeight: .infinity, alignment: .center)
                 .foregroundStyle(tint)
@@ -185,6 +187,21 @@ struct CardEntityRow<Trailing: View>: View {
         }
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .combine)
+    }
+
+    /// 行首图标:真物件图标(app-volume/01)或 SF Symbol 分支。
+    @ViewBuilder
+    private var iconView: some View {
+        if let image {
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFit()
+                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        } else {
+            Image(systemName: systemImage)
+                .font(.system(size: compact ? 13 : 16, weight: .medium))
+                .foregroundStyle(tint)
+        }
     }
 }
 
