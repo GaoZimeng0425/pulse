@@ -136,9 +136,13 @@ final class AlertCenterToastTests: XCTestCase {
     }
 
     /// 记录型系统通知替身(授权恒为已授;锁纪律同 FakeToastSender)。
+    /// `authorizationDelayNanos` > 0 时把授权两问拖慢——满载竞态
+    /// (alert-toast-flake/01:setEnabled 拉起的授权链晚于告警触发落地)的
+    /// 确定性复现开关;默认 0 不等。
     private final class RecordingSystemSender: AlertNotificationSending, @unchecked Sendable {
         private let lock = NSLock()
         private var delivered: [AlertNotificationPayload] = []
+        var authorizationDelayNanos: UInt64 = 0
 
         var sent: [AlertNotificationPayload] {
             lock.lock()
@@ -147,11 +151,17 @@ final class AlertCenterToastTests: XCTestCase {
         }
 
         func requestAuthorization() async -> Bool {
-            true
+            if authorizationDelayNanos > 0 {
+                try? await Task.sleep(nanoseconds: authorizationDelayNanos)
+            }
+            return true
         }
 
         func authorizationStatus() async -> NotificationAuthorization {
-            .authorized
+            if authorizationDelayNanos > 0 {
+                try? await Task.sleep(nanoseconds: authorizationDelayNanos)
+            }
+            return .authorized
         }
 
         func authorizationDiagnostics() async -> String {
@@ -189,9 +199,12 @@ final class AlertCenterToastTests: XCTestCase {
     }
 
     /// 双开:两路都发(用户显式要横幅 + 卡)。
+    /// 授权链注入 80ms 延迟 = 满载竞态的确定性复现(setEnabled 的授权请求晚于
+    /// 告警触发落地;修复前此处 system 双发,alert-toast-flake/01)。
     func testBothOutletsDeliver() async {
         let toast = FakeToastSender()
         let system = RecordingSystemSender()
+        system.authorizationDelayNanos = 80_000_000
         let clock = MutableClock(t0)
         let defaults = makeDefaults()
         defaults.set(true, forKey: AlertSettingsStore.systemDeliveryStorageKey)
@@ -203,8 +216,25 @@ final class AlertCenterToastTests: XCTestCase {
         )
         center.setEnabled(true, for: .systemLoad)
         await fireSystemLoad(center, clock: clock, processes: [])
+        // 等两条异步链都落地(授权链尾 + 批次送达),再让渡一轮放行迟到的
+        // 补发任务(若有)——断言的是终态,不是竞速。
+        await waitUntil(center.notificationsAuthorized && !system.sent.isEmpty)
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
         XCTAssertEqual(toast.sent.count, 1)
-        XCTAssertEqual(system.sent.count, 1)
+        XCTAssertEqual(system.sent.count, 1, "补发不得重发批次已送达的告警(授权链晚落地竞态)")
+    }
+
+    /// 等条件成立(每 10ms 让渡,上限 2s):等的是异步链落地,不是 sleep 糊断言。
+    private func waitUntil(
+        _ condition: @autoclosure () -> Bool,
+        timeout: TimeInterval = 2
+    ) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition(), Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
     }
 
     /// 全关:两路都不发,但应用内提示照常(activeAlerts 仍记录)。

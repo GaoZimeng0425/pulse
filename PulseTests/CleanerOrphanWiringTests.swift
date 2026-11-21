@@ -150,6 +150,7 @@ final class CleanerOrphanWiringTests: XCTestCase {
         let box = Box()
         let cache = CleanScanResultStore(load: { box.value }, save: { box.value = $0 })
         let first = CleanerModel(
+            trash: FakeCleanTrashExecutor(),
             scanCache: cache,
             homeDirectory: home,
             installedAppInventory: { _, _, _ in .complete([]) }
@@ -161,6 +162,7 @@ final class CleanerOrphanWiringTests: XCTestCase {
         // 新会话装载缓存:全集按此刻现采(装机后新装的 app 立即受保护)。
         let log = CallLog()
         let second = CleanerModel(
+            trash: FakeCleanTrashExecutor(),
             scanCache: cache,
             homeDirectory: home,
             installedAppInventory: { trees, cancelled, home in

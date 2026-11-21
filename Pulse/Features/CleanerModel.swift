@@ -171,11 +171,15 @@ final class CleanerModel {
     ///     装配点漏传即功能静默死亡的病(票 11 scanCache 实案)不再给机会)。
     ///   - aiManifestReader: 读一个 Ollama manifest 文件的 UTF-8 内容
     ///     (p6-cleaner/02 内容寻址记账;生产 FileManager,测试注入字典)。
+    ///   - trash: **必传,无默认值**(2026-11-21 收账:曾有默认 Live 真执行器,
+    ///     新测试漏传又调清空 = 清空用户真废纸篓——编译期挡住;生产传
+    ///     LiveCleanTrashExecutor,测试传 FakeCleanTrashExecutor;同
+    ///     AlertCenter 发送器必传纪律)。
     init(
         exclusions: CleanExclusionsStore = CleanExclusionsStore(load: { [] }, persist: { _ in }),
         scanRoots: CleanScanRootsStore = CleanScanRootsStore(load: { [] }, persist: { _ in }),
         history: CleanHistoryStore? = nil,
-        trash: any CleanTrashExecutor = LiveCleanTrashExecutor(),
+        trash: any CleanTrashExecutor,
         activity: (any CleanActivitySource)? = nil,
         volumeSummaries: (@Sendable () -> [SpaceMapVolumeSummary])? = nil,
         scanCache: CleanScanResultStore? = nil,

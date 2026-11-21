@@ -129,6 +129,12 @@ enum AlertNotificationContent {
     /// userInfo 里携带路由的键(点开通知 → 直达视图)。
     static let routeUserInfoKey = "pulse.alertRoute"
 
+    /// 通知 identifier(种类+主体):同类同主体重发即替换;AlertCenter 的
+    /// 已送达去重集合同用此键(alert-toast-flake/01)。单一出处,勿手拼。
+    static func identifier(kind: AlertKind, subjectKey: String) -> String {
+        "\(kind.rawValue)|\(subjectKey)"
+    }
+
     /// 告警 → 通知载荷。identifier 稳定(种类+主体):同类同主体重发即替换。
     /// alert-offender-outlets:body 追加归因(有 entries 才追加),系统通知与
     /// 应用内提示行共用本函数——两出口「谁在吃」口径一致。
@@ -137,7 +143,7 @@ enum AlertNotificationContent {
         offender: AlertOffenderSummary = .none
     ) -> AlertNotificationPayload {
         AlertNotificationPayload(
-            identifier: "\(occurrence.kind.rawValue)|\(occurrence.subjectKey)",
+            identifier: identifier(kind: occurrence.kind, subjectKey: occurrence.subjectKey),
             title: title(for: occurrence),
             body: body(for: occurrence, offender: offender),
             route: occurrence.kind.route
