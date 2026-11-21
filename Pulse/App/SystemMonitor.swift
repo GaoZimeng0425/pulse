@@ -92,6 +92,11 @@ final class SystemMonitor {
         features.sound
     }
 
+    /// 每应用音量混音(app-volume/01)。
+    var appVolume: AppVolumeFeature {
+        features.appVolume
+    }
+
     /// 蓝牙三源合并读数(工单 p2-sensors/06)。
     var bluetooth: BluetoothFeature {
         features.bluetooth

@@ -22,6 +22,7 @@
 		0B2D3F53EE597649EDE9B7B7 /* GroupingPipelineSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32DF241AAD5F8798ADDE0FC2 /* GroupingPipelineSmokeTests.swift */; };
 		0CD8B452A8220B3185ECCD6A /* PowerCardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8B61FF7D57A239D0234D1A3 /* PowerCardViews.swift */; };
 		0E7CC3EE21A1321E89D78BFC /* ProjectRootsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF43629A17EF4D982135C6DC /* ProjectRootsStoreTests.swift */; };
+		0FBD4002D7EBAFE6CA93E67E /* AppAudioPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF1112B10A2BC7B9FA3CF32C /* AppAudioPipeline.swift */; };
 		1069B0AC6FD05BFF476483F6 /* MetricAccent.swift in Sources */ = {isa = PBXBuildFile; fileRef = D764FB1CFE74208F7730C4FA /* MetricAccent.swift */; };
 		114C6C63ADBC73CF7E07FFEB /* DiskFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C75CB2BD11EEDA12D6C898D /* DiskFixture.swift */; };
 		1373C9B67FAC501E4118ACD4 /* DiskCardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75143473F1438552A6B29F53 /* DiskCardViews.swift */; };
@@ -65,6 +66,7 @@
 		3DEFB73B1AB0CBBE257F342F /* DevServerFinderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF3E209527FBD12B7B4014D9 /* DevServerFinderTests.swift */; };
 		417BC00094F41184FE546F35 /* SoundFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEE86D46318C3A81F3B27F06 /* SoundFeature.swift */; };
 		42CC1DC1CC1DFFC5186B8248 /* NemoNotchToastSender.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF6813960D12A83141B88F0F /* NemoNotchToastSender.swift */; };
+		43B294E1AC951C6369C303A5 /* AppVolumeFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 269ED1A76CFF0AE7EB984F81 /* AppVolumeFeatureTests.swift */; };
 		44FF4D90C0131F982D4887A1 /* RankingOverflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FD44EAE086DEE8538A21818 /* RankingOverflow.swift */; };
 		468E4F4F50FB387354742865 /* EnergyModelSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2C47A273B11DED944F68280 /* EnergyModelSensor.swift */; };
 		46DBB21B089E14C2B6E39036 /* BirthScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B861A747FF3BF8E186AD5FFB /* BirthScannerTests.swift */; };
@@ -81,6 +83,7 @@
 		5052F645F62C479429754080 /* NetworkFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45E2272104F2DA88C999666C /* NetworkFixture.swift */; };
 		52B7BFF2EB1BB1F7EF1D5B56 /* SmcCardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FFEDF60F89066B8BB05A0EF /* SmcCardViews.swift */; };
 		53ABDB008BB23CFB289F450E /* PillTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A07FFFA11CBCFAE4FED292 /* PillTabBar.swift */; };
+		54537BEB9CA7F7278AA957B9 /* AppVolumeCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E96070C180E8A9D018C6C /* AppVolumeCardView.swift */; };
 		549EC237B5E5F830B3C652A2 /* PulseCore in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 679FABC27E634B3FA90955FE /* PulseCore */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		5665FC76EC2418D1B81682B1 /* MenuBarBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABC98F0C4A2054944D3B34AC /* MenuBarBadge.swift */; };
 		57D679777701897AD304570E /* LiveCleanDirectoryEnumerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FFE17F679EFFD8CCA29B0DC /* LiveCleanDirectoryEnumerator.swift */; };
@@ -94,9 +97,11 @@
 		616D7878CF54B2A29104277C /* ProcArgsParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 922EBEDDF974C9C5C567A5C8 /* ProcArgsParserTests.swift */; };
 		62894C55877E1831EA472420 /* GpuFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4822D29598222B0F5B29959A /* GpuFeature.swift */; };
 		6517E8053877F96B96DB576D /* BluetoothSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931F7070B78C75E7EF03B08A /* BluetoothSensor.swift */; };
+		675184BA29B63C32F823D5DD /* AppVolumeFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFAB4F953C46A790C479CD32 /* AppVolumeFeature.swift */; };
 		67564384C3B69AC9097524CE /* MainWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 689A729F03DE35CA0C9E3D5D /* MainWindowView.swift */; };
 		6A5229101F7D0A32D3436F8A /* GeneralSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C9E00667C343ED4FBBFF8AE /* GeneralSettingsView.swift */; };
 		6AE1DE9970F8D5A45B4928F7 /* CleanExclusionsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BAF755934C2A24A5B2DD1FE /* CleanExclusionsStore.swift */; };
+		6CBC9432B7C593DE131A7F22 /* LiveAppVolumeEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7680F870F17AC5213357C69E /* LiveAppVolumeEngine.swift */; };
 		6D331913DA49D304F3CFFF3A /* CleanerModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123227853485E0064F73A518 /* CleanerModelTests.swift */; };
 		6F81F0419525B5BABE9C8885 /* MenuBarBadgeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D24F280DF9DF1C4BD1AE2729 /* MenuBarBadgeSettingsView.swift */; };
 		6FFFBBE1DD4567DBCD7A9884 /* McpCleanBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F873321FB00A9164A02DBFE9 /* McpCleanBridge.swift */; };
@@ -107,6 +112,7 @@
 		793FED693BFB62064DA0DE63 /* PageHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 784169E55AFE6F109F41B427 /* PageHeader.swift */; };
 		7A42BF5BE1ECD8D87989902C /* SoundSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A93981AEA461948386E597BB /* SoundSensor.swift */; };
 		7B78DA9310927EF3FB5CB0F3 /* UninstallModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 607B205CBD1C5DFC1F58E246 /* UninstallModelTests.swift */; };
+		7BF12994E21D701AED3C426D /* AppVolumeSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D92D289F11A76D17A3BC65D3 /* AppVolumeSettingsStore.swift */; };
 		7DA585A2786F7FEDFED5D08E /* EnergyHelperClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CDD19BA97EC142A19A465AE /* EnergyHelperClient.swift */; };
 		7EECD9B072C93FEBF647E76A /* LiveCleanTrashExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 402CDC78D088CCD268E214D9 /* LiveCleanTrashExecutor.swift */; };
 		7F19E400612A69AA2613B8C3 /* DevServerViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16D71F0A473C1329AEE02FF2 /* DevServerViews.swift */; };
@@ -182,6 +188,7 @@
 		D89F1D815D05E848BE31A83E /* AlertCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 556E90C2DDB739846AA22485 /* AlertCenter.swift */; };
 		DBBB83A52145048627D0E2D7 /* LiveBrewUninstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 865415F5B0ED2A2E5C81362F /* LiveBrewUninstallerTests.swift */; };
 		DC5C75FC243BB1F7EC9DE426 /* UiUnifyRowMetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC87A93839D6CA24CF501E16 /* UiUnifyRowMetricsTests.swift */; };
+		DE026A23A1D01EE77D742A8E /* AppAudioSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59E8C9C533F4F51112D551A2 /* AppAudioSupport.swift */; };
 		E0391947A668FC976A3C1FEC /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 992920D9BD4AE699DFE1A1B5 /* SettingsView.swift */; };
 		E193DEFD26CEB49C029AF9BC /* CleanScanRootsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48832042B66772435003651D /* CleanScanRootsStoreTests.swift */; };
 		E3B976A319DD3E4CA4DF499F /* AlertSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0853EEEEB0FB9F6834A00E /* AlertSettingsStore.swift */; };
@@ -273,6 +280,7 @@
 		2395D7D9D7A918F62EDFADD8 /* InertSources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InertSources.swift; sourceTree = "<group>"; };
 		23CC14BC245E753EAACD6E13 /* LiveCoreTickSourceSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCoreTickSourceSmokeTests.swift; sourceTree = "<group>"; };
 		23CEC39FCC8CC2FDE38BBAF7 /* NetworkSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkSensor.swift; sourceTree = "<group>"; };
+		269ED1A76CFF0AE7EB984F81 /* AppVolumeFeatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppVolumeFeatureTests.swift; sourceTree = "<group>"; };
 		276EA0F7DAC2C0AC558E9614 /* DiagnosticReportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticReportTests.swift; sourceTree = "<group>"; };
 		29E406A1D678E2CAF14F3E30 /* RankingListMetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingListMetricsTests.swift; sourceTree = "<group>"; };
 		2D83B99D1565E444748A7987 /* ModuleRankingCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleRankingCard.swift; sourceTree = "<group>"; };
@@ -308,6 +316,7 @@
 		53973290E8EB9138A67B958C /* MetricCardModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricCardModel.swift; sourceTree = "<group>"; };
 		556E90C2DDB739846AA22485 /* AlertCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertCenter.swift; sourceTree = "<group>"; };
 		578B06925AAA893C922D03BC /* ContainerCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerCardViews.swift; sourceTree = "<group>"; };
+		59E8C9C533F4F51112D551A2 /* AppAudioSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAudioSupport.swift; sourceTree = "<group>"; };
 		5A686C29DAEAD2AC1D94E833 /* HistoryFeatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryFeatureTests.swift; sourceTree = "<group>"; };
 		5D074B7F60170564351BEE7F /* MenuBarBadgeDisplayModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarBadgeDisplayModelTests.swift; sourceTree = "<group>"; };
 		5E7F860EECC5F68388BB8FC6 /* AlertSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSettingsView.swift; sourceTree = "<group>"; };
@@ -328,6 +337,7 @@
 		7139D7B174756F0CAD5B532C /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
 		726DD15D946CA1C40E9B17F9 /* MeterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeterBar.swift; sourceTree = "<group>"; };
 		75143473F1438552A6B29F53 /* DiskCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskCardViews.swift; sourceTree = "<group>"; };
+		7680F870F17AC5213357C69E /* LiveAppVolumeEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveAppVolumeEngine.swift; sourceTree = "<group>"; };
 		784169E55AFE6F109F41B427 /* PageHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageHeader.swift; sourceTree = "<group>"; };
 		78EC09371E86E7408FA32ADC /* AppIconCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconCacheTests.swift; sourceTree = "<group>"; };
 		793E152BCFF6DC45BB501438 /* CardFamily.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardFamily.swift; sourceTree = "<group>"; };
@@ -378,6 +388,7 @@
 		BD3B00277D6CF515AEA81E6C /* MenuBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarController.swift; sourceTree = "<group>"; };
 		BD925AFC633F3C421507FEE7 /* LiveInstalledAppInventory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveInstalledAppInventory.swift; sourceTree = "<group>"; };
 		BE86A48D24949B3D225394BD /* TestHostIsolationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHostIsolationTests.swift; sourceTree = "<group>"; };
+		BF1112B10A2BC7B9FA3CF32C /* AppAudioPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAudioPipeline.swift; sourceTree = "<group>"; };
 		C3ED9E7F6F40FF3D9167EACB /* BirthScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BirthScanner.swift; sourceTree = "<group>"; };
 		C52DB5F7C6F83EAC51BD568F /* LiveCleanDirectoryEnumeratorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCleanDirectoryEnumeratorTests.swift; sourceTree = "<group>"; };
 		C53D2D1E33AFAC1704FD224A /* KillServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KillServiceTests.swift; sourceTree = "<group>"; };
@@ -401,6 +412,7 @@
 		D60B90549169579BCCD01677 /* BatteryFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryFeature.swift; sourceTree = "<group>"; };
 		D6CB838FAB56E49D3DB8D34D /* MemoryStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryStats.swift; sourceTree = "<group>"; };
 		D764FB1CFE74208F7730C4FA /* MetricAccent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricAccent.swift; sourceTree = "<group>"; };
+		D92D289F11A76D17A3BC65D3 /* AppVolumeSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppVolumeSettingsStore.swift; sourceTree = "<group>"; };
 		D9E66EF3F4924169F8F7E693 /* NativeList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeList.swift; sourceTree = "<group>"; };
 		DAD5923604EC0076DBCA7F94 /* ProjectRootsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRootsSettingsView.swift; sourceTree = "<group>"; };
 		DB7CF3F08B4853A7F4B4401E /* LiveAppCatalogSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveAppCatalogSource.swift; sourceTree = "<group>"; };
@@ -429,10 +441,12 @@
 		F686C4FCD1571352152AE894 /* LiveBatterySourceSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveBatterySourceSmokeTests.swift; sourceTree = "<group>"; };
 		F852219B5F9D1F164FD759CD /* CleanFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanFixture.swift; sourceTree = "<group>"; };
 		F873321FB00A9164A02DBFE9 /* McpCleanBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = McpCleanBridge.swift; sourceTree = "<group>"; };
+		FA7E96070C180E8A9D018C6C /* AppVolumeCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppVolumeCardView.swift; sourceTree = "<group>"; };
 		FA89F0F6BF4AD6BD4BC8C012 /* AgentUsageReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentUsageReaderTests.swift; sourceTree = "<group>"; };
 		FA9D963B1DE0ED63855A6AAF /* RankingCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingCard.swift; sourceTree = "<group>"; };
 		FC33A37E9CAE34AFFF9CA920 /* ProjectRootsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRootsStore.swift; sourceTree = "<group>"; };
 		FD1902314E98C2C8F685D0D9 /* MetricAccentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricAccentTests.swift; sourceTree = "<group>"; };
+		FFAB4F953C46A790C479CD32 /* AppVolumeFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppVolumeFeature.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -509,6 +523,8 @@
 				18902C5B107303C6D1E30137 /* AgentUsageFeature.swift */,
 				556E90C2DDB739846AA22485 /* AlertCenter.swift */,
 				BA0853EEEEB0FB9F6834A00E /* AlertSettingsStore.swift */,
+				FFAB4F953C46A790C479CD32 /* AppVolumeFeature.swift */,
+				D92D289F11A76D17A3BC65D3 /* AppVolumeSettingsStore.swift */,
 				D60B90549169579BCCD01677 /* BatteryFeature.swift */,
 				AFE3997D6A5E04C1873A7645 /* BluetoothFeature.swift */,
 				CA3A16609D5C3DE31DFFA9AB /* CleanerModel.swift */,
@@ -578,6 +594,8 @@
 				484C387C1C41472A41FEA919 /* AgentSessionReader.swift */,
 				889ED8280498C2EF70A6AD34 /* AgentUsageReader.swift */,
 				05102129BE186A01609E2D26 /* AlertNotification.swift */,
+				BF1112B10A2BC7B9FA3CF32C /* AppAudioPipeline.swift */,
+				59E8C9C533F4F51112D551A2 /* AppAudioSupport.swift */,
 				1C592AC26CEC4C7129D0463B /* BatterySensor.swift */,
 				C3ED9E7F6F40FF3D9167EACB /* BirthScanner.swift */,
 				931F7070B78C75E7EF03B08A /* BluetoothSensor.swift */,
@@ -592,6 +610,7 @@
 				AD227C96857D63ACF7B5E480 /* KillService.swift */,
 				986C77EF7853628E6A424165 /* LaunchdManifestSensor.swift */,
 				DB7CF3F08B4853A7F4B4401E /* LiveAppCatalogSource.swift */,
+				7680F870F17AC5213357C69E /* LiveAppVolumeEngine.swift */,
 				20A04E30F215BC0E462F41F6 /* LiveBrewUninstaller.swift */,
 				CD87D6AF9EFA784A9E84C641 /* LiveCleanActivitySource.swift */,
 				7FFE17F679EFFD8CCA29B0DC /* LiveCleanDirectoryEnumerator.swift */,
@@ -621,6 +640,7 @@
 				42CC78E5BC8E7711F99AF55B /* AgentViews.swift */,
 				5E7F860EECC5F68388BB8FC6 /* AlertSettingsView.swift */,
 				9E21F1F65F4010BF7A6C0C88 /* AlertViews.swift */,
+				FA7E96070C180E8A9D018C6C /* AppVolumeCardView.swift */,
 				84AFAFC8D33B01908457ADE1 /* BluetoothCardViews.swift */,
 				793E152BCFF6DC45BB501438 /* CardFamily.swift */,
 				DE72B348BD32348080C6C17C /* ChipView.swift */,
@@ -685,6 +705,7 @@
 				02DA72B605936ABAB68101E8 /* AlertNotificationSmokeTests.swift */,
 				F24703C16273CB98970E4297 /* AlertSettingsStoreTests.swift */,
 				78EC09371E86E7408FA32ADC /* AppIconCacheTests.swift */,
+				269ED1A76CFF0AE7EB984F81 /* AppVolumeFeatureTests.swift */,
 				8D0336878D6164F8E0FA0FCD /* BatterySensorTests.swift */,
 				B861A747FF3BF8E186AD5FFB /* BirthScannerTests.swift */,
 				0865C19D0EBD79356196C778 /* BluetoothFeatureAccessTests.swift */,
@@ -861,6 +882,7 @@
 				CF06B9E60C578C995DAF72DC /* AlertNotificationSmokeTests.swift in Sources */,
 				20550F03DAEF45E3DEBE36E7 /* AlertSettingsStoreTests.swift in Sources */,
 				31A4795EB7C03BA0FE9573D2 /* AppIconCacheTests.swift in Sources */,
+				43B294E1AC951C6369C303A5 /* AppVolumeFeatureTests.swift in Sources */,
 				AA6920C6B25E30AC0A50495C /* BatteryFixture.swift in Sources */,
 				9E646AB14BF339B36602F1B8 /* BatterySensorTests.swift in Sources */,
 				46DBB21B089E14C2B6E39036 /* BirthScannerTests.swift in Sources */,
@@ -947,6 +969,11 @@
 				E3B976A319DD3E4CA4DF499F /* AlertSettingsStore.swift in Sources */,
 				1C68C42F1E98C6B386C6CF43 /* AlertSettingsView.swift in Sources */,
 				FDC1890BBEEC4851C1070282 /* AlertViews.swift in Sources */,
+				0FBD4002D7EBAFE6CA93E67E /* AppAudioPipeline.swift in Sources */,
+				DE026A23A1D01EE77D742A8E /* AppAudioSupport.swift in Sources */,
+				54537BEB9CA7F7278AA957B9 /* AppVolumeCardView.swift in Sources */,
+				675184BA29B63C32F823D5DD /* AppVolumeFeature.swift in Sources */,
+				7BF12994E21D701AED3C426D /* AppVolumeSettingsStore.swift in Sources */,
 				E714615BB26F05C456D5D362 /* BatteryFeature.swift in Sources */,
 				CD3119D8DB34CB29A184EFC1 /* BatterySensor.swift in Sources */,
 				D4605E885F98739193E40F49 /* BirthScanner.swift in Sources */,
@@ -994,6 +1021,7 @@
 				71FDAE1452AD249D0F8D0867 /* LaunchdManifestFeature.swift in Sources */,
 				0B23F408C8204B0867448614 /* LaunchdManifestSensor.swift in Sources */,
 				B8A7E170826E5E447B7C0211 /* LiveAppCatalogSource.swift in Sources */,
+				6CBC9432B7C593DE131A7F22 /* LiveAppVolumeEngine.swift in Sources */,
 				A83B3273400AF603C993572D /* LiveBrewUninstaller.swift in Sources */,
 				2F016FF68304A538C3FEF849 /* LiveCleanActivitySource.swift in Sources */,
 				57D679777701897AD304570E /* LiveCleanDirectoryEnumerator.swift in Sources */,
@@ -1154,6 +1182,7 @@
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSAudioCaptureUsageDescription = "Pulse 按应用调节音量时需要捕获该应用的音频并重新播放;100% 时不接管,退出后自动恢复原始音量。";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Pulse 读取已配对蓝牙设备的连接状态与电量,用于外设页展示。";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1181,6 +1210,7 @@
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSAudioCaptureUsageDescription = "Pulse 按应用调节音量时需要捕获该应用的音频并重新播放;100% 时不接管,退出后自动恢复原始音量。";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Pulse 读取已配对蓝牙设备的连接状态与电量,用于外设页展示。";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

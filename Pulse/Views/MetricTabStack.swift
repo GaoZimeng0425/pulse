@@ -131,9 +131,10 @@ struct MetricTabStack<Ranking: View>: View {
                 builder.card("temps", SmcTempsDetailCardView(reading: monitor.smc.reading, isCompact: false))
             }
         case .peripherals:
-            // 外设页(p2-sensors/05/06):蓝牙设备表(三源电量合并,可见 30s 扫描;
-            // 默认关,卡片按钮 / 设置开关是唯一触发源——权限原则)+ 声音区(纯展示,
-            // 事件驱动零轮询)。
+            // 外设页(p2-sensors/05/06 + app-volume/01):蓝牙设备表(三源电量合并,
+            // 可见 30s 扫描;默认关,卡片按钮 / 设置开关是唯一触发源——权限原则)
+            // + 声音区(读数纯展示、事件驱动零轮询;每应用混音卡 1.5s 枚举走
+            // shows(.sound) 可见性闸,已接管管线不随可见性拆)。
             builder.card("bluetooth", BluetoothDevicesCardView(
                 reading: monitor.bluetooth.reading,
                 accessState: monitor.bluetooth.accessState,
@@ -143,6 +144,7 @@ struct MetricTabStack<Ranking: View>: View {
                 onAuthorize: { monitor.bluetooth.requestAuthorization() }
             ))
             builder.card("sound", SoundCardView(reading: monitor.sound.reading, isCompact: isCompact))
+            builder.card("app-volume", AppVolumeCardView(feature: monitor.appVolume, isCompact: isCompact))
         case .gpu:
             // GPU 页(p2-sensors/02/03):利用率主卡 + ANE 卡与五路功率区
             // (同一 Energy Model 订阅,一鱼五吃);每 App GPU 归因是 P3(root

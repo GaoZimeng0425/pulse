@@ -275,6 +275,19 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   数值列里的未知读数(容器 CPU 无样本)仍写"—"——那是表格的诚实单元格,不是状态提示。
   meter 条宽一律 `RowMetrics.meterWidth`(120 / 52),不随窗宽拉伸——弹窗与主窗口同一节奏。
 
+- **实体行真图标扩展**(app-volume/01,2026-11-21):`CardEntityRow` 增设可选
+  `image: NSImage?`——给得出真实物件图标(每应用音量卡的 app 图标)时行首画
+  图标本体(`RowMetrics.iconSize` 见方、圆角 5 continuous 收边),缺省回 SF Symbol
+  分支不动;既有调用点零改动(带默认值)。
+- **音量滑块行**(app-volume/01,2026-11-21):实体行的控制形态,首次用于外设页
+  「每应用音量」卡——实体行(真 app 图标 + 名称 + 副文"出声中/静音/接管中")尾部 =
+  原生 `Slider`(宽 `RowMetrics.meterWidth` 两档,与读数行 meter 同一节奏;
+  tint = 所在页指标色)+ `CardRowValue` 百分比(定宽 `CardRowWidth.percentValue`,
+  RowMetrics 数值档)+ 静音图标钮(`speaker.wave.2.fill` / `speaker.slash.fill`,
+  13/11pt,热区 = 行距×2 见方,`.plain` 无边框;静音态钮染指标色,常态
+  `{colors.state-inactive}`)。滑块是**用户驱动**件,不受"meter 无过渡动画"规矩
+  约束;接管失败行副文一句短话("接管失败 · 重拖滑块重试"),完整错误走悬停 help。
+
 - **行两档制 RowMetrics**(ui-unify/01,2026-11-08 用户拍板"功能相似组件长一个样",
   `Pulse/Views/RowMetrics.swift`):全 app **列表行**共享值的单一出处——紧凑档(弹窗)/
   舒适档(主窗口一切列表行:排行 / 清理 / sheet 清单)。字号 = 名称与数值**同号**
