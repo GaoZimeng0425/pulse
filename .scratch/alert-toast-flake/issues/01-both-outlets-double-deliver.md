@@ -15,4 +15,23 @@ AlertCenterToastTests.swift:207: XCTAssertEqual failed: ("2") is not equal to ("
 
 **修复方向(接手时):** 给 FakeToastSender 的计数路径加串行化或把 fire 收敛为确定性等待(await 到 toast.sent 变 1 再断言);不要用 sleep 重试糊。
 
-**Status:** needs-triage(非本分支引入,不阻塞 mcp-eyes 合并——单跑绿 + 三见均在满载整包轮)
+**Status:** done(2026-11-22 定谳修复,feat/chore-debts 批)
+
+## 定谳与修法(2026-11-22)
+
+**真凶(非票面原疑点)**:不是 toast 路径——`setEnabled` 拉起的授权请求链
+(`requestAuthorization → recordStatus`)在满载下**晚于告警触发落地**;此刻
+`wasAuthorized=false→true` 的转变触发补发,而 `resendingExcept` 只排除**同批**
+的 identifier,把批次**已经送达**的同一条告警再补一遍。测试里 = 双计数
+(旧版行号是 toast 断言、新版是 system 断言,当年行号漂移误导了方向);
+生产里 = 同一告警**双横幅**(窄竞态:授权请求在途时恰好有告警触发)。
+
+**修法**:AlertCenter 记「本会话已送达 identifier 集合」——批次**决定发即
+记账**(发完才记会留窗口,补发链读不到),补发过滤该集合,`.resolved` 即清
+(同主体再触发是新 occurrence,照发);identifier 构造收单一出处
+`AlertNotificationContent.identifier(kind:subjectKey:)`。授权后补发「从未
+送达」的既有语义不受影响(AlertCenterTests 381-414 原测全绿)。
+
+**回归钉死**:`testBothOutletsDeliver` 给假发送器注入 80ms 授权延迟,把满载
+竞态变成**确定性复现**(修复前必红);等待改为确定性条件(授权链落地 + 批次
+送达)而非固定 yield 数。
