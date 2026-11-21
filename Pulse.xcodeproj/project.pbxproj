@@ -145,6 +145,7 @@
 		A7EC8929C2925EBEC907E4DC /* LiveCleanVolumeSummaries.swift in Sources */ = {isa = PBXBuildFile; fileRef = 521CFD7E4C18FECCE0749E5E /* LiveCleanVolumeSummaries.swift */; };
 		A83B3273400AF603C993572D /* LiveBrewUninstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A04E30F215BC0E462F41F6 /* LiveBrewUninstaller.swift */; };
 		A94FE8284BA99E78188EAEA4 /* SyntheticProcessSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F037E709135740FF3012BA47 /* SyntheticProcessSourceTests.swift */; };
+		A9E6BB2813EE2E1DD504E8D1 /* AsyncWaitFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0863805F0E9F5CF3CDF79A4 /* AsyncWaitFixture.swift */; };
 		AA528E9EE2DB20755AA5481C /* LaunchdManifestFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B76926FB48518EBB58CAA6F /* LaunchdManifestFeatureTests.swift */; };
 		AA6920C6B25E30AC0A50495C /* BatteryFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AF42F49FFB85D97F2B8C74D /* BatteryFixture.swift */; };
 		AD213F94A8779D13A260C332 /* LineagePruningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 660FB2721DCBDC67C5B3E98A /* LineagePruningTests.swift */; };
@@ -423,6 +424,7 @@
 		DEE86D46318C3A81F3B27F06 /* SoundFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundFeature.swift; sourceTree = "<group>"; };
 		DF3E209527FBD12B7B4014D9 /* DevServerFinderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevServerFinderTests.swift; sourceTree = "<group>"; };
 		DF43629A17EF4D982135C6DC /* ProjectRootsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRootsStoreTests.swift; sourceTree = "<group>"; };
+		E0863805F0E9F5CF3CDF79A4 /* AsyncWaitFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncWaitFixture.swift; sourceTree = "<group>"; };
 		E0C2BC1088F0581063C1D49A /* DiskSensorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskSensorTests.swift; sourceTree = "<group>"; };
 		E30359B7325F49ACFB28D448 /* NetworkFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkFeature.swift; sourceTree = "<group>"; };
 		E353A0118896B05E3761D72A /* DockPresence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockPresence.swift; sourceTree = "<group>"; };
@@ -554,6 +556,7 @@
 		705BA277D972401D161B804F /* PulseCoreTestSupport */ = {
 			isa = PBXGroup;
 			children = (
+				E0863805F0E9F5CF3CDF79A4 /* AsyncWaitFixture.swift */,
 				1AF42F49FFB85D97F2B8C74D /* BatteryFixture.swift */,
 				F852219B5F9D1F164FD759CD /* CleanFixture.swift */,
 				6C75CB2BD11EEDA12D6C898D /* DiskFixture.swift */,
@@ -883,6 +886,7 @@
 				20550F03DAEF45E3DEBE36E7 /* AlertSettingsStoreTests.swift in Sources */,
 				31A4795EB7C03BA0FE9573D2 /* AppIconCacheTests.swift in Sources */,
 				43B294E1AC951C6369C303A5 /* AppVolumeFeatureTests.swift in Sources */,
+				A9E6BB2813EE2E1DD504E8D1 /* AsyncWaitFixture.swift in Sources */,
 				AA6920C6B25E30AC0A50495C /* BatteryFixture.swift in Sources */,
 				9E646AB14BF339B36602F1B8 /* BatterySensorTests.swift in Sources */,
 				46DBB21B089E14C2B6E39036 /* BirthScannerTests.swift in Sources */,

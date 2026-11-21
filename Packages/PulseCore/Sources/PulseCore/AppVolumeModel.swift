@@ -22,13 +22,6 @@ public enum AppVolumeCurve {
         let level = max(0, min(maximum, volume))
         return Float(level < 1 ? level * level : level)
     }
-
-    /// 增益 → 滑块位(gain(for:) 的逆;坏值钳回 1)。UI 把增益还原成滑块位置用。
-    public static func volume(forGain gain: Double) -> Double {
-        guard gain.isFinite else { return 1 }
-        let level = max(0, min(maximum, gain))
-        return level < 1 ? level.squareRoot() : level
-    }
 }
 
 // MARK: - 设置载荷
@@ -126,23 +119,12 @@ public struct AppVolumeClient: Equatable, Sendable {
     }
 }
 
-/// 一轮枚举的设备面:默认输出设备的身份(换设备 = 全部管线重建的判据)。
-public struct AppVolumeSnapshot: Equatable, Sendable {
-    public let outputID: UInt32
-    public let outputUID: String
-    public let clients: [AppVolumeClient]
-
-    public init(outputID: UInt32, outputUID: String, clients: [AppVolumeClient]) {
-        self.outputID = outputID
-        self.outputUID = outputUID
-        self.clients = clients
-    }
-}
-
 // MARK: - 展示条目与归并
 
 /// 混音卡一行(纯数据;app 图标是 AppKit 物,住 feature 层不进核心包)。
 /// `processIDs` 是 HAL 进程对象 ID 列表(沿用 mixbar 命名,升序)。
+/// `bundleID` = **宿主 app** 的 bundle(图标/身份用)——浏览器 helper 归并到
+/// 宿主行后,图标要查宿主的,不是 helper 自己的。
 public struct AppVolumeEntry: Equatable, Identifiable, Sendable {
     /// 应用身份:bundleID,兜底 "pid:<pid>"(无 bundle 的音频进程)。
     public let id: String
@@ -192,11 +174,15 @@ public struct AttributedVolumeClient: Sendable {
     /// 宿主应用身份键(AppVolumeEntry.id 同口径)。
     public let appKey: String
     public let appName: String
+    /// 宿主 app 的 bundleID(条目身份/图标用;pid 行 = nil)。刻意独立于
+    /// `client.bundleID`:浏览器 helper 归因到宿主后,身份跟宿主走。
+    public let appBundleID: String?
 
-    public init(client: AppVolumeClient, appKey: String, appName: String) {
+    public init(client: AppVolumeClient, appKey: String, appName: String, appBundleID: String?) {
         self.client = client
         self.appKey = appKey
         self.appName = appName
+        self.appBundleID = appBundleID
     }
 }
 
@@ -219,7 +205,7 @@ public enum AppVolumeGrouping {
             } else {
                 grouped[key] = AppVolumeEntry(
                     id: key,
-                    bundleID: item.client.bundleID,
+                    bundleID: item.appBundleID,
                     name: item.appName,
                     processIDs: [item.client.objectID],
                     volume: settings.volume(for: key),

@@ -28,17 +28,6 @@ final class AppVolumeModelTests: XCTestCase {
         XCTAssertEqual(AppVolumeCurve.gain(for: .infinity), 1)
     }
 
-    func testCurveVolumeForGainInverts() {
-        for level in stride(from: 0.0, through: 1.0, by: 0.1) {
-            XCTAssertEqual(
-                AppVolumeCurve.volume(forGain: Double(AppVolumeCurve.gain(for: level))),
-                level,
-                accuracy: 0.0001
-            )
-        }
-        XCTAssertEqual(AppVolumeCurve.volume(forGain: 2), 2)
-    }
-
     // MARK: 设置载荷
 
     func testSettingsDefaultsToUnity() {
@@ -100,17 +89,20 @@ final class AppVolumeModelTests: XCTestCase {
             AttributedVolumeClient(
                 client: client(7, pid: 101, bundle: "org.mozilla.firefox", playing: false),
                 appKey: "org.mozilla.firefox",
-                appName: "Firefox"
+                appName: "Firefox",
+                appBundleID: "org.mozilla.firefox"
             ),
             AttributedVolumeClient(
                 client: client(3, pid: 102, bundle: "org.mozilla.firefox", playing: true),
                 appKey: "org.mozilla.firefox",
-                appName: "Firefox"
+                appName: "Firefox",
+                appBundleID: "org.mozilla.firefox"
             ),
             AttributedVolumeClient(
                 client: client(9, pid: 103, bundle: "com.apple.Music", playing: false),
                 appKey: "com.apple.Music",
-                appName: "音乐"
+                appName: "音乐",
+                appBundleID: "com.apple.Music"
             ),
         ]
         let entries = AppVolumeGrouping.entries(from: attributed, settings: AppVolumeSettings())
@@ -123,18 +115,41 @@ final class AppVolumeModelTests: XCTestCase {
         XCTAssertEqual(entries.map(\.id), ["com.apple.Music", "org.mozilla.firefox"])
     }
 
+    /// 条目身份跟**宿主**走,不跟 helper 的 bundle 走——图标/身份查宿主才对。
+    func testGroupingTakesOwnerBundleNotHelperForIdentity() {
+        let attributed = [
+            AttributedVolumeClient(
+                client: client(5, pid: 50, bundle: "org.mozilla.firefox.helper", playing: true),
+                appKey: "org.mozilla.firefox",
+                appName: "Firefox",
+                appBundleID: "org.mozilla.firefox"
+            ),
+            AttributedVolumeClient(
+                client: client(6, pid: 51, bundle: nil, playing: false),
+                appKey: "pid:51",
+                appName: "无名音频进程",
+                appBundleID: nil
+            ),
+        ]
+        let entries = AppVolumeGrouping.entries(from: attributed, settings: AppVolumeSettings())
+        XCTAssertEqual(entries.first { $0.id == "org.mozilla.firefox" }?.bundleID, "org.mozilla.firefox")
+        XCTAssertNil(entries.first { $0.id == "pid:51" }?.bundleID)
+    }
+
     func testGroupingAppliesSavedSettings() {
         let settings = AppVolumeSettings(volumes: ["com.apple.Music": 0.5], mutes: ["pid:42"])
         let attributed = [
             AttributedVolumeClient(
                 client: client(1, pid: 10, bundle: "com.apple.Music", playing: true),
                 appKey: "com.apple.Music",
-                appName: "音乐"
+                appName: "音乐",
+                appBundleID: "com.apple.Music"
             ),
             AttributedVolumeClient(
                 client: client(2, pid: 42, bundle: nil, playing: true),
                 appKey: "pid:42",
-                appName: "无名音频进程"
+                appName: "无名音频进程",
+                appBundleID: nil
             ),
         ]
         let entries = AppVolumeGrouping.entries(from: attributed, settings: settings)

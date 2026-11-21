@@ -168,10 +168,10 @@ final class AppVolumeFeature: MonitorFeature {
 
     private func apply(_ scan: AppVolumeScan) {
         hasOutputDevice = true
-        outputID = scan.snapshot.outputID
-        outputUID = scan.snapshot.outputUID
+        outputID = scan.outputID
+        outputUID = scan.outputUID
         // 换输出设备 = 全部管线作废(它们聚合的是旧设备),整批换代。
-        let signature = "\(scan.snapshot.outputID):\(scan.snapshot.outputUID)"
+        let signature = "\(scan.outputID):\(scan.outputUID)"
         if outputSignature != signature {
             destroyPipelines()
             outputSignature = signature

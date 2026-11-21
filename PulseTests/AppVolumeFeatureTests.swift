@@ -134,12 +134,14 @@ final class AppVolumeFeatureTests: XCTestCase {
         clients: [AppVolumeClient]
     ) -> AppVolumeScan {
         AppVolumeScan(
-            snapshot: AppVolumeSnapshot(outputID: outputID, outputUID: outputUID, clients: clients),
+            outputID: outputID,
+            outputUID: outputUID,
             attributed: clients.map {
                 AttributedVolumeClient(
                     client: $0,
                     appKey: $0.bundleID ?? "pid:\($0.pid)",
-                    appName: $0.bundleID ?? "pid:\($0.pid)"
+                    appName: $0.bundleID ?? "pid:\($0.pid)",
+                    appBundleID: $0.bundleID
                 )
             }
         )
@@ -152,13 +154,7 @@ final class AppVolumeFeatureTests: XCTestCase {
         objectID: 12, pid: 200, bundleID: "systemsoundserverd", isPlaying: false
     )
 
-    /// 等异步构建(Task.detached + MainActor.run)落地,上限 2s。
-    private func drain(until condition: @autoclosure () -> Bool, timeout: TimeInterval = 2) async {
-        let deadline = Date().addingTimeInterval(timeout)
-        while !condition(), Date() < deadline {
-            try? await Task.sleep(for: .milliseconds(20))
-        }
-    }
+    // 异步等待走共享 waitUntil(PulseCoreTestSupport,ub-mode 收批合一)。
 
     // MARK: 枚举归并 × 设置
 
@@ -168,7 +164,7 @@ final class AppVolumeFeatureTests: XCTestCase {
         engine.scanResult = scanWith(clients: [musicClient, systemSoundsClient])
         let feature = makeFeature()
         feature.visibilityChanged(peripheralsVisible)
-        await drain(until: !feature.entries.isEmpty)
+        await waitUntil(!feature.entries.isEmpty)
 
         XCTAssertEqual(feature.entries.map(\.id), ["com.apple.Music", "systemsoundserverd"])
         XCTAssertEqual(feature.entries[0].volume, 0.5)
@@ -183,7 +179,7 @@ final class AppVolumeFeatureTests: XCTestCase {
         engine.scanResult = scanWith(clients: [musicClient])
         let feature = makeFeature()
         feature.visibilityChanged(peripheralsVisible)
-        await drain(until: !feature.entries.isEmpty)
+        await waitUntil(!feature.entries.isEmpty)
 
         XCTAssertTrue(engine.madePipelines.isEmpty)
         XCTAssertEqual(feature.entries.first?.isControlled, false)
@@ -195,11 +191,11 @@ final class AppVolumeFeatureTests: XCTestCase {
         engine.scanResult = scanWith(clients: [musicClient])
         let feature = makeFeature()
         feature.visibilityChanged(peripheralsVisible)
-        await drain(until: !feature.entries.isEmpty)
+        await waitUntil(!feature.entries.isEmpty)
 
         feature.setVolume(0.5, for: "com.apple.Music")
         // drain 到 start 落地 + 行已接管(finishBuild 之后),不是 makePipeline 那一刻。
-        await drain(until: engine.madePipelines.first?.started == true && feature.entries.first?.isControlled == true)
+        await waitUntil(engine.madePipelines.first?.started == true && feature.entries.first?.isControlled == true)
 
         let pipeline = engine.madePipelines[0]
         XCTAssertTrue(pipeline.started)
@@ -215,13 +211,13 @@ final class AppVolumeFeatureTests: XCTestCase {
         engine.scanResult = scanWith(clients: [musicClient])
         let feature = makeFeature()
         feature.visibilityChanged(peripheralsVisible)
-        await drain(until: !feature.entries.isEmpty)
+        await waitUntil(!feature.entries.isEmpty)
 
         feature.setVolume(0.5, for: "com.apple.Music")
-        await drain(until: engine.madePipelines.first?.started == true)
+        await waitUntil(engine.madePipelines.first?.started == true)
 
         feature.setVolume(1, for: "com.apple.Music")
-        await drain(until: engine.madePipelines[0].stopped)
+        await waitUntil(engine.madePipelines[0].stopped)
 
         XCTAssertTrue(engine.madePipelines[0].stopped)
         XCTAssertEqual(feature.entries.first?.isControlled, false)
@@ -232,17 +228,17 @@ final class AppVolumeFeatureTests: XCTestCase {
         engine.scanResult = scanWith(clients: [musicClient])
         let feature = makeFeature()
         feature.visibilityChanged(peripheralsVisible)
-        await drain(until: !feature.entries.isEmpty)
+        await waitUntil(!feature.entries.isEmpty)
 
         feature.toggleMute(for: "com.apple.Music")
-        await drain(until: engine.madePipelines.first?.started == true)
+        await waitUntil(engine.madePipelines.first?.started == true)
         // 静音 = 接管播无声:增益 0,不是拆管线。
         XCTAssertEqual(engine.madePipelines[0].gains.last ?? 1, 0, accuracy: 0.0001)
         XCTAssertFalse(engine.madePipelines[0].stopped)
 
         // 拖动音量即解除静音(设置层语义在核心包已测,这里过端到端)。
         feature.setVolume(0.5, for: "com.apple.Music")
-        await drain(until: engine.madePipelines[0].gains.last ?? 1 > 0)
+        await waitUntil(engine.madePipelines[0].gains.last ?? 1 > 0)
         XCTAssertEqual(feature.entries.first?.isMuted, false)
     }
 
@@ -250,20 +246,20 @@ final class AppVolumeFeatureTests: XCTestCase {
         engine.scanResult = scanWith(clients: [musicClient])
         let feature = makeFeature()
         feature.visibilityChanged(peripheralsVisible)
-        await drain(until: !feature.entries.isEmpty)
+        await waitUntil(!feature.entries.isEmpty)
 
         // 首次拖动:建管线即失败(模拟授权被拒 / 设备失败)→ 行错误,不接管。
         engine.nextStartError = AppAudioPipelineError(operation: "获取应用音频", code: -1)
         feature.setVolume(0.5, for: "com.apple.Music")
         // drain 到失败落地(finishBuild 记完行错误/失败账),再重拖才不会被在途 token 挡住。
-        await drain(until: feature.entries.first { $0.id == "com.apple.Music" }?.error != nil)
+        await waitUntil(feature.entries.first { $0.id == "com.apple.Music" }?.error != nil)
         XCTAssertFalse(engine.madePipelines[0].started)
         XCTAssertEqual(feature.entries.first { $0.id == "com.apple.Music" }?.isControlled, false)
 
         // 重拖 = 清失败账重试,新管线成功,行错误消失(drain 到错误真被
         // finishBuild 清掉,started 置位与回主线程清错之间有窗口)。
         feature.setVolume(0.6, for: "com.apple.Music")
-        await drain(until: engine.madePipelines.count == 2
+        await waitUntil(engine.madePipelines.count == 2
             && engine.madePipelines.last?.started == true
             && feature.entries.first { $0.id == "com.apple.Music" }?.error == nil)
         XCTAssertTrue(engine.madePipelines.last?.started == true)
@@ -275,17 +271,17 @@ final class AppVolumeFeatureTests: XCTestCase {
         engine.scanResult = scanWith(clients: [musicClient])
         let feature = makeFeature()
         feature.visibilityChanged(peripheralsVisible)
-        await drain(until: !feature.entries.isEmpty)
+        await waitUntil(!feature.entries.isEmpty)
 
         feature.setVolume(0.5, for: "com.apple.Music")
-        await drain(until: engine.madePipelines.count == 1 && engine.madePipelines[0].started)
+        await waitUntil(engine.madePipelines.count == 1 && engine.madePipelines[0].started)
         let first = engine.madePipelines[0]
 
         // 切到新输出设备:老管线必须停(它们聚合的是旧设备)。tick = 产品路径的
         // 可见重扫(visibilityChanged 同值重发不会再扫)。
         engine.scanResult = scanWith(outputID: 9, outputUID: "airpods", clients: [musicClient])
         feature.tick()
-        await drain(until: engine.madePipelines.count == 2)
+        await waitUntil(engine.madePipelines.count == 2)
 
         XCTAssertTrue(first.stopped)
         XCTAssertTrue(engine.madePipelines[1].started)
@@ -298,17 +294,17 @@ final class AppVolumeFeatureTests: XCTestCase {
         engine.scanResult = scanWith(clients: [musicClient])
         let feature = makeFeature()
         feature.visibilityChanged(peripheralsVisible)
-        await drain(until: !feature.entries.isEmpty)
+        await waitUntil(!feature.entries.isEmpty)
 
         feature.setVolume(0.5, for: "com.apple.Music")
-        await drain(until: engine.madePipelines.count == 1 && engine.madePipelines[0].started)
+        await waitUntil(engine.madePipelines.count == 1 && engine.madePipelines[0].started)
         let stalled = engine.madePipelines[0]
         stalled.rendersForever = false // 播放中但渲染计数停走
 
         // 记基线(首次巡检只记账不判定),再推到窗口外 → 重建(拆旧建新)。
         feature.checkStalledPipelines(now: Date())
         feature.checkStalledPipelines(now: Date().addingTimeInterval(AppVolumeFeature.stallWindow + 1))
-        await drain(until: engine.madePipelines.count == 2 && engine.madePipelines.last?.started == true)
+        await waitUntil(engine.madePipelines.count == 2 && engine.madePipelines.last?.started == true)
 
         XCTAssertTrue(stalled.stopped)
         XCTAssertTrue(engine.madePipelines[1].started)
@@ -319,10 +315,10 @@ final class AppVolumeFeatureTests: XCTestCase {
         engine.scanResult = scanWith(clients: [musicClient])
         let feature = makeFeature()
         feature.visibilityChanged(peripheralsVisible)
-        await drain(until: !feature.entries.isEmpty)
+        await waitUntil(!feature.entries.isEmpty)
 
         feature.setVolume(0.5, for: "com.apple.Music")
-        await drain(until: engine.madePipelines.count == 1)
+        await waitUntil(engine.madePipelines.count == 1)
 
         feature.visibilityChanged(MonitorVisibility(mainWindowTab: .cpu))
         feature.checkStalledPipelines(now: Date()) // 不可见时的本地巡检

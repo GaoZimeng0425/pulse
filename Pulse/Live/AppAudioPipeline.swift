@@ -87,7 +87,6 @@ final class AppAudioPipeline: @unchecked Sendable {
     private var ramp: Float = 0.001
     /// duplex 硬件(带麦克风通道的设备)会把麦克风缓冲排在 tap 之前:tap 流的索引。
     private var inputOffset = 0
-    private(set) var sampleRate: Double = 0
     private(set) var started = false
     /// 超 100% 增益会把响料推出满刻度;逐采样钳会把峰削成爆音,所以用峰值限制器
     /// 整帧压低一点,安静料吃满增益。上限 ≈ −0.5 dBFS,160ms 指数释放。
@@ -182,7 +181,7 @@ final class AppAudioPipeline: @unchecked Sendable {
               tapFormat.1.mFormatFlags & kAudioFormatFlagIsNonInterleaved == 0 else {
             throw AppAudioPipelineError(operation: "当前应用的音频格式不受支持", code: kAudioDeviceUnsupportedFormatError)
         }
-        sampleRate = format.mSampleRate
+        let sampleRate = format.mSampleRate
         ramp = 1 - exp(-1 / (Float(sampleRate) * 0.025))
         limiterRelease = Float(exp(-1000 / (max(sampleRate, 8000) * 160)))
         inputOffset = max(0, bufferCount(aggregateID, scope: kAudioObjectPropertyScopeInput) - 1)
