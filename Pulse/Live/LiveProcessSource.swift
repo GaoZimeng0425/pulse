@@ -193,7 +193,11 @@ final class LiveProcessSource: ProcessSource, @unchecked Sendable {
         // 本 SDK 的 proc_pidpath 缓冲长度形参是 UInt32(探针用字面量 4096 故未暴露)。
         let length = proc_pidpath(pid, &buffer, UInt32(buffer.count))
         guard length > 0 else { return nil }
-        return String(cString: buffer)
+        // length = 写入字节数(不含 NUL);按它截,映 UInt8 后 decoding,不带尾巴零字节。
+        return String(
+            decoding: buffer.prefix(Int(length)).map { UInt8(bitPattern: $0) },
+            as: UTF8.self
+        )
     }
 
     private static func taskInfo(pid: pid_t) -> proc_taskinfo? {

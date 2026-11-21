@@ -61,9 +61,14 @@ struct AgentProjectCardGrid: View {
     @State private var columnCount = 1
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Self.spacing) {
+        // 断点常量先取局部:onGeometryChange 的 transform 是非隔离闭包,直接引
+        // actor 隔离 static 会告警(Swift 6 严格化即错误);局部值捕获无此约束。
+        let minimumCardWidth = Self.minimumCardWidth
+        let spacing = Self.spacing
+        let maximumColumns = Self.maximumColumns
+        return VStack(alignment: .leading, spacing: spacing) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                HStack(alignment: .top, spacing: Self.spacing) {
+                HStack(alignment: .top, spacing: spacing) {
                     ForEach(row) { project in
                         AgentProjectCardView(project: project, windowDays: windowDays)
                             .frame(maxHeight: .infinity, alignment: .top)
@@ -72,8 +77,8 @@ struct AgentProjectCardGrid: View {
             }
         }
         .onGeometryChange(for: Int.self) { proxy in
-            let perColumn = Self.minimumCardWidth + Self.spacing
-            return min(Self.maximumColumns, max(1, Int((proxy.size.width + Self.spacing) / perColumn)))
+            let perColumn = minimumCardWidth + spacing
+            return min(maximumColumns, max(1, Int((proxy.size.width + spacing) / perColumn)))
         } action: { newValue in
             if newValue != columnCount {
                 columnCount = newValue

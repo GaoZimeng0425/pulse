@@ -362,8 +362,12 @@ struct AdaptiveCardGrid<Item: Identifiable, Card: View>: View {
     }
 
     var body: some View {
+        // 网格参数先取局部(非隔离 transform 闭包不得直引隔离存储属性)。
+        let minimumCardWidth = minimumCardWidth
+        let spacing = spacing
+        let maximumColumns = maximumColumns
         // 监听宿主 = 外层普通容器(VStack 即网格本体,几何逐帧跟窗口)。
-        VStack(alignment: .leading, spacing: spacing) {
+        return VStack(alignment: .leading, spacing: spacing) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 HStack(alignment: .top, spacing: spacing) {
                     ForEach(row) { item in

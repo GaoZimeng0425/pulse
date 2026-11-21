@@ -149,7 +149,6 @@ final class CleanIPCService: @unchecked Sendable {
         case ("GET", "/health"):
             respond(connection: connection, status: 200, json: Self.okJSON)
         case ("GET", "/cleanable"):
-            nonisolated(unsafe) let connection = connection
             let service = self
             Task { @MainActor in
                 let list = await service.handleCleanable()
@@ -161,7 +160,6 @@ final class CleanIPCService: @unchecked Sendable {
                 respond(connection: connection, status: 400, json: Self.errorJSON("请求体不是合法 JSON(需要 {\"paths\":[…]})"))
                 return
             }
-            nonisolated(unsafe) let connection = connection
             let service = self
             Task { @MainActor in
                 let result = await service.handleClean(decoded.paths)
@@ -175,7 +173,6 @@ final class CleanIPCService: @unchecked Sendable {
 
     /// 写回:跳回专属队列再发(与接收同队,免数据竞争),发完即关。
     private func respond(connection: NWConnection, status: Int, json: Data) {
-        nonisolated(unsafe) let connection = connection
         queue.async {
             Self.respond(connection: connection, status: status, json: json)
         }

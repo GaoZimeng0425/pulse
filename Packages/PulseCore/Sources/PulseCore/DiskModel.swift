@@ -530,7 +530,7 @@ public final class DiskThroughputAccumulator: @unchecked Sendable {
 
 private extension String {
     /// 前缀剥离(找不到前缀返回 nil)——container_of 的第一步。
-    public func removePrefix(_ prefix: String) -> String? {
+    func removePrefix(_ prefix: String) -> String? {
         hasPrefix(prefix) ? String(dropFirst(prefix.count)) : nil
     }
 }
