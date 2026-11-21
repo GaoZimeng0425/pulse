@@ -817,6 +817,7 @@ final class CleanerModel {
 
     /// 组头 checkbox 的三态。`safeCandidates` = 该组里「可安全清理」档的项——
     /// 整组勾选只看、只动这些;「先检查」项永远要用户单独点,不参与组勾选。
+    /// (深查甄别:产品视图不直读,是 CleanerModelTests 钉组勾选语义的口——非死码。)
     func groupState(of safeCandidates: [JunkCandidate]) -> JunkSelection.GroupState {
         selection.state(of: safeCandidates)
     }

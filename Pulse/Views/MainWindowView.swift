@@ -73,6 +73,12 @@ struct MainWindowView: View {
         let cleanHistory = monitor.history.cleanHistory
         _uninstallModel = State(initialValue: UninstallModel(
             activityBoard: monitor.activityBoard,
+            recycle: { paths in
+                await LiveCleanTrashExecutor().recycleToTrash(paths)
+            },
+            deletePermanently: { paths in
+                await LiveCleanPermanentDeleter().deletePermanently(paths)
+            },
             recordHistory: { report in
                 // 与一期清理同库同表(CleanHistoryStore actor 串行化);落库失败
                 // 记日志不阻断横幅——历史缺行可追,静默吞错不可追。

@@ -95,13 +95,11 @@ final class UninstallModel {
         prober: @escaping @Sendable ([LeftoverProbe]) async -> [AppLeftoverRow] = { probes in
             await LiveAppCatalogSource().probeLeftovers(probes)
         },
-        // 03 票执行边界(全闭包注入,测试喂 spy;Live 默认):
-        recycle: @escaping @Sendable ([String]) async -> TrashRecycleOutcome = { paths in
-            await LiveCleanTrashExecutor().recycleToTrash(paths)
-        },
-        deletePermanently: @escaping @Sendable ([String]) async -> PermanentDeletionOutcome = { paths in
-            await LiveCleanPermanentDeleter().deletePermanently(paths)
-        },
+        // 破坏性执行器必传,无默认值(2026-11-22 深查收账:曾有 Live 真执行器默认,
+        // 新测试漏传又调删除 = 动用户真文件——编译期挡住;CleanerModel trash 同款
+        // 纪律。生产传 Live,测试喂 spy;其余只读参数保留 Live 默认)。
+        recycle: @escaping @Sendable ([String]) async -> TrashRecycleOutcome,
+        deletePermanently: @escaping @Sendable ([String]) async -> PermanentDeletionOutcome,
         brewUninstall: @escaping @Sendable (String, Bool) async -> BrewUninstallResult = { cask, zap in
             await LiveBrewUninstaller().uninstall(cask: cask, zap: zap)
         },
