@@ -99,6 +99,7 @@ struct PulseApp: App {
                 exclusions: cleanExclusionsStore,
                 scanRoots: cleanScanRootsStore,
                 history: monitor.history.cleanHistory,
+                trash: LiveCleanTrashExecutor(),
                 activity: LiveCleanActivitySource(board: monitor.activityBoard),
                 volumeSummaries: { LiveCleanVolumeSummaries().internalSystemVolumes() },
                 scanCache: CleanScanResultStore()

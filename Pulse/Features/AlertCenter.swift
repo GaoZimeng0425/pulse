@@ -35,6 +35,11 @@ final class AlertCenter {
     private(set) var authorizationRequestFailed = false
     /// 授权请求在途:连开几条规则只发一次请求(弹窗等作答期间一直持有)。
     private var requestingAuthorization = false
+    /// 本会话已由批次决定发出的系统通知 identifier(alert-toast-flake/01):
+    /// 补发只补「从未送达」的——授权请求链(setEnabled/回前台现查)晚于告警
+    /// 触发落地时,批次已发过的这条不再补,否则同一告警双横幅。resolved 即清
+    /// (再触发是新 occurrence,同 identifier 照发)。
+    @ObservationIgnored private var deliveredNotificationIdentifiers: Set<String> = []
     /// 上次记下的系统授权状态(nil = 本会话尚未查询):变化才记日志。
     private var loggedStatus: NotificationAuthorization?
 
@@ -167,7 +172,8 @@ final class AlertCenter {
                         offender: offenders[occurrence.offenderKey] ?? .none
                     )
                 }
-                .filter { !skipped.contains($0.identifier) }
+                .filter { !skipped.contains($0.identifier) && !deliveredNotificationIdentifiers.contains($0.identifier)
+                }
             if !backlog.isEmpty {
                 let sender = sender
                 Task {
@@ -228,6 +234,10 @@ final class AlertCenter {
                     $0.kind == kind && $0.subjectKey == subjectKey
                 }
                 offenders.removeValue(forKey: "\(kind.rawValue)|\(subjectKey)")
+                // 已送达记账随之清:同主体再触发是新 occurrence,照发不误。
+                deliveredNotificationIdentifiers.remove(
+                    AlertNotificationContent.identifier(kind: kind, subjectKey: subjectKey)
+                )
                 LogService.info("告警恢复:\(kind.title)(\(subjectKey))", category: "Alert")
             }
         }
@@ -240,6 +250,9 @@ final class AlertCenter {
             guard let self else { return }
             let status = await recordStatus(resendingExcept: Set(batch.map(\.identifier)))
             guard status == .authorized else { return }
+            // 决定发即记账(发完才记会留窗口):补发链从此刻起读到的就是
+            // 「已决定送达」全集,晚落地的授权链不会把这批再补一遍。
+            deliveredNotificationIdentifiers.formUnion(batch.map(\.identifier))
             for payload in batch {
                 await sender.send(payload)
             }

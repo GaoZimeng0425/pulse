@@ -60,6 +60,7 @@ struct MainWindowView: View {
             exclusions: cleanExclusions,
             scanRoots: cleanScanRoots,
             history: monitor.history.cleanHistory,
+            trash: LiveCleanTrashExecutor(),
             activity: LiveCleanActivitySource(board: monitor.activityBoard),
             volumeSummaries: { LiveCleanVolumeSummaries().internalSystemVolumes() },
             // 落盘缓存(票 11):2026-11-03 实机排障发现此装配点漏传——测试全绿
