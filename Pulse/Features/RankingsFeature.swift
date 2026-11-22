@@ -3,13 +3,16 @@ import Foundation
 import Observation
 import PulseCore
 
-/// 模块排行功能模块(工单 module-rankings/01;ADR-0003 MonitorFeature):电池 / 磁盘 / 网络三页的
-/// 「能耗影响 / 读写最多 / 每进程流量」三张只读榜。@Observable 薄壳 + 纯值核
-/// RankingBoard(AlertCenter + AlertEngine 同款样板);视图直读 `energyRows /
-/// diskRows / networkRows`,不在视图体里现场聚合。
+/// 模块排行功能模块(工单 module-rankings/01;ADR-0003 MonitorFeature):磁盘 / 网络两页的
+/// 「读写最多 / 每进程流量」两张只读榜。@Observable 薄壳 + 纯值核
+/// RankingBoard(AlertCenter + AlertEngine 同款样板);视图直读 `diskRows /
+/// networkRows`,不在视图体里现场聚合。
+/// (能耗影响榜已于 battery-energy/01 移交 root 能耗指数口径——电池页直读
+/// EnergyImpactFeature,本模块不再聚合能耗;5s CPU 差分账本仍在 Sampler 供
+/// 主干与告警使用。)
 ///
-/// 三路读数、一只组钟:
-/// - 能耗(5s 窗)/ 磁盘(30s 窗)两本账本住 Sampler 心跳(arch-review-2026-10-18/01 高2),经 onRound 的
+/// 两路读数、一只组钟:
+/// - 磁盘(30s 窗)账本住 Sampler 心跳(arch-review-2026-10-18/01 高2),经 onRound 的
 ///   `context.update.rankings` 送达,满窗才出数;行与主干同轮的组一起出。
 /// - 网络每进程是本模块自有的 nettop 传感器(ADR-0004,5s),经 sensorDrivers 登记进
 ///   SystemMonitor 的调度器;轮间交付按最新一轮的组重算网络行。
@@ -21,8 +24,6 @@ import PulseCore
 @Observable
 @MainActor
 final class RankingsFeature: MonitorFeature {
-    /// 电池页·能耗影响行;首个满窗前为空。
-    private(set) var energyRows: [ModuleRankingRow] = []
     /// 磁盘页·读写最多行;首个满窗前为空。
     private(set) var diskRows: [ModuleRankingRow] = []
     /// 网络页·每进程流量行;nettop 首次出数前为空。
@@ -93,16 +94,13 @@ final class RankingsFeature: MonitorFeature {
     }
 
     private func publishAll() {
-        publish(energy: board.energyRows, disk: board.diskRows)
+        publish(disk: board.diskRows)
         publish(network: board.networkRows)
     }
 
     /// 只在行真变化时写入(卡片不空转重画)。Swift 6.2+ 的 @Observable 宏对 Equatable
     /// 同值写入本已不通知(shouldNotifyObservers);显式比较让这条契约不依赖宏的版本。
-    private func publish(energy: [ModuleRankingRow], disk: [ModuleRankingRow]) {
-        if energy != energyRows {
-            energyRows = energy
-        }
+    private func publish(disk: [ModuleRankingRow]) {
         if disk != diskRows {
             diskRows = disk
         }

@@ -13,23 +13,15 @@ import Foundation
 public struct RankingBoard: Sendable {
     /// 最新一轮的全部组(主干同轮产出):每轮整份换新。
     private var groups: [ProcessGroup] = []
-    /// 能耗影响最近一窗(每 pid 差分):满窗轮整份替换。
-    private var energyImpacts: [pid_t: ProcessEnergyImpact] = [:]
-    /// 能耗这一窗的实际跨度(唤醒/秒的折算分母),随 energyImpacts 整份替换。
-    private var energyWindowSeconds = ProcessRankingLedgers.energyWindow
     /// 磁盘每进程最近一窗(每 pid 读写速率):满窗轮整份替换。
     private var diskRates: [pid_t: ProcessDiskRates] = [:]
     /// 网络每进程最近一次交付(nettop 每 pid 上下行速率):有读数即整份替换。
     private var networkRates: [pid_t: ProcessNetworkRates] = [:]
 
-    /// 一轮心跳落地:组每轮换新;能耗 / 磁盘只在本轮满窗时整份替换(空字典 = 本窗无
+    /// 一轮心跳落地:组每轮换新;磁盘只在本轮满窗时整份替换(空字典 = 本窗无
     /// 活跃进程,同样替换),nil = 本轮该窗未满,保留上一窗——但照常按新组重归属。
     public mutating func recordRound(groups: [ProcessGroup], rankings: ProcessRankingRound) {
         self.groups = groups
-        if let impacts = rankings.energyImpacts {
-            energyImpacts = impacts
-            energyWindowSeconds = rankings.energyWindowSeconds ?? ProcessRankingLedgers.energyWindow
-        }
         if let rates = rankings.diskRates {
             diskRates = rates
         }
@@ -41,15 +33,6 @@ public struct RankingBoard: Sendable {
         if let rates {
             networkRates = rates
         }
-    }
-
-    /// 电池页·能耗影响行。
-    public var energyRows: [ModuleRankingRow] {
-        ModuleRankingAggregator.energyRows(
-            impacts: energyImpacts,
-            windowSeconds: energyWindowSeconds,
-            groups: groups
-        )
     }
 
     /// 磁盘页·读写最多行。

@@ -322,7 +322,10 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   读写最多 / 每进程流量」(`ModuleRankingCardView`,只读)是同一组件的两种用法,不另写卡
   或行。卡 = 卡内标题 `{typography.card-title}`(12.5 semibold,**所在页指标色**)→ 表头
   「应用 | 指标名」(10.5 medium tertiary,右列对齐数值列)→ 行 → 可选注脚(10.5 tertiary,
-  如"5 秒一档")→ 空态在卡内(12.5 medium secondary 一句 + 10.5 tertiary 说明)。
+  如"5 秒一档")→ 空态在卡内(12.5 medium secondary 一句 + 10.5 tertiary 说明;
+  battery-energy/01 起空态可带**一个 `.link` 动作**(授权型能力卡「去开启/去系统设置」
+  出口,`RankingEmptyMessage.actionTitle/action`,与 CardEmptyState 授权配方同一家规:
+  前置条件不在本 app 内完成的空态必须给出路,不留死空态——首例:电池页耗电排行两卡)。
   行 = 图标 22→**24** / 名称 13→**14.5 medium**(可挂徽章)/ 副文 10.5→**12 secondary** /
   meter 110→**120 榜首归一** / 数值 13→**14.5 semibold** `monospacedDigit` **定宽列**
   (尺寸全走 `RowMetrics` 舒适档,ui-unify/01 排行升舒适档;按口径最宽现实读数量宽 + 2:组排行

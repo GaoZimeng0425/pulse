@@ -120,10 +120,15 @@ enum RankingListMetrics {
     }
 }
 
-/// 空态文案:标题一句 + 可选说明(卡内由 CardEmptyState 绘制)。
+/// 空态文案:标题一句 + 可选说明 + 可选动作(卡内由 CardEmptyState 绘制)。
+/// 动作 = 授权型能力卡的「去开启 / 去系统设置」出口(battery-energy/01 起支持,
+/// 与蓝牙卡同一家规:前置条件不在本 app 内完成的空态,必须给用户一条出路,
+/// 不留「猜为什么空」的死空态)。
 struct RankingEmptyMessage {
     let title: String
     var detail: String?
+    var actionTitle: String?
+    var action: (() -> Void)?
 }
 
 /// 排行卡外壳:标题 / 表头 / 行 / 截断末行 / 注脚 / 空态。行内容由调用方给(RankingListRow)。
@@ -209,7 +214,12 @@ struct RankingListHeader: View {
                 .foregroundStyle(accent)
                 .padding(.bottom, 6)
             if isEmpty {
-                CardEmptyState(title: emptyMessage.title, detail: emptyMessage.detail)
+                CardEmptyState(
+                    title: emptyMessage.title,
+                    detail: emptyMessage.detail,
+                    actionTitle: emptyMessage.actionTitle,
+                    action: emptyMessage.action
+                )
             } else {
                 columnHeader
             }

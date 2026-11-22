@@ -145,20 +145,6 @@ final class PulseFormatTests: XCTestCase {
         XCTAssertEqual(PulseFormat.milliseconds(0), "0 ms")
     }
 
-    // MARK: 能耗影响排行(工单 01)
-
-    func testCPUSecondsAndWakeupsPerSecondShowOneDecimal() {
-        XCTAssertEqual(PulseFormat.cpuSeconds(0), "0.0 秒")
-        XCTAssertEqual(PulseFormat.cpuSeconds(3.14159), "3.1 秒")
-        XCTAssertEqual(PulseFormat.wakeupsPerSecond(0), "0.0 次/秒")
-        XCTAssertEqual(PulseFormat.wakeupsPerSecond(2.46), "2.5 次/秒")
-    }
-
-    func testCPUSecondsAndWakeupsClampNegativeToZero() {
-        XCTAssertEqual(PulseFormat.cpuSeconds(-1), "0.0 秒")
-        XCTAssertEqual(PulseFormat.wakeupsPerSecond(-0.5), "0.0 次/秒")
-    }
-
     func testWattsIsTheSingleFormatOneDecimalAtEveryMagnitude() {
         // 功率文案唯一出处(p2-review/03 收口:五路功率卡 / ANE 卡 / 电池卡 / 历史统计
         // 同一套)。口径 = 参考文档 §1.1 "Power Draw 12.6 W" 与历史统计既有断言:

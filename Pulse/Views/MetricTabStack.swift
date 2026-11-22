@@ -168,28 +168,29 @@ struct MetricTabStack<Ranking: View>: View {
             )
             builder.card("containers", ContainersCardView(reading: monitor.containers.reading, isCompact: isCompact))
         case .battery:
-            // 电池页(工单 p1-history/02):六项读数主卡 + 能耗影响排行
-            // (工单 module-rankings/01,只读;CPU 时间估算口径)+ AI 助手能耗
-            // (p3-root-mcp/04,root Energy Impact 真值,60s 一档);组排行与
-            // 电池无关,不放。
+            // 电池页(p1-history/02 + battery-energy/01):六项读数主卡 + 耗电排行
+            // 成对——全部应用 / AI 助手同走 root 能耗指数口径(占比主值 + 指数副文,
+            // 活动监视器同族);特权助手未装 / 待批准时两卡共用授权型引导空态,
+            // 不留「猜为什么空」的死空态。组排行与电池无关,不放。
             builder.card("main", MetricMainCardView(model: model.batteryModel, isCompact: isCompact))
+            let impact = monitor.energyImpact.reading
+            let totalImpact = impact?.totalImpact ?? 0
+            let gateEmpty = Self.energyGateEmptyMessage(status: monitor.energyImpact.helperStatus)
             builder.moduleRanking("energy", ModuleRankingSpec(
-                title: "能耗影响",
-                valueLabel: "CPU 时间",
-                rows: monitor.rankings.energyRows,
+                title: "耗电排行 · 全部应用",
+                valueLabel: "占比",
+                rows: EnergyImpactTable.allAppsRows(impact?.top ?? [], totalImpact: totalImpact),
                 accent: Metric.battery.accentColor,
-                cadenceNote: "5 秒一档"
+                cadenceNote: "能耗指数 · 60 秒一档",
+                emptyMessage: gateEmpty
             ))
             builder.moduleRanking("agents", ModuleRankingSpec(
-                title: "AI 助手",
-                valueLabel: "能耗",
-                rows: AgentEnergyTable.rankingRows(monitor.energyImpact.reading?.agents ?? []),
+                title: "耗电排行 · AI 助手",
+                valueLabel: "占比",
+                rows: EnergyImpactTable.agentRows(impact?.agents ?? [], totalImpact: totalImpact),
                 accent: Metric.battery.accentColor,
-                cadenceNote: "60 秒一档",
-                emptyMessage: RankingEmptyMessage(
-                    title: "暂无数据",
-                    detail: "开启 设置 → 通用 → 特权助手 后出数"
-                )
+                cadenceNote: "能耗指数 · 60 秒一档",
+                emptyMessage: gateEmpty
             ))
         case .disk:
             // 磁盘页(工单 p1-history/05 + tab-regroup/03):主卡 + 空间地图(紧跟主卡
@@ -346,6 +347,42 @@ struct MetricTabBlock: Identifiable {
     /// tab 前缀 + 卡名:切 tab 不复用上一页同名卡的视图身份。
     let id: String
     let kind: Kind
+}
+
+extension MetricTabStack {
+    /// 耗电排行两卡的门槛空态(battery-energy/01):助手三态各给一条出路,
+    /// 不留死空态。设置通路 = `pulseOpenSettings` 通知(MainWindowGate 常驻
+    /// 接收器在 Scene 环境调 openSettings——弹窗宿主里环境不可用的已验证桥);
+    /// 批准动作在系统设置(TCC 授权用户自点原则),app 只深链带过去。
+    static func energyGateEmptyMessage(status: PrivilegedHelperStatus) -> RankingEmptyMessage {
+        switch status {
+        case .notRegistered:
+            RankingEmptyMessage(
+                title: "耗电排行需要特权助手",
+                detail: "每分钟采集一次各 App 能耗(活动监视器同口径);不开启则完全不存在",
+                actionTitle: "去开启",
+                action: {
+                    NotificationCenter.default.post(name: .pulseOpenSettings, object: nil)
+                }
+            )
+        case .requiresApproval:
+            RankingEmptyMessage(
+                title: "等待系统批准",
+                detail: "已提交安装:去 系统设置 → 通用 → 登录项与扩展 里允许 Pulse 的后台项目",
+                actionTitle: "打开系统设置",
+                action: {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+            )
+        case .enabled:
+            RankingEmptyMessage(
+                title: "等待读数",
+                detail: "特权助手运行中,首档约 1 分钟内到达"
+            )
+        }
+    }
 }
 
 /// 卡片序列的拼装器(tab 前缀统一在这里加)。
