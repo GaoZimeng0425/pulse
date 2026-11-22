@@ -141,4 +141,10 @@ final class DashboardModel {
         let targets = servers.map { KillTarget(pid: $0.pid, name: $0.displayName) }
         killFailureReport = KillRequestFlow.stopAll(targets, monitor: monitor)
     }
+
+    /// 监听端口卡行"结束"(port-view/01):该端口的全部占用进程一次确认逐个
+    /// 点名 → 逐个 SIGTERM。同取点击瞬间名单,确认期间消失者如实进失败汇总。
+    func requestEndPortHolders(_ targets: [KillTarget]) {
+        killFailureReport = KillRequestFlow.endHolders(targets, monitor: monitor)
+    }
 }

@@ -89,8 +89,9 @@ final class MonitorVisibilityTests: XCTestCase {
         XCTAssertEqual(MetricTab.sensors.displayedFamilies, [.smc])
         // 外设页:蓝牙 + 每应用音量混音卡(app-volume/01:枚举轮询闸)。
         XCTAssertEqual(MetricTab.peripherals.displayedFamilies, [.bluetooth, .sound])
-        // 服务页承接容器家族(tab-regroup/01 合页,门控跟着页走)。
-        XCTAssertEqual(MetricTab.services.displayedFamilies, [.containers])
+        // 服务页承接容器 + 端口家族(tab-regroup/01 合页,门控跟着页走;
+        // 端口 = port-view/01 全机监听口扫描闸)。
+        XCTAssertEqual(MetricTab.services.displayedFamilies, [.containers, .ports])
         // 无家族内容的 tab:排行与主卡数据走心跳/低频档,不经家族闸。
         for tab: MetricTab in [.cpu, .memory, .disk, .network, .agents, .battery, .cleaner, .history] {
             XCTAssertTrue(tab.displayedFamilies.isEmpty, "\(tab) 不该展示传感器家族")

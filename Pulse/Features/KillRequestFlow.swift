@@ -67,4 +67,19 @@ enum KillRequestFlow {
         let report = monitor.terminate(targets)
         return report.hasFailures ? report : nil
     }
+
+    /// 监听端口卡行"结束"(port-view/01):结束该端口的全部占用进程——
+    /// 单目标即一个;多目标一张确认单逐个点名(confirmationTitle/Message 本就
+    /// 吃数组,零新文案),确认后逐个 SIGTERM;同一 NSAlert 关口,绝不自动杀。
+    static func endHolders(_ targets: [KillTarget], monitor: SystemMonitor) -> KillReport? {
+        guard !targets.isEmpty else { return nil }
+        let confirmed = KillConfirmationDialog.confirm(
+            title: KillCopy.confirmationTitle(for: targets),
+            informativeText: KillCopy.confirmationMessage(for: targets),
+            actionTitle: KillCopy.singleActionTitle
+        )
+        guard confirmed else { return nil }
+        let report = monitor.terminate(targets)
+        return report.hasFailures ? report : nil
+    }
 }

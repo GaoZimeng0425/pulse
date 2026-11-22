@@ -241,6 +241,13 @@ struct InertDevServerPortScanner: DevServerPortScanning {
     }
 }
 
+/// 全局端口扫描(port-view/01):不扫,空盘点——预览空态观感与真机一致。
+struct InertGlobalPortScanner: GlobalPortScanning {
+    func listeningPorts(pids: [pid_t]) -> [pid_t: [UInt16]] {
+        [:]
+    }
+}
+
 /// 惰性 AI 助手会话读源(智能体 tab,agent-tab/01):一律空——预览不起文件读,
 /// 空态观感与「没有在跑的 agent」一致。
 struct InertAgentSessionReader: AgentSessionReading {
@@ -346,6 +353,7 @@ extension SystemMonitor {
                 network: NetworkFeature(),
                 alerts: .inert(),
                 devServers: DevServerFeature(portScanner: InertDevServerPortScanner()),
+                ports: PortsFeature(scanner: InertGlobalPortScanner()),
                 agentSessions: AgentSessionFeature(reader: InertAgentSessionReader()),
                 agentUsage: AgentUsageFeature(reader: InertAgentUsageReader(), store: nil),
                 rankings: RankingsFeature(nettopSource: InertNettopCSVSource()),

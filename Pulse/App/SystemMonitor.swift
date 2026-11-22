@@ -112,6 +112,11 @@ final class SystemMonitor {
         features.devServers
     }
 
+    /// 全局端口盘点(工单 port-view/01):服务页「监听端口」卡直读。
+    var ports: PortsFeature {
+        features.ports
+    }
+
     /// AI 助手会话聚合(智能体 tab,agent-tab/01)。
     var agentSessions: AgentSessionFeature {
         features.agentSessions

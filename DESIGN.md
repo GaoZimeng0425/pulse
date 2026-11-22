@@ -205,6 +205,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
 | `{layout.module-card-min-width}` | 340pt | 清理总览模块大卡自适应网格的单卡最小宽(p6-cleaner/03):列数 = min(2, 内容宽容纳列数)——720 最小窗 1 列、默认窗 880 起 2 列、**上限 2 列**(品类只有六卡,不随 ultrawide 拉列);列距 `{spacing.group-gap}` 12 |
 | `{layout.agent-project-card-min-width}` | ~~960pt~~ | **superseded**(agent-tab/06 二度修正):SwiftUI `GridItem(.flexible(minimum:))` 的 min 是硬下限,容器再窄不缩——960 在窄窗/弹窗把内容撑出容器右缘被裁(与 CSS min-width 会被轨道压缩不同)。项目大卡终态 = **恒单列满宽 VStack**,无网格参数 |
 | `{layout.agent-project-limit}` | 10 个 | 智能体页消耗子页项目默认展示上限(agent-tab/06,2026-11-14 用户拍板):超出末行「显示全部(另 N 个项目)⌄ / 收起,只看前 10 个⌃」,排行截断末行(`RankingOverflowRow`)同款交互与视觉 |
+| `{layout.port-row-limit}` | 20 行 | 服务页监听端口卡默认展示行上限(port-view/01):端口号升序,超出末行「显示全部(另 N 个端口)⌄ / 收起,只看前 20 个⌃」(`AgentProjectOverflowRow` 同款交互与视觉,文案按端口口径);代码侧单一出处 `PortsCardMetrics.rowLimit` |
 | `{layout.agent-chart-two-column-min-width}` | 1872pt | 智能体页消耗子页「日历图 + 走势」并排断点(agent-tab/07 立于窗宽 1280,2026-11-16 用户修订「1920 才变一行」):子页内容宽 ≥ 1872(= 窗宽 1920 − 两侧 `{spacing.window-padding}` 24)两列并排等高,否则上下一列;弹窗恒一列。替代 06 的 `ViewThatFits`(按弹性子视图理想宽判定,切换点不可控) |
 | `{layout.card-pair-two-column-min-width}` | 696pt | 两卡组(`AdaptiveCardPair`,MetricTabStack 的 pair:内存双环 / 传感器派生+风扇 / GPU ANE+功率 / 磁盘卷+快照)主窗口并排断点(2026-11-21 用户拍板响应式 + 同组等高):内容宽 ≥ 696(= `{layout.overview-card-min-width}` ×2 + 列距 16,与总览网格两列同档)并排**等高**、不足上下排;弹窗恒上下排。此前写死 HStack 两列,窄窗(720)每卡 ~328pt 图例被压截断 |
 | `{layout.agent-trend-height}` | ~~180pt / 120pt~~ | **superseded**(agent-tab/10,11-15 用户实报「两个 chart 高度应该一致,坐标水平对齐」):走势绘图区高 = `AgentHeatWall.gridHeight(forWidth:)`(与热力墙同宽同式,一列 / 两列都等高,下限 60);仅弹窗紧凑档定高 100 |
@@ -647,8 +648,14 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   (Claude Code 会话卡 + ZCode 会话卡;agent-tab/08 重设计见下「会话子页」)。
 - **服务页**(tab-regroup/01,2026-11-16 拍板):前身容器页(p2-sensors/07),
   标题「服务」、图标沿用 cube.box.fill、强调色沿用 containers 品类令牌——页的
-  主体仍是容器盘点。两卡上下堆叠:上 = dev server 卡(p1-history/08 配方原样,
+  主体仍是容器盘点。三卡上下堆叠:上 = dev server 卡(p1-history/08 配方原样,
   自智能体页迁回,「全部停止」流不动;dev server 闲置告警落点跟卡走 → 本页),
+  中 = **监听端口卡**(port-view/01):全机监听 TCP 端口 + 占用进程,行 = 端口号
+  (等宽 `:5173`)+ 占用者副文(名字 · pid,多进程如实「等 N 个进程」)+ dev server
+  标注(种类 · 闲置,琥珀,与 dev server 卡同口径)+ 行级「结束」(= 该端口全部
+  占用进程,确认单逐个点名,复用 KillRequestFlow「结束进程」文案零新增);
+  号序 + `{layout.port-row-limit}` 截断展开;root 进程端口读不到、卡脚一行
+  tertiary 小字如实注明;`.ports` 传感器家族 10s 档可见才扫(探针 ≈2.9ms/轮),
   下 = 容器卡(docker.sock 单发快照表,数据卷占用行维持不做)。
   - **消耗子页**(agent-tab/05 视觉细节全保留,agent-tab/06 只改结构与归属):
     ①数字卡排 = **四张一排**(今日消耗 / N 天合计 / 日均 / **Claude 用量**——
