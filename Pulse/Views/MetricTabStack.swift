@@ -166,6 +166,14 @@ struct MetricTabStack<Ranking: View>: View {
                     model.requestStopAllDevServers(monitor.devServers.servers)
                 }
             )
+            // 监听端口卡(port-view/01):全机监听 TCP 口 + 占用者,行「结束」
+            // 上抛该端口全部占用进程(同一 KillRequestFlow 关口)。
+            builder.card(
+                "ports",
+                PortsCardView(inventory: monitor.ports.inventory, isCompact: isCompact) { targets in
+                    model.requestEndPortHolders(targets)
+                }
+            )
             builder.card("containers", ContainersCardView(reading: monitor.containers.reading, isCompact: isCompact))
         case .battery:
             // 电池页(p1-history/02 + battery-energy/01):六项读数主卡 + 耗电排行

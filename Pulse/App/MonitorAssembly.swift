@@ -50,6 +50,7 @@ struct MonitorFeatures {
     let network: NetworkFeature
     let alerts: AlertCenter
     let devServers: DevServerFeature
+    let ports: PortsFeature
     let agentSessions: AgentSessionFeature
     let agentUsage: AgentUsageFeature
     let rankings: RankingsFeature
@@ -72,6 +73,7 @@ struct MonitorFeatures {
             network,
             alerts,
             devServers,
+            ports,
             agentSessions,
             agentUsage,
             rankings,
@@ -110,6 +112,7 @@ extension SystemMonitor {
                     alertHistory: history.alertHistory
                 ),
                 devServers: DevServerFeature(portScanner: LiveDevServerPortScanner()),
+                ports: PortsFeature(scanner: LiveGlobalPortScanner()),
                 agentSessions: AgentSessionFeature(reader: LiveAgentSessionReader()),
                 agentUsage: AgentUsageFeature(
                     reader: LiveAgentUsageReader(),
