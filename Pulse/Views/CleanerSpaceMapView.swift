@@ -13,39 +13,6 @@ import SwiftUI
 // 版面纪律(ui-unify 追改,2026-11-09 用户实报三修,两形态同守):图表区弹性高、
 // 卡头不被挤压;悬停零重排——不出现/消失任何占行元素,信息与按钮都浮在图表内。
 
-/// 分区完全异色·鲜亮版(space-map-forms/03 三轮拍板:01 高饱和 0.75 被嫌「闹」,
-/// 02 同色系被毙,03 柔和 0.60 上线一天用户实报「发灰、想要鲜艳」——2026-11-11
-/// 折中 = 0.70 + 地图内局部提饱和 ×1.25,不动全 app 的 accent 令牌):顶层块按序
-/// 循环十个 accent 令牌,基色不透明度 0.70;旭日外环 = 父色 −0.13;hover +0.08
-/// 封顶 0.95;文字色 ≥0.5 白、其余墨。密封 = inkTertiary 0.5、「其他」= cardHigh
-/// 0.75 不变(灰系不提饱和,saturation 对其无效果)。
-private let sectionColors: [Color] = [
-    Metric.cpu, .memory, .network, .battery, .gpu,
-    .sensors, .sound, .bluetooth, .containers, .disk,
-].map(\.accentColor)
-
-/// 地图内局部提饱和(三轮拍板 2026-11-11):`Color.saturation` 是 View 修饰符,
-/// 色域内提饱和要经 NSColor 走 HSB——s ×1.25 封顶 1、亮度不动;灰系(s≈0)
-/// 原样返回。必须在**取色点**做(动态色按当前外观解析);定义时烤色会把深浅
-/// 双值固定在一个外观里,外观切换颜色不跟。
-private func vivid(_ color: Color) -> Color {
-    guard let ns = NSColor(color).usingColorSpace(.deviceRGB) else { return color }
-    var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-    // NSColor.getHue 不回传成败(iOS 的 UIColor 版才回 Bool);上面已强转
-    // deviceRGB,HSB 换算恒可,出参必被写。
-    ns.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
-    return Color(
-        hue: Double(h),
-        saturation: Double(min(s * 1.25, 1)),
-        brightness: Double(b),
-        opacity: Double(a)
-    )
-}
-
-private let sectionBaseOpacity: Double = 0.70
-private let sectionChildStep: Double = 0.13
-private let hoverBoost: Double = 0.08
-
 /// 方块形态图表区最小高({layout.spacemap-chart-min-height})。注意:弹性区在
 /// ScrollView 里拿到无限高度提案、塌到最小高,所以这个值 ≈ 方块形态的实际高度。
 private let chartMinHeight: CGFloat = 220
@@ -222,7 +189,7 @@ struct SpaceMapSection: View {
                     )
                     guard rect.width > 6, rect.height > 6 else { continue }
 
-                    let fill = blockFill(
+                    let fill = SpaceMapPalette.blockFill(
                         node: tr.node,
                         rank: index,
                         isHovered: hoveredTreemapIndex == index
@@ -322,37 +289,6 @@ struct SpaceMapSection: View {
     /// 块填充(两形态同一套配色出口):正常块 = 分区异色(rank 按序循环 accent,
     /// 鲜亮 0.70 + 饱和 ×1.25),密封灰、「其他」浅灰;hover 一律 +0.08。文字色随
     /// 基色深浅——密封与「其他」是浅面恒用墨色,正常块基色 0.70 白字成立。
-    private struct BlockFill {
-        let color: Color
-        let opacity: Double
-        let textColor: Color
-    }
-
-    private func blockFill(
-        node: SpaceMapNode,
-        rank: Int,
-        isHovered: Bool
-    ) -> BlockFill {
-        let base = if node.isSealed {
-            BlockFill(color: Surface.inkTertiary, opacity: 0.5, textColor: .primary)
-        } else if node.isAggregate {
-            BlockFill(color: Surface.cardHigh, opacity: 0.75, textColor: .primary)
-        } else {
-            BlockFill(
-                color: vivid(sectionColors[rank % sectionColors.count]),
-                opacity: sectionBaseOpacity,
-                textColor: sectionBaseOpacity >= 0.5 ? .white : .primary
-            )
-        }
-        guard isHovered else { return base }
-        return BlockFill(
-            color: base.color,
-            opacity: min(base.opacity + hoverBoost, 0.95),
-            textColor: base.textColor
-        )
-    }
-
-    /// 轻桥(p4-uninstaller/05):悬停命中白名单块时,「这块能清」浮在该块右上角。
     /// 原形态是卡顶悬停信息行(路径 + 大小 + 按钮),出现/消失推动整卡重排
     /// (2026-11-09 用户实报),改为地图内悬浮、零重排;路径与大小块内已有。
     @ViewBuilder
@@ -403,7 +339,7 @@ struct SpaceMapSection: View {
         isTopLevel: Bool,
         resolve: @escaping (String) -> JunkGroup?
     ) -> some View {
-        let colored = coloredArcs(arcs)
+        let colored = SpaceMapPalette.coloredArcs(arcs)
         return GeometryReader { geo in
             Canvas { context, size in
                 let radius = sunburstRadius(in: size)
@@ -434,7 +370,7 @@ struct SpaceMapSection: View {
                     )
                     path.closeSubpath()
                     let isHovered = hovered?.id == arc.id
-                    let fillOpacity = isHovered ? min(item.opacity + hoverBoost, 0.95) : item.opacity
+                    let fillOpacity = isHovered ? min(item.opacity + SpaceMapPalette.hoverBoost, 0.95) : item.opacity
                     context.fill(path, with: .color(item.color.opacity(fillOpacity)))
                 }
 
@@ -516,40 +452,6 @@ struct SpaceMapSection: View {
 
     /// 分区异色着色(space-map-forms/03):内环每支一色(按序循环 accent,鲜亮
     /// 0.70 + 饱和 ×1.25),外环 = 父色 −0.13;密封灰、「其他」浅灰(布局按父-子顺序产出)。
-    private struct ColoredArc {
-        let arc: SunburstArc
-        let color: Color
-        let opacity: Double
-    }
-
-    private func coloredArcs(_ arcs: [SunburstArc]) -> [ColoredArc] {
-        var result: [ColoredArc] = []
-        var ring1Rank = 0
-        var parentColor = vivid(sectionColors[0])
-        for arc in arcs {
-            if arc.node.isSealed {
-                result.append(ColoredArc(arc: arc, color: Surface.inkTertiary, opacity: 0.5))
-                continue
-            }
-            if arc.node.isAggregate {
-                result.append(ColoredArc(arc: arc, color: Surface.cardHigh, opacity: 0.75))
-                continue
-            }
-            if arc.ring == 1 {
-                parentColor = vivid(sectionColors[ring1Rank % sectionColors.count])
-                ring1Rank += 1
-                result.append(ColoredArc(arc: arc, color: parentColor, opacity: sectionBaseOpacity))
-            } else {
-                result.append(ColoredArc(
-                    arc: arc,
-                    color: parentColor,
-                    opacity: max(sectionBaseOpacity - sectionChildStep, 0.2)
-                ))
-            }
-        }
-        return result
-    }
-
     /// 中心圈 = 旭日的悬停读数位(零重排):悬停弧时显示该块名字 + 实际占用 +
     /// 占当前根的份额;不悬停时显示当前根 + 「↩ 返回上级」(顶层为下钻提示)。
     /// 小弧画不下标签,悬停中心读数就是它的名字与大小出处(方块形态块内已有)。
