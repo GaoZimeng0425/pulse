@@ -326,7 +326,13 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
   如"5 秒一档")→ 空态在卡内(12.5 medium secondary 一句 + 10.5 tertiary 说明;
   battery-energy/01 起空态可带**一个 `.link` 动作**(授权型能力卡「去开启/去系统设置」
   出口,`RankingEmptyMessage.actionTitle/action`,与 CardEmptyState 授权配方同一家规:
-  前置条件不在本 app 内完成的空态必须给出路,不留死空态——首例:电池页耗电排行两卡)。
+  前置条件不在本 app 内完成的空态必须给出路,不留死空态——首例:电池页耗电排行两卡);
+  battery-energy/02 起,**同一前置条件喂多张排行卡**的空态可收成**一条紧凑引导行**
+  (`BatteryGateHintRow`:一行高 `cardShell` 两档 + 页指标色图标 16/13 + title 12
+  medium secondary + detail 10.5 tertiary 单行(hover 显全文)+ 尾部 11 `.link` 出口,
+  文案与动作走 `energyGateEmptyMessage` 同源;**展开触发 = rows 非空,数据说了算**,
+  不猜 gate「快有数据了」——首例:电池页耗电排行两卡在助手未批准/等读数时整段
+  收为一行,双胞胎死卡观感案)。
   行 = 图标 22→**24** / 名称 13→**14.5 medium**(可挂徽章)/ 副文 10.5→**12 secondary** /
   meter 110→**120 榜首归一** / 数值 13→**14.5 semibold** `monospacedDigit` **定宽列**
   (尺寸全走 `RowMetrics` 舒适档,ui-unify/01 排行升舒适档;按口径最宽现实读数量宽 + 2:组排行

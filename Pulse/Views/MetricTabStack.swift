@@ -185,30 +185,49 @@ struct MetricTabStack<Ranking: View>: View {
             )
             builder.card("containers", ContainersCardView(reading: monitor.containers.reading, isCompact: isCompact))
         case .battery:
-            // 电池页(p1-history/02 + battery-energy/01):六项读数主卡 + 耗电排行
+            // 电池页(p1-history/02 + battery-energy/01+02):六项读数主卡 + 耗电排行
             // 成对——全部应用 / AI 助手同走 root 能耗指数口径(占比主值 + 指数副文,
-            // 活动监视器同族);特权助手未装 / 待批准时两卡共用授权型引导空态,
-            // 不留「猜为什么空」的死空态。组排行与电池无关,不放。
+            // 活动监视器同族);helper 链不可用或尚无读数时两卡收成一条紧凑引导行
+            // (battery-energy/02,双胞胎空卡观感案),读到数据自动还原。组排行与
+            // 电池无关,不放。
             builder.card("main", MetricMainCardView(model: model.batteryModel, isCompact: isCompact))
             let impact = monitor.energyImpact.reading
             let totalImpact = impact?.totalImpact ?? 0
-            let gateEmpty = Self.energyGateEmptyMessage(gate: monitor.energyImpact.helperGate)
-            builder.moduleRanking("energy", ModuleRankingSpec(
-                title: "耗电排行 · 全部应用",
-                valueLabel: "占比",
-                rows: EnergyImpactTable.allAppsRows(impact?.top ?? [], totalImpact: totalImpact),
-                accent: Metric.battery.accentColor,
-                cadenceNote: "能耗指数 · 60 秒一档",
-                emptyMessage: gateEmpty
-            ))
-            builder.moduleRanking("agents", ModuleRankingSpec(
-                title: "耗电排行 · AI 助手",
-                valueLabel: "占比",
-                rows: EnergyImpactTable.agentRows(impact?.agents ?? [], totalImpact: totalImpact),
-                accent: Metric.battery.accentColor,
-                cadenceNote: "能耗指数 · 60 秒一档",
-                emptyMessage: gateEmpty
-            ))
+            let gate = monitor.energyImpact.helperGate
+            let allAppsRows = EnergyImpactTable.allAppsRows(impact?.top ?? [], totalImpact: totalImpact)
+            let agentRows = EnergyImpactTable.agentRows(impact?.agents ?? [], totalImpact: totalImpact)
+            switch BatteryRankingsLayout.resolve(
+                gate: gate,
+                allAppsRowCount: allAppsRows.count,
+                agentRowCount: agentRows.count
+            ) {
+            case .cards:
+                let gateEmpty = Self.energyGateEmptyMessage(gate: gate)
+                builder.moduleRanking("energy", ModuleRankingSpec(
+                    title: "耗电排行 · 全部应用",
+                    valueLabel: "占比",
+                    rows: allAppsRows,
+                    accent: Metric.battery.accentColor,
+                    cadenceNote: "能耗指数 · 60 秒一档",
+                    emptyMessage: gateEmpty
+                ))
+                builder.moduleRanking("agents", ModuleRankingSpec(
+                    title: "耗电排行 · AI 助手",
+                    valueLabel: "占比",
+                    rows: agentRows,
+                    accent: Metric.battery.accentColor,
+                    cadenceNote: "能耗指数 · 60 秒一档",
+                    emptyMessage: gateEmpty
+                ))
+            case let .hint(gate):
+                builder.card(
+                    "energy-gate-hint",
+                    BatteryGateHintRow(
+                        message: Self.energyGateEmptyMessage(gate: gate),
+                        isCompact: isCompact
+                    )
+                )
+            }
         case .disk:
             // 磁盘页(工单 p1-history/05 + tab-regroup/03):主卡 + 空间地图(紧跟主卡
             // 折线图之下,2026-11-16 用户目验改序——容量总览与占用地图同族相邻)+ 各卷
