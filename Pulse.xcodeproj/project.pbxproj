@@ -43,6 +43,7 @@
 		28947F9F54B002109E5D2606 /* AgentViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42CC78E5BC8E7711F99AF55B /* AgentViews.swift */; };
 		28E10F6A5444AE34BD9A17C5 /* MenuBarPopoverGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61B8D8E52DBAB492B5EDA31E /* MenuBarPopoverGate.swift */; };
 		294EBD9BB566F85D7B9E80A6 /* MemoryStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6CB838FAB56E49D3DB8D34D /* MemoryStats.swift */; };
+		2A88AA0745E0565EF8F32554 /* CleanerOverviewTrashCounter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CCA03864EF27597D3C998D8 /* CleanerOverviewTrashCounter.swift */; };
 		2C1C4AA05A53133216CF1E3B /* ProcArgsParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A311BFB8099AF93518F47C9B /* ProcArgsParser.swift */; };
 		2CCCA9B897A9A569F82F95BB /* LiveProcessSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06A4CAD37F3D2BE0A494F9DA /* LiveProcessSource.swift */; };
 		2D0E9BE7A0401A822DC62C47 /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD3B00277D6CF515AEA81E6C /* MenuBarController.swift */; };
@@ -279,6 +280,7 @@
 		1C01F3A4AB4BC765537F64DA /* EnergyModelSensorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyModelSensorTests.swift; sourceTree = "<group>"; };
 		1C3691DE09224C04DEA8AB40 /* LaunchdManifestFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchdManifestFeature.swift; sourceTree = "<group>"; };
 		1C592AC26CEC4C7129D0463B /* BatterySensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySensor.swift; sourceTree = "<group>"; };
+		1CCA03864EF27597D3C998D8 /* CleanerOverviewTrashCounter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanerOverviewTrashCounter.swift; sourceTree = "<group>"; };
 		1CDD19BA97EC142A19A465AE /* EnergyHelperClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyHelperClient.swift; sourceTree = "<group>"; };
 		1D62C614668136B62C900ECA /* RankingOverflowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingOverflowTests.swift; sourceTree = "<group>"; };
 		1FF2CA7CD9C3FB8777581E6E /* ContainerFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerFeature.swift; sourceTree = "<group>"; };
@@ -544,6 +546,7 @@
 				D60B90549169579BCCD01677 /* BatteryFeature.swift */,
 				AFE3997D6A5E04C1873A7645 /* BluetoothFeature.swift */,
 				CA3A16609D5C3DE31DFFA9AB /* CleanerModel.swift */,
+				1CCA03864EF27597D3C998D8 /* CleanerOverviewTrashCounter.swift */,
 				3BAF755934C2A24A5B2DD1FE /* CleanExclusionsStore.swift */,
 				F1D252095D35F597C5739228 /* CleanScanResultStore.swift */,
 				07518FFB4B2568CB567FFA0C /* CleanScanRootsStore.swift */,
@@ -1021,6 +1024,7 @@
 				D13598C5852FE5D54CB29D0B /* CleanerJunkViews.swift in Sources */,
 				2E50BD7556CEBBD55531E712 /* CleanerListCommonViews.swift in Sources */,
 				47428E4FF35C1121BE1BF5AE /* CleanerModel.swift in Sources */,
+				2A88AA0745E0565EF8F32554 /* CleanerOverviewTrashCounter.swift in Sources */,
 				9BB2782F91E17B5423C2296F /* CleanerOverviewViews.swift in Sources */,
 				BBB03F24EFBE9FB3735CEDF7 /* CleanerSettingsView.swift in Sources */,
 				ED8D725C2D83E14742AA3797 /* CleanerSpaceMapPalette.swift in Sources */,

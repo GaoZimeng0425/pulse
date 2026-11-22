@@ -381,7 +381,7 @@ private struct OverviewModuleCard: View {
 private struct OverviewTrashCard: View {
     /// 读数状态:没查 / 清点中 / 读不到 / 查到了。「读不到」绝不是空或 0——
     /// 没查与读不到都走占位,数字只在查到了(或刷新在飞时的上次读数)出现。
-    let phase: CleanerModel.OverviewTrashPhase
+    let phase: OverviewTrashPhase
     /// inventorying / running 期间禁用(与原页头按钮同口径)。
     let busy: Bool
     /// 显式清点(用户动作——授权弹窗只许出现在这一下点击)。
