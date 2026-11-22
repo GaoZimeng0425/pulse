@@ -731,7 +731,12 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
     (cardHigh 底、`{rounded.inner}` 10、内距 12 / 弹窗 10,块间 8);左 = 图标 +
     **项目名**(row-name semibold;09:工作目录经 PulseCore `AgentSessionLocation`
     折回主仓名,worktree 另挂 `ChipView.inline` ink-tertiary +
-    `arrow.triangle.branch`「⑂ slug」——11-14 实报「看不出是哪个项目」)+ 状态 `ChipView.inline`(Claude 忙 = 页 accent、其余
+    `arrow.triangle.branch`「⑂ slug」——11-14 实报「看不出是哪个项目」;**分支
+    chip**(agent-git-status/01):worktree 标签后同款 `ChipView.inline`
+    ink-tertiary 显会话工作目录当前 git 分支(detached 显 7 位短 SHA;非 git
+    仓库安静缺位),工作区有未提交改动(含未跟踪文件)再挂「未提交」
+    `ChipView.inline` `{colors.state-warning}`;数据 = 智能体页可见才采,15s 档
+    (cwd 集变化提前 5s),采集含 git 子进程全在后台任务)+ 状态 `ChipView.inline`(Claude 忙 = 页 accent、其余
     ink-tertiary;ZCode 在跑 / 空闲)→ 摘要(row-sub secondary:Claude 任务摘要 /
     ZCode 更新于 N 前)→ **路径行**(09:`folder` + home 缩写 `~` 的工作目录,
     micro tertiary,中段截断,help 显全路径)→ 元信息 micro tertiary(Claude

@@ -46,14 +46,18 @@ private struct AgentSessionMetric: View {
     }
 }
 
-/// 会话 lift 小块骨架:左图标 + 文字列(项目名 + ⑂ worktree + 状态 / 摘要 /
-/// 路径 / 元信息),右读数块。09:标题恒为项目名(worktree 折回主仓),worktree
-/// 另挂标签、补缩写路径——用户实报「会话看不出是哪个项目」。
+/// 会话 lift 小块骨架:左图标 + 文字列(项目名 + ⑂ worktree + 分支 + 状态 /
+/// 摘要 / 路径 / 元信息),右读数块。09:标题恒为项目名(worktree 折回主仓),
+/// worktree 另挂标签、补缩写路径——用户实报「会话看不出是哪个项目」。分支 chip
+/// +「未提交」标记 = agent-git-status/01:会话工作目录当前 git 分支(detached
+/// 显短 SHA,非 git 仓库安静缺位)+ 工作区有未落盘改动(含未跟踪文件)时琥珀。
 private struct AgentSessionTile<Badge: View, Metric: View>: View {
     let systemImage: String
     let tint: Color
     let name: String
     var worktree: String?
+    var branch: String?
+    var dirty = false
     let summary: String?
     var path: String?
     let meta: String?
@@ -81,6 +85,22 @@ private struct AgentSessionTile<Badge: View, Metric: View>: View {
                             profile: .inline,
                             systemImage: "arrow.triangle.branch",
                             help: "在 worktree「\(worktree)」里运行"
+                        )
+                    }
+                    if let branch {
+                        ChipView(
+                            text: branch,
+                            tint: Surface.inkTertiary,
+                            profile: .inline,
+                            help: "会话工作目录的当前 git 分支"
+                        )
+                    }
+                    if dirty {
+                        ChipView(
+                            text: "未提交",
+                            tint: Surface.warning,
+                            profile: .inline,
+                            help: "工作区有未提交改动(含未跟踪文件)"
                         )
                     }
                     badge()
@@ -158,6 +178,8 @@ private struct AgentSessionCount: View {
 /// input+cache_read(首建缓存期 input+creation)÷ 窗口上限(200k/1M 二档,abtop 同款)。
 struct ClaudeSessionsCardView: View {
     let sessions: [ClaudeAgentSessionStatus]
+    /// 工作目录 → git 状态(agent-git-status/01);缺省空表(非 Live 装配)。
+    var gitStatuses: [String: SessionGitStatus] = [:]
     /// 弹窗紧凑档。
     var isCompact = false
 
@@ -186,11 +208,14 @@ struct ClaudeSessionsCardView: View {
 
     private func tile(_ session: ClaudeAgentSessionStatus) -> some View {
         let location = agentSessionLocation(session.cwd)
+        let git = gitStatuses[session.cwd]
         return AgentSessionTile(
             systemImage: "ant",
             tint: agentsAccent,
             name: location?.project ?? session.projectName,
             worktree: location?.worktree,
+            branch: git?.branch,
+            dirty: git?.dirty ?? false,
             summary: session.taskSummary,
             path: location?.displayPath,
             meta: meta(session, location: location),
@@ -253,6 +278,8 @@ struct ClaudeSessionsCardView: View {
 /// 在跑 = 状态非终态(completed 等)。
 struct ZCodeSessionsCardView: View {
     let sessions: [ZCodeSessionStatus]
+    /// 工作区路径 → git 状态(agent-git-status/01);缺省空表(非 Live 装配)。
+    var gitStatuses: [String: SessionGitStatus] = [:]
     /// 弹窗紧凑档。
     var isCompact = false
 
@@ -282,11 +309,14 @@ struct ZCodeSessionsCardView: View {
     private func tile(_ session: ZCodeSessionStatus) -> some View {
         let running = session.activeAgents > 0
         let location = agentSessionLocation(session.workspaceRoot)
+        let git = session.workspaceRoot.flatMap { gitStatuses[$0] }
         return AgentSessionTile(
             systemImage: "chevron.left.forwardslash.chevron.right",
             tint: running ? agentsAccent : Surface.inactive,
             name: location?.project ?? session.workspaceName ?? shortSessionID(session.sessionId),
             worktree: location?.worktree,
+            branch: git?.branch,
+            dirty: git?.dirty ?? false,
             summary: session.updatedAgoSeconds.map { "更新于 \(PulseFormat.duration(seconds: $0))前" },
             path: location?.displayPath,
             meta: "会话 \(shortSessionID(session.sessionId))",
@@ -342,8 +372,17 @@ struct ZCodeSessionsCardView: View {
         ),
     ]
     return VStack(spacing: 16) {
-        ClaudeSessionsCardView(sessions: claudeSessions)
-        ZCodeSessionsCardView(sessions: zcodeSessions)
+        ClaudeSessionsCardView(
+            sessions: claudeSessions,
+            gitStatuses: [
+                "/Users/x/octok-client": SessionGitStatus(branch: "feat/payment", dirty: true),
+                "/Users/x/pulse": SessionGitStatus(branch: "develop", dirty: false),
+            ]
+        )
+        ZCodeSessionsCardView(
+            sessions: zcodeSessions,
+            gitStatuses: ["/Users/x/pulse": SessionGitStatus(branch: "develop", dirty: false)]
+        )
     }
     .padding(24)
     .frame(width: 680)
