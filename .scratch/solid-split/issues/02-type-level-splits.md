@@ -18,7 +18,18 @@
 
 **背景:** solid-split/01 的 Out of scope;2026-11-22 深查定谳。
 
-**Status:** needs-triage(设计票;开工前需用户点名排期)
+**Status:** in-progress(2026-11-22 步骤 1/2 已落,见 Comments;装载/编排定谳另票)
+
+- [x] 步骤 1:SpaceMap 配色域抽 `SpaceMapPalette`(816912f;106 行,纯搬运)
+- [x] 步骤 2:总览废纸篓清点器抽 `OverviewTrashCounter`(46ebc41;101 行,
+      转发面保调用点零变化,CleanerModelTests 28 处断言全绿)
+- [ ] ~~缓存装载抽会话装载器~~ / ~~扫描编排抽引擎驱动~~:**实读定谳改判**
+      (2026-11-22)——两节直接编织主类十几处私有状态(phase/mapTrees/
+      loadedFromCache/loadedCacheMeta/lastSavedMeta/recycledPaths/
+      sessionCleanedCount/installedApps/scanStartedAt…),不是内聚子状态机;
+      抽离 = 状态搬家 + 回调网,行为面风险大,需先做状态分组设计再动手,
+      不属于「测试全绿即证明」的搬运件。复活条件:清理域下次功能票触及
+      这两节时顺势设计(或用户点名专项)。
 
 **Out of scope:** 拆分不顺手改行为/不顺手优化——每步纯搬运或纯抽取,
 tests 全绿为闸。
