@@ -148,8 +148,30 @@ enum PrivilegedHelperStatus {
         let service = SMAppService.daemon(plistName: "com.gaozimeng.pulse.helper2.plist")
         if installed {
             try? service.register()
+            // energy-one-tap:开开关不止登记——系统确要批准时直接带用户去批准页
+            // (类方法会高亮待批准项),不再停在自家开关让用户猜下一步。
+            if current() == .requiresApproval {
+                SMAppService.openSystemSettingsLoginItems()
+            }
         } else {
             try? service.unregister()
         }
+    }
+
+    /// 一键直达批准页(energy-one-tap):未登记 → 登记;已登记(换 bundle 旧代
+    /// 残留等)→ 注销重登(plist 运维口径「bootout → 重开 → 重批」);随后打开
+    /// 系统设置的登录项批准页。批准仍是用户自点(TCC 原则),app 只带路。
+    static func reRegisterAndOpenApproval() {
+        let service = SMAppService.daemon(plistName: "com.gaozimeng.pulse.helper2.plist")
+        if current() != .notRegistered {
+            try? service.unregister()
+        }
+        try? service.register()
+        SMAppService.openSystemSettingsLoginItems()
+    }
+
+    /// 已提交注册、只差用户点头:直接打开批准页(比通用深链好,会高亮条目)。
+    static func openApprovalPane() {
+        SMAppService.openSystemSettingsLoginItems()
     }
 }
