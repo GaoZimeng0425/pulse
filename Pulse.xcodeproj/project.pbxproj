@@ -206,6 +206,7 @@
 		E714615BB26F05C456D5D362 /* BatteryFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60B90549169579BCCD01677 /* BatteryFeature.swift */; };
 		E9F71EE03BA7B4C44DD8DCC6 /* SmcSensorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C9148F4EC10E000CE96ABA /* SmcSensorTests.swift */; };
 		ECDE2C98242191C44A6CC06F /* CleanerAppUninstallSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100B66BC2A30B06DEE21526 /* CleanerAppUninstallSheet.swift */; };
+		ED8D725C2D83E14742AA3797 /* CleanerSpaceMapPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ABD0F49B382EE3281B6A91B /* CleanerSpaceMapPalette.swift */; };
 		EE16F89A8CB0C4C60A8E25AF /* ProjectRootsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC33A37E9CAE34AFFF9CA920 /* ProjectRootsStore.swift */; };
 		EF095DB50F12562588921E86 /* SoundSensorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 126800DC1FC5FCB799DDA633 /* SoundSensorTests.swift */; };
 		F48BA1C1690106034382FCE8 /* AgentSessionFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 118DC5924619038F55847031 /* AgentSessionFeature.swift */; };
@@ -336,6 +337,7 @@
 		689A729F03DE35CA0C9E3D5D /* MainWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowView.swift; sourceTree = "<group>"; };
 		6A98A79159A39E317CC43DA0 /* NettopProcessRateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NettopProcessRateTests.swift; sourceTree = "<group>"; };
 		6A9DD984A73F2C57684332F7 /* PreDeleteLiveConsistencyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreDeleteLiveConsistencyTests.swift; sourceTree = "<group>"; };
+		6ABD0F49B382EE3281B6A91B /* CleanerSpaceMapPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanerSpaceMapPalette.swift; sourceTree = "<group>"; };
 		6B06E911B136D09E8F6E569D /* LiveCoreTickSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCoreTickSource.swift; sourceTree = "<group>"; };
 		6B76926FB48518EBB58CAA6F /* LaunchdManifestFeatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchdManifestFeatureTests.swift; sourceTree = "<group>"; };
 		6C75CB2BD11EEDA12D6C898D /* DiskFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskFixture.swift; sourceTree = "<group>"; };
@@ -669,6 +671,7 @@
 				7428ABC51C5AE4C0E54D6475 /* CleanerListCommonViews.swift */,
 				BC47165BC5F259312DF6927B /* CleanerOverviewViews.swift */,
 				0C6CEE6C6B6AE62D9C87C5E1 /* CleanerSettingsView.swift */,
+				6ABD0F49B382EE3281B6A91B /* CleanerSpaceMapPalette.swift */,
 				53623D09AB9CE417052C09D5 /* CleanerSpaceMapView.swift */,
 				CEF074B1893DFC234824F594 /* CleanerViews.swift */,
 				578B06925AAA893C922D03BC /* ContainerCardViews.swift */,
@@ -1020,6 +1023,7 @@
 				47428E4FF35C1121BE1BF5AE /* CleanerModel.swift in Sources */,
 				9BB2782F91E17B5423C2296F /* CleanerOverviewViews.swift in Sources */,
 				BBB03F24EFBE9FB3735CEDF7 /* CleanerSettingsView.swift in Sources */,
+				ED8D725C2D83E14742AA3797 /* CleanerSpaceMapPalette.swift in Sources */,
 				9449EB0472D580D4E71AD350 /* CleanerSpaceMapView.swift in Sources */,
 				BD1F3E7EC48AE3C07CC765D3 /* CleanerViews.swift in Sources */,
 				89F5E5931E2250F60A9FCA0B /* ContainerCardViews.swift in Sources */,
