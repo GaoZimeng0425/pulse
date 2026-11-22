@@ -358,42 +358,39 @@ struct MetricTabBlock: Identifiable {
 }
 
 extension MetricTabStack {
-    /// 耗电排行两卡的门槛空态(battery-energy/01;energy-gate-fix 升四态):
-    /// 各给一条出路,不留死空态、不假称运行中。设置通路 = `pulseOpenSettings`
-    /// 通知(MainWindowGate 常驻接收器在 Scene 环境调 openSettings——弹窗宿主
-    /// 里环境不可用的已验证桥);批准动作在系统设置(TCC 授权用户自点原则),
-    /// app 只深链带过去。
+    /// 耗电排行两卡的门槛空态(battery-energy/01;energy-gate-fix 四态;
+    /// energy-one-tap 一键直达):各给一条出路,不留死空态、不假称运行中、
+    /// 不停在自家开关让用户猜下一步——需要批准的动作直接带到系统设置的
+    /// 登录项批准页(高亮待批准项)。批准仍是用户自点(TCC 原则),app 只带路。
     static func energyGateEmptyMessage(gate: EnergyHelperGate) -> RankingEmptyMessage {
         switch gate {
         case .notInstalled:
             RankingEmptyMessage(
                 title: "耗电排行需要特权助手",
-                detail: "每分钟采集一次各 App 能耗(活动监视器同口径);不开启则完全不存在",
-                actionTitle: "去开启",
+                detail: "每分钟采集一次各 App 能耗(活动监视器同口径)。点一下:登记并带你到系统设置允许(仅首次)",
+                actionTitle: "开启并去批准",
                 action: {
-                    NotificationCenter.default.post(name: .pulseOpenSettings, object: nil)
+                    PrivilegedHelperStatus.reRegisterAndOpenApproval()
                 }
             )
         case .awaitingSystemApproval:
             RankingEmptyMessage(
                 title: "等待系统批准",
-                detail: "已提交安装:去 系统设置 → 通用 → 登录项与扩展 里允许 Pulse 的后台项目",
-                actionTitle: "打开系统设置",
+                detail: "已提交安装,只差你在系统设置里点允许",
+                actionTitle: "去批准",
                 action: {
-                    if let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") {
-                        NSWorkspace.shared.open(url)
-                    }
+                    PrivilegedHelperStatus.openApprovalPane()
                 }
             )
         case .approvedButNotRunning:
             // status 说谎态(2026-11-22 用户实案):换 bundle 后 BTM 残留旧批准,
-            // 新助手从未跑起。说实话 + 给重新登记出口。
+            // 新助手从未跑起。说实话 + 一键重登直达批准页,不绕自家开关。
             RankingEmptyMessage(
                 title: "助手已批准但没在运行",
-                detail: "Pulse 更新后需要重新登记一次:关开一次 设置 → 通用 → 特权助手 开关,再到系统设置允许",
-                actionTitle: "去重新登记",
+                detail: "Pulse 更新后系统要求重新批准一次。点一下:重新登记并带你到系统设置允许",
+                actionTitle: "重新登记并去批准",
                 action: {
-                    NotificationCenter.default.post(name: .pulseOpenSettings, object: nil)
+                    PrivilegedHelperStatus.reRegisterAndOpenApproval()
                 }
             )
         case .approvedAwaitingReading:
