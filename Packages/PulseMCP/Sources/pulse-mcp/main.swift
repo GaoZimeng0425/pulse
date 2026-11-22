@@ -512,6 +512,11 @@ await server.withMethodHandler(ListTools.self) { _ in
                 ]),
             ])
         ),
+        Tool(
+            name: "self_usage",
+            description: "自查 token 账本(mcp-self-usage/01):一次答全「当前会话 + 今天 + 近 7 天」的 token 用量,互斥五桶(净输入/净输出/缓存读/缓存写/推理)+ 合计 + 请求数,只报 token 不换算美元。当前会话按本进程工作目录识别(ZCode 每会话一个 MCP 进程,cwd = 会话工作区);识别不出时如实说明并列出候选,不猜。",
+            inputSchema: .object(["type": .string("object"), "properties": .object([:])])
+        ),
     ])
 }
 
@@ -572,10 +577,156 @@ await server.withMethodHandler(CallTool.self) { params in
             path: arguments["path"]?.stringValue,
             topN: max(1, min(30, topN))
         )
+    case "self_usage":
+        // 无参数(拍板:范围固定,不设 knobs)。
+        text = selfUsageText()
     default:
         return .init(content: [.text(text: "未知工具 \(params.name)")], isError: true)
     }
     return .init(content: [.text(text: text)], isError: false)
+}
+
+// MARK: - self_usage(mcp-self-usage/01)
+
+/// 自查账本文本:当前会话(按本进程 cwd 识别)+ 今天 + 近 7 天,互斥五桶口径。
+/// 会话识别探针实证:ZCode 每会话各起一个 MCP 进程、cwd = 会话工作区;
+/// Claude 客户端同法实现,识别不出如实降级(不猜)。
+private func selfUsageText() -> String {
+    let now = Date()
+    let cwd = FileManager.default.currentDirectoryPath
+    let today = AgentUsageInsightQuery.localDay(now)
+    // 日历语义的「今天往前 6 天」(评审 P3):-6*86400 在 DST 切换日会差一小时,
+    // 日界可能多含一天;Calendar 按天回退才对齐账本 day 键。
+    let weekAgo = AgentUsageInsightQuery.localDay(
+        Calendar.current.date(byAdding: .day, value: -6, to: now) ?? now.addingTimeInterval(-6 * 86400)
+    )
+    let lookback: TimeInterval = 7 * 86400
+
+    // 窗口两行(账本库;打不开时 withDatabase 给诚实文案)。
+    let windowText = withDatabase { db, _ in
+        let todayUsage = try AgentUsageInsightQuery.windowUsage(fromDay: today, throughDay: today, in: db)
+        let weekUsage = try AgentUsageInsightQuery.windowUsage(fromDay: weekAgo, throughDay: today, in: db)
+        return windowLines(today: todayUsage, week: weekUsage).joined(separator: "\n")
+    }
+
+    // 当前会话:ZCode 用量库 + Claude 会话文件,同工作区候选择取。
+    let sessions = zcodeSessionsForWorkspace(cwd, lookback: lookback, now: now)
+        + claudeSessionsForWorkspace(cwd, lookback: lookback, now: now)
+    let pick = AgentUsageInsightQuery.SessionPick.pick(sessions)
+
+    var lines: [String] = []
+    if let primary = pick.primary {
+        lines.append("当前会话(\(primary.harness) \(primary.sessionID),工作区 \((cwd as NSString).lastPathComponent)):")
+        lines.append(sessionLine(primary))
+    } else {
+        lines.append("当前会话:未识别到(\(cwd) 近 7 天无匹配会话记录),只报窗口汇总。")
+    }
+    for other in pick.others {
+        lines.append(
+            "同工作区另有会话:\(other.harness) \(other.sessionID)(\(agoText(other.lastActiveAt, now: now)))——如非本会话,该行仅供参考"
+        )
+    }
+    // 截断如实报数(评审 P3):只列最近 3 个其余,总数说清,不静默消失。
+    let omitted = sessions.count - 1 - pick.others.count
+    if omitted > 0 {
+        lines.append("同工作区近 7 天共 \(sessions.count) 个会话,还有 \(omitted) 个更早的未列出。")
+    }
+    lines.append(windowText)
+    lines.append("口径:互斥五桶(净输入/净输出/缓存读/缓存写/推理),合计 = 五桶相加;与 Pulse 智能体页同源同口径,只报 token 不换算美元。")
+    return lines.joined(separator: "\n")
+}
+
+/// 窗口两行:今天 + 近 7 天(合计 + 按来源拆)。
+private func windowLines(
+    today: AgentUsageInsightQuery.WindowUsage,
+    week: AgentUsageInsightQuery.WindowUsage
+) -> [String] {
+    [
+        "今天:合计 \(AgentTokenFormat.short(today.buckets.totalTokens)) · 请求 \(today.buckets.requestCount) 次\(sourceBreakdown(today))",
+        "近 7 天:合计 \(AgentTokenFormat.short(week.buckets.totalTokens)) · 请求 \(week.buckets.requestCount) 次\(sourceBreakdown(week))",
+    ]
+}
+
+private func sourceBreakdown(_ usage: AgentUsageInsightQuery.WindowUsage) -> String {
+    guard !usage.sources.isEmpty else { return "(账本为空——Pulse 尚未记账)" }
+    let parts = usage.sources.map { "\($0.name) \(AgentTokenFormat.short($0.buckets.totalTokens))" }
+    return "(\(parts.joined(separator: " / ")))"
+}
+
+/// 单会话一行五桶 + 合计。
+private func sessionLine(_ session: AgentUsageInsightQuery.SessionUsage) -> String {
+    let b = session.buckets
+    return "净输入 \(AgentTokenFormat.short(b.inputTokens)) · 输出 \(AgentTokenFormat.short(b.outputTokens)) · 缓存读 \(AgentTokenFormat.short(b.cacheReadTokens)) · 缓存写 \(AgentTokenFormat.short(b.cacheWriteTokens)) · 推理 \(AgentTokenFormat.short(b.reasoningTokens)),合计 \(AgentTokenFormat.short(b.totalTokens)) · 请求 \(b.requestCount) 次(最近活动 \(agoText(session.lastActiveAt, now: Date())))"
+}
+
+/// 「N 分钟前」(未知如实说)。
+private func agoText(_ date: Date?, now: Date) -> String {
+    guard let date else { return "时间未知" }
+    return PulseFormat.duration(seconds: max(0, now.timeIntervalSince(date))) + "前"
+}
+
+/// ZCode 用量库(只读,ZCodeUsageDatabase.openReader):本工作区近 lookback 的会话。
+private func zcodeSessionsForWorkspace(
+    _ workspace: String,
+    lookback: TimeInterval,
+    now: Date
+) -> [AgentUsageInsightQuery.SessionUsage] {
+    guard let queue = try? ZCodeUsageDatabase.openReader() else { return [] }
+    do {
+        return try queue.read { db in
+            try AgentUsageInsightQuery.zcodeSessions(
+                workspace: workspace, lookback: lookback, now: now, in: db
+            )
+        }
+    } catch {
+        return [] // 读不到 = 该来源缺位,窗口汇总不受影响
+    }
+}
+
+/// Claude 会话文件(projects/<slug>/,slug = cwd "/"→"-"):近 lookback 有动静的
+/// jsonl 各聚合为一个会话;新文件在前,至多 8 个(重会话文件可到几十 MB,
+/// 全量读单文件可接受、跨全部文件不可接受)。
+private func claudeSessionsForWorkspace(
+    _ workspace: String,
+    lookback: TimeInterval,
+    now: Date
+) -> [AgentUsageInsightQuery.SessionUsage] {
+    let home = NSHomeDirectory()
+    // Claude 的 slug 规则(评审 P2,真库 slug 实证):非 [a-zA-Z0-9] 一律换 "-",
+    // 不只 "/"——`.worktrees` 的点也换(实样:-Users-…-octok-client--worktrees-…),
+    // 只换 "/" 的话在 worktree 里开的 Claude 会话一个都找不到。
+    let slug = String(workspace.map { ch in
+        (ch.isASCII && (ch.isLetter || ch.isNumber)) ? ch : "-"
+    })
+    let dir = URL(fileURLWithPath: home + "/.claude/projects/\(slug)")
+    guard
+        let files = try? FileManager.default.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: [.contentModificationDateKey]
+        )
+    else { return [] }
+    let cutoff = now.addingTimeInterval(-lookback)
+    let jsonlFiles = files
+        .filter { $0.pathExtension == "jsonl" }
+        .compactMap { file -> (URL, Date)? in
+            guard let modified = try? file.resourceValues(forKeys: [.contentModificationDateKey])
+                .contentModificationDate, modified >= cutoff else { return nil }
+            return (file, modified)
+        }
+        .sorted { $0.1 > $1.1 }
+        .prefix(8)
+    return jsonlFiles.compactMap { file, modified in
+        guard let text = try? String(contentsOf: file, encoding: .utf8) else { return nil }
+        let sum = AgentUsageInsightQuery.sumClaudeLines(
+            text.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+        )
+        guard sum.buckets.requestCount > 0 else { return nil }
+        return AgentUsageInsightQuery.SessionUsage(
+            harness: "Claude",
+            sessionID: String(file.deletingPathExtension().lastPathComponent.prefix(8)),
+            buckets: sum.buckets,
+            lastActiveAt: max(modified, sum.latestAt ?? .distantPast)
+        )
+    }
 }
 
 try await server.start(transport: StdioTransport())
