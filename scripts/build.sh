@@ -81,19 +81,26 @@ cp "Packages/PulseMCP/.build/release/pulse-mcp" "$APP_BUNDLE/Contents/MacOS/puls
 # 特权助手 daemon(p3-root-mcp/03,探针 09 安装组合):可执行 + plist 嵌
 # Contents/Library/LaunchDaemons/(SMAppService.daemon 的既定位置);同样在
 # 重签前进 bundle。
-# 指纹稳定策略(energy-gate-fix):SMAppService 按内容指纹批准守护进程——
-# 覆盖 helper = 已批准条目立即作废,用户被迫重批。新产物与已装机版本指纹
-# 相同(源码没动的常规发版)则**不覆盖**,保住批准;真变了才换并响亮提醒。
+# 指纹稳定策略(energy-gate-fix;battery-energy/02 守卫修正):SMAppService 按
+# 内容指纹批准守护进程——覆盖 helper = 已批准条目立即作废,用户被迫重批。
+# 探针 2026-11-23 定谳:同一身份重复签名,文件字节随 signingTime 变(跨秒必变,
+# sha 守卫在签名时代必误报),但 cdhash 恒稳——改为**先签新产物再比 cdhash**
+# (BTM/Launch Constraint 认的代码身份),源码没动的常规发版零误报,真变了
+# 才换并响亮提醒。注意 codesign -d 的诊断输出走 stderr,提取必须 2>&1(评审
+# P1 实证:2>/dev/null 下 stdout 恒空,守卫恒判「变了」)。
 echo "==> 构建 pulse-helper(特权助手 daemon)..."
 swift build -c release --package-path Packages/PulseHelper -q
 mkdir -p "$APP_BUNDLE/Contents/Library/LaunchDaemons"
 NEW_HELPER="Packages/PulseHelper/.build/release/pulse-helper"
 INSTALLED_HELPER="$APP_BUNDLE/Contents/Library/LaunchDaemons/pulse-helper"
+if [ "$SIGNING_IDENTITY" != "-" ]; then
+  codesign --force --sign "$SIGNING_IDENTITY" "$NEW_HELPER"
+fi
+cdhash() { codesign -dvvv "$1" 2>&1 | grep '^CDHash=' | awk -F= '/^CDHash=/{print $2}'; }
 if [ -f "$INSTALLED_HELPER" ] \
-  && shasum -a 256 "$NEW_HELPER" | awk '{print $1}' > /tmp/pulse-helper-new.sha \
-  && shasum -a 256 "$INSTALLED_HELPER" | awk '{print $1}' > /tmp/pulse-helper-old.sha \
-  && cmp -s /tmp/pulse-helper-new.sha /tmp/pulse-helper-old.sha; then
-  echo "==> 特权助手指纹未变,保留已装机版本(系统批准继续有效)"
+  && [ -n "$(cdhash "$NEW_HELPER")" ] \
+  && [ "$(cdhash "$NEW_HELPER")" = "$(cdhash "$INSTALLED_HELPER")" ]; then
+  echo "==> 特权助手代码指纹(cdhash)未变,保留已装机版本(系统批准继续有效)"
 else
   if [ -f "$INSTALLED_HELPER" ]; then
     echo "⚠️  特权助手已更新:装机后需到 设置 → 通用 关开一次「特权助手」开关,"
@@ -101,7 +108,6 @@ else
   fi
   cp "$NEW_HELPER" "$INSTALLED_HELPER"
 fi
-rm -f /tmp/pulse-helper-new.sha /tmp/pulse-helper-old.sha
 cp "Packages/PulseHelper/com.gaozimeng.pulse.helper2.plist" "$APP_BUNDLE/Contents/Library/LaunchDaemons/"
 chmod 755 "$APP_BUNDLE/Contents/Library/LaunchDaemons/pulse-helper"
 
