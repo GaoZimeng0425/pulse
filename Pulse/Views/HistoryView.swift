@@ -217,12 +217,22 @@ private struct QueryKey: Equatable {
 /// StripChartView 同族——同一份 MetricAccent 强调色令牌、同一 9% 轨道底、
 /// 圆角画法;无轴无标签,数值由统计行文字承载(P0.6 同决策)。
 /// 归一化:系统负载固定 0–100 语义域(菜单栏同口径),其余按窗口内最大值。
+/// 悬停读数(history-hover/01):竖线贴**吸附点**(空桶吸最近非空点,全空不出)
+/// 横贯曲线区,浮层报「时刻 · 数值」——智能体页热力墙同配方(坐标反算 +
+/// overlay + ChartHoverGeometry;竖线贴点不贴光标,agent-tab/07 同语义)。
 struct HistoryCurveView: View {
     let series: HistorySeries
 
     /// 折线上下的留白(线不贴轨道边)。
     private static let verticalInset: CGFloat = 8
     private static let lineWidth: CGFloat = 2
+
+    /// 吸附点序号(nil = 未悬停或全空)。清空机制 = 指针离开触发 .ended(切药丸
+    /// 时鼠标必在曲线外)+ 下面的越界/空桶守卫兜底——父级同位置替换 series 不改
+    /// 视图 identity,@State 并不重置(评审 P3 修正注释失实)。
+    @State private var hoverIndex: Int?
+    @State private var plotSize: CGSize = .zero
+    @State private var tooltipSize: CGSize = .zero
 
     var body: some View {
         Canvas { context, size in
@@ -233,28 +243,114 @@ struct HistoryCurveView: View {
             series.tint.opacity(0.09),
             in: .rect(cornerRadius: 8)
         )
+        .contentShape(.rect)
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { newValue in
+            if abs(newValue.width - plotSize.width) > 0.5
+                || abs(newValue.height - plotSize.height) > 0.5 {
+                plotSize = newValue
+            }
+        }
+        .onContinuousHover(coordinateSpace: .local) { phase in
+            switch phase {
+            case let .active(location):
+                let raw = HistoryCurveHover.bucketIndex(
+                    atX: location.x, width: plotSize.width, count: series.values.count
+                )
+                let next = HistoryCurveHover.nearestFilled(anchor: raw, values: series.values)
+                if next != hoverIndex {
+                    hoverIndex = next
+                }
+            case .ended:
+                hoverIndex = nil
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            // 序列换新后的残留态安静收起(评审 P2):越界(切范围桶数变短,
+            // 下标越界直接崩)与空桶(轮询滑窗后同一 index 对上未落库的新末端桶)
+            // 都不出浮层——空桶若显示会伪造「0 读数」,0 是真读数不许编。
+            if let hoverIndex, series.values.indices.contains(hoverIndex),
+               series.values[hoverIndex] != nil {
+                hoverOverlay(hoverIndex)
+            }
+        }
         .accessibilityHidden(true) // 数值信息由统计行的文字承载
+    }
+
+    // MARK: - 悬停读数
+
+    /// 竖线 + 浮层(不参与命中);锚点 = 吸附点小矩形,定位走钳位翻面公式。
+    private func hoverOverlay(_ index: Int) -> some View {
+        let value = series.values[index] ?? 0
+        let center = point(index, value, in: plotSize, normalizer: normalizer)
+        let anchor = CGRect(x: center.x - 4, y: center.y - 4, width: 8, height: 8)
+        let origin = ChartHoverGeometry.tooltipOrigin(
+            anchor: anchor, size: tooltipSize, bounds: plotSize, gap: 6
+        )
+        return ZStack(alignment: .topLeading) {
+            Rectangle()
+                .fill(series.tint.opacity(0.7))
+                .frame(width: 1, height: max(plotSize.height, 0))
+                .position(x: center.x, y: plotSize.height / 2)
+            AgentChartTooltip(
+                title: hoverTimeText(index),
+                value: series.metric.statisticText(value),
+                swatch: series.tint
+            )
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { tooltipSize = $0 }
+            .opacity(tooltipSize == .zero ? 0 : 1)
+            .offset(x: origin.x, y: origin.y)
+        }
+        .allowsHitTesting(false)
+    }
+
+    /// 吸附桶的时刻:桶结束时刻(序列锚推算,不用悬停瞬间的钟——轮询间隙
+    /// 不漂移);桶宽 ≥1 小时报到小时,否则到分钟。
+    private func hoverTimeText(_ index: Int) -> String {
+        let end = Date(
+            timeIntervalSince1970: TimeInterval(series.startSeconds + (index + 1) * series.bucketSeconds)
+        )
+        let formatter = series.bucketSeconds >= 3600 ? Self.hourFormatter : Self.minuteFormatter
+        return formatter.string(from: end)
+    }
+
+    /// 悬停时刻两档格式化(评审 P3 缓存):DateFormatter 已知贵,吸附横移每帧
+    /// 调用,静态两枚常驻。
+    private static let minuteFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "M月d日 HH:mm"
+        return formatter
+    }()
+
+    private static let hourFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "M月d日 HH时"
+        return formatter
+    }()
+
+    // MARK: - 绘制(悬停与绘制共用同一映射,单一出处)
+
+    /// 归一化基准:系统负载固定 0–100 语义域,其余按窗口内最大值(不小于 1)。
+    private var normalizer: Double {
+        let filled = series.values.compactMap(\.self)
+        return series.metric == .systemLoad ? 100.0 : max(filled.max() ?? 0, 1)
+    }
+
+    /// 桶值 → 点坐标:桶中心取 x(首尾桶的半桶让出边缘,窗界读数不裁半)。
+    private func point(_ index: Int, _ value: Double, in size: CGSize, normalizer: Double) -> CGPoint {
+        let count = series.values.count
+        let fraction = CGFloat(min(max(value / normalizer, 0), 1))
+        let drawableHeight = size.height - Self.verticalInset * 2
+        return CGPoint(
+            x: (CGFloat(index) + 0.5) * size.width / CGFloat(count),
+            y: Self.verticalInset + (1 - fraction) * drawableHeight
+        )
     }
 
     private func draw(in context: inout GraphicsContext, size: CGSize) {
         let count = series.values.count
         guard count > 1 else { return }
-        let filled = series.values.compactMap(\.self)
-        let normalizer =
-            series.metric == .systemLoad
-                ? 100.0
-                : max(filled.max() ?? 0, 1)
-        let drawableHeight = size.height - Self.verticalInset * 2
-
-        // 桶中心取 x(首尾桶的半桶让出边缘,窗界读数不裁半)。
-        func point(_ index: Int, _ value: Double) -> CGPoint {
-            let fraction = CGFloat(min(max(value / normalizer, 0), 1))
-            return CGPoint(
-                x: (CGFloat(index) + 0.5) * size.width / CGFloat(count),
-                y: Self.verticalInset + (1 - fraction) * drawableHeight
-            )
-        }
-
         let tint = series.tint
         var run: [(index: Int, value: Double)] = []
 
@@ -263,7 +359,7 @@ struct HistoryCurveView: View {
             guard let first = run.first else { return }
             if run.count == 1 {
                 // 单点段:圆头线在此退化为零长路径,显式落一个点。
-                let center = point(first.index, first.value)
+                let center = point(first.index, first.value, in: size, normalizer: normalizer)
                 let radius = Self.lineWidth / 2
                 context.fill(
                     Path(ellipseIn: CGRect(
@@ -275,9 +371,9 @@ struct HistoryCurveView: View {
                 return
             }
             var path = Path()
-            path.move(to: point(first.index, first.value))
+            path.move(to: point(first.index, first.value, in: size, normalizer: normalizer))
             for (index, value) in run.dropFirst() {
-                path.addLine(to: point(index, value))
+                path.addLine(to: point(index, value, in: size, normalizer: normalizer))
             }
             context.stroke(
                 path,

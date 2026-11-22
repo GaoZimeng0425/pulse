@@ -577,6 +577,13 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
     视图只描边配色命中。
 - **AreaTrendChartView**:56 点、线 2px 指标色、线下渐变 32%→0、4 条 8% 网格线、
   2% 左垫底;**StripChartView**:44 柱、36pt 高。二者都是自绘 Canvas,不引 Charts。
+- **历史曲线悬停(HistoryCurveView,history-hover/01)**:历史页走势(自绘 Canvas,
+  空桶断线)带悬停读数——竖线**贴吸附点**(空桶吸最近非空点,等距取更早,全空不出)
+  横贯曲线区(1px 曲线 tint 70%),`AgentChartTooltip` 两行形态报「时刻 · 数值」
+  (时刻 = 桶结束时刻、序列锚推算不用悬停瞬间的钟;桶宽 <1h 到分钟、≥1h 到小时;
+  数值 = `statisticText` 与统计行同口径),定位 `ChartHoverGeometry.tooltipOrigin`
+  (钳位翻面,首帧未量到尺寸前隐藏)——智能体页热力墙同配方(坐标反算 + overlay,
+  竖线贴点不贴光标,agent-tab/07 同语义)。
 - **PillTabBar(通用药丸 tab 条,用户拍板 2026-10-22:tab 是通用组件样式)**:
   唯一视觉配方在 `Pulse/Views/PillTabBar.swift`——选中 = 该项强调色 15% 胶囊底
   + 同色前景,未选中 = secondary 前景无底;药丸间距 4;
