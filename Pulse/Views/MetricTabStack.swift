@@ -95,13 +95,22 @@ struct MetricTabStack<Ranking: View>: View {
                     )
                 )
             case .sessions:
+                let gitStatuses = monitor.agentSessions.gitStatuses
                 builder.card(
                     "claude-sessions",
-                    ClaudeSessionsCardView(sessions: snapshot.claudeSessions, isCompact: isCompact)
+                    ClaudeSessionsCardView(
+                        sessions: snapshot.claudeSessions,
+                        gitStatuses: gitStatuses,
+                        isCompact: isCompact
+                    )
                 )
                 builder.card(
                     "zcode-sessions",
-                    ZCodeSessionsCardView(sessions: snapshot.zcodeSessions, isCompact: isCompact)
+                    ZCodeSessionsCardView(
+                        sessions: snapshot.zcodeSessions,
+                        gitStatuses: gitStatuses,
+                        isCompact: isCompact
+                    )
                 )
             }
         case .cpu:

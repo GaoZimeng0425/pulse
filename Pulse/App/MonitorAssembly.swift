@@ -113,7 +113,10 @@ extension SystemMonitor {
                 ),
                 devServers: DevServerFeature(portScanner: LiveDevServerPortScanner()),
                 ports: PortsFeature(scanner: LiveGlobalPortScanner()),
-                agentSessions: AgentSessionFeature(reader: LiveAgentSessionReader()),
+                agentSessions: AgentSessionFeature(
+                    reader: LiveAgentSessionReader(),
+                    gitReader: LiveSessionGitStatusReader()
+                ),
                 agentUsage: AgentUsageFeature(
                     reader: LiveAgentUsageReader(),
                     store: history.agentUsageStore,
