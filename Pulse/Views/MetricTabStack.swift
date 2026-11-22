@@ -175,7 +175,7 @@ struct MetricTabStack<Ranking: View>: View {
             builder.card("main", MetricMainCardView(model: model.batteryModel, isCompact: isCompact))
             let impact = monitor.energyImpact.reading
             let totalImpact = impact?.totalImpact ?? 0
-            let gateEmpty = Self.energyGateEmptyMessage(status: monitor.energyImpact.helperStatus)
+            let gateEmpty = Self.energyGateEmptyMessage(gate: monitor.energyImpact.helperGate)
             builder.moduleRanking("energy", ModuleRankingSpec(
                 title: "耗电排行 · 全部应用",
                 valueLabel: "占比",
@@ -350,13 +350,14 @@ struct MetricTabBlock: Identifiable {
 }
 
 extension MetricTabStack {
-    /// 耗电排行两卡的门槛空态(battery-energy/01):助手三态各给一条出路,
-    /// 不留死空态。设置通路 = `pulseOpenSettings` 通知(MainWindowGate 常驻
-    /// 接收器在 Scene 环境调 openSettings——弹窗宿主里环境不可用的已验证桥);
-    /// 批准动作在系统设置(TCC 授权用户自点原则),app 只深链带过去。
-    static func energyGateEmptyMessage(status: PrivilegedHelperStatus) -> RankingEmptyMessage {
-        switch status {
-        case .notRegistered:
+    /// 耗电排行两卡的门槛空态(battery-energy/01;energy-gate-fix 升四态):
+    /// 各给一条出路,不留死空态、不假称运行中。设置通路 = `pulseOpenSettings`
+    /// 通知(MainWindowGate 常驻接收器在 Scene 环境调 openSettings——弹窗宿主
+    /// 里环境不可用的已验证桥);批准动作在系统设置(TCC 授权用户自点原则),
+    /// app 只深链带过去。
+    static func energyGateEmptyMessage(gate: EnergyHelperGate) -> RankingEmptyMessage {
+        switch gate {
+        case .notInstalled:
             RankingEmptyMessage(
                 title: "耗电排行需要特权助手",
                 detail: "每分钟采集一次各 App 能耗(活动监视器同口径);不开启则完全不存在",
@@ -365,7 +366,7 @@ extension MetricTabStack {
                     NotificationCenter.default.post(name: .pulseOpenSettings, object: nil)
                 }
             )
-        case .requiresApproval:
+        case .awaitingSystemApproval:
             RankingEmptyMessage(
                 title: "等待系统批准",
                 detail: "已提交安装:去 系统设置 → 通用 → 登录项与扩展 里允许 Pulse 的后台项目",
@@ -376,7 +377,18 @@ extension MetricTabStack {
                     }
                 }
             )
-        case .enabled:
+        case .approvedButNotRunning:
+            // status 说谎态(2026-11-22 用户实案):换 bundle 后 BTM 残留旧批准,
+            // 新助手从未跑起。说实话 + 给重新登记出口。
+            RankingEmptyMessage(
+                title: "助手已批准但没在运行",
+                detail: "Pulse 更新后需要重新登记一次:关开一次 设置 → 通用 → 特权助手 开关,再到系统设置允许",
+                actionTitle: "去重新登记",
+                action: {
+                    NotificationCenter.default.post(name: .pulseOpenSettings, object: nil)
+                }
+            )
+        case .approvedAwaitingReading:
             RankingEmptyMessage(
                 title: "等待读数",
                 detail: "特权助手运行中,首档约 1 分钟内到达"

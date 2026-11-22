@@ -28,7 +28,17 @@ final class EnergyImpactFeature: MonitorFeature {
 
     /// 特权助手安装三态(battery-energy/01:电池页两卡共用引导空态的判据)。
     /// start 即读、每轮 poll 前刷新(用户在设置里开关/批准后,最长 60s 内跟上)。
+    /// **注意 status 会说谎**(energy-gate-fix,2026-11-22 用户实案):Pulse 更新
+    /// 换 bundle 后,BTM 里残留旧条目的 enabled 判定,而新 helper 从未批准/从未
+    /// 跑起——卡片据此显示「运行中」骗人干等。物理真值在 `helperGate`(融合
+    /// 拉取健康度),视图一律读它。
     private(set) var helperStatus: PrivilegedHelperStatus = .notRegistered
+
+    /// 融合判定:系统说开了 + 一分钟一跳的拉取持续失败 = 助手实际没在运行
+    /// (换 bundle 未重登/BTM 旧代残留)——如实给「重新登记」出口,不假称运行中。
+    var helperGate: EnergyHelperGate {
+        EnergyHelperGate.resolve(status: helperStatus, fetchFailing: lastFetchFailed)
+    }
 
     init(fetch: @escaping Fetch = { try await EnergyHelperClient().fetchLatest() }) {
         self.fetch = fetch
@@ -50,7 +60,7 @@ final class EnergyImpactFeature: MonitorFeature {
         pollTask = nil
     }
 
-    private var lastFetchFailed = false
+    private(set) var lastFetchFailed = false
 
     private func pollOnce() async {
         helperStatus = PrivilegedHelperStatus.current()

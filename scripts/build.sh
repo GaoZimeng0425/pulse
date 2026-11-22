@@ -67,10 +67,27 @@ cp "Packages/PulseMCP/.build/release/pulse-mcp" "$APP_BUNDLE/Contents/MacOS/puls
 # 特权助手 daemon(p3-root-mcp/03,探针 09 安装组合):可执行 + plist 嵌
 # Contents/Library/LaunchDaemons/(SMAppService.daemon 的既定位置);同样在
 # 重签前进 bundle。
+# 指纹稳定策略(energy-gate-fix):SMAppService 按内容指纹批准守护进程——
+# 覆盖 helper = 已批准条目立即作废,用户被迫重批。新产物与已装机版本指纹
+# 相同(源码没动的常规发版)则**不覆盖**,保住批准;真变了才换并响亮提醒。
 echo "==> 构建 pulse-helper(特权助手 daemon)..."
 swift build -c release --package-path Packages/PulseHelper -q
 mkdir -p "$APP_BUNDLE/Contents/Library/LaunchDaemons"
-cp "Packages/PulseHelper/.build/release/pulse-helper" "$APP_BUNDLE/Contents/Library/LaunchDaemons/pulse-helper"
+NEW_HELPER="Packages/PulseHelper/.build/release/pulse-helper"
+INSTALLED_HELPER="$APP_BUNDLE/Contents/Library/LaunchDaemons/pulse-helper"
+if [ -f "$INSTALLED_HELPER" ] \
+  && shasum -a 256 "$NEW_HELPER" | awk '{print $1}' > /tmp/pulse-helper-new.sha \
+  && shasum -a 256 "$INSTALLED_HELPER" | awk '{print $1}' > /tmp/pulse-helper-old.sha \
+  && cmp -s /tmp/pulse-helper-new.sha /tmp/pulse-helper-old.sha; then
+  echo "==> 特权助手指纹未变,保留已装机版本(系统批准继续有效)"
+else
+  if [ -f "$INSTALLED_HELPER" ]; then
+    echo "⚠️  特权助手已更新:装机后需到 设置 → 通用 关开一次「特权助手」开关,"
+    echo "⚠️  并在 系统设置 → 通用 → 登录项与扩展 重新允许一次(macOS 按内容指纹批准守护进程)"
+  fi
+  cp "$NEW_HELPER" "$INSTALLED_HELPER"
+fi
+rm -f /tmp/pulse-helper-new.sha /tmp/pulse-helper-old.sha
 cp "Packages/PulseHelper/com.gaozimeng.pulse.helper2.plist" "$APP_BUNDLE/Contents/Library/LaunchDaemons/"
 chmod 755 "$APP_BUNDLE/Contents/Library/LaunchDaemons/pulse-helper"
 
