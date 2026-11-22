@@ -71,3 +71,19 @@ final class EnergyImpactTableTests: XCTestCase {
         XCTAssertEqual(rows[1].meterFraction, 33.67 / 2409.65, accuracy: 0.0001)
     }
 }
+
+// MARK: - 门槛四态融合(energy-gate-fix)
+
+final class EnergyHelperGateTests: XCTestCase {
+    func testResolveFourStates() {
+        XCTAssertEqual(EnergyHelperGate.resolve(status: .notRegistered, fetchFailing: false), .notInstalled)
+        XCTAssertEqual(EnergyHelperGate.resolve(status: .notRegistered, fetchFailing: true), .notInstalled)
+        XCTAssertEqual(
+            EnergyHelperGate.resolve(status: .requiresApproval, fetchFailing: false),
+            .awaitingSystemApproval
+        )
+        // status 说谎实案:系统报 enabled,但拉取持续失败 → 如实判「没在运行」。
+        XCTAssertEqual(EnergyHelperGate.resolve(status: .enabled, fetchFailing: true), .approvedButNotRunning)
+        XCTAssertEqual(EnergyHelperGate.resolve(status: .enabled, fetchFailing: false), .approvedAwaitingReading)
+    }
+}

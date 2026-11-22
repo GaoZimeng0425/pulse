@@ -71,6 +71,7 @@
 		42CC1DC1CC1DFFC5186B8248 /* NemoNotchToastSender.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF6813960D12A83141B88F0F /* NemoNotchToastSender.swift */; };
 		43B294E1AC951C6369C303A5 /* AppVolumeFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 269ED1A76CFF0AE7EB984F81 /* AppVolumeFeatureTests.swift */; };
 		44FF4D90C0131F982D4887A1 /* RankingOverflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FD44EAE086DEE8538A21818 /* RankingOverflow.swift */; };
+		45F1C8E65E553E310E692564 /* EnergyHelperGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B3E17EDB4CF9D22C9DDBAC4 /* EnergyHelperGate.swift */; };
 		468E4F4F50FB387354742865 /* EnergyModelSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2C47A273B11DED944F68280 /* EnergyModelSensor.swift */; };
 		46DBB21B089E14C2B6E39036 /* BirthScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B861A747FF3BF8E186AD5FFB /* BirthScannerTests.swift */; };
 		46FA3C977CB5BA520598C04C /* SystemMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7B5ADC98A14B764E51366DB /* SystemMonitor.swift */; };
@@ -278,6 +279,7 @@
 		16E122CDE8CB7A49B14C617E /* MonitorAssembly.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorAssembly.swift; sourceTree = "<group>"; };
 		18902C5B107303C6D1E30137 /* AgentUsageFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentUsageFeature.swift; sourceTree = "<group>"; };
 		1AF42F49FFB85D97F2B8C74D /* BatteryFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryFixture.swift; sourceTree = "<group>"; };
+		1B3E17EDB4CF9D22C9DDBAC4 /* EnergyHelperGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyHelperGate.swift; sourceTree = "<group>"; };
 		1B7ADC75304AC8AC8EF1CED3 /* GroupCategoryDisplayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupCategoryDisplayTests.swift; sourceTree = "<group>"; };
 		1C01F3A4AB4BC765537F64DA /* EnergyModelSensorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyModelSensorTests.swift; sourceTree = "<group>"; };
 		1C3691DE09224C04DEA8AB40 /* LaunchdManifestFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchdManifestFeature.swift; sourceTree = "<group>"; };
@@ -557,6 +559,7 @@
 				1FF2CA7CD9C3FB8777581E6E /* ContainerFeature.swift */,
 				41196C89D2456B23F701DF21 /* DevServerFeature.swift */,
 				F5067DB98A38E61400019E48 /* DiskFeature.swift */,
+				1B3E17EDB4CF9D22C9DDBAC4 /* EnergyHelperGate.swift */,
 				6FAC8FF0F5F516CFC9CC7150 /* EnergyImpactFeature.swift */,
 				C0148962B15C35DBD46696E1 /* EnergyImpactTable.swift */,
 				4822D29598222B0F5B29959A /* GpuFeature.swift */,
@@ -1050,6 +1053,7 @@
 				3CF021A14DA00F8F1381EBF7 /* DiskSensor.swift in Sources */,
 				1EC99DA794DBE3C8C9787753 /* DockPresence.swift in Sources */,
 				7DA585A2786F7FEDFED5D08E /* EnergyHelperClient.swift in Sources */,
+				45F1C8E65E553E310E692564 /* EnergyHelperGate.swift in Sources */,
 				4B9D8CCCFE156DEBEB5FAA2D /* EnergyImpactFeature.swift in Sources */,
 				868B2FB599B4548C7FEB517B /* EnergyImpactTable.swift in Sources */,
 				468E4F4F50FB387354742865 /* EnergyModelSensor.swift in Sources */,
