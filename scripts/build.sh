@@ -13,25 +13,39 @@ APP_NAME="Pulse"
 BUILD_DIR="build"
 INSTALL_PATH="/Applications/$APP_NAME.app"
 
-# ── 本地部署自签(2026-10-24,照搬 NemoNotch 2026-10-20 方案)──────────────
-# ad-hoc 每次重建换 cdhash,TCC/Keychain 授权全丢 = 每次重装都被当陌生 app
-# 重新弹权限框(蓝牙票 p2-sensors/06 补记的"一直提示"根因之二)。改用登录钥匙串里的
-# 稳定自签身份:授权锚定在证书上,重装不丢。
-# 判据用 codesign 实签探针(find-identity -p codesigning 对无信任设置的自签
-# 证书不显示,不能当存在性检查,NemoNotch 实测)。
-# 生成/重建证书:sh scripts/make-signing-cert.sh
-# 显式逃生口(临时 ad-hoc):PULSE_SIGNING_IDENTITY=-
-SIGNING_IDENTITY="${PULSE_SIGNING_IDENTITY:-Pulse Local Code Signing}"
+# ── 发布签名:Apple Development 证书(release-dev-signing,2026-11-22)──────
+# 历史两层,别混:
+# ① TCC/授权稳定:锚定证书,重装不丢——Apple Development 同样满足(固定身份,
+#    非临时签名);换证书那次会重弹授权(一次性,已记档)。
+# ② 守护进程 Launch Constraint(11-22 定谳):macOS 26 对系统级后台程序校验
+#    签名里的**开发者团队身份**——自签证书没有,ad-hoc 更没有,launchd 每次
+#    15ms 拒 spawn(OS_REASON_CODESIGNING)。唯一活路 = 有 Team 身份的证书,
+#    即 Apple Development(Xcode 已登录的 Apple ID 免费签发,一年有效期)。
+# 注意:换签名身份 = 系统视 Pulse 为陌生 app,**一次性**重弹 TCC 授权框
+# (蓝牙/通知/音频捕获逐个允许),助手也要重新批准一次——记档的一次性成本。
+# 证书过期预警:探针顺带检查剩余有效期(<30 天响亮警告)。
+# 显式逃生口(临时 ad-hoc,助手将无法运行):PULSE_SIGNING_IDENTITY=-
+SIGNING_IDENTITY="${PULSE_SIGNING_IDENTITY:-Apple Development}"
 if [ "$SIGNING_IDENTITY" != "-" ]; then
   probe=$(mktemp) && printf 'probe' > "$probe"
   if ! codesign -f -s "$SIGNING_IDENTITY" "$probe" >/dev/null 2>&1; then
     echo "✋ 签名身份 '$SIGNING_IDENTITY' 解析不到 — 拒绝静默回退 ad-hoc。"
-    echo "   重建: sh scripts/make-signing-cert.sh"
+    echo "   铸造/刷新: xcodebuild -allowProvisioningUpdates 走 Xcode 已登录 Apple ID"
+    echo "   (AGENTS.md 构建节有完整口径;证书一年有效,过期即重铸)"
     echo "   临时显式回退: PULSE_SIGNING_IDENTITY=- sh scripts/build.sh"
     rm -f "$probe"
     exit 1
   fi
   rm -f "$probe"
+  # 过期预警:证书链里找 Apple Development 的剩余天数(<30 天警告)。
+  expiry=$(security find-certificate -a -c "Apple Development" -p login.keychain-db 2>/dev/null \
+    | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
+  if [ -n "$expiry" ]; then
+    days=$(( ( $(date -j -f "%b %d %H:%M:%S %Y GMT" "$expiry" "+%s" 2>/dev/null || echo 0) - $(date +%s) ) / 86400 ))
+    if [ "$days" -lt 30 ]; then
+      echo "⚠️  Apple Development 证书仅剩 ${days} 天有效——过期后签名失效,需重铸(release-dev-signing 记档)"
+    fi
+  fi
 fi
 echo "==> 签名身份: $SIGNING_IDENTITY"
 
