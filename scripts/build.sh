@@ -94,6 +94,11 @@ chmod 755 "$APP_BUNDLE/Contents/Library/LaunchDaemons/pulse-helper"
 if [ "$SIGNING_IDENTITY" != "-" ]; then
   echo "==> 重签($SIGNING_IDENTITY)..."
   codesign --force --deep --sign "$SIGNING_IDENTITY" "$APP_BUNDLE"
+  # 守护进程必须显式单独签:--deep(deprecated)不保证覆盖 LaunchDaemons 里的
+  # 独立可执行文件,swift build 产物的 ad-hoc 签名残留 → 与宿主身份不符 →
+  # macOS 26 Launch Constraint 直接拒 spawn(OS_REASON_CODESIGNING,
+  # 2026-11-22 定谳:BTM 批准一直为真,助手自发布脚本接管装机起从未跑起)。
+  codesign --force --sign "$SIGNING_IDENTITY" "$APP_BUNDLE/Contents/Library/LaunchDaemons/pulse-helper"
 fi
 
 echo "==> 优雅退出正在运行的 $APP_NAME..."
