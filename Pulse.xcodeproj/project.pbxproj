@@ -122,6 +122,7 @@
 		7F9B2BCCDACD80F852FC20D3 /* HostInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = D363D25298EACE08DE4713DF /* HostInfo.swift */; };
 		8328544835522E8F1A0BDCF7 /* ProcessDrilldownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8434AD3F303A7E024D2887D /* ProcessDrilldownView.swift */; };
 		848B3618CDF4F547B6619433 /* StripChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB4FA4027487EAA178DE6EC /* StripChartView.swift */; };
+		868B2FB599B4548C7FEB517B /* EnergyImpactTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0148962B15C35DBD46696E1 /* EnergyImpactTable.swift */; };
 		89F5E5931E2250F60A9FCA0B /* ContainerCardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 578B06925AAA893C922D03BC /* ContainerCardViews.swift */; };
 		8BDCC1FD5A8A1D0FA8E1BAD4 /* AlertNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05102129BE186A01609E2D26 /* AlertNotification.swift */; };
 		8F2764770678C37BC8F19EB5 /* MetricTabStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC7E021DBD973F60A3D713EE /* MetricTabStack.swift */; };
@@ -133,6 +134,7 @@
 		9491ADCA2B64ECCB6848620F /* AgentUsageViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1DCE0B930E3B618D9BFE2DC /* AgentUsageViews.swift */; };
 		95ED42ABC298ED4EB202E74F /* CleanerConfirmSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB40B26CEE07BB01EDE3C798 /* CleanerConfirmSheet.swift */; };
 		95F11AA60DFD61D22F17DAA0 /* AgentIncrementalLiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36BBD49FB118B6B3BD3CF96D /* AgentIncrementalLiveTests.swift */; };
+		9730A85711DA1A95E61C1299 /* EnergyImpactTableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E61F388AE87DD149C463A8C4 /* EnergyImpactTableTests.swift */; };
 		982599D2B6085264FC74583F /* SmcFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA3DD124F0650F10B15F255D /* SmcFeature.swift */; };
 		99F53EC068B34061699D821F /* AgentUsageFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18902C5B107303C6D1E30137 /* AgentUsageFeature.swift */; };
 		9BB2782F91E17B5423C2296F /* CleanerOverviewViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC47165BC5F259312DF6927B /* CleanerOverviewViews.swift */; };
@@ -404,6 +406,7 @@
 		BD925AFC633F3C421507FEE7 /* LiveInstalledAppInventory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveInstalledAppInventory.swift; sourceTree = "<group>"; };
 		BE86A48D24949B3D225394BD /* TestHostIsolationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHostIsolationTests.swift; sourceTree = "<group>"; };
 		BF1112B10A2BC7B9FA3CF32C /* AppAudioPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAudioPipeline.swift; sourceTree = "<group>"; };
+		C0148962B15C35DBD46696E1 /* EnergyImpactTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyImpactTable.swift; sourceTree = "<group>"; };
 		C3ED9E7F6F40FF3D9167EACB /* BirthScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BirthScanner.swift; sourceTree = "<group>"; };
 		C52DB5F7C6F83EAC51BD568F /* LiveCleanDirectoryEnumeratorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCleanDirectoryEnumeratorTests.swift; sourceTree = "<group>"; };
 		C53D2D1E33AFAC1704FD224A /* KillServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KillServiceTests.swift; sourceTree = "<group>"; };
@@ -444,6 +447,7 @@
 		E30359B7325F49ACFB28D448 /* NetworkFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkFeature.swift; sourceTree = "<group>"; };
 		E353A0118896B05E3761D72A /* DockPresence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockPresence.swift; sourceTree = "<group>"; };
 		E47B1B2BE308D9127A0DB19A /* RankingsFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingsFeature.swift; sourceTree = "<group>"; };
+		E61F388AE87DD149C463A8C4 /* EnergyImpactTableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyImpactTableTests.swift; sourceTree = "<group>"; };
 		E98C287752EFC374E2CC7F9A /* PowerFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerFeature.swift; sourceTree = "<group>"; };
 		EA32BC4006AFA168EE6CF9B5 /* RoundSpineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoundSpineTests.swift; sourceTree = "<group>"; };
 		EBB4FA4027487EAA178DE6EC /* StripChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StripChartView.swift; sourceTree = "<group>"; };
@@ -554,6 +558,7 @@
 				41196C89D2456B23F701DF21 /* DevServerFeature.swift */,
 				F5067DB98A38E61400019E48 /* DiskFeature.swift */,
 				6FAC8FF0F5F516CFC9CC7150 /* EnergyImpactFeature.swift */,
+				C0148962B15C35DBD46696E1 /* EnergyImpactTable.swift */,
 				4822D29598222B0F5B29959A /* GpuFeature.swift */,
 				0D85BCEEF64EDEAAFC5AE256 /* HistoryFeature.swift */,
 				2D9E9859704834567FBC963A /* KillRequestFlow.swift */,
@@ -749,6 +754,7 @@
 				E0C2BC1088F0581063C1D49A /* DiskSensorTests.swift */,
 				0B776C2ED787C3294C4F2E33 /* DockPresenceTests.swift */,
 				CB2143C633E5F922EDA23B55 /* EnergyImpactFeatureTests.swift */,
+				E61F388AE87DD149C463A8C4 /* EnergyImpactTableTests.swift */,
 				1C01F3A4AB4BC765537F64DA /* EnergyModelSensorTests.swift */,
 				997E4A682EAB7F54A6FEB9BE /* GpuSensorTests.swift */,
 				1B7ADC75304AC8AC8EF1CED3 /* GroupCategoryDisplayTests.swift */,
@@ -930,6 +936,7 @@
 				C54E62D5C96A4FFA4851744E /* DiskSensorTests.swift in Sources */,
 				FCD182D71A4DC761A91EE8C5 /* DockPresenceTests.swift in Sources */,
 				F64753C9B30A91EA24799BB1 /* EnergyImpactFeatureTests.swift in Sources */,
+				9730A85711DA1A95E61C1299 /* EnergyImpactTableTests.swift in Sources */,
 				6164A801BF9C51036BBF73BC /* EnergyModelSensorTests.swift in Sources */,
 				21BAA7AE4F5D186DD8EF781F /* GpuSensorTests.swift in Sources */,
 				3891285DCA8188E59A9EC34E /* GroupCategoryDisplayTests.swift in Sources */,
@@ -1044,6 +1051,7 @@
 				1EC99DA794DBE3C8C9787753 /* DockPresence.swift in Sources */,
 				7DA585A2786F7FEDFED5D08E /* EnergyHelperClient.swift in Sources */,
 				4B9D8CCCFE156DEBEB5FAA2D /* EnergyImpactFeature.swift in Sources */,
+				868B2FB599B4548C7FEB517B /* EnergyImpactTable.swift in Sources */,
 				468E4F4F50FB387354742865 /* EnergyModelSensor.swift in Sources */,
 				6A5229101F7D0A32D3436F8A /* GeneralSettingsView.swift in Sources */,
 				62894C55877E1831EA472420 /* GpuFeature.swift in Sources */,

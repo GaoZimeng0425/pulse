@@ -46,24 +46,4 @@ final class AgentEnergyTableTests: XCTestCase {
         XCTAssertEqual(AgentEnergyTable.agent(for: "OLLAMA"), "Ollama")
         XCTAssertEqual(AgentEnergyTable.agent(for: "Claude Helper"), "Claude")
     }
-
-    func testRankingRowsUseLeaderNormalizationAndAdaptiveFormat() {
-        let rows = AgentEnergyTable.rankingRows([
-            AgentEnergyEntry(agent: "ZCode", impact: 2409.65, processCount: 3),
-            AgentEnergyEntry(agent: "zap", impact: 33.67, processCount: 1),
-        ])
-        XCTAssertEqual(rows.count, 2)
-        XCTAssertEqual(rows[0].id, "agent:ZCode")
-        XCTAssertEqual(rows[0].primaryText, "2410") // ≥100 取整
-        XCTAssertEqual(rows[0].subtitle, "3 个进程")
-        XCTAssertEqual(rows[0].meterFraction, 1, accuracy: 0.001) // 榜首满条
-        XCTAssertEqual(rows[1].primaryText, "33.7") // <100 一位小数
-        XCTAssertEqual(rows[1].meterFraction, 33.67 / 2409.65, accuracy: 0.001)
-    }
-
-    func testFormatBoundaryAt100() {
-        XCTAssertEqual(AgentEnergyTable.format(99.96), "100.0")
-        XCTAssertEqual(AgentEnergyTable.format(100), "100")
-        XCTAssertEqual(AgentEnergyTable.format(0.34), "0.3")
-    }
 }

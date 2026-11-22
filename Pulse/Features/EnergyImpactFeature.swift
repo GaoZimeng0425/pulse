@@ -26,12 +26,17 @@ final class EnergyImpactFeature: MonitorFeature {
     private var host: MonitorHost?
     private var pollTask: Task<Void, Never>?
 
+    /// 特权助手安装三态(battery-energy/01:电池页两卡共用引导空态的判据)。
+    /// start 即读、每轮 poll 前刷新(用户在设置里开关/批准后,最长 60s 内跟上)。
+    private(set) var helperStatus: PrivilegedHelperStatus = .notRegistered
+
     init(fetch: @escaping Fetch = { try await EnergyHelperClient().fetchLatest() }) {
         self.fetch = fetch
     }
 
     func start(_ host: MonitorHost) {
         self.host = host
+        helperStatus = PrivilegedHelperStatus.current()
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.pollOnce()
@@ -48,6 +53,7 @@ final class EnergyImpactFeature: MonitorFeature {
     private var lastFetchFailed = false
 
     private func pollOnce() async {
+        helperStatus = PrivilegedHelperStatus.current()
         let result: (samples: [(pid: Int, name: String, impact: Double)], collectedAt: Date)?
         do {
             result = try await fetch()

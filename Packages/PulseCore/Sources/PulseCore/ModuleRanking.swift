@@ -61,31 +61,6 @@ public enum ModuleRankingAggregator {
         var secondaryB: Double = 0
     }
 
-    /// 电池页·能耗影响行(工单 01):主值 = 本档 CPU 时间(秒,一位小数),
-    /// 副文 = 唤醒/秒——数据层对能耗故意不出速率(复合分是窗口差分),这里按这一窗的
-    /// 实际跨度 `windowSeconds` 折算每秒(ProcessRankingRound.energyWindowSeconds);排序与 meter 按复合分 impact——唤醒重的进程名次不亏
-    /// (主值只管展示,复合分才是"影响"的口径)。
-    public static func energyRows(
-        impacts: [pid_t: ProcessEnergyImpact],
-        windowSeconds: TimeInterval,
-        groups: [ProcessGroup]
-    ) -> [ModuleRankingRow] {
-        let perSecond = windowSeconds > 0 ? 1 / windowSeconds : 0
-        let readings = impacts.mapValues { impact in
-            Readings(
-                rankValue: Double(impact.impact),
-                primary: Double(impact.cpuNanosDelta) / 1_000_000_000,
-                secondaryA: Double(impact.wakeupsDelta) * perSecond
-            )
-        }
-        return rows(readings, groups: groups) { aggregate in
-            (
-                primaryText: PulseFormat.cpuSeconds(aggregate.primary),
-                subtitle: "唤醒 \(PulseFormat.wakeupsPerSecond(aggregate.secondaryA))"
-            )
-        }
-    }
-
     /// 磁盘页·读写最多行(工单 01):主值 = 读 + 写总速率;副文分列读写。
     public static func diskRows(
         rates: [pid_t: ProcessDiskRates],
