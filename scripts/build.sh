@@ -109,6 +109,7 @@ else
   cp "$NEW_HELPER" "$INSTALLED_HELPER"
 fi
 cp "Packages/PulseHelper/com.gaozimeng.pulse.helper2.plist" "$APP_BUNDLE/Contents/Library/LaunchDaemons/"
+cp "Packages/PulseHelper/com.gaozimeng.pulse.helper3.plist" "$APP_BUNDLE/Contents/Library/LaunchDaemons/"
 chmod 755 "$APP_BUNDLE/Contents/Library/LaunchDaemons/pulse-helper"
 
 if [ "$SIGNING_IDENTITY" != "-" ]; then

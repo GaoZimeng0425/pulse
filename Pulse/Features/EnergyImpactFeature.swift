@@ -136,7 +136,19 @@ enum PrivilegedHelperStatus {
     case requiresApproval
     case enabled
 
-    static func current(plistName: String = "com.gaozimeng.pulse.helper2.plist") -> PrivilegedHelperStatus {
+    /// btm-lwcr-fix(11-23 定谳):helper2 的 BTM 条目沉积成疾——disposition 停在
+    /// enabled,但 Launch Constraint 的 cdhash 放行名单是空数组,用户侧任何关-
+    /// 开循环都只是「重提交 job → 15ms 拒杀」,永远补不进名单。修法 = 换全新
+    /// 身份号 helper3 走干净批准链;helper2 死条目在此注销(plist 保留在 bundle,
+    /// SMAppService 按 bundle 内路径解析)。幂等,失败不阻塞(条目可能已被清)。
+    private static func unregisterLegacyHelper2() {
+        let legacy = SMAppService.daemon(plistName: "com.gaozimeng.pulse.helper2.plist")
+        if legacy.status != .notRegistered {
+            try? legacy.unregister()
+        }
+    }
+
+    static func current(plistName: String = "com.gaozimeng.pulse.helper3.plist") -> PrivilegedHelperStatus {
         switch SMAppService.daemon(plistName: plistName).status {
         case .enabled: .enabled
         case .requiresApproval: .requiresApproval
@@ -145,7 +157,8 @@ enum PrivilegedHelperStatus {
     }
 
     static func setInstalled(_ installed: Bool) {
-        let service = SMAppService.daemon(plistName: "com.gaozimeng.pulse.helper2.plist")
+        unregisterLegacyHelper2()
+        let service = SMAppService.daemon(plistName: "com.gaozimeng.pulse.helper3.plist")
         if installed {
             try? service.register()
             // energy-one-tap:开开关不止登记——系统确要批准时直接带用户去批准页
@@ -162,7 +175,8 @@ enum PrivilegedHelperStatus {
     /// 残留等)→ 注销重登(plist 运维口径「bootout → 重开 → 重批」);随后打开
     /// 系统设置的登录项批准页。批准仍是用户自点(TCC 原则),app 只带路。
     static func reRegisterAndOpenApproval() {
-        let service = SMAppService.daemon(plistName: "com.gaozimeng.pulse.helper2.plist")
+        unregisterLegacyHelper2()
+        let service = SMAppService.daemon(plistName: "com.gaozimeng.pulse.helper3.plist")
         if current() != .notRegistered {
             try? service.unregister()
         }

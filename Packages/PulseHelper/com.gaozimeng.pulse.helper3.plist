@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.gaozimeng.pulse.helper3</string>
+    <!-- btm-lwcr-fix(2026-11-23 定谳):helper2 条目在 BTM 库沉积成疾——
+         disposition 停在 enabled/allowed,但 LWCR cdhash 放行名单为空数组,
+         用户每次关-开循环 smd 都重新提交 job,launchd 每次 15ms 内以
+         OS_REASON_CODESIGNING | Launch Constraint Violation 拒杀
+         (consistent failure),开关动作永远补不进名单。唯一实证活路 =
+         换全新身份号走干净批准链,批准时当前 cdhash 才会真正入名单
+         (10-27 helper→helper2 同款手术,当日复活,Last Use 11-01)。
+         历史口径全数继承(2026-10-27):相对路径 + 批准链是唯一成功组合;
+         快速重注册链两条都死;换 bundle(二进制/plist 变)后必须完整
+         关-开循环 + 系统设置重新批准一次。helper2 死条目由 app 侧
+         unregisterLegacyHelper2() 注销,plist 仍随 bundle 分发
+         (注销时 SMAppService 按此路径解析)。 -->
+    <key>BundleProgram</key>
+    <string>Contents/Library/LaunchDaemons/pulse-helper</string>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
