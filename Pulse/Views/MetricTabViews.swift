@@ -328,7 +328,7 @@ struct MetricMainCardView: View {
         MetricIconTabBar(selection: $selection)
         MetricPillTabBar(selection: $selection)
         Text("当前:\(selection.current.title)")
-            .font(.caption)
+            .font(.system(size: 10.5))
             .foregroundStyle(.secondary)
     }
     .padding(16)

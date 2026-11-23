@@ -32,7 +32,7 @@ struct CleanerSettingsView: View {
             exclusionSection
             Section {
                 Text("清理扫描根与上方「项目根目录」页的归组配置互不影响(两套独立配置)。项目 = 扫描根的直接子目录;正在使用的项目(终端 / 构建 / git 活动在其中)永不进入清理,且每次清理前都会重查。")
-                    .font(.caption)
+                    .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
             }
         }
@@ -130,7 +130,7 @@ struct CleanerSettingsView: View {
             }
             if store.paths.isEmpty {
                 Text("尚无排除目录。清理页右键任意清单行可排除该目录,或在这里添加。")
-                    .font(.caption)
+                    .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
             }
             Button {

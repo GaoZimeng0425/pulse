@@ -45,3 +45,13 @@ custom_rules:
       - '.*/PulseTests/.*'
     message: "永久删除出口仅两处(废纸篓执行器/卸载域永久删除);新出口先过 ADR-0008 闸门再进白名单。"
     severity: error
+  # DESIGN.md:窗口 UI 文字只取五档显式字号,图标取 IconSize 档位。系统语义字体
+  # (.caption 等)不在档内、随系统版本漂移,预览块与图标同守,不设豁免。
+  no_system_text_style_fonts:
+    name: "No System Text Style Fonts"
+    regex: '\.font\(\s*\.(caption2?|footnote|title2|title3|title|headline|subheadline|body|callout|largeTitle)\b'
+    excluded:
+      - '.*/Tests/.*'
+      - '.*/PulseTests/.*'
+    message: "文字只取五档显式字号(10.5 / 11 / 12 / 14.5 / 17),图标取 IconSize 档位;不用系统语义字体。"
+    severity: error

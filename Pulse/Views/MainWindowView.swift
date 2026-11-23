@@ -458,7 +458,7 @@ struct SortableProcessTableView: View {
             headerButton(title: "CPU%", key: .cpu, minWidth: 44)
             headerButton(title: "内存", key: .memory, minWidth: 56)
         }
-        .font(.caption)
+        .font(.system(size: 10.5))
         .padding(.horizontal, 12)
         .padding(.top, 6)
     }

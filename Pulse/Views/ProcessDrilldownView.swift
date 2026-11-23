@@ -72,7 +72,7 @@ struct ProcessRowView: View {
                     MeterBar(fraction: meterFraction, tint: Metric.cpu.accentColor)
                 }
             }
-            .font(.caption)
+            .font(.system(size: 10.5))
             .padding(.horizontal, 12)
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -143,7 +143,7 @@ struct ProcessDetailView: View {
             }
             endProcessRow
         }
-        .font(.caption)
+        .font(.system(size: 10.5))
         .padding(12)
         .background(Color.primary.opacity(0.06), in: .rect(cornerRadius: 8))
         .padding(.horizontal, 6)
@@ -158,7 +158,7 @@ struct ProcessDetailView: View {
                 onEnd(detail.process.killTarget)
             } label: {
                 Label("结束进程", systemImage: "xmark.octagon")
-                    .font(.caption.weight(.semibold))
+                    .font(.system(size: 10.5, weight: .semibold))
             }
             .buttonStyle(.bordered)
             .tint(Surface.negative)
@@ -193,7 +193,7 @@ struct ProcessDetailView: View {
                     copyArgv()
                 } label: {
                     Image(systemName: "doc.on.doc")
-                        .font(.caption2)
+                        .font(.system(size: IconSize.inline))
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
