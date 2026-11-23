@@ -35,3 +35,21 @@ public enum HistoryCurveHover {
         return nil
     }
 }
+
+// MARK: - 端点锚定网格(主卡面积图,history-hover/02)
+
+public extension HistoryCurveHover {
+    /// 主卡面积图的反算:x = i/(count-1)·width(首尾点贴两缘,与历史页的
+    /// 桶中心式不同——两图 x 几何不同构,反算各写各的,别硬套)。
+    static func edgeIndex(atX x: CGFloat, width: CGFloat, count: Int) -> Int {
+        guard count > 1, width > 0 else { return 0 }
+        let raw = x / width * CGFloat(count - 1)
+        return min(max(Int(raw.rounded()), 0), count - 1)
+    }
+
+    /// 槽序号 → 真实数据窗内序号:主卡图右对齐,左端 paddingCount 个槽是
+    /// 2% 垫底假点(不是读数)——垫底槽返回 nil,悬停不出读数不编数。
+    static func windowIndex(forSlot slot: Int, paddingCount: Int) -> Int? {
+        slot >= paddingCount ? slot - paddingCount : nil
+    }
+}

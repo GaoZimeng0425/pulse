@@ -14,8 +14,15 @@ final class GpuFeature: MonitorFeature {
     /// (p2-review/06)后为混排节拍——可见 5s / 不可见 30s,窗长按样本数计。
     /// 关电归 0 与真 0 同记——走势如实反映"没在用"。
     private var ring = TrendRing<Double>(limit: 60)
+    /// 与值环同批的时刻环(history-hover/02;SensorDelivery 不带时刻,取交付
+    /// 到达钟——秒级精度够 HH:mm:ss 展示,与值同环同长)。
+    private var timeRing = TrendRing<Date>(limit: 60)
     var trend: [Double] {
         ring.values
+    }
+
+    var trendTimes: [Date] {
+        timeRing.values
     }
 
     private let provider: GpuSensorProvider
@@ -25,6 +32,9 @@ final class GpuFeature: MonitorFeature {
     init(source: any GpuSource, trendLimit: Int = 60) {
         provider = GpuSensorProvider(source: source)
         ring = TrendRing(limit: trendLimit)
+        // 双环同容量(评审 P2):注入非默认 limit 时值环封顶而时刻环继续涨,
+        // times/values 等长不变量破坏 → 悬停无声失效。
+        timeRing = TrendRing(limit: trendLimit)
     }
 
     func start(_ host: MonitorHost) {
@@ -63,6 +73,8 @@ final class GpuFeature: MonitorFeature {
     private func apply(_ delivery: SensorDelivery<GpuReading>?) {
         guard case let .fresh(reading) = delivery else { return }
         self.reading = reading
+        let arrivedAt = Date()
         ring.append(reading.utilizationPercent)
+        timeRing.append(arrivedAt)
     }
 }

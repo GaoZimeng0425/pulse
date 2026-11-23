@@ -116,10 +116,19 @@ public struct NetworkTrendBuffer: Equatable, Sendable {
     /// 走势环收编(p2-review/06):窗口语义住在核心 TrendRing,本类型只承载
     /// 网络速率值与图表口径。
     private var ring = TrendRing<NetworkRates>(limit: NetworkTrendBuffer.capacity)
+    /// 与速率环同批的时刻环(history-hover/02 主卡悬停:心跳节奏 5s/1s 混合,
+    /// 按序号猜时刻不可靠,时间与值同环同长)。
+    private var timeRing = TrendRing<Date>(limit: NetworkTrendBuffer.capacity)
 
     /// 追加一轮速率(丢弃轮的 0 也入环——图表如实画谷底,不跳点)。
-    public mutating func append(_ rates: NetworkRates) {
+    public mutating func append(_ rates: NetworkRates, at date: Date) {
         ring.append(rates)
+        timeRing.append(date)
+    }
+
+    /// 与 `totalBytesPerSecond` 对齐的时刻(旧 → 新)。
+    public var times: [Date] {
+        timeRing.values
     }
 
     /// 图表口径:上 + 下合计流量(与磁盘卡"读写合计"同款惯例)。

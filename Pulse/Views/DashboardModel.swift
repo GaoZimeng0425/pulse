@@ -52,10 +52,12 @@ final class DashboardModel {
             statistics: monitor.sampleHistory.systemCPULoad.statistics,
             trend: monitor.sampleHistory.systemCPULoad.values
         )
+        .settingTrendTimes(monitor.sampleHistory.systemCPULoadTimes.values.map(Date.init(timeIntervalSince1970:)))
     }
 
     var memoryModel: MetricCardModel {
         .memory(monitor.memory, trend: monitor.sampleHistory.memoryUsed.values, host: .current)
+            .settingTrendTimes(monitor.sampleHistory.memoryUsedTimes.values.map(Date.init(timeIntervalSince1970:)))
     }
 
     /// 电池卡(p1-history/02;p2-sensors/04 顺手活):六项读数读 monitor.battery
@@ -74,12 +76,16 @@ final class DashboardModel {
     /// 容量未首读时全占位(MetricCardModel.disk 兜底)。
     var diskModel: MetricCardModel {
         .disk(capacity: monitor.disk.capacity, throughput: monitor.disk.throughput)
+            .settingTrendTimes(
+                (monitor.disk.throughput?.trendTimes ?? []).map(Date.init(timeIntervalSince1970:))
+            )
     }
 
     /// GPU 卡(p2-sensors/02):读数与走势环都读 monitor.gpu(LastGood 语义);
     /// 未首读时全占位(MetricCardModel.gpu 兜底)。
     var gpuModel: MetricCardModel {
         .gpu(monitor.gpu.reading, trend: monitor.gpu.trend)
+            .settingTrendTimes(monitor.gpu.trendTimes)
     }
 
     /// ANE 卡(p2-sensors/03):功率读 monitor.power,归一化随芯片上限折算;
@@ -90,6 +96,8 @@ final class DashboardModel {
             normalizedPercent: monitor.power.aneNormalizedPercent,
             trend: monitor.power.aneTrend
         )
+        .settingTrendTimes(monitor.power.aneTrendTimes)
+        .settingTrendValueText { PulseFormat.watts($0) }
     }
 
     /// 网络卡(工单 06):实时速率读心跳差分(monitor.network.reading,LastGood),
@@ -101,6 +109,7 @@ final class DashboardModel {
             trend: monitor.network.trend.totalBytesPerSecond,
             totals: monitor.history.networkTotals
         )
+        .settingTrendTimes(monitor.network.trend.times)
     }
 
     // MARK: 会话状态与处置请求(工单 08;确认 + 执行在 KillRequestFlow)
