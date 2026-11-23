@@ -6,7 +6,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** done(代码 2026-11-23 完成;合入与用户目验归票 09)
 
 ## Agent Brief
 

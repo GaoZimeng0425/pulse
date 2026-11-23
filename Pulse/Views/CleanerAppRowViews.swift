@@ -64,7 +64,7 @@ struct AppRow: View {
             .frame(width: CleanerListMetrics.valueWidthWithMark, alignment: .trailing)
             Button(action: onToggleExpand) {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: IconSize.inline, weight: .semibold))
                     .foregroundStyle(.tertiary)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
                     .frame(width: 24, height: 24)

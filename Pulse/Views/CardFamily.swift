@@ -98,7 +98,7 @@ struct CardSubHeader: View {
     var body: some View {
         HStack(spacing: 5) {
             Image(systemName: symbolName)
-                .font(.system(size: 10.5, weight: .semibold))
+                .font(.system(size: IconSize.inline, weight: .semibold))
                 .foregroundStyle(tint)
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
@@ -200,7 +200,7 @@ struct CardEntityRow<Trailing: View>: View {
         } else {
             // tint 统一由调用点的链尾 foregroundStyle 上(与真图标分支同一处)。
             Image(systemName: systemImage)
-                .font(.system(size: compact ? 13 : 16, weight: .medium))
+                .font(.system(size: IconSize.leading(compact: compact), weight: .medium))
         }
     }
 }

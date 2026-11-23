@@ -42,7 +42,7 @@ struct MetricCardView: View {
         VStack(alignment: .leading, spacing: 12) {
             CardHeader(symbolName: model.symbolName, title: model.title, tint: model.tint) {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: IconSize.inline, weight: .semibold))
                     .foregroundStyle(.tertiary)
             }
             VStack(alignment: .leading, spacing: 4) {
@@ -143,7 +143,7 @@ struct MetricBadge: View {
 
     var body: some View {
         Image(systemName: symbolName)
-            .font(.system(size: 11, weight: .semibold))
+            .font(.system(size: IconSize.inline, weight: .semibold))
             .foregroundStyle(tint)
             .frame(width: 22, height: 22)
             .background(tint.opacity(0.16), in: .rect(cornerRadius: 8))

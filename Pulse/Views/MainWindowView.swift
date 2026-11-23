@@ -364,7 +364,7 @@ private struct MainSearchField: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 11))
+                .font(.system(size: IconSize.inline))
                 .foregroundStyle(.secondary)
             TextField("搜索应用或 PID", text: $query)
                 .textFieldStyle(.plain)
@@ -384,7 +384,7 @@ private struct MainSearchField: View {
                     isFocused = true
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 11))
+                        .font(.system(size: IconSize.inline))
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
@@ -476,7 +476,7 @@ struct SortableProcessTableView: View {
             HStack(spacing: 2) {
                 if order.key == key {
                     Image(systemName: order.ascending ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 7, weight: .semibold))
+                        .font(.system(size: IconSize.chevron, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
                 Text(title)

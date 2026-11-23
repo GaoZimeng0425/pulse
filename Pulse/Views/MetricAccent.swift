@@ -177,7 +177,40 @@ extension MemoryBreakdown {
     }
 }
 
+// MARK: - 设置侧栏图标砖渐变色(`{colors.settings-icon-*}`)
+
+/// 设置窗侧栏图标砖的渐变起止色:仿系统设置的固定装饰色,不随明暗切换,不走
+/// 指标色 / 类别色。每页一对(起色 → 止色,左上 → 右下)。
+enum SettingsIconTint {
+    static let general = Token(from: 0x9E9EA8, to: 0x6B6B78)
+    static let alerts = Token(from: 0xF29E33, to: 0xD9591A)
+    static let projectRoots = Token(from: 0x4D8CF2, to: 0x2659BF)
+    static let menuBar = Token(from: 0x9466EB, to: 0x6B38C7)
+    static let cleaner = Token(from: 0xFAB326, to: 0xD98500)
+
+    static let all: [Token] = [general, alerts, projectRoots, menuBar, cleaner]
+
+    struct Token: Equatable {
+        /// 0xRRGGBB。
+        let from: UInt32
+        let to: UInt32
+
+        var fromColor: Color {
+            Color.fixed(from)
+        }
+
+        var toColor: Color {
+            Color.fixed(to)
+        }
+    }
+}
+
 extension Color {
+    /// 固定色令牌(不随明暗切换):与浅深令牌走同一个 hex 解码点。
+    static func fixed(_ hex: UInt32) -> Color {
+        Color(nsColor: NSColor(srgbHex: hex))
+    }
+
     /// 浅深自适应色:动态 NSColor provider 让同一 `Color` 随系统外观切换。
     static func dynamic(light: UInt32, dark: UInt32) -> Color {
         Color(nsColor: NSColor(name: nil) { appearance in

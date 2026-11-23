@@ -391,7 +391,7 @@ struct JunkListCard: View {
             HStack(spacing: 8) {
                 if allInUse {
                     Image(systemName: "lock.fill")
-                        .font(.system(size: 13))
+                        .font(.system(size: IconSize.inline))
                         .foregroundStyle(.tertiary)
                         .help("在用保护:该\(owner)此刻有进程活动(终端/构建等),不参与本次清理")
                 } else {
@@ -428,7 +428,7 @@ struct JunkListCard: View {
                         .truncationMode(.middle)
                     Spacer(minLength: 8)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: IconSize.inline, weight: .semibold))
                         .foregroundStyle(.tertiary)
                         .rotationEffect(.degrees(isCollapsed ? 0 : 90))
                 }

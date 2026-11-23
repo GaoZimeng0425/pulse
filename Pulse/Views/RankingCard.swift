@@ -186,7 +186,7 @@ struct RankingRowView: View {
             Button(action: onEndGroup) {
                 let side = RankingListMetrics.endButtonSize(compact: isCompact)
                 Image(systemName: "xmark.octagon")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: IconSize.inline, weight: .semibold))
                     .foregroundStyle(Surface.negative)
                     .frame(width: side, height: side)
                     .contentShape(.rect)
@@ -196,7 +196,7 @@ struct RankingRowView: View {
             .help("结束整组(需确认)")
             .accessibilityLabel("结束整组 \(group.name)")
             Image(systemName: "chevron.right")
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: IconSize.inline, weight: .semibold))
                 .foregroundStyle(.tertiary)
                 .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 .frame(width: 10)

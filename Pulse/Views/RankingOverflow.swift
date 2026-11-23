@@ -87,7 +87,7 @@ struct RankingOverflowRow: View {
             HStack(spacing: 4) {
                 Text(label)
                 Image(systemName: symbolName)
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: IconSize.chevron, weight: .semibold))
             }
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(.secondary)

@@ -70,7 +70,7 @@ struct JunkRow: View {
         HStack(spacing: CleanerListMetrics.spacing) {
             if isInUse {
                 Image(systemName: "lock.fill")
-                    .font(.system(size: 13))
+                    .font(.system(size: IconSize.inline))
                     .foregroundStyle(.tertiary)
                     .help("在用保护:该项目有进程活动,不参与本次清理")
             } else {

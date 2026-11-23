@@ -60,7 +60,7 @@ struct AppListSection: View {
                     model.refresh()
                 } label: {
                     Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 12))
+                        .font(.system(size: IconSize.inline))
                 }
                 .buttonStyle(.plain)
                 .disabled(model.isBusy)

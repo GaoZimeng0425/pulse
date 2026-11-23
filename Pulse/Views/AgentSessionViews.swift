@@ -68,7 +68,7 @@ private struct AgentSessionTile<Badge: View, Metric: View>: View {
     var body: some View {
         HStack(alignment: .top, spacing: RowMetrics.spacing(compact: compact)) {
             Image(systemName: systemImage)
-                .font(.system(size: compact ? 13 : 16, weight: .medium))
+                .font(.system(size: IconSize.leading(compact: compact), weight: .medium))
                 .foregroundStyle(tint)
                 .frame(width: RowMetrics.iconSize(compact: compact))
                 .padding(.top, 2)

@@ -101,7 +101,7 @@ struct PillTabBar<Item: Hashable>: View {
             HStack(spacing: 5) {
                 if let symbol = spec.symbol {
                     Image(systemName: symbol)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: IconSize.inline, weight: .medium))
                 }
                 if showsText(isSelected) {
                     Text(spec.title)

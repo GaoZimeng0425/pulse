@@ -76,7 +76,7 @@ struct CleanerCheckBox: View {
             RoundedRectangle(cornerRadius: 5, style: .continuous)
                 .strokeBorder(state == .off ? Surface.inkTertiary : tint, lineWidth: 1.5)
             Image(systemName: state == .mixed ? "minus" : "checkmark")
-                .font(.system(size: 12, weight: .bold))
+                .font(.system(size: IconSize.inline, weight: .bold))
                 .foregroundStyle(.white)
                 .opacity(state == .off ? 0 : 1)
         }

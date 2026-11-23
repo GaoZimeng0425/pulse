@@ -113,7 +113,7 @@ private struct AppVolumeRowView: View {
     private var muteButton: some View {
         Button(action: onToggleMute) {
             Image(systemName: entry.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                .font(.system(size: compact ? 11 : 13, weight: .medium))
+                .font(.system(size: IconSize.inline, weight: .medium))
                 .frame(
                     width: RowMetrics.spacing(compact: compact) * 2,
                     height: RowMetrics.spacing(compact: compact) * 2

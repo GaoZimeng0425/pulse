@@ -35,7 +35,7 @@ struct BatteryGateHintRow: View {
     var body: some View {
         HStack(spacing: RowMetrics.spacing(compact: isCompact)) {
             Image(systemName: "bolt.badge.clock")
-                .font(.system(size: isCompact ? 13 : 16, weight: .medium))
+                .font(.system(size: IconSize.leading(compact: isCompact), weight: .medium))
                 .foregroundStyle(Metric.battery.accentColor)
                 .frame(width: RowMetrics.iconSize(compact: isCompact))
             VStack(alignment: .leading, spacing: 2) {

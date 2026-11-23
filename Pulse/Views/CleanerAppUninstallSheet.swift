@@ -117,7 +117,7 @@ struct AppUninstallConfirmSheet: View {
     private func confirmRow(_ row: Row) -> some View {
         HStack(spacing: 8) {
             Image(systemName: row.viaBrew ? "brew" : "arrow.triangle.2.circlepath")
-                .font(.system(size: 11))
+                .font(.system(size: IconSize.inline))
                 .foregroundStyle(row.viaBrew ? Surface.inkTertiary : accent)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 1) {
@@ -166,7 +166,7 @@ struct CleanerSearchField: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 11))
+                .font(.system(size: IconSize.inline))
                 .foregroundStyle(.secondary)
             TextField(prompt, text: $text)
                 .textFieldStyle(.plain)
@@ -177,7 +177,7 @@ struct CleanerSearchField: View {
                     text = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 11))
+                        .font(.system(size: IconSize.inline))
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)

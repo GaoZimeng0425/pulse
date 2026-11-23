@@ -24,7 +24,7 @@ struct AgentProjectOverflowRow: View {
             HStack(spacing: 4) {
                 Text(label)
                 Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: IconSize.chevron, weight: .semibold))
             }
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(.secondary)
@@ -128,7 +128,7 @@ struct AgentProjectCardView: View {
     private var header: some View {
         HStack(spacing: 6) {
             Image(systemName: "folder.fill")
-                .font(.system(size: 12))
+                .font(.system(size: IconSize.inline))
                 .foregroundStyle(isActive ? agentsAccent : Surface.inactive)
             Text(project.project)
                 .font(.system(size: 14.5, weight: .semibold))
@@ -284,7 +284,7 @@ struct AgentProjectCardView: View {
     private func metaItem(_ symbol: String, _ text: String) -> some View {
         HStack(spacing: 4) {
             Image(systemName: symbol)
-                .font(.system(size: 10.5))
+                .font(.system(size: IconSize.inline))
                 .foregroundStyle(.tertiary)
             Text(text)
                 .font(.system(size: 11))

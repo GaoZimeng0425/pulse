@@ -366,7 +366,7 @@ private struct OverviewModuleCard: View {
                 .monospacedDigit()
             Spacer(minLength: 8)
             Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: IconSize.inline, weight: .semibold))
                 .foregroundStyle(.tertiary)
         }
     }

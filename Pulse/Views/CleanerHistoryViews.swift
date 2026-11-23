@@ -88,7 +88,7 @@ private struct CleanRunDisclosureRow: View {
                 HStack(spacing: 8) {
                     // 类型标记(Q15):卸载带应用图标、清理带垃圾桶,扫一眼可分;不做筛选分页。
                     Image(systemName: run.isUninstall ? "app.dashed" : "trash")
-                        .font(.system(size: 13))
+                        .font(.system(size: IconSize.inline))
                         .foregroundStyle(.tertiary)
                         .help(run.isUninstall ? "应用卸载" : "清理")
                     Text(run.startedAt.formatted(date: .abbreviated, time: .shortened))
@@ -107,7 +107,7 @@ private struct CleanRunDisclosureRow: View {
                     // 展开/收起统一样式(与项目大卡点头排同款):箭头在行右缘,
                     // 右指、展开时旋转向下、整行可点——不再独一份行首三角。
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: IconSize.inline, weight: .semibold))
                         .foregroundStyle(.tertiary)
                         .rotationEffect(.degrees(expanded ? 90 : 0))
                         .frame(width: 24, height: 24)
@@ -176,7 +176,7 @@ private struct CleanHistoryItemRow: View {
                     NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: destination)])
                 } label: {
                     Image(systemName: "magnifyingglass.circle")
-                        .font(.system(size: 13))
+                        .font(.system(size: IconSize.inline))
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)

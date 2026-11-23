@@ -129,7 +129,7 @@ private struct PortOverflowRow: View {
             HStack(spacing: 4) {
                 Text(label)
                 Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: IconSize.chevron, weight: .semibold))
             }
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(.secondary)

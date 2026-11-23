@@ -178,7 +178,7 @@ struct HistoryTabView: View {
     private var emptyState: some View {
         VStack(spacing: 8) {
             Image(systemName: "chart.line.uptrend.xyaxis")
-                .font(.system(size: 26, weight: .light))
+                .font(.system(size: IconSize.emptyState, weight: .light))
                 .foregroundStyle(.tertiary)
             Text("暂无数据")
                 .font(.system(size: 14.5))
