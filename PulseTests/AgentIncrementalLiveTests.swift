@@ -85,7 +85,15 @@ final class AgentIncrementalLiveTests: XCTestCase {
     }
 
     private func line(id: String, minutesAgo: Double, input: Int) -> String {
-        let ts = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-minutesAgo * 60))
+        // 时间锚(2026-11-23 实案:夹具最大 800min,13:20 前跑必越午夜——增量账
+        // 本多出昨天账、金标全量按天切,断言必挂):统一钳到「今天零点+1分钟」
+        // 以内,任何时刻跑都落今天。等价性验证不涉及跨天切账(跨天语义归
+        // PulseCore AgentIncrementalModelTests);钳后各行时刻可能挤近,增量
+        // 按 id/checkpoint 去重,不依赖行间时间排序。
+        let dayStart = Calendar.current.startOfDay(for: Date())
+        let minutesIntoDay = Date().timeIntervalSince(dayStart) / 60
+        let clamped = min(minutesAgo, max(minutesIntoDay - 1, 0))
+        let ts = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-clamped * 60))
         return """
         {"type":"assistant","timestamp":"\(ts)","cwd":"/Users/x/alpha","message":{"id":"\(id)","model":"claude-opus-5-5","role":"assistant","usage":{"input_tokens":\(input),"cache_read_input_tokens":50,"cache_creation_input_tokens":10,"output_tokens":200}}}
         """

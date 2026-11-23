@@ -45,4 +45,31 @@ final class EnergyImpactFeatureTests: XCTestCase {
         let row = EnergyImpactReading.Row(name: "Arc", impact: 5.0)
         XCTAssertEqual(row.id, "Arc")
     }
+
+    /// 等待期加密轮询(btm-lwcr-fix/04):已登记但拉取失败(等系统批准/助手
+    /// 未跑起)时 5s 一档——「点完批准 5s 内跟上」的反馈窗口钉死。
+    @MainActor
+    func testPollIntervalFastWhileRegisteredButFailing() {
+        XCTAssertEqual(
+            EnergyImpactFeature.pollInterval(fetchFailed: true, status: .requiresApproval),
+            .seconds(5)
+        )
+        XCTAssertEqual(
+            EnergyImpactFeature.pollInterval(fetchFailed: true, status: .enabled),
+            .seconds(5)
+        )
+    }
+
+    @MainActor
+    func testPollIntervalRegularWhenHealthyOrNotRegistered() {
+        XCTAssertEqual(
+            EnergyImpactFeature.pollInterval(fetchFailed: false, status: .enabled),
+            .seconds(60)
+        )
+        // 未登记没人等,不 5s 空转。
+        XCTAssertEqual(
+            EnergyImpactFeature.pollInterval(fetchFailed: true, status: .notRegistered),
+            .seconds(60)
+        )
+    }
 }
