@@ -271,9 +271,15 @@ final class DiskModelTests: XCTestCase {
     func testAccumulatorBooksNoIncrementForADroppedJump() {
         // 作废轮的记账增量同为 0(速率与增量同真同零),基线照常推进到本轮。
         let accumulator = DiskThroughputAccumulator()
-        _ = accumulator.record(DiskFixture.counters(read: 0, write: 0, uptime: 1_000_000_000))
-        let dropped = accumulator.record(DiskFixture.counters(read: 900_000_000_000, write: 0, uptime: 31_000_000_000))
-        let next = accumulator.record(DiskFixture.counters(read: 900_000_003_000, write: 0, uptime: 32_000_000_000))
+        _ = accumulator.record(DiskFixture.counters(read: 0, write: 0, uptime: 1_000_000_000), atSeconds: 0)
+        let dropped = accumulator.record(
+            DiskFixture.counters(read: 900_000_000_000, write: 0, uptime: 31_000_000_000),
+            atSeconds: 0
+        )
+        let next = accumulator.record(
+            DiskFixture.counters(read: 900_000_003_000, write: 0, uptime: 32_000_000_000),
+            atSeconds: 0
+        )
 
         XCTAssertEqual(dropped.readBytesDelta, 0)
         XCTAssertEqual(next.readBytesDelta, 3000, "基线已推进到跳变后的计数")
@@ -284,9 +290,12 @@ final class DiskModelTests: XCTestCase {
     func testAccumulatorRecoversRatesAfterRollback() {
         // 回退后基线已重立:下一轮差分从新基线起算(stats samples 同款)。
         let accumulator = DiskThroughputAccumulator()
-        _ = accumulator.record(DiskFixture.counters(read: 5000, write: 0, uptime: 1_000_000_000)) // 首读
-        _ = accumulator.record(DiskFixture.counters(read: 100, write: 0, uptime: 2_000_000_000)) // 回退 → 0
-        let recovered = accumulator.record(DiskFixture.counters(read: 1100, write: 0, uptime: 3_000_000_000))
+        _ = accumulator.record(DiskFixture.counters(read: 5000, write: 0, uptime: 1_000_000_000), atSeconds: 0) // 首读
+        _ = accumulator.record(DiskFixture.counters(read: 100, write: 0, uptime: 2_000_000_000), atSeconds: 0) // 回退 → 0
+        let recovered = accumulator.record(
+            DiskFixture.counters(read: 1100, write: 0, uptime: 3_000_000_000),
+            atSeconds: 0
+        )
         XCTAssertEqual(recovered.current.readBytesPerSecond, 1000, accuracy: 1e-9)
         // 走势三点齐全(首读 0 / 回退 0 / 恢复 1000)。
         XCTAssertEqual(recovered.trend.count, 3)
@@ -297,13 +306,19 @@ final class DiskModelTests: XCTestCase {
         // 走势窗 60 点:超过容量丢最旧(环形),时间序保持旧 → 新。
         let accumulator = DiskThroughputAccumulator()
         for tick in 0 ... 70 {
-            _ = accumulator.record(DiskFixture.counters(
-                read: UInt64(tick) * 1000,
-                write: 0,
-                uptime: UInt64(tick) * 1_000_000_000
-            ))
+            _ = accumulator.record(
+                DiskFixture.counters(
+                    read: UInt64(tick) * 1000,
+                    write: 0,
+                    uptime: UInt64(tick) * 1_000_000_000
+                ),
+                atSeconds: 0
+            )
         }
-        let reading = accumulator.record(DiskFixture.counters(read: 72000, write: 0, uptime: 72_000_000_000))
+        let reading = accumulator.record(
+            DiskFixture.counters(read: 72000, write: 0, uptime: 72_000_000_000),
+            atSeconds: 0
+        )
         XCTAssertEqual(reading.trend.count, DiskThroughputAccumulator.trendCapacity)
         XCTAssertEqual(reading.trend.last?.read ?? -1, 1000, accuracy: 1e-9) // 第 72 点:Δ1000/1s
     }
@@ -313,30 +328,39 @@ final class DiskModelTests: XCTestCase {
     func testAccumulatorCarriesByteDeltasOnSuccessAndZeroOnDroppedRounds() {
         // 成功轮:速率非零时增量 = 计数差(600B/300B)。
         let accumulator = DiskThroughputAccumulator()
-        _ = accumulator.record(DiskFixture.counters(read: 400, write: 200, uptime: 1_000_000_000)) // 首读
-        let good = accumulator.record(DiskFixture.counters(read: 1000, write: 500, uptime: 6_000_000_000))
+        _ = accumulator.record(DiskFixture.counters(read: 400, write: 200, uptime: 1_000_000_000), atSeconds: 0) // 首读
+        let good = accumulator.record(DiskFixture.counters(read: 1000, write: 500, uptime: 6_000_000_000), atSeconds: 0)
         XCTAssertEqual(good.readBytesDelta, 600)
         XCTAssertEqual(good.writeBytesDelta, 300)
 
         // 回退轮:速率钳零,增量同轮为 0(不把回退记成负数或巨大 IO)。
-        let rolledBack = accumulator.record(DiskFixture.counters(read: 100, write: 100, uptime: 7_000_000_000))
+        let rolledBack = accumulator.record(
+            DiskFixture.counters(read: 100, write: 100, uptime: 7_000_000_000),
+            atSeconds: 0
+        )
         XCTAssertEqual(rolledBack.readBytesDelta, 0)
         XCTAssertEqual(rolledBack.writeBytesDelta, 0)
 
         // 恢复轮从新基线起算:增量与速率同真。
-        let recovered = accumulator.record(DiskFixture.counters(read: 1100, write: 600, uptime: 8_000_000_000))
+        let recovered = accumulator.record(
+            DiskFixture.counters(read: 1100, write: 600, uptime: 8_000_000_000),
+            atSeconds: 0
+        )
         XCTAssertEqual(recovered.readBytesDelta, 1000)
         XCTAssertEqual(recovered.writeBytesDelta, 500)
 
         // 真无 IO 轮:速率为 0 且增量如实为 0(与丢弃轮同形,语义都正确)。
-        let idle = accumulator.record(DiskFixture.counters(read: 1100, write: 600, uptime: 9_000_000_000))
+        let idle = accumulator.record(DiskFixture.counters(read: 1100, write: 600, uptime: 9_000_000_000), atSeconds: 0)
         XCTAssertEqual(idle.readBytesDelta, 0)
         XCTAssertEqual(idle.writeBytesDelta, 0)
     }
 
     func testAccumulatorFirstReadingCarriesZeroDeltas() {
         let accumulator = DiskThroughputAccumulator()
-        let first = accumulator.record(DiskFixture.counters(read: 9999, write: 9999, uptime: 1_000_000_000))
+        let first = accumulator.record(
+            DiskFixture.counters(read: 9999, write: 9999, uptime: 1_000_000_000),
+            atSeconds: 0
+        )
         XCTAssertEqual(first.readBytesDelta, 0, "首读只立基线,增量 0")
         XCTAssertEqual(first.writeBytesDelta, 0)
     }

@@ -14,8 +14,14 @@ final class PowerFeature: MonitorFeature {
     /// ANE 瓦数走势环(最近 60 个样本;分档单循环 p2-review/06 后为混排节拍,
     /// 可见 5s / 不可见 30s,窗长按样本数计)。
     private var aneRing = TrendRing<Double>(limit: 60)
+    /// 与值环同批的时刻环(history-hover/02;取交付到达钟,与 GPU 同款)。
+    private var aneTimeRing = TrendRing<Date>(limit: 60)
     var aneTrend: [Double] {
         aneRing.values
+    }
+
+    var aneTrendTimes: [Date] {
+        aneTimeRing.values
     }
 
     /// 芯片名(ANE 归一化表的键源,装配时注入)。
@@ -28,6 +34,8 @@ final class PowerFeature: MonitorFeature {
         provider = EnergyModelSensorProvider(source: source)
         self.chipName = chipName
         aneRing = TrendRing(limit: trendLimit)
+        // 双环同容量(评审 P2),同 GpuFeature。
+        aneTimeRing = TrendRing(limit: trendLimit)
     }
 
     /// ANE 归一化百分比(M4 = 6.0W 上限,stats 表);未首读或 ANE 通道缺席为 nil
@@ -74,5 +82,6 @@ final class PowerFeature: MonitorFeature {
         // ANE 缺席不追加:走势只画真读数(p2-review/01 ④)。
         guard let aneWatts = reading.watts[.ane] else { return }
         aneRing.append(aneWatts)
+        aneTimeRing.append(Date())
     }
 }

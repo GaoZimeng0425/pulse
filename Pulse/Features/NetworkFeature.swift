@@ -20,6 +20,6 @@ final class NetworkFeature: MonitorFeature {
     func onRound(_ context: RoundContext) {
         guard let result = context.update.network else { return }
         reading = NetworkRatesReading(rates: result.rates, interfaceName: result.interface)
-        trend.append(result.rates)
+        trend.append(result.rates, at: context.takenAt)
     }
 }

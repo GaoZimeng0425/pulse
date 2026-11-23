@@ -577,7 +577,12 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
     (firmlink 提升把 /System/Volumes/Data/* 拼回顶层、System 余量折叠为密封块),
     视图只描边配色命中。
 - **AreaTrendChartView**:56 点、线 2px 指标色、线下渐变 32%→0、4 条 8% 网格线、
-  2% 左垫底;**StripChartView**:44 柱、36pt 高。二者都是自绘 Canvas,不引 Charts。
+  2% 左垫底;history-hover/02 起带悬停读数(与历史页曲线行为一致):竖线贴吸附点
+  + `AgentChartTooltip`「HH:mm:ss · 数值」两行,数值格式随所在指标(主卡装配点给
+  `valueText`)。**时刻轴与值同环同长才启用**(各采集点并行时间环,心跳 5s/1s
+  混合不按序号猜时刻);**左端 2% 垫底假点槽不出读数**;轴缺失/长度不齐安静收起。
+  **StripChartView**:44 柱、36pt 高,氛围件不查数,**无悬停**(2026-11-24 用户
+  拍板)。二者都是自绘 Canvas,不引 Charts。
 - **历史曲线悬停(HistoryCurveView,history-hover/01)**:历史页走势(自绘 Canvas,
   空桶断线)带悬停读数——竖线**贴吸附点**(空桶吸最近非空点,等距取更早,全空不出)
   横贯曲线区(1px 曲线 tint 70%),`AgentChartTooltip` 两行形态报「时刻 · 数值」

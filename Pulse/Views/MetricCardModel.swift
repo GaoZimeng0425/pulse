@@ -52,11 +52,49 @@ struct MetricCardModel {
     /// 小统计:总览卡取前 3 列,tab 主卡全部展示。
     let stats: [MetricCardStat]
     let trend: [Double]
+    /// 与 trend 对齐的采样时刻(旧 → 新,history-hover/02 主卡悬停用);
+    /// 空 = 该卡不出悬停(电池卡无趋势、老装配路径,诚实降级)。
+    var trendTimes: [Date] = []
     /// 走势归一上限:CPU 固定 0–100,内存 = 物理总量。
     let domainMax: Double
 
     var tint: Color {
         metric.accentColor
+    }
+
+    /// 悬停时刻轴挂载(history-hover/02):工厂签名不动,装配点构造后挂上。
+    func settingTrendTimes(_ times: [Date]) -> MetricCardModel {
+        var copy = self
+        copy.trendTimes = times
+        return copy
+    }
+
+    /// 悬停数值格式化覆写(评审 P1:ANE 卡 metric 落 .gpu 但趋势是瓦数,按指标
+    /// 分派必错——特例由装配点显式给,与主数字同族口径)。
+    var trendValueTextOverride: ((Double) -> String)?
+
+    /// 悬停数值格式化:覆写优先,否则按所在指标。
+    var trendValueText: (Double) -> String {
+        if let trendValueTextOverride {
+            return trendValueTextOverride
+        }
+        switch metric {
+        case .memory:
+            return { PulseFormat.memory(UInt64(max($0, 0).rounded())) }
+        case .network, .disk:
+            return { PulseFormat.diskRate($0) }
+        case .battery:
+            return { "\(Int($0.rounded()))%" }
+        default:
+            return { PulseFormat.cpuPercent($0) }
+        }
+    }
+
+    /// 悬停数值格式化挂载(工厂签名不动,装配点构造后挂;ANE 瓦数同款)。
+    func settingTrendValueText(_ formatter: @escaping (Double) -> String) -> MetricCardModel {
+        var copy = self
+        copy.trendValueTextOverride = formatter
+        return copy
     }
 }
 
