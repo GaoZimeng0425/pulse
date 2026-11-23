@@ -224,7 +224,8 @@ struct MetricTabStack<Ranking: View>: View {
                     "energy-gate-hint",
                     BatteryGateHintRow(
                         message: Self.energyGateEmptyMessage(gate: gate),
-                        isCompact: isCompact
+                        isCompact: isCompact,
+                        showsProgress: gate == .approvedAwaitingReading
                     )
                 )
             }

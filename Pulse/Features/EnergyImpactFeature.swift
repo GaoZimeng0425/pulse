@@ -44,13 +44,26 @@ final class EnergyImpactFeature: MonitorFeature {
         self.fetch = fetch
     }
 
+    /// btm-lwcr-fix/04(11-23 用户实案「点了没反应」):用户拨开关/点登记动作后,
+    /// 引导行最长 60s 不动。动作侧(PrivilegedHelperStatus)post 此通知,拉取
+    /// 循环监听并立即跑一轮——状态与文案即时翻转,不等下一跳。
+    static let helperStateChanged = Notification.Name("pulse.energyHelperStateChanged")
+
+    private var observerTask: Task<Void, Never>?
+
     func start(_ host: MonitorHost) {
         self.host = host
         helperStatus = PrivilegedHelperStatus.current()
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.pollOnce()
-                try? await Task.sleep(for: .seconds(60))
+                let interval = await self?.pollOnce() ?? .seconds(60)
+                try? await Task.sleep(for: interval)
+            }
+        }
+        observerTask = Task { [weak self] in
+            for await _ in NotificationCenter.default.notifications(named: Self.helperStateChanged) {
+                guard let self else { return }
+                _ = await pollOnce()
             }
         }
     }
@@ -58,11 +71,29 @@ final class EnergyImpactFeature: MonitorFeature {
     func stop() {
         pollTask?.cancel()
         pollTask = nil
+        observerTask?.cancel()
+        observerTask = nil
     }
 
     private(set) var lastFetchFailed = false
 
-    private func pollOnce() async {
+    /// 等待期加密轮询(btm-lwcr-fix/04):拉取失败且已登记(等系统批准/已批准
+    /// 助手未跑起)时 5s 一档——用户在系统设置点完允许后 5s 内跟上,数据尽快
+    /// 出现;拉取成功或未登记(没人等,不空转)回落常规 60s。纯判定,单测钉口径。
+    static func pollInterval(
+        fetchFailed: Bool,
+        status: PrivilegedHelperStatus
+    ) -> Duration {
+        (fetchFailed && status != .notRegistered) ? .seconds(5) : .seconds(60)
+    }
+
+    /// 下一跳间隔在轮末按最新健康度决定(见 pollInterval)。
+    private var nextPollInterval: Duration {
+        Self.pollInterval(fetchFailed: lastFetchFailed, status: helperStatus)
+    }
+
+    @discardableResult
+    private func pollOnce() async -> Duration {
         helperStatus = PrivilegedHelperStatus.current()
         let result: (samples: [(pid: Int, name: String, impact: Double)], collectedAt: Date)?
         do {
@@ -73,15 +104,15 @@ final class EnergyImpactFeature: MonitorFeature {
                 LogService.error("特权助手拉取失败(未装/未批准/超时):\(error.localizedDescription)", category: "Energy")
                 lastFetchFailed = true
             }
-            return
+            return nextPollInterval
         }
         if lastFetchFailed {
             LogService.info("特权助手拉取恢复", category: "Energy")
         }
         lastFetchFailed = false
-        guard let result else { return } // 编译器收窄(catch 路径已 return)
+        guard let result else { return nextPollInterval } // 编译器收窄(catch 路径已 return)
         let aggregated = Self.aggregate(result.samples)
-        guard !aggregated.isEmpty else { return }
+        guard !aggregated.isEmpty else { return nextPollInterval }
         let total = aggregated.reduce(0) { $0 + $1.impact }
         reading = EnergyImpactReading(
             top: aggregated.sorted { $0.impact > $1.impact }.prefix(10)
@@ -91,6 +122,7 @@ final class EnergyImpactFeature: MonitorFeature {
             collectedAt: result.collectedAt
         )
         host?.broadcast(.gauges([.energyImpact: total]))
+        return nextPollInterval
     }
 
     /// 同名进程求和(纯函数,单测钉口径)。**pid < 0 的伪行不进聚合**
@@ -169,6 +201,8 @@ enum PrivilegedHelperStatus {
         } else {
             try? service.unregister()
         }
+        // btm-lwcr-fix/04:动作后立即通知拉取循环刷新状态,引导行即时反馈。
+        NotificationCenter.default.post(name: EnergyImpactFeature.helperStateChanged, object: nil)
     }
 
     /// 一键直达批准页(energy-one-tap):未登记 → 登记;已登记(换 bundle 旧代
@@ -182,6 +216,8 @@ enum PrivilegedHelperStatus {
         }
         try? service.register()
         SMAppService.openSystemSettingsLoginItems()
+        // btm-lwcr-fix/04:动作后立即通知拉取循环刷新状态,引导行即时反馈。
+        NotificationCenter.default.post(name: EnergyImpactFeature.helperStateChanged, object: nil)
     }
 
     /// 已提交注册、只差用户点头:直接打开批准页(比通用深链好,会高亮条目)。

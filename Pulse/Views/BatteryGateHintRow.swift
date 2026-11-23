@@ -28,6 +28,9 @@ struct BatteryGateHintRow: View {
     let message: RankingEmptyMessage
     /// 弹窗紧凑档。
     var isCompact = false
+    /// 等读数态(btm-lwcr-fix/04):行尾小号转圈,点了开关后有「正在等」的
+    /// 反馈,数据到自动被排行替换(DESIGN.md「小号转圈+文案」同款)。
+    var showsProgress = false
 
     var body: some View {
         HStack(spacing: RowMetrics.spacing(compact: isCompact)) {
@@ -52,6 +55,10 @@ struct BatteryGateHintRow: View {
                 Button(actionTitle, action: action)
                     .buttonStyle(.link)
                     .font(.system(size: 11))
+            } else if showsProgress {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(Metric.battery.accentColor)
             }
         }
         .cardShell(compact: isCompact)
