@@ -657,6 +657,8 @@ struct SpaceMapSection: View {
 
     // MARK: 面包屑与多根选择(与形态无关)
 
+    /// 路径栏只有层级:非末级可点跳转,末级加粗。不设末尾「回到整卷」按钮——它前带
+    /// 「›」,被读成当前层级的下一层(2026-11-23 用户实报,拍板删除);回顶层点首级。
     private func breadcrumbRow(_ tree: SpaceMapNode) -> some View {
         let chain = SpaceMapNode.breadcrumb(to: drillPath ?? tree.path, in: tree) ?? [tree]
         return HStack(spacing: 4) {
@@ -675,15 +677,6 @@ struct SpaceMapSection: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                 }
-            }
-            if drillPath != nil {
-                Text("›").foregroundStyle(.tertiary)
-                Button("回到整卷") { notice = nil
-                    drillPath = nil
-                }
-                .font(.system(size: 11))
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
         }
