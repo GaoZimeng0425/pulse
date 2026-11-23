@@ -185,6 +185,19 @@ extension Color {
             return NSColor(srgbHex: isDark ? dark : light)
         })
     }
+
+    /// 取本颜色在指定外观下的定值。离屏位图渲染用:动态色默认跟绘制时的环境外观
+    /// 走,逐外观缓存位图的调用方(菜单栏徽标)必须按自己手里的外观显式解析。
+    func resolved(for scheme: ColorScheme) -> Color {
+        var resolved = self
+        NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)?
+            .performAsCurrentDrawingAppearance {
+                if let nsColor = NSColor(self).usingColorSpace(.sRGB) {
+                    resolved = Color(nsColor: nsColor)
+                }
+            }
+        return resolved
+    }
 }
 
 private extension NSColor {

@@ -14,8 +14,8 @@ import SwiftUI
 
 /// 菜单栏徽标位图渲染器:渲染输入数组 → ImageRenderer → 单张 NSImage,按
 /// (全部内容, 外观) 缓存——每轮采样最多一次位图化,值不变时零开销。
-/// 缓存键为纯函数(单测钉死"配置变键变"):槽位顺序 / 文案 / 强调级 /
-/// 外观任一变化都换键,内容相同的不同配置共享缓存不亏。
+/// 缓存键为纯函数(单测钉死"配置变键变"):槽位顺序 / 文案 / 强调级 / 版式 /
+/// 定宽槽 / 外观任一变化都换键,内容相同的不同配置共享缓存不亏。
 /// 缓存有界(评审修复):徽标文案逐轮变新键(网络速率数字刷新最频),
 /// 无上限会常驻数周持续累积;上限 ~20 项——新旧键命中率稳态极高(负载/
 /// 内存/磁盘数字变化低频,网络速率在几秒窗内来回切换仍命中),被挤出的
@@ -40,14 +40,14 @@ enum MenuBarBadgeRenderer {
                         badge(
                             caption: content.caption,
                             valueText: content.text,
-                            valueColor: color(for: content.emphasis, ink: ink),
+                            valueColor: color(for: content.emphasis, scheme: colorScheme),
                             ink: ink,
                             slotWidth: content.slotWidth
                         )
                     case .stacked:
                         stackedBadge(
                             lines: content.text.components(separatedBy: "\n"),
-                            color: color(for: content.emphasis, ink: ink),
+                            color: color(for: content.emphasis, scheme: colorScheme),
                             slotWidth: content.slotWidth
                         )
                     }
@@ -81,10 +81,13 @@ enum MenuBarBadgeRenderer {
     }
 
     /// 缓存键(纯函数):外观 + 全部徽标内容。槽位配置的差异完全由内容承载
-    /// (顺序 = 数组序,caption/text/emphasis 逐枚进键)。
+    /// (顺序 = 数组序,caption/text/emphasis/layout/定宽槽逐枚进键——定宽槽决定
+    /// 位图宽度,文案相同而槽宽不同的两枚不能互相命中)。
     static func cacheKey(for contents: [MenuBarBadgeContent], colorScheme: ColorScheme) -> String {
         let body = contents
-            .map { "\($0.caption)|\($0.text)|\($0.emphasis)|\($0.layout)" }
+            .map {
+                "\($0.caption)|\($0.text)|\($0.emphasis)|\($0.layout)|\($0.slotWidth.map(String.init(describing:)) ?? "-")"
+            }
             .joined(separator: ";")
         return "\(colorScheme == .dark ? "dark" : "light")|\(body)"
     }
@@ -130,12 +133,15 @@ enum MenuBarBadgeRenderer {
         .padding(.horizontal, 1)
     }
 
-    /// 强调级 → 色:normal 墨色随外观,warning 橙,critical 红。
-    private static func color(for emphasis: MenuBarBadgeContent.Emphasis, ink: Color) -> Color {
+    /// 强调级 → 色:normal 墨色随外观;warning / critical 取语义令牌
+    /// (`{colors.state-warning}` 琥珀、`{colors.state-negative}` 红)。位图离屏渲染,
+    /// 深浅值按**传入的**外观显式解析——系统动态色跟绘制时的环境外观走,不保证与
+    /// 菜单栏实际外观一致。
+    private static func color(for emphasis: MenuBarBadgeContent.Emphasis, scheme: ColorScheme) -> Color {
         switch emphasis {
-        case .normal: ink
-        case .warning: .orange
-        case .critical: .red
+        case .normal: scheme == .dark ? Color.white : Color.black
+        case .warning: Surface.warning.resolved(for: scheme)
+        case .critical: Surface.negative.resolved(for: scheme)
         }
     }
 }

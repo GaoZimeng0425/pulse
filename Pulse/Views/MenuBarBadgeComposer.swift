@@ -15,7 +15,8 @@ struct MenuBarBadgeContent: Equatable {
     let caption: String
     /// 数值文案;叠两行版式以 "\n" 分上下两行。
     let text: String
-    /// 强调级:normal = 墨色随外观,warning = 橙,critical = 红。
+    /// 强调级:normal = 墨色随外观,warning = 警示琥珀,critical = 负面红——色取语义
+    /// 令牌,由渲染器按外观解析深浅值。
     let emphasis: Emphasis
     /// 槽位定宽(nil = 自然宽):按该指标**最大现实读数**量好钉死,数字位数
     /// 逐轮变化(38%↔100%)不再改变位图宽——状态项宽度恒定,相邻菜单栏图标
