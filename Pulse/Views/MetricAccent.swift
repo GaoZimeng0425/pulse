@@ -188,8 +188,6 @@ enum SettingsIconTint {
     static let menuBar = Token(from: 0x9466EB, to: 0x6B38C7)
     static let cleaner = Token(from: 0xFAB326, to: 0xD98500)
 
-    static let all: [Token] = [general, alerts, projectRoots, menuBar, cleaner]
-
     struct Token: Equatable {
         /// 0xRRGGBB。
         let from: UInt32
@@ -221,8 +219,10 @@ extension Color {
 
     /// 取本颜色在指定外观下的定值。离屏位图渲染用:动态色默认跟绘制时的环境外观
     /// 走,逐外观缓存位图的调用方(菜单栏徽标)必须按自己手里的外观显式解析。
-    func resolved(for scheme: ColorScheme) -> Color {
-        var resolved = self
+    /// 令牌都是 sRGB 可表达的色;解析不出定值说明传进来的不是颜色令牌,返回 nil
+    /// 交调用方决定怎么退,不在这里悄悄换成别的色。
+    func resolved(for scheme: ColorScheme) -> Color? {
+        var resolved: Color?
         NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)?
             .performAsCurrentDrawingAppearance {
                 if let nsColor = NSColor(self).usingColorSpace(.sRGB) {

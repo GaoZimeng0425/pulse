@@ -14,11 +14,12 @@ final class SettingsIconTintTests: XCTestCase {
     }
 
     /// 每页起止色互异(否则渐变退成平色),页与页之间起色互异(侧栏靠它区分)。
-    func testTintsAreDistinct() {
-        let all = SettingsIconTint.all
-        for tint in all {
+    /// 从设置页清单出发逐页取色:新增设置页却没登记颜色时,这里直接崩,不会漏测。
+    func testEverySettingsPageHasDistinctTint() {
+        let tints = SettingsPage.allCases.map(\.iconTint)
+        for tint in tints {
             XCTAssertNotEqual(tint.from, tint.to)
         }
-        XCTAssertEqual(Set(all.map(\.from)).count, all.count)
+        XCTAssertEqual(Set(tints.map(\.from)).count, tints.count)
     }
 }

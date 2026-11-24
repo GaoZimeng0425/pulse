@@ -31,7 +31,7 @@ enum MenuBarBadgeRenderer {
             return cached
         }
 
-        let ink = colorScheme == .dark ? Color.white : Color.black
+        let ink = ink(for: colorScheme)
         let renderer = ImageRenderer(
             content: HStack(alignment: .center, spacing: 5) {
                 ForEach(Array(contents.enumerated()), id: \.offset) { _, content in
@@ -133,15 +133,21 @@ enum MenuBarBadgeRenderer {
         .padding(.horizontal, 1)
     }
 
+    /// 墨色:深色外观白、浅色外观黑。
+    private static func ink(for scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white : Color.black
+    }
+
     /// 强调级 → 色:normal 墨色随外观;warning / critical 取语义令牌
     /// (`{colors.state-warning}` 琥珀、`{colors.state-negative}` 红)。位图离屏渲染,
     /// 深浅值按**传入的**外观显式解析——系统动态色跟绘制时的环境外观走,不保证与
-    /// 菜单栏实际外观一致。
+    /// 菜单栏实际外观一致。解析不出定值(不是颜色令牌)时退回令牌本身,仍能上色;
+    /// 深浅两张徽标的像素单测守着这条退路。
     private static func color(for emphasis: MenuBarBadgeContent.Emphasis, scheme: ColorScheme) -> Color {
         switch emphasis {
-        case .normal: scheme == .dark ? Color.white : Color.black
-        case .warning: Surface.warning.resolved(for: scheme)
-        case .critical: Surface.negative.resolved(for: scheme)
+        case .normal: ink(for: scheme)
+        case .warning: Surface.warning.resolved(for: scheme) ?? Surface.warning
+        case .critical: Surface.negative.resolved(for: scheme) ?? Surface.negative
         }
     }
 }
