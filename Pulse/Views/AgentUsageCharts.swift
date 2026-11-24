@@ -2,25 +2,18 @@ import Charts
 import PulseCore
 import SwiftUI
 
-// MARK: - 消耗子页两图(agent-tab/07 修正;自 AgentUsageViews.swift 拆出)
+// MARK: - 消耗子页两图:热力墙 + 走势(agent-tab/07)
 
 //
-// 07 根因修正(2026-11-14 用户实报「折线画线漂移、坐标偏、左侧没对齐边缘、
-// tooltip 不好看」):
-// ① 折线 `LineMark(x: .value(_, date, unit: .day))` 带 unit 时 Charts 把点画在
-//    **当天区间中点**(+12h),而轴刻度与悬停吸附按零点算——点、刻度、吸附三者
-//    差半天;域又是 first−12h…last+12h,首点离左缘整整一天宽 = 「左侧没对齐」。
-//    06g/06h 两次「竖线贴光标」是绕开症状,根因在此。去掉 unit、域 = 首…末日。
-// ② 悬停把整张图(含左 y 轴标签区)坐标直接喂 `proxy.value(atX:)`,而它要
-//    **绘图区坐标**——多出 y 标签宽(≈40pt)的系统性右偏。改为先减 plotFrame 原点。
-// ③ 30 天标签 `rotationEffect(-45°)` 不参与布局:斜字照样互相压、伸出图外;
-//    改为按宽度抽稀(从今天倒数,末点恒标)、横排,每天仍有刻度。
-// ④ 浮层:两图共用 `AgentChartTooltip`(系统材质 + 两行层级),定位走 PulseCore
-//    `ChartHoverGeometry`(锚定命中格 / 数据点正上方,放不下翻下方、实测尺寸钳位)。
+// 两张图的骨架相同——图区 → 日期轴带,并排时靠这份同构等高、左右缘对齐:
+// · `AgentHeatWall`:一年 52 列格子墙,Canvas 自绘,随容器宽等比缩放、不滚动;
+// · `AgentTrendChart`:近 N 天折线 + 线下渐变面积,官方 Swift Charts,x 轴隐藏;
+// · `AgentChartAxis`:两图共用的自绘日期轴带;
+// · `AgentChartTooltip`:两图共用的悬停浮层(通用件,规范在 DESIGN.md)。
 
-/// 两图共用悬停浮层:上行日期(secondary)、中行色点 + 读数(12 semibold);
-/// 该时段有分项时末尾加 2×2 四桶明细(标签层级对齐项目卡 bucketsRow)。
-/// 底 = 系统材质(DESIGN「弹出的浮层交给系统材质,不自绘阴影」)。
+/// 两图共用的悬停浮层。形态、材质与定位走 DESIGN.md「图表悬停读数与浮层」组件规范
+/// (定位算法在 PulseCore `ChartHoverGeometry`);本页特有的只有一处——该时段有分项
+/// 时,末尾加一块 2×2 四桶明细(标签层级对齐项目卡 `bucketsRow`)。
 struct AgentChartTooltip: View {
     let title: String
     let value: String
@@ -107,7 +100,8 @@ func agentTooltipWeek(first: Date, last: Date, now: Date = Date()) -> String {
     return calendar.isDate(last, inSameDayAs: now) ? "近 7 天 · \(range)" : range
 }
 
-/// 热力墙粒度(agent-tab/11):按天 = 一格一天;按周 = 一列 7 天同色、悬停读一周合计。
+/// 热力墙粒度。按天 = 一格一天;按周 = 一列连续 7 天同色、悬停读一周合计——列以
+/// 今天收尾往前数,是滚动周不是自然周;色阶按周峰值归一,与按天各一套峰值。
 enum AgentHeatGranularity: Hashable {
     case day
     case week
@@ -119,12 +113,12 @@ enum AgentHeatGranularity: Hashable {
 
 // MARK: - 共享日期轴带
 
-/// 两图共用的日期轴带(agent-tab/10,用户实报「两个 chart 高度应该一致,左右的
-/// 坐标应该水平对齐」):图区下方定高 18,标签 micro tertiary、中线距图区底 11。
-/// 热力墙与走势都用这一个函数画标签——同高同基线由构造保证,不靠两套布局碰巧对齐。
+/// 两图共用的日期轴带:热力墙与走势都用这一个函数画标签,轴带高与标签到图区底的
+/// 距离是同一组常量——两图并排时上下缘与日期标签基线对齐由构造保证,不靠两套
+/// 布局碰巧对齐。
 enum AgentChartAxis {
     static let height: CGFloat = 18
-    /// 标签垂直中线距图区底边的距离(热力墙 06 原值 = height/2 + 2)。
+    /// 标签垂直中线距图区底边的距离。
     static let labelCenterOffset: CGFloat = 11
 
     static func drawLabel(
@@ -147,10 +141,10 @@ enum AgentChartAxis {
 
 // MARK: - 热力墙
 
-/// 一年 52 列格子墙(2026-11-14 用户拍板:**等比缩放、不滚动、每月一刻度**)。
-/// 格子边长 = (容器宽 − 51×间距)÷ 52;四档色阶按一年峰值归一(≤8% 灰档);
-/// 悬停 = 命中格描边 + 格上方浮层(07:锚定命中格,不再随光标像素抖动)。
-/// 命中一律坐标反算、不依赖形状 hit test(空间地图同款纪律)。
+/// 一年 52 列格子墙:随容器宽**等比缩放、不滚动**,每月一个刻度;四档色阶按峰值
+/// 归一(量化在 PulseCore `AgentHeatScale`)。悬停 = 命中格描边 + 浮层,浮层锚定
+/// 命中格而不是跟随光标(逐格吸附不抖);命中一律坐标反算,不依赖形状
+/// hit test(空间地图同款纪律)。
 struct AgentHeatWall: View {
     static let weeks = 52
     private static let gap: CGFloat = 3
@@ -161,7 +155,7 @@ struct AgentHeatWall: View {
 
     /// 旧 → 新的逐天合计(weeks × 7 条;天数固定,缺天 0)。
     let totals: [AgentDayTotal]
-    /// 按天 / 按周(11:按周时一列同色,悬停命中整列)。
+    /// 按天 / 按周,规则见 `AgentHeatGranularity`。
     var granularity: AgentHeatGranularity = .day
 
     @State private var width: CGFloat = 640
@@ -206,6 +200,7 @@ struct AgentHeatWall: View {
             }
         }
         .contentShape(.rect)
+        // 悬停下标两档含义不同(天序号 / 列序号),切档必须清,否则按旧义错位命中。
         .onChange(of: granularity) { hoverIndex = nil }
         .onContinuousHover(coordinateSpace: .local) { phase in
             switch phase {
@@ -301,9 +296,10 @@ struct AgentHeatWall: View {
         return granularity == .week ? column : column * 7 + row
     }
 
-    /// 逐格色阶(0 = 灰档,1…4 = accent 0.25…1;量化式在 PulseCore `AgentHeatScale`)。
-    /// 进行中的「今天」按时刻折算成全天等效量再分档(11-14 实报「今天没色」;折算
-    /// 下限 6h 防凌晨虚高)。按周:一列 7 格取同一档(按周峰值归一)。
+    /// 逐格色阶(0 = 灰档,1…4 = 页 accent 四档;量化式在 PulseCore `AgentHeatScale`)。
+    /// 进行中的「今天」先按时刻折算成全天等效量再分档:不折算的话,今天和完整天
+    /// 直接比天然吃亏,到下午也可能还落在灰档;折算下限 6h,防凌晨虚高。按周:一列
+    /// 7 格取同一档(按周峰值归一),今天那份照样折算。
     private var levels: [Int] {
         let elapsed = dates.last.map { Date().timeIntervalSince(Calendar.current.startOfDay(for: $0)) }
         switch granularity {
@@ -339,8 +335,8 @@ struct AgentHeatWall: View {
         }
 
         // 月刻度:某列首日的月份与前列不同 → 该列是新月起点,标「N月」。
-        // 相邻两签不足 `monthLabelMinGap` 时丢前一个(首列常是残月,只占一两列,
-        // 与下月签挤成「11月12月」——10 修)。
+        // 相邻两签不足 `monthLabelMinGap` 时丢前一个——首列常是残月,只占一两列,
+        // 不丢会和下月签挤成「11月12月」。
         var marks: [(x: CGFloat, month: Int)] = []
         var lastMonth = -1
         for column in 0 ..< Self.weeks {
@@ -369,12 +365,11 @@ struct AgentHeatWall: View {
 
 // MARK: - 走势(官方 Swift Charts)
 
-/// 近 N 天合计折线 + 线下渐变面积(07:同 AreaTrendChartView 配方 32%→0)。
-/// 10 起与热力墙**同构**:绘图区高 = `AgentHeatWall.gridHeight(forWidth:)`(同宽同
-/// 高)、图区底同为 primary 6% 圆角 8、下接同一条 `AgentChartAxis` 自绘日期轴带
-/// (Charts 自带 x 轴隐藏);y 轴标签挪进图内左上(只留网格线),绘图区铺满卡宽、
-/// 左右缘与热力墙齐。日期标签按宽抽稀(从今天倒数,首左末右锚、中间居中);
-/// 悬停 = 吸附日竖线 + 高亮点 + 点上方浮层。
+/// 近 N 天合计折线 + 线下渐变面积(与 `AreaTrendChartView` 同配方)。与热力墙
+/// **同构**,并排时才等高、左右缘对齐:绘图区高 = 热力墙同宽图区高
+/// (`AgentHeatWall.gridHeight(forWidth:)`),图区底同式,下接同一条 `AgentChartAxis`。
+/// Charts 自带 x 轴隐藏、y 标签画进图内左上——轴标签一旦占了绘图区以外的宽,
+/// 绘图区就比热力墙窄,左右缘对不齐。悬停 = 吸附日竖线 + 高亮点 + 点上方浮层。
 struct AgentTrendChart: View {
     let totals: [AgentDayTotal]
     /// nil = 与热力墙等高(按自身宽套同式);弹窗紧凑档传定高。
@@ -428,6 +423,8 @@ struct AgentTrendChart: View {
         return CGFloat(date.timeIntervalSince(first) / span) * width
     }
 
+    /// 日期标签横排、按宽抽稀,不用斜排:`rotationEffect` 不参与布局,斜字照样互压、
+    /// 伸出图外。抽稀从今天倒数、末点恒标;首签左锚、末签右锚,末签才不出界。
     private func axisStrip(_ points: [Point]) -> some View {
         let first = points[0].date
         let last = points[points.count - 1].date
@@ -467,6 +464,9 @@ struct AgentTrendChart: View {
         )
         let focus = hoverIndex.map { points[$0] } ?? points[points.count - 1]
 
+        // x 值一律不带 `unit:`——带 `.day` 时 Charts 把点画在当天区间中点(+12h),
+        // 刻度与悬停吸附却按零点算,点、刻度、吸附三者差半天:线看着漂、吸附不贴点。
+        // 遇到竖线不贴点先查这里,不要去挪竖线。
         return Chart {
             ForEach(points) { point in
                 AreaMark(x: .value("日期", point.date), y: .value("Token", point.value))
@@ -512,7 +512,8 @@ struct AgentTrendChart: View {
                         .onContinuousHover(coordinateSpace: .local) { phase in
                             switch phase {
                             case let .active(location):
-                                // 绘图区坐标 = 本地坐标 − plotFrame 原点。
+                                // `value(atX:)` 吃绘图区坐标:本地坐标先减 plotFrame
+                                // 原点,漏减会整体右偏一个 y 标签区的宽。
                                 guard let date: Date = proxy.value(atX: location.x - plot.minX) else { return }
                                 hoverIndex = ChartHoverGeometry.nearestIndex(
                                     of: date.timeIntervalSinceReferenceDate,

@@ -1,7 +1,7 @@
 import PulseCore
 import SwiftUI
 
-// MARK: - 容器页卡片(p2-sensors/07;行样式 ui-unify 追改 2026-11-09)
+// MARK: - 服务页容器卡(p2-sensors/07)
 
 // HTTP 解析与 stats 折算在核心层 ContainerModel(纯逻辑,单测覆盖——含探针⑦
 // 四坑);本文件只做 SwiftUI 外观——容器实体行(CardEntityRow:图标 + 名称 + CPU% +

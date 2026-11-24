@@ -1,13 +1,15 @@
 import PulseCore
 import SwiftUI
 
-// MARK: - 项目大卡族(agent-tab/07 重设计;自 AgentUsageViews.swift 拆出)
+// MARK: - 项目大卡族(agent-tab/07)
 
 //
-// 07 重设计(2026-11-14 用户实报「项目卡有点丑」):06 版五层四条分隔线 +
-// 两条独立分段条 + 满屏 micro 灰字,信息平铺无主次。终态 = 三段式:
-// 头(状态图标 + 名 + 在跑 chip / 占比)+ 主数值 → 五格读数 → 构成两行
-// (模型 / 来源,标签列对齐)→ 唯一一条分隔线 → 带图标的元信息尾行。
+// 卡的骨架自上而下四段,段间疏、段内密;主次靠字号与留白拉开,不靠分隔线——
+// 全卡只有一条 hairline,压在元信息尾行之上:
+// 1. 头:状态图标 + 项目名 + 在跑 chip,右侧占比;下接主数值 + 环比;
+// 2. 五格读数(Input / Output / Cache R / Cache W / Cache×);
+// 3. 构成两行(模型 / 来源):标签列 + 分段条 + 图例;
+// 4. 元信息尾行(活跃天数 / 会话数 / 请求数)+ 右侧活跃态。
 
 /// 项目展开/收起末行:排行截断末行(`RankingOverflowRow`)同款视觉配方
 /// (11 medium secondary + chevron + 悬停 primary 5% 圆角 8),文案按项目口径
@@ -43,13 +45,14 @@ struct AgentProjectOverflowRow: View {
     }
 }
 
-// MARK: - 项目卡响应式网格(agent-tab/06 三度修正)
+// MARK: - 项目卡响应式网格(agent-tab/06)
 
-/// 项目大卡响应式网格:列数 = 容器实宽容纳的最多列(单卡保底 520,上限 3),
-/// 逐行 HStack——**行内等高**、末行不满自动满宽;容器多窄都单列 100%(不走
-/// GridItem minimum,规避 flexible 硬下限在窄容器溢出裁剪的前案)。
+/// 项目大卡响应式网格:列数 = 容器实宽容纳得下的最多列,逐行 HStack——**行内
+/// 等高**、末行不满自动满宽;容器再窄也是单列 100% 宽。
+/// 不要换成 `LazyVGrid`(行内拉不齐高度)或 `GridItem(minimum:)`(minimum 是硬下限,
+/// 容器比它窄时溢出裁剪)。
 struct AgentProjectCardGrid: View {
-    /// 单卡保底宽(低于此宁可少一列——呼吸感是 06 追补的实报教训)。
+    /// 单卡保底宽:低于它宁可少一列,不把卡挤窄。
     private static let minimumCardWidth: CGFloat = 520
     private static let spacing: CGFloat = 12
     private static let maximumColumns = 3
@@ -97,7 +100,7 @@ struct AgentProjectCardGrid: View {
 
 // MARK: - 项目大卡
 
-/// 项目一张宽卡(cardHigh 底、圆角 10、内距 16;段间 16、段内 8)。
+/// 项目大卡:四段自上而下,骨架与段间节奏见文件头。
 struct AgentProjectCardView: View {
     let project: AgentProjectSummary
     let windowDays: Int
@@ -165,9 +168,9 @@ struct AgentProjectCardView: View {
 
     // MARK: 段 2:五格读数(tokscale 对齐)
 
-    /// 倍率 = 缓存读 ÷ 净(输入+输出),衡量缓存吃掉多少重复读取。
-    /// 08:五格**两端对齐、等间距**(首格贴左、末格贴右,格间 Spacer 均分;用户
-    /// 实报 07 的等宽列让末格「Cache×」悬在中段不靠右)。末格内部右对齐。
+    /// 倍率 = 缓存读 ÷ 净(输入+输出),衡量缓存吃掉多少重复读取;分母 0 显示「—」。
+    /// 五格**两端对齐、等间距**(首格贴左、末格贴右,格间 Spacer 均分),不要排成
+    /// 等宽列——末格「Cache×」会悬在中段、不靠右。末格内部右对齐。
     private var bucketsRow: some View {
         HStack(alignment: .top, spacing: 0) {
             bucket("Input", agentTokenText(project.inputTokens))
@@ -270,7 +273,7 @@ struct AgentProjectCardView: View {
 
     // MARK: 段 4:元信息尾行
 
-    /// 活跃天数 · 现存会话数 · 请求数(图标引导,不再三段灰字挤一行);右侧活跃态。
+    /// 活跃天数 · 现存会话数 · 请求数,符号引导、项间留白;右侧活跃态。
     private var footer: some View {
         HStack(spacing: 16) {
             metaItem("calendar", "活跃 \(project.activeDays)/\(windowDays) 天")
@@ -310,7 +313,7 @@ struct AgentProjectCardView: View {
 // MARK: - 分段条(SwiftUI 原语,agent-tab/05)
 
 /// 占比分段条(高 6 圆角 3,轨道 = 三级墨 14%);段宽按 fraction、>0 才画,
-/// 段间留 2pt 缝(07:相邻段同明度时不再糊成一条)。
+/// 段间留 2pt 缝——相邻段同明度时靠这条缝分得开。
 struct AgentSegmentedBar: View {
     let segments: [(fraction: Double, tint: Color)]
 

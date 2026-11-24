@@ -1,13 +1,15 @@
 import PulseCore
 import SwiftUI
 
-// MARK: - 智能体 tab 卡片(agent-tab/01)
+// MARK: - 智能体页:页面骨架与页级零件(agent-tab/06)
 
 //
-// 三张卡:用量限额(读数行)/ Claude Code 会话(实体行)/ ZCode 会话(实体行);
-// dev server 卡从总览迁入本页(原样,见 DevServerViews)。全部组装 CardFamily 标准件,
-// 行尺寸走 RowMetrics 两档。meter 与数值一律取本页指标色(蓝牙青,junk-ai 同源
-// 的 AI 身份色)——「正常/偏高/紧张」的阈值变色集中在既有三处,本页不开第四处。
+// 页面骨架:子药丸条 + 当前子页,两块在 `MetricTabStack` 组装(主窗口与弹窗同一份,
+// 弹窗走紧凑档)。两个子页——
+// · 消耗(`AgentUsagePaneView`):数字卡排 → 日历图 + 走势 → 项目大卡;
+// · 会话(`ClaudeSessionsCardView` / `ZCodeSessionsCardView`):Claude Code 与 ZCode
+//   各一张卡,卡身每个会话一块。
+// 本文件只放页级零件:页指标色、token 读数转发、日期小工具、子页枚举、子药丸条。
 
 /// 智能体页指标色:蓝牙青(DESIGN.md junk-ai 先例;tab accent 同源)。
 /// 智能体页各卡(AgentViews / AgentUsageViews)共用。
@@ -51,10 +53,10 @@ func agentShortDate(_ date: Date) -> String {
     return String(format: "%02d-%02d", components.month ?? 0, components.day ?? 0)
 }
 
-/// 智能体页子 tab(agent-tab/06 三子页被 tab-regroup/01 缩编为两页——dev server
-/// 迁服务页;状态在 DashboardModel)。
+/// 智能体页的两个子页;选中态存在 `DashboardModel.agentSubTab`(切 tab 不丢),
+/// 默认落消耗。
 enum AgentSubTab: Hashable {
-    /// 消耗(token 账:数字卡排 / 日历图+走势 / 项目宽卡)。
+    /// 消耗(token 账:数字卡排 / 日历图 + 走势 / 项目大卡)。
     case usage
     /// 会话(现在在跑什么:两家会话卡)。
     case sessions
@@ -69,8 +71,8 @@ enum AgentSubTab: Hashable {
     static let all: [AgentSubTab] = [.usage, .sessions]
 }
 
-/// 智能体页子药丸条(清理页子页条同款 `PillTabBar` comfortable 档 + 页指标色 +
-/// 玻璃外裹;08 补 `isGlassContainer`——06 漏传,与清理页子页条外观不一致)。
+/// 智能体页子药丸条:清理页子页条同款(`PillTabBar` comfortable 档 + 页指标色 +
+/// 玻璃外裹)。`isGlassContainer` 默认 false,漏传就没有玻璃外裹,和清理页子页条两个样。
 struct AgentSubTabBar: View {
     @Binding var selection: AgentSubTab
 

@@ -5,7 +5,7 @@ import SwiftUI
 
 /// 服务页「监听端口」卡:全机监听 TCP 端口 + 占用进程;行级「结束」上抛该端口
 /// 全部占用进程(确认流在 KillRequestFlow 同一关口,绝不自动杀)。
-/// dev server 占用行带种类+闲置标注(与 dev server 卡同口径);root 进程端口
+/// dev server 占用行带种类 + 闲置标注(文案与 dev server 卡同口径);root 进程端口
 /// 系统读不到,卡脚一行小字如实注明。空态安静——不制造焦虑。
 struct PortsCardView: View {
     let inventory: PortInventory?
@@ -101,7 +101,8 @@ struct PortsCardView: View {
         return "\(base) 等 \(entry.holders.count) 个进程"
     }
 
-    /// dev server 标注:种类 + 闲置(琥珀,与 dev server 卡同口径);全非 dev server 不占列。
+    /// dev server 标注:种类 + 闲置时长,文案与 dev server 卡同口径;颜色不随闲置
+    /// 转琥珀。整行都不是 dev server 时不占这一列。
     private func devServerLabel(_ entry: PortEntry) -> Text? {
         guard let holder = entry.holders.first(where: { $0.devServerKind != nil }) else {
             return nil
