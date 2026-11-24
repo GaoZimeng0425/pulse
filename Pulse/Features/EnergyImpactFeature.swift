@@ -23,6 +23,7 @@ final class EnergyImpactFeature: MonitorFeature {
         -> (samples: [(pid: Int, name: String, impact: Double)], collectedAt: Date)
 
     private let fetch: Fetch
+    private let now: @Sendable () -> Date
     private var host: MonitorHost?
     private var pollTask: Task<Void, Never>?
 
@@ -40,8 +41,22 @@ final class EnergyImpactFeature: MonitorFeature {
         EnergyHelperGate.resolve(status: helperStatus, fetchFailing: lastFetchFailed)
     }
 
-    init(fetch: @escaping Fetch = { try await EnergyHelperClient().fetchLatest() }) {
+    init(
+        fetch: @escaping Fetch = { try await EnergyHelperClient().fetchLatest() },
+        now: @escaping @Sendable () -> Date = { Date() }
+    ) {
         self.fetch = fetch
+        self.now = now
+    }
+
+    /// 快照判龄阈值(arch-review-2026-11-24/01):助手 60s 一采,采集失败时**保留旧
+    /// collectedAt** 照常每 60s 重写文件——文件读得到 ≠ 数据新。2.5 拍:偶发一次
+    /// 失败不误判,连续两次以上即视为助手没在正常采。
+    static let staleAfter: TimeInterval = 150
+
+    /// 快照是否过期(含首轮即失败的 distantPast)。
+    static func isStale(collectedAt: Date, now: Date) -> Bool {
+        now.timeIntervalSince(collectedAt) > staleAfter
     }
 
     /// btm-lwcr-fix/04(11-23 用户实案「点了没反应」):用户拨开关/点登记动作后,
@@ -93,17 +108,18 @@ final class EnergyImpactFeature: MonitorFeature {
     }
 
     @discardableResult
-    private func pollOnce() async -> Duration {
+    func pollOnce() async -> Duration {
         helperStatus = PrivilegedHelperStatus.current()
         let result: (samples: [(pid: Int, name: String, impact: Double)], collectedAt: Date)?
         do {
             result = try await fetch()
         } catch {
-            // 翻转才记(读路径健康状态沿):未装期间每分钟一条 error 会刷屏。
-            if !lastFetchFailed {
-                LogService.error("特权助手拉取失败(未装/未批准/超时):\(error.localizedDescription)", category: "Energy")
-                lastFetchFailed = true
-            }
+            markFetchFailed("特权助手拉取失败(未装/未批准/超时):\(error.localizedDescription)")
+            return nextPollInterval
+        }
+        // 陈旧快照与拉取失败同口径:不发布、不进历史,Gate 据此说实话。
+        if let result, Self.isStale(collectedAt: result.collectedAt, now: now()) {
+            markFetchFailed("特权助手快照过期(采集于 \(result.collectedAt)),助手未在正常采集")
             return nextPollInterval
         }
         if lastFetchFailed {
@@ -123,6 +139,16 @@ final class EnergyImpactFeature: MonitorFeature {
         )
         host?.broadcast(.gauges([.energyImpact: total]))
         return nextPollInterval
+    }
+
+    /// 失败沿:清掉旧读数(卡片回空态,不显示冻结值);翻转才记日志
+    /// (读路径健康状态沿:未装期间每分钟一条 error 会刷屏)。
+    private func markFetchFailed(_ message: String) {
+        reading = nil
+        if !lastFetchFailed {
+            LogService.error(message, category: "Energy")
+            lastFetchFailed = true
+        }
     }
 
     /// 同名进程求和(纯函数,单测钉口径)。**pid < 0 的伪行不进聚合**
