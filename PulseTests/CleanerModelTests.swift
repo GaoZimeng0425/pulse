@@ -16,7 +16,7 @@ final class CleanerModelTests: XCTestCase {
             "/r/sub": .entries([CleanFixture.file("b.bin", allocated: 256, reclaimable: 256)]),
             "/r/locked": .failure(.tccDenied),
         ])
-        let model = CleanerModel(trash: FakeCleanTrashExecutor())
+        let model = CleanerModel.testing(trash: FakeCleanTrashExecutor())
         model.startScan(using: fake, roots: ["/r"])
 
         await waitUntil { !model.isScanning }
@@ -38,7 +38,7 @@ final class CleanerModelTests: XCTestCase {
         let fake = FakeCleanDirectoryEnumerator(listings: [
             "/r": .entries([CleanFixture.file("v1.bin", allocated: 128, reclaimable: 128)]),
         ])
-        let model = CleanerModel(trash: FakeCleanTrashExecutor())
+        let model = CleanerModel.testing(trash: FakeCleanTrashExecutor())
         model.startScan(using: fake, roots: ["/r"])
         await waitUntil { !model.isScanning }
         XCTAssertEqual(model.result?.stats.files, 1)
@@ -63,7 +63,7 @@ final class CleanerModelTests: XCTestCase {
             ]),
             "/r/root-owned": .failure(.permissionDenied),
         ])
-        let model = CleanerModel(trash: FakeCleanTrashExecutor())
+        let model = CleanerModel.testing(trash: FakeCleanTrashExecutor())
         model.startScan(using: fake, roots: ["/r"])
         await waitUntil { !model.isScanning }
         XCTAssertEqual(model.permissionDeniedCount, 0, "EACCES 不进 TCC 计数")
@@ -76,7 +76,7 @@ final class CleanerModelTests: XCTestCase {
         let fake = FakeCleanDirectoryEnumerator(listings: [
             "/r": .entries([CleanFixture.file("a.bin", allocated: 64, reclaimable: 64)]),
         ])
-        let model = CleanerModel(trash: FakeCleanTrashExecutor())
+        let model = CleanerModel.testing(trash: FakeCleanTrashExecutor())
         model.startScan(using: fake, roots: ["/r"])
         await waitUntil { !model.isScanning }
         XCTAssertNil(model.permissionHint)
@@ -114,7 +114,7 @@ final class CleanerModelTests: XCTestCase {
             recycled: [derivedPath: home + "/.Trash/DerivedData"]
         ))
         let history = try CleanHistoryStore(database: HistoryDatabase.openInMemory())
-        let model = CleanerModel(
+        let model = CleanerModel.testing(
             exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
             history: history,
             trash: spy,
@@ -178,7 +178,7 @@ final class CleanerModelTests: XCTestCase {
             failures: [derivedPath: "Operation not permitted"]
         ))
         let history = try CleanHistoryStore(database: HistoryDatabase.openInMemory())
-        let model = CleanerModel(history: history, trash: spy, homeDirectory: home)
+        let model = CleanerModel.testing(history: history, trash: spy, homeDirectory: home)
         model.startScan(using: makeHomeEnumerator(), roots: [home])
         await waitUntil { !model.isScanning }
         model.toggle(model.candidates[0])
@@ -203,7 +203,7 @@ final class CleanerModelTests: XCTestCase {
         let spy = FakeCleanTrashExecutor(nextRecycleOutcome: TrashRecycleOutcome(
             recycled: [home + "/Library/Caches/Homebrew": home + "/.Trash/Homebrew"]
         ))
-        let model = CleanerModel(history: nil, trash: spy, homeDirectory: home)
+        let model = CleanerModel.testing(history: nil, trash: spy, homeDirectory: home)
         model.startScan(using: makeHomeEnumerator(), roots: [home])
         await waitUntil { !model.isScanning }
         XCTAssertFalse(model.historyAvailable)
@@ -224,7 +224,7 @@ final class CleanerModelTests: XCTestCase {
     func testExcludeNarrowsImmediatelyPersistsAndSkipsOnRescan() async throws {
         var persisted: [[String]] = []
         let exclusions = CleanExclusionsStore(load: { [] }, persist: { persisted.append($0) })
-        let model = CleanerModel(exclusions: exclusions, trash: FakeCleanTrashExecutor(), homeDirectory: home)
+        let model = CleanerModel.testing(exclusions: exclusions, trash: FakeCleanTrashExecutor(), homeDirectory: home)
         let fake = makeHomeEnumerator()
         model.startScan(using: fake, roots: [home])
         await waitUntil { !model.isScanning }
@@ -248,7 +248,7 @@ final class CleanerModelTests: XCTestCase {
     }
 
     func testCancelFromConfirmReturnsToIdle() async {
-        let model = CleanerModel(trash: FakeCleanTrashExecutor(), homeDirectory: home)
+        let model = CleanerModel.testing(trash: FakeCleanTrashExecutor(), homeDirectory: home)
         model.startScan(using: makeHomeEnumerator(), roots: [home])
         await waitUntil { !model.isScanning }
         model.toggle(model.candidates[0])
@@ -262,7 +262,7 @@ final class CleanerModelTests: XCTestCase {
     // MARK: 整组勾选(2026-10-30 拍板 B:只勾组内「可安全清理」项,先检查项单独勾)
 
     func testGroupToggleSelectsOnlySafeTierAndCyclesBack() async {
-        let model = CleanerModel(trash: FakeCleanTrashExecutor(), homeDirectory: home)
+        let model = CleanerModel.testing(trash: FakeCleanTrashExecutor(), homeDirectory: home)
         model.startScan(
             using: makeHomeEnumerator(extra: ["Library/Caches/JetBrains": 5_400_000]),
             roots: [home]
@@ -317,7 +317,7 @@ final class CleanerModelTests: XCTestCase {
             ]),
             "/bin": .entries([CleanFixture.file("sh.bin", allocated: 4, reclaimable: 4)]),
         ])
-        let model = CleanerModel(trash: FakeCleanTrashExecutor())
+        let model = CleanerModel.testing(trash: FakeCleanTrashExecutor())
         model.startScan(using: fake, roots: ["/"])
 
         await waitUntil { !model.isScanning }
@@ -343,7 +343,7 @@ final class CleanerModelTests: XCTestCase {
         activity: FakeCleanActivitySource,
         trash: FakeCleanTrashExecutor = FakeCleanTrashExecutor()
     ) -> CleanerModel {
-        CleanerModel(
+        CleanerModel.testing(
             scanRoots: CleanScanRootsStore(load: { ["/Users/dev/code"] }, persist: { _ in }),
             trash: trash,
             activity: activity,
@@ -453,7 +453,7 @@ final class CleanerModelTests: XCTestCase {
         }
         let probes = Counter()
         let exclusions = CleanExclusionsStore(load: { [] }, persist: { _ in })
-        let model = CleanerModel(
+        let model = CleanerModel.testing(
             exclusions: exclusions,
             scanRoots: CleanScanRootsStore(load: { ["/Users/dev/code"] }, persist: { _ in }),
             trash: FakeCleanTrashExecutor(),
@@ -491,7 +491,7 @@ final class CleanerModelTests: XCTestCase {
                 CleanFixture.file("me.bin", allocated: 200, reclaimable: 200),
             ]),
         ])
-        let model = CleanerModel(
+        let model = CleanerModel.testing(
             trash: FakeCleanTrashExecutor(),
             volumeSummaries: {
                 [SpaceMapVolumeSummary(label: "SSV", usedBytes: 80)]
@@ -536,7 +536,7 @@ final class CleanerModelTests: XCTestCase {
                 CleanFixture.file("b.bin", allocated: 1_500_000, reclaimable: 1_500_000),
             ]),
         ])
-        let model = CleanerModel(trash: FakeCleanTrashExecutor(), homeDirectory: "/Users/me")
+        let model = CleanerModel.testing(trash: FakeCleanTrashExecutor(), homeDirectory: "/Users/me")
         model.startScan(using: fake)
         await waitUntil { !model.isScanning }
 
@@ -554,7 +554,7 @@ final class CleanerModelTests: XCTestCase {
                 "Library/Caches/Homebrew": 400_000, // 亚兆:照列
             ]
         ))
-        let model = CleanerModel(trash: FakeCleanTrashExecutor(), homeDirectory: home)
+        let model = CleanerModel.testing(trash: FakeCleanTrashExecutor(), homeDirectory: home)
         model.startScan(using: fake, roots: [home])
         await waitUntil { !model.isScanning }
 
@@ -611,7 +611,7 @@ final class CleanerModelTests: XCTestCase {
         let cache = CleanScanResultStore(load: { box.value }, save: { box.value = $0 })
 
         // 第一次会话:扫描 → 落盘
-        let first = CleanerModel(
+        let first = CleanerModel.testing(
             exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
             trash: FakeCleanTrashExecutor(),
             scanCache: cache,
@@ -623,7 +623,7 @@ final class CleanerModelTests: XCTestCase {
         XCTAssertNotNil(box.value, "扫完即落盘")
 
         // 第二次会话(新模型 = 关窗/重启语义):空态装载缓存 → 结果复活
-        let second = CleanerModel(
+        let second = CleanerModel.testing(
             exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
             trash: FakeCleanTrashExecutor(),
             scanCache: cache,
@@ -670,7 +670,7 @@ final class CleanerModelTests: XCTestCase {
         }
         let saves = SaveCounter()
         let cache = CleanScanResultStore(load: { nil }, save: { _ in saves.bump() })
-        let model = CleanerModel(
+        let model = CleanerModel.testing(
             exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
             trash: FakeCleanTrashExecutor(),
             scanCache: cache,
@@ -702,7 +702,7 @@ final class CleanerModelTests: XCTestCase {
         let stuck = StuckReleaseEnumerator(entriesAfterRelease: [])
         let saves = Counter()
         let inventories = Counter()
-        let model = CleanerModel(
+        let model = CleanerModel.testing(
             exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
             trash: FakeCleanTrashExecutor(),
             scanCache: CleanScanResultStore(load: { nil }, save: { _ in saves.bump() }),
@@ -757,7 +757,7 @@ final class CleanerModelTests: XCTestCase {
         }
         let box = Box()
         let cache = CleanScanResultStore(load: { box.value }, save: { box.value = $0 })
-        let first = CleanerModel(
+        let first = CleanerModel.testing(
             exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
             trash: FakeCleanTrashExecutor(),
             scanCache: cache,
@@ -768,7 +768,7 @@ final class CleanerModelTests: XCTestCase {
         XCTAssertNotNil(box.value)
 
         // 新会话:排除清单与扫描时不同 → 过期提示(数字只可能偏大方向)
-        let second = CleanerModel(
+        let second = CleanerModel.testing(
             exclusions: CleanExclusionsStore(
                 load: { ["/Users/me/Library/Caches/Homebrew"] },
                 persist: { _ in }
@@ -782,7 +782,7 @@ final class CleanerModelTests: XCTestCase {
         XCTAssertNotNil(second.cacheStalenessHint, "排除配置变了要提示建议重扫")
 
         // 没有缓存的模型不落盘也不装载(旧测试路径零影响)
-        let bare = CleanerModel(trash: FakeCleanTrashExecutor(), homeDirectory: "/Users/me")
+        let bare = CleanerModel.testing(trash: FakeCleanTrashExecutor(), homeDirectory: "/Users/me")
         bare.loadCachedScan()
         try? await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertNil(bare.result, "无缓存 store:装载零动作")
@@ -813,7 +813,7 @@ final class CleanerModelTests: XCTestCase {
         let spy = FakeCleanTrashExecutor(nextRecycleOutcome: TrashRecycleOutcome(
             recycled: [homebrew: "/Users/me/.Trash/Homebrew"]
         ))
-        let first = CleanerModel(
+        let first = CleanerModel.testing(
             exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
             trash: spy,
             scanCache: cache,
@@ -831,7 +831,7 @@ final class CleanerModelTests: XCTestCase {
         await waitUntil { box.value?.meta.cleanedPaths.contains(homebrew) == true }
 
         // 会话 2(重启语义):装载 → 已清项过滤,不回列表
-        let second = CleanerModel(
+        let second = CleanerModel.testing(
             exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
             trash: FakeCleanTrashExecutor(),
             scanCache: cache,
@@ -867,7 +867,7 @@ final class CleanerModelTests: XCTestCase {
         let spy = FakeCleanTrashExecutor(nextRecycleOutcome: TrashRecycleOutcome(
             recycled: [homebrew: "/Users/me/.Trash/Homebrew"]
         ))
-        let model = CleanerModel(
+        let model = CleanerModel.testing(
             exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
             trash: spy,
             homeDirectory: "/Users/me"
@@ -910,7 +910,7 @@ final class CleanerModelTests: XCTestCase {
 
     func testEmptyTrashInventoryEmptyGivesNoticeWithoutSheetOrDeletion() async {
         let spy = FakeCleanTrashExecutor()
-        let model = CleanerModel(trash: spy, trashInventory: {
+        let model = CleanerModel.testing(trash: spy, trashInventory: {
             TrashInventory(volumes: [.init(name: "启动卷", items: 0, bytes: 0)])
         })
         model.beginEmptyTrash()
@@ -928,7 +928,7 @@ final class CleanerModelTests: XCTestCase {
                 TrashVolumeEmptySummary(volume: "启动卷", emptiedItems: 3, freedBytes: 1000),
             ])
         )
-        let model = CleanerModel(trash: spy, trashInventory: {
+        let model = CleanerModel.testing(trash: spy, trashInventory: {
             TrashInventory(volumes: [.init(name: "启动卷", items: 3, bytes: 1000)])
         })
         model.beginEmptyTrash()
@@ -961,7 +961,7 @@ final class CleanerModelTests: XCTestCase {
 
     func testEmptyTrashCancelKeepsEverything() async {
         let spy = FakeCleanTrashExecutor()
-        let model = CleanerModel(trash: spy, trashInventory: {
+        let model = CleanerModel.testing(trash: spy, trashInventory: {
             TrashInventory(volumes: [.init(name: "启动卷", items: 2, bytes: 5)])
         })
         model.beginEmptyTrash()
@@ -1040,7 +1040,7 @@ final class CleanerModelTests: XCTestCase {
             home: home,
             directories: ["Library/Caches/JetBrains": 5_400_000] // 先检查档,夹具里唯一候选
         ))
-        let model = CleanerModel(trash: FakeCleanTrashExecutor(), homeDirectory: home)
+        let model = CleanerModel.testing(trash: FakeCleanTrashExecutor(), homeDirectory: home)
         model.startScan(using: fake, roots: [home])
         await waitUntil { !model.isScanning }
         XCTAssertTrue(model.candidates.filter { $0.tier == .safe }.isEmpty, "夹具前提:没有任何 safe 项")
@@ -1095,7 +1095,7 @@ final class CleanerModelTests: XCTestCase {
     /// 读数通道为 nil(视图走「—」)——绝不能变成一份「0 项 · 0 字节」的空清点。
     func testOverviewTrashReadFailureIsPlaceholderNotZero() async {
         let probe = TrashSourceProbe(results: [nil])
-        let model = CleanerModel(trash: FakeCleanTrashExecutor(), trashInventory: { await probe.next() })
+        let model = CleanerModel.testing(trash: FakeCleanTrashExecutor(), trashInventory: { await probe.next() })
         XCTAssertEqual(model.overviewTrashPhase, .notCounted, "没查就是没查,不预置读数")
         XCTAssertNil(model.overviewTrash)
 
@@ -1112,7 +1112,7 @@ final class CleanerModelTests: XCTestCase {
     /// 点「清空废纸篓」时清点读不到:如实提示,不谎报「废纸篓是空的」,不进确认单、零删除。
     func testEmptyTrashUnreadableInventoryIsNotReportedAsEmpty() async {
         let spy = FakeCleanTrashExecutor()
-        let model = CleanerModel(trash: spy, trashInventory: { nil })
+        let model = CleanerModel.testing(trash: spy, trashInventory: { nil })
         model.beginEmptyTrash()
         await waitUntil { model.trashNotice != nil }
 
@@ -1130,7 +1130,7 @@ final class CleanerModelTests: XCTestCase {
         let first = trashInventory(items: 3, bytes: 1000)
         let second = trashInventory(items: 5, bytes: 2000)
         let probe = TrashSourceProbe(results: [first, second, nil])
-        let model = CleanerModel(trash: FakeCleanTrashExecutor(), trashInventory: { await probe.next() })
+        let model = CleanerModel.testing(trash: FakeCleanTrashExecutor(), trashInventory: { await probe.next() })
 
         // 默认关:可见性切换(自动入口)零读取,态不动。
         model.refreshOverviewTrashIfUnlocked()
@@ -1167,7 +1167,7 @@ final class CleanerModelTests: XCTestCase {
     func testEmptyTrashInventoryUnlocksAutoRefreshAndFeedsOverview() async {
         let inventory = trashInventory(items: 2, bytes: 5)
         let probe = TrashSourceProbe(results: [inventory, inventory])
-        let model = CleanerModel(trash: FakeCleanTrashExecutor(), trashInventory: { await probe.next() })
+        let model = CleanerModel.testing(trash: FakeCleanTrashExecutor(), trashInventory: { await probe.next() })
         model.beginEmptyTrash()
         await waitUntil { model.trashPhase == .confirming(inventory) }
         XCTAssertEqual(model.overviewTrashPhase, .counted(inventory), "同一次清点落总览,不多读一遍")
@@ -1186,7 +1186,7 @@ final class CleanerModelTests: XCTestCase {
         let stale = trashInventory(items: 9, bytes: 9000)
         let fresh = trashInventory(items: 1, bytes: 100)
         let probe = TrashSourceProbe(results: [stale, fresh], holdFirst: true)
-        let model = CleanerModel(trash: FakeCleanTrashExecutor(), trashInventory: { await probe.next() })
+        let model = CleanerModel.testing(trash: FakeCleanTrashExecutor(), trashInventory: { await probe.next() })
 
         model.refreshOverviewTrash()
         await waitUntil { await probe.callCount == 1 } // 第一次清点已发起并挂起
@@ -1234,7 +1234,7 @@ final class CleanerModelTests: XCTestCase {
                 #"{"config":{"digest":"sha256:b1"},"layers":[{"digest":"sha256:shared"}]}"#,
         ]
         let activity = FakeCleanActivitySource(entries: [])
-        let model = CleanerModel(
+        let model = CleanerModel.testing(
             trash: FakeCleanTrashExecutor(),
             activity: activity,
             homeDirectory: home,
@@ -1274,7 +1274,7 @@ final class CleanerModelTests: XCTestCase {
             CleanFixture.file("latest", allocated: 100, reclaimable: 100),
             CleanFixture.file("blob-elsewhere", allocated: 5000, reclaimable: 5000),
         ])
-        let model = CleanerModel(
+        let model = CleanerModel.testing(
             trash: FakeCleanTrashExecutor(),
             homeDirectory: home,
             aiManifestReader: { _ in #"{"broken"# }
@@ -1308,7 +1308,7 @@ final class CleanerModelTests: XCTestCase {
         ])
         // B:挂起在途,phase 停在 .scanning 的初始空统计上。
         let current = StuckReleaseEnumerator(entriesAfterRelease: [])
-        let model = CleanerModel(
+        let model = CleanerModel.testing(
             exclusions: CleanExclusionsStore(load: { [] }, persist: { _ in }),
             trash: FakeCleanTrashExecutor(),
             homeDirectory: "/Users/me",

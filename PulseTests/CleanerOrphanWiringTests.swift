@@ -42,7 +42,7 @@ final class CleanerOrphanWiringTests: XCTestCase {
         _ inventory: InstalledAppInventory,
         log: CallLog = CallLog()
     ) async -> CleanerModel {
-        let model = CleanerModel(
+        let model = CleanerModel.testing(
             trash: FakeCleanTrashExecutor(),
             homeDirectory: home,
             installedAppInventory: { trees, cancelled, home in
@@ -149,7 +149,7 @@ final class CleanerOrphanWiringTests: XCTestCase {
         }
         let box = Box()
         let cache = CleanScanResultStore(load: { box.value }, save: { box.value = $0 })
-        let first = CleanerModel(
+        let first = CleanerModel.testing(
             trash: FakeCleanTrashExecutor(),
             scanCache: cache,
             homeDirectory: home,
@@ -161,7 +161,7 @@ final class CleanerOrphanWiringTests: XCTestCase {
 
         // 新会话装载缓存:全集按此刻现采(装机后新装的 app 立即受保护)。
         let log = CallLog()
-        let second = CleanerModel(
+        let second = CleanerModel.testing(
             trash: FakeCleanTrashExecutor(),
             scanCache: cache,
             homeDirectory: home,

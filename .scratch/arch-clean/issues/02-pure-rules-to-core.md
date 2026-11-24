@@ -20,7 +20,9 @@ Blocked by: 01
 
 1. `isUserDomain` 挪到 PulseCore 成纯函数(如 `CleanPathDomain.isUserDomain`),补正反例测试;Live 枚举器改调它。
 2. `LiveAppCatalogFacts` 去掉 Live 前缀挪到 PulseCore;`UninstallModel` 不再引用 Live 类型。
-3. `UninstallModel` 补一条带假 `CleanActivityBoard` 的「应用正在运行」测试(现三处测试都传 nil,该分支没测到)。
+3. 预览里构造的放错目录件(arch-clean/01 门禁豁免清单第二组):`HostInfo`(纯数据)挪 PulseCore;
+   `InertNemoNotchToastSender` 挪 `Pulse/App/InertSources.swift`;删清单对应 4 行。
+4. `UninstallModel` 补一条带假 `CleanActivityBoard` 的「应用正在运行」测试(现三处测试都传 nil,该分支没测到)。
    不为它新开 Core 接口。
 
 ## 验收

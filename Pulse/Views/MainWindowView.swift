@@ -48,51 +48,15 @@ struct MainWindowView: View {
         monitor: SystemMonitor,
         initialTab: MetricTab = .overview,
         alertRouter: AlertNotificationRouter? = nil,
-        cleanExclusions: CleanExclusionsStore = CleanExclusionsStore(load: { [] }, persist: { _ in }),
-        cleanScanRoots: CleanScanRootsStore = CleanScanRootsStore(load: { [] }, persist: { _ in }),
+        cleanAssembly: CleanAssembly,
         mcpClean: McpCleanBridge? = nil
     ) {
         self.monitor = monitor
         self.alertRouter = alertRouter
         self.mcpClean = mcpClean
         _model = State(initialValue: DashboardModel(monitor: monitor))
-        _cleanerModel = State(initialValue: CleanerModel(
-            exclusions: cleanExclusions,
-            scanRoots: cleanScanRoots,
-            history: monitor.history.cleanHistory,
-            trash: LiveCleanTrashExecutor(),
-            activity: LiveCleanActivitySource(board: monitor.activityBoard),
-            volumeSummaries: { LiveCleanVolumeSummaries().internalSystemVolumes() },
-            // 落盘缓存(票 11):2026-11-03 实机排障发现此装配点漏传——测试全绿
-            // (注入 store)而正式版从未落盘,关窗即回空态。registry-漏登病再犯,
-            // 见 p2-audit 教训;目录建不了时 init 返回 nil,功能优雅降级。
-            scanCache: CleanScanResultStore()
-        ))
-        // 先取值再捕获(Monitor 的属性带 actor 隔离,闭包里直读过不了并发检查);
-        // 与 cleanerModel 的 history 注入同一来源、同一库。
-        let cleanHistory = monitor.history.cleanHistory
-        _uninstallModel = State(initialValue: UninstallModel(
-            activityBoard: monitor.activityBoard,
-            recycle: { paths in
-                await LiveCleanTrashExecutor().recycleToTrash(paths)
-            },
-            deletePermanently: { paths in
-                await LiveCleanPermanentDeleter().deletePermanently(paths)
-            },
-            recordHistory: { report in
-                // 与一期清理同库同表(CleanHistoryStore actor 串行化);落库失败
-                // 记日志不阻断横幅——历史缺行可追,静默吞错不可追。
-                guard let cleanHistory else {
-                    LogService.warn("卸载历史落库跳过:历史库未初始化", category: "Cleaner")
-                    return
-                }
-                do {
-                    try await cleanHistory.record(report)
-                } catch {
-                    LogService.error("卸载历史落库失败:\(error.localizedDescription)", category: "Cleaner")
-                }
-            }
-        ))
+        _cleanerModel = State(initialValue: cleanAssembly.makeCleanerModel())
+        _uninstallModel = State(initialValue: cleanAssembly.makeUninstallModel())
         // 展示轴随电池可用性(工单 02):无内建电池的机器不含电池页。
         // 窗口新建/重建时先取路由落点(点通知时窗口可能还没开)。
         _tabSelection = State(initialValue: MetricTabSelection(
@@ -540,6 +504,6 @@ struct SortableProcessTableView: View {
             ),
         ])
     )
-    return MainWindowView(monitor: monitor)
+    return MainWindowView(monitor: monitor, cleanAssembly: .preview(monitor: monitor))
         .task { monitor.start() }
 }

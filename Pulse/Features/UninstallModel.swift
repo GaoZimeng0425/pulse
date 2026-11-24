@@ -79,39 +79,25 @@ final class UninstallModel {
     @ObservationIgnored private let recordHistory: @Sendable (CleanRunReport) async -> Void
 
     init(
-        collectFacts: @escaping @Sendable () async -> LiveAppCatalogFacts = {
-            LiveAppCatalogSource().collectFacts()
-        },
+        collectFacts: @escaping @Sendable () async -> LiveAppCatalogFacts,
         scanSizes: @escaping @Sendable (
             [String],
             (@Sendable (ScanStats) -> Void)?,
             (@Sendable () -> Bool)?
-        ) async -> [String: (bytes: Int64, partial: Bool)] = { paths, progress, isCancelled in
-            await LiveAppCatalogSource().scanAppSizes(
-                appPaths: paths, progress: progress, isCancelled: isCancelled
-            )
-        },
+        ) async -> [String: (bytes: Int64, partial: Bool)],
         activityBoard: CleanActivityBoard? = nil,
-        prober: @escaping @Sendable ([LeftoverProbe]) async -> [AppLeftoverRow] = { probes in
-            await LiveAppCatalogSource().probeLeftovers(probes)
-        },
+        prober: @escaping @Sendable ([LeftoverProbe]) async -> [AppLeftoverRow],
         // 破坏性执行器必传,无默认值(2026-11-22 深查收账:曾有 Live 真执行器默认,
         // 新测试漏传又调删除 = 动用户真文件——编译期挡住;CleanerModel trash 同款
-        // 纪律。生产传 Live,测试喂 spy;其余只读参数保留 Live 默认)。
+        // 纪律。arch-clean/01 起全部 IO 参数都必传,生产组装在 CleanAssembly,测试喂假闭包)。
         recycle: @escaping @Sendable ([String]) async -> TrashRecycleOutcome,
         deletePermanently: @escaping @Sendable ([String]) async -> PermanentDeletionOutcome,
-        brewUninstall: @escaping @Sendable (String, Bool) async -> BrewUninstallResult = { cask, zap in
-            await LiveBrewUninstaller().uninstall(cask: cask, zap: zap)
-        },
-        crossCheckCasks: @escaping @Sendable () async -> [String: String] = {
-            LiveAppCatalogSource().collectFacts().brewAppNames
-        },
-        // 删前复核探针(p5-cleaner/03):与 CleanRunner 的执行器探针同款 lstat(零副作用)。
-        leftoverState: @escaping @Sendable (String) async -> PathSnapshot = { path in
-            await LiveCleanTrashExecutor().currentState(ofPath: path)
-        },
+        brewUninstall: @escaping @Sendable (String, Bool) async -> BrewUninstallResult,
+        crossCheckCasks: @escaping @Sendable () async -> [String: String],
+        // 删前复核探针(p5-cleaner/03):生产 = 执行器同款 lstat(零副作用)。
+        leftoverState: @escaping @Sendable (String) async -> PathSnapshot,
         recordHistory: @escaping @Sendable (CleanRunReport) async -> Void = { _ in
-            // 正式装配在 MainWindowView 注入历史库;默认 no-op 供预览与单测。
+            // 正式装配在 CleanAssembly 注入历史库;默认 no-op 供单测。
         }
     ) {
         self.collectFacts = collectFacts

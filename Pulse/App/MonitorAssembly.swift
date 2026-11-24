@@ -138,10 +138,16 @@ extension SystemMonitor {
                     store: AppVolumeSettingsStore(),
                     iconProvider: LiveAppVolumeEngine.appIcon(forBundleID:)
                 ),
-                bluetooth: BluetoothFeature(source: LiveBluetoothSource()),
+                bluetooth: BluetoothFeature(
+                    source: LiveBluetoothSource(),
+                    access: LiveBluetoothAccessControl(),
+                    probe: GattBatteryProbe(),
+                    loadEnabled: { UserDefaults.standard.bool(forKey: BluetoothFeature.enabledStorageKey) },
+                    persistEnabled: { UserDefaults.standard.set($0, forKey: BluetoothFeature.enabledStorageKey) }
+                ),
                 containers: ContainerFeature(source: LiveContainerSource()),
                 launchdManifest: LaunchdManifestFeature(provider: LaunchdManifestProvider()),
-                energyImpact: EnergyImpactFeature()
+                energyImpact: EnergyImpactFeature(fetch: { try await EnergyHelperClient().fetchLatest() })
             )
         )
     }

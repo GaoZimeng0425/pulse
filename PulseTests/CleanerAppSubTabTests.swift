@@ -32,7 +32,7 @@ final class CleanerAppSubTabTests: XCTestCase {
                 isCompact: compact,
                 monitor: monitor,
                 model: model,
-                cleanerModel: compact ? nil : CleanerModel(trash: FakeCleanTrashExecutor()),
+                cleanerModel: compact ? nil : CleanerModel.testing(trash: FakeCleanTrashExecutor()),
                 content: MetricTabContent.build(groups: [], tab: .disk),
                 onSelectTab: { _ in },
                 overflowPolicy: .expandInPlace

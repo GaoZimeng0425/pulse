@@ -52,6 +52,8 @@ struct PulseApp: App {
     /// AI 清理中枢(mcp-clean/01):app 常驻——影子模型列清单 + clean 请求桥接
     /// 确认单;本机 IPC 服务(127.0.0.1 + 令牌)只服务 pulse-mcp。
     @State private var mcpClean: McpCleanBridge
+    /// 清理 / 卸载模型工厂(arch-clean/01):主窗口与 AI 影子模型同一来源。
+    @State private var cleanAssembly: CleanAssembly
     @State private var mcpCleanIPC: CleanIPCService?
     /// 常驻代理:拒绝「最后窗口关闭即终止」(见 MenuBarController.KeepAliveAppDelegate)。
     @NSApplicationDelegateAdaptor(KeepAliveAppDelegate.self) private var keepAlive
@@ -94,16 +96,14 @@ struct PulseApp: App {
         // AI 清理(mcp-clean/01):影子模型与主窗口清理页同装配同源(排除/扫描根/
         // 历史/活动板/缓存 store),但只读缓存——永不扫描、不清删。拉起主窗口到
         // 清理页复用告警路由的 activate 三合一(激活 + 落点 + 广播开窗)。
+        let cleanAssembly = CleanAssembly(
+            monitor: monitor,
+            exclusions: cleanExclusionsStore,
+            scanRoots: cleanScanRootsStore
+        )
+        _cleanAssembly = State(initialValue: cleanAssembly)
         let mcpBridge = McpCleanBridge(
-            shadowModel: CleanerModel(
-                exclusions: cleanExclusionsStore,
-                scanRoots: cleanScanRootsStore,
-                history: monitor.history.cleanHistory,
-                trash: LiveCleanTrashExecutor(),
-                activity: LiveCleanActivitySource(board: monitor.activityBoard),
-                volumeSummaries: { LiveCleanVolumeSummaries().internalSystemVolumes() },
-                scanCache: CleanScanResultStore()
-            ),
+            shadowModel: cleanAssembly.makeCleanerModel(),
             focusCleanerTab: { [weak router] in router?.activate(tab: .cleaner) }
         )
         _mcpClean = State(initialValue: mcpBridge)
@@ -161,8 +161,7 @@ struct PulseApp: App {
             MainWindowGate(
                 monitor: monitor,
                 alertRouter: alertRouter,
-                cleanExclusions: cleanExclusions,
-                cleanScanRoots: cleanScanRoots,
+                cleanAssembly: cleanAssembly,
                 mcpClean: mcpClean
             )
             .background(MainWindowOpenWindowCapture())
