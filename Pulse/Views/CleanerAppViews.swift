@@ -194,6 +194,7 @@ struct AppListSection: View {
         case let .finished(report):
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: IconSize.inline, weight: .medium))
                     .foregroundStyle(Surface.positive)
                 Text(finishedText(report))
                     .font(.system(size: 12, weight: .medium))
@@ -202,6 +203,7 @@ struct AppListSection: View {
                     model.dismissUninstallBanner()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: IconSize.inline))
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
@@ -212,6 +214,7 @@ struct AppListSection: View {
         case let .aborted(reason):
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: IconSize.inline, weight: .medium))
                     .foregroundStyle(Surface.negative)
                 Text(reason)
                     .font(.system(size: 12, weight: .medium))
@@ -221,6 +224,7 @@ struct AppListSection: View {
                     model.dismissUninstallBanner()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: IconSize.inline))
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)

@@ -119,6 +119,7 @@ private struct AgentSessionTile<Badge: View, Metric: View>: View {
                             .truncationMode(.middle)
                     } icon: {
                         Image(systemName: "folder")
+                            .font(.system(size: IconSize.inline))
                     }
                     .labelStyle(AgentSessionPathLabelStyle())
                     .help(path)

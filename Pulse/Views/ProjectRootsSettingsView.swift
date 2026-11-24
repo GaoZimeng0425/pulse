@@ -44,6 +44,7 @@ struct ProjectRootsSettingsView: View {
     private func rootRow(_ root: String) -> some View {
         HStack {
             Image(systemName: "folder")
+                .font(.system(size: IconSize.leading(compact: true)))
                 .foregroundStyle(.secondary)
             Text(root)
                 .lineLimit(1)
@@ -54,6 +55,7 @@ struct ProjectRootsSettingsView: View {
                 store.remove(root)
             } label: {
                 Image(systemName: "minus.circle")
+                    .font(.system(size: IconSize.inline))
             }
             .buttonStyle(.borderless)
             .help("移除该目录")

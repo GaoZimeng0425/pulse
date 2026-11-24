@@ -348,7 +348,7 @@ struct DashboardView: View {
 struct FooterButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 12, weight: .medium))
+            .font(.system(size: IconSize.inline, weight: .medium))
             .padding(.horizontal, 12)
             .frame(height: 30)
             .background(

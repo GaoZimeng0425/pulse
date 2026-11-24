@@ -91,6 +91,7 @@ struct CleanerSettingsView: View {
     private func customRootRow(_ path: String) -> some View {
         HStack {
             Image(systemName: "folder.badge.gearshape")
+                .font(.system(size: IconSize.leading(compact: true)))
                 .foregroundStyle(.secondary)
             Text(path)
                 .lineLimit(1)
@@ -101,6 +102,7 @@ struct CleanerSettingsView: View {
                 scanRoots.remove(path)
             } label: {
                 Image(systemName: "minus.circle")
+                    .font(.system(size: IconSize.inline))
             }
             .buttonStyle(.borderless)
             .help("移除该扫描根")
@@ -144,6 +146,7 @@ struct CleanerSettingsView: View {
     private func exclusionRow(_ path: String) -> some View {
         HStack {
             Image(systemName: "folder.badge.minus")
+                .font(.system(size: IconSize.leading(compact: true)))
                 .foregroundStyle(.secondary)
             Text(path)
                 .lineLimit(1)
@@ -154,6 +157,7 @@ struct CleanerSettingsView: View {
                 store.remove(path)
             } label: {
                 Image(systemName: "minus.circle")
+                    .font(.system(size: IconSize.inline))
             }
             .buttonStyle(.borderless)
             .help("取消排除该目录")

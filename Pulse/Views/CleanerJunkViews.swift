@@ -517,6 +517,7 @@ struct JunkListCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: IconSize.inline, weight: .medium))
                         .foregroundStyle(Surface.positive)
                     Text(report.failed.isEmpty
                         ? "已移入废纸篓 \(report.recycled.count) 项 · 释放 \(PulseFormat.memory(UInt64(max(0, report.freedBytes))))"

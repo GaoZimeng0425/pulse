@@ -292,6 +292,7 @@ struct AgentUsagePaneView: View {
                         .controlSize(.mini)
                 } else {
                     Image(systemName: "arrow.clockwise")
+                        .font(.system(size: IconSize.inline, weight: .semibold))
                 }
                 Text(isScanning ? "扫描中" : "重新扫描")
             }

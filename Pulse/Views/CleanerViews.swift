@@ -222,6 +222,7 @@ struct CleanerTabView: View {
         case let .finished(summary):
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: IconSize.inline, weight: .medium))
                     .foregroundStyle(Surface.positive)
                 Text(trashFinishedText(summary))
                     .font(.system(size: 12, weight: .medium))
@@ -234,6 +235,7 @@ struct CleanerTabView: View {
             if let notice = model.trashNotice {
                 HStack(spacing: 8) {
                     Image(systemName: "info.circle")
+                        .font(.system(size: IconSize.inline))
                         .foregroundStyle(.secondary)
                     Text(notice)
                         .font(.system(size: 11))
@@ -252,6 +254,7 @@ struct CleanerTabView: View {
             model.dismissTrashFeedback()
         } label: {
             Image(systemName: "xmark.circle.fill")
+                .font(.system(size: IconSize.inline))
                 .foregroundStyle(.tertiary)
         }
         .buttonStyle(.plain)
@@ -316,6 +319,7 @@ struct CleanerTabView: View {
     private func stalenessBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "clock.badge.exclamationmark")
+                .font(.system(size: IconSize.inline))
                 .foregroundStyle(.secondary)
             Text(text)
                 .font(.system(size: 11))
@@ -331,6 +335,7 @@ struct CleanerTabView: View {
     private func fdaBanner(_ hint: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "lock.shield")
+                .font(.system(size: IconSize.inline))
                 .foregroundStyle(Surface.warning)
             Text(hint)
                 .font(.system(size: 11))
