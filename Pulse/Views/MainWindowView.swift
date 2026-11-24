@@ -368,6 +368,11 @@ private struct MainSearchField: View {
             TextField("搜索应用或 PID", text: $query)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12))
+                // 定宽 132 内让输入框先让位:理想宽超预算时整行溢出,frame 居中裁掉
+                // 两侧内距(左内距消失的成因)。可缩到 0 + 单行尾截,占位/内容显示「…」。
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(minWidth: 0, maxWidth: .infinity)
                 .focused($isFocused)
                 .keyboardShortcut("f", modifiers: .command)
                 .onExitCommand {
@@ -395,7 +400,10 @@ private struct MainSearchField: View {
         .padding(.vertical, 4)
         .background(Color.primary.opacity(0.06), in: .capsule)
         // 定长是 720 窗宽预算的一部分:宁可搜索框窄,不要工具栏溢出菜单。
-        .frame(width: 132)
+        // 系统玻璃组底把本项与齿轮包在一起,却不给自定义视图左内距——胶囊会贴组底
+        // 左缘。左侧自留 {spacing.inline} 6(与组底上下留白同量,同心),从 132 预算里扣。
+        .frame(width: 126)
+        .padding(.leading, 6)
     }
 }
 
