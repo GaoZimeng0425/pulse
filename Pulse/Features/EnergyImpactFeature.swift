@@ -17,7 +17,7 @@ final class EnergyImpactFeature: MonitorFeature {
     /// 一轮聚合结果:top 进程(名聚合,impact 降序)+ 全机合计 + 采样时刻。
     private(set) var reading: EnergyImpactReading?
 
-    /// 拉取缝:Live = XPC client;预览/测试注入合成闭包(60s 循环不设缝,
+    /// 拉取缝(必传,组装点在 MonitorAssembly):Live = 助手快照文件读侧;预览/测试注入合成闭包(60s 循环不设缝,
     /// 真机验收,探针 09 同族)。
     typealias Fetch = @Sendable () async throws
         -> (samples: [(pid: Int, name: String, impact: Double)], collectedAt: Date)
@@ -42,7 +42,7 @@ final class EnergyImpactFeature: MonitorFeature {
     }
 
     init(
-        fetch: @escaping Fetch = { try await EnergyHelperClient().fetchLatest() },
+        fetch: @escaping Fetch,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.fetch = fetch

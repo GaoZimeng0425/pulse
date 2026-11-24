@@ -167,8 +167,10 @@ final class CleanerModel {
     ///   - volumeSummaries: 只读系统卷卷级摘要源(生产 statfs;测试固定值)。
     ///   - homeDirectory: 规则表相对它展开;测试注入假家目录。
     ///   - markerExists: 项目产物标记探测(cleaner-hardening/02;生产查盘,测试注入假集合)。
-    ///   - installedAppInventory: 已装 bundle id 全集采集(p5-cleaner/02;默认 Live——
-    ///     装配点漏传即功能静默死亡的病(票 11 scanCache 实案)不再给机会)。
+    ///   - directoryEnumerator: 生产扫描用的目录枚举器(arch-clean/01:必传,组装点在
+    ///     `CleanAssembly`);测试可另经 `startScan(using:)` 单次覆盖。
+    ///   - installedAppInventory / trashInventory: **必传**(arch-clean/01)——无默认值比
+    ///     「默认 Live」更强:装配点漏传直接编译失败(票 11 scanCache 实案的病)。
     ///   - aiManifestReader: 读一个 Ollama manifest 文件的 UTF-8 内容
     ///     (p6-cleaner/02 内容寻址记账;生产 FileManager,测试注入字典)。
     ///   - trash: **必传,无默认值**(2026-11-21 收账:曾有默认 Live 真执行器,
@@ -180,17 +182,14 @@ final class CleanerModel {
         scanRoots: CleanScanRootsStore = CleanScanRootsStore(load: { [] }, persist: { _ in }),
         history: CleanHistoryStore? = nil,
         trash: any CleanTrashExecutor,
+        directoryEnumerator: any CleanDirectoryEnumerator,
         activity: (any CleanActivitySource)? = nil,
         volumeSummaries: (@Sendable () -> [SpaceMapVolumeSummary])? = nil,
         scanCache: CleanScanResultStore? = nil,
         homeDirectory: String = NSHomeDirectory(),
         markerExists: @escaping (String) -> Bool = { FileManager.default.fileExists(atPath: $0) },
-        installedAppInventory: @escaping @Sendable ([SpaceNode], Bool, String) -> InstalledAppInventory = {
-            LiveInstalledAppInventory.collect(trees: $0, scanCancelled: $1, home: $2)
-        },
-        trashInventory: @escaping @Sendable () async -> TrashInventory? = {
-            await LiveCleanTrashExecutor().inventory()
-        },
+        installedAppInventory: @escaping @Sendable ([SpaceNode], Bool, String) -> InstalledAppInventory,
+        trashInventory: @escaping @Sendable () async -> TrashInventory?,
         aiManifestReader: @escaping (String) -> String? = { path in
             try? String(contentsOfFile: path, encoding: .utf8)
         },
@@ -201,6 +200,7 @@ final class CleanerModel {
         self.scanRoots = scanRoots
         self.history = history
         self.trash = trash
+        self.directoryEnumerator = directoryEnumerator
         self.activity = activity
         self.volumeSummaries = volumeSummaries
         self.scanCache = scanCache
@@ -212,6 +212,7 @@ final class CleanerModel {
         overviewTrashCounter = OverviewTrashCounter(source: trashInventory)
     }
 
+    @ObservationIgnored private let directoryEnumerator: any CleanDirectoryEnumerator
     @ObservationIgnored private let markerExists: (String) -> Bool
     @ObservationIgnored private let trashInventorySource: @Sendable () async -> TrashInventory?
     /// 总览废纸篓清点子状态机(solid-split/02 步骤 2 抽出;对外经下方转发面,零调用点变化)。
@@ -427,7 +428,7 @@ final class CleanerModel {
 
     // MARK: 扫描
 
-    /// - Parameter enumerator: 生产不传 = Live 扫描器;测试传 TestSupport 假实现
+    /// - Parameter enumerator: 不传 = 构造时注入的枚举器;测试可单次覆盖为 TestSupport 假实现
     ///   (协议注入,p4-cleaner/02 的接缝约定)。
     func startScan(
         using enumerator: (any CleanDirectoryEnumerator)? = nil,
@@ -450,12 +451,7 @@ final class CleanerModel {
         if case .finished = cleanPhase {
             cleanPhase = .idle
         }
-        var liveEnumerator = LiveCleanDirectoryEnumerator()
-        // 批粒度取消(cleaner-scan-hang/02):巨大目录枚举在途时,取消也能在
-        // 一批(~几百条)内被看见;闭包在 worker 任务上下文求值,与引擎的
-        // 目录入口检查同源(取消自 scanTask 传播)。
-        liveEnumerator.isCancelled = { Task.isCancelled }
-        let source = enumerator ?? liveEnumerator
+        let source = enumerator ?? directoryEnumerator
         scanGeneration &+= 1
         let generation = scanGeneration
         // 方案 A 路径域修正:物理根喂枚举器,树路径以规范根("/")落——匹配/排除/展示同域。

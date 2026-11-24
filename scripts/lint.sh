@@ -131,6 +131,11 @@ else
   ast-grep scan Pulse PulseTests Packages/PulseCore || ag_status=1
 fi
 
+# ── 分层门禁(arch-clean/01):功能层 / 视图层不构造 Live 层类型;存量豁免只许变短 ──
+# 全仓口径(豁免清单按全仓记账),staged 模式也跑全仓——一次 rg,毫秒级。
+layer_status=0
+sh "$root/scripts/check-layers.sh" >/dev/null || layer_status=1
+
 fail=0
 if [ "$sf_status" != 0 ]; then
   fail=1
@@ -155,7 +160,12 @@ if [ "$ag_status" != 0 ]; then
   echo "   按消息里的替代写法修;确属误报时在规则文件收紧 pattern 并写明原因。" >&2
 fi
 
+if [ "$layer_status" != 0 ]; then
+  fail=1
+  echo "   (分层门禁明细见上;规则与豁免清单:scripts/check-layers.sh、scripts/layer-baseline.txt)" >&2
+fi
+
 if [ "$fail" = 0 ]; then
-  echo "✅ swiftformat + swiftlint + ast-grep 通过"
+  echo "✅ swiftformat + swiftlint + ast-grep + 分层门禁 通过"
 fi
 exit $fail

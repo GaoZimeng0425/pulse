@@ -79,7 +79,12 @@ final class UninstallModelTests: XCTestCase {
             },
             deletePermanently: { _ in
                 PermanentDeletionOutcome()
-            }
+            },
+            // arch-clean/01 起 brew 卸载也必传:Bitwarden 被标成 brew 应用,曾走 Live
+            // 默认 = 任何执行路径的新测试都会在本机真跑 `brew uninstall bitwarden`。
+            brewUninstall: { _, _ in .brewMissing },
+            crossCheckCasks: { [:] },
+            leftoverState: { _ in .present(modifiedEpoch: 100) }
         )
     }
 
@@ -241,7 +246,8 @@ final class UninstallModelTests: XCTestCase {
             recycle: { _ in TrashRecycleOutcome() },
             deletePermanently: { _ in PermanentDeletionOutcome() },
             brewUninstall: { _, _ in .brewMissing },
-            crossCheckCasks: { [:] }
+            crossCheckCasks: { [:] },
+            leftoverState: { _ in .present(modifiedEpoch: 100) }
         )
         model.loadIfNeeded()
         await waitForFinished(model)

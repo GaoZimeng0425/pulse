@@ -25,10 +25,8 @@ extension Notification.Name {
 struct MainWindowGate: View {
     let monitor: SystemMonitor
     let alertRouter: AlertNotificationRouter
-    /// 清理页排除目录(p4-cleaner/04):app 级单实例,与设置页「清理」同源。
-    let cleanExclusions: CleanExclusionsStore
-    /// 清理扫描根(p4-cleaner/05):app 级单实例,与设置页「清理」同源。
-    let cleanScanRoots: CleanScanRootsStore
+    /// 清理 / 卸载模型工厂(arch-clean/01:唯一组装点,与 AI 清理影子模型同源)。
+    let cleanAssembly: CleanAssembly
     /// AI 清理桥(mcp-clean/01):窗口可见期把清理页模型挂给它(列清单活数据 /
     /// clean 请求落确认单);关窗即摘。
     let mcpClean: McpCleanBridge
@@ -41,8 +39,7 @@ struct MainWindowGate: View {
                 MainWindowView(
                     monitor: monitor,
                     alertRouter: alertRouter,
-                    cleanExclusions: cleanExclusions,
-                    cleanScanRoots: cleanScanRoots,
+                    cleanAssembly: cleanAssembly,
                     mcpClean: mcpClean
                 )
             } else {

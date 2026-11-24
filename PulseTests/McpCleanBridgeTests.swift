@@ -15,7 +15,7 @@ final class McpCleanBridgeTests: XCTestCase {
         activity: FakeCleanActivitySource = FakeCleanActivitySource(),
         trash: FakeCleanTrashExecutor = FakeCleanTrashExecutor()
     ) -> CleanerModel {
-        CleanerModel(
+        CleanerModel.testing(
             scanRoots: CleanScanRootsStore(load: { ["/Users/dev/code"] }, persist: { _ in }),
             trash: trash,
             activity: activity,

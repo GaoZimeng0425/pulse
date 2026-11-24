@@ -53,7 +53,7 @@ final class BluetoothFeature: MonitorFeature {
     init(
         source: any BluetoothSource,
         access: any BluetoothAccessControl,
-        probe: any GattBatteryProbing = GattBatteryProbe(),
+        probe: any GattBatteryProbing,
         loadEnabled: () -> Bool,
         persistEnabled: @escaping (Bool) -> Void
     ) {
@@ -63,16 +63,6 @@ final class BluetoothFeature: MonitorFeature {
         isEnabled = loadEnabled()
         // 启动路径只静默读:重装后开关仍开而授权未决,也只是等用户点,不弹。
         authorization = access.authorization()
-    }
-
-    /// 生产构造:Live 授权控制 + UserDefaults 持久。
-    convenience init(source: any BluetoothSource, defaults: UserDefaults = .standard) {
-        self.init(
-            source: source,
-            access: LiveBluetoothAccessControl(),
-            loadEnabled: { defaults.bool(forKey: Self.enabledStorageKey) },
-            persistEnabled: { defaults.set($0, forKey: Self.enabledStorageKey) }
-        )
     }
 
     /// 卡片呈现态:开关优先于授权态(没开 = 一切免谈)。
