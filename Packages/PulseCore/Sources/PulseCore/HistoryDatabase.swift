@@ -58,7 +58,16 @@ public enum HistoryDatabase {
             try db.execute(sql: "PRAGMA journal_mode = WAL")
         }
         let queue = try DatabaseQueue(path: url.path, configuration: configuration)
+        let slimPending = try queue.read { db in
+            try !migrator().completedMigrations(db).contains(agentSeenSlimMigrationID)
+        }
         try migrator().migrate(queue)
+        // 瘦身迁移删掉的页不会自己还给磁盘;只在它首次生效时整理一次
+        // (VACUUM 不能在事务里跑,故放迁移之外)。失败不挡启动:VACUUM 要独占锁,
+        // pulse-mcp 只读连接恰在读时会 busy——最坏只是这次空间没还,功能无损。
+        if slimPending {
+            try? queue.vacuum()
+        }
         return queue
     }
 
@@ -431,8 +440,41 @@ public enum HistoryDatabase {
             try db.execute(sql: "CREATE INDEX agent_seen_messages_file ON agent_seen_messages(file_key)")
         }
 
+        // 消息去重表瘦身(agent-tab/13):文件路径抽到 agent_seen_files 只存一份,
+        // id 行只带整数 file_id;去掉只写不读的 day 列。全史 6.5 万行实测
+        // 19MB → 4.6MB。语义不变(仍是全局 message-id 去重)。
+        migrator.registerMigration(agentSeenSlimMigrationID) { db in
+            try db.execute(sql: """
+            CREATE TABLE agent_seen_files (
+                id       INTEGER PRIMARY KEY,
+                file_key TEXT    NOT NULL UNIQUE
+            )
+            """)
+            try db.execute(sql: """
+            INSERT INTO agent_seen_files (file_key)
+            SELECT DISTINCT file_key FROM agent_seen_messages
+            """)
+            try db.execute(sql: """
+            CREATE TABLE agent_seen_messages_slim (
+                message_id TEXT    NOT NULL PRIMARY KEY,
+                file_id    INTEGER NOT NULL
+            ) WITHOUT ROWID
+            """)
+            try db.execute(sql: """
+            INSERT INTO agent_seen_messages_slim (message_id, file_id)
+            SELECT m.message_id, f.id FROM agent_seen_messages m
+            JOIN agent_seen_files f ON f.file_key = m.file_key
+            """)
+            try db.execute(sql: "DROP TABLE agent_seen_messages")
+            try db.execute(sql: "ALTER TABLE agent_seen_messages_slim RENAME TO agent_seen_messages")
+            try db.execute(sql: "CREATE INDEX agent_seen_messages_file ON agent_seen_messages(file_id)")
+        }
+
         return migrator
     }
+
+    /// 消息去重表瘦身迁移标识(agent-tab/13;打开时据此决定是否 VACUUM)。
+    static let agentSeenSlimMigrationID = "agent-tab-13-seen-slim"
 
     /// 每日账本迁移标识(agent-tab/02)。
     static let agentUsageMigrationID = "agent-tab-02-usage"
@@ -463,6 +505,6 @@ public enum HistoryDatabase {
         "clean_run", "clean_item",
         "alert_event", "dev_server_state",
         "agent_daily_usage", "agent_daily_project_usage", "agent_daily_model_usage",
-        "agent_file_checkpoints", "agent_seen_messages",
+        "agent_file_checkpoints", "agent_seen_messages", "agent_seen_files",
     ]
 }
