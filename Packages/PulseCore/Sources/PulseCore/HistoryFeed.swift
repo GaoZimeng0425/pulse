@@ -81,6 +81,8 @@ public extension HistoryEngine {
 public struct HistoryFeed: Sendable {
     private var pendingDiskReadBytes: UInt64 = 0
     private var pendingDiskWriteBytes: UInt64 = 0
+    /// 组级磁盘账本(arch-review-2026-11-24/04):每轮从快照累计计数差分出组增量。
+    private var groupDisk = GroupDiskLedger()
     /// P2 传感器趋势量的最新仪表值(p2-sensors/08):广播样本覆盖暂存,每轮 takeIngest
     /// 整笔带走(轮间重复携带同一值 = 仪表携带前推,分钟均值口径不变)。
     /// 样本带时刻:超过 `gaugeMaxAge` 无新样本(传感器持续失败)即置 nil 出
@@ -119,13 +121,16 @@ public struct HistoryFeed: Sendable {
         pendingDiskWriteBytes &+= reading.writeBytesDelta
     }
 
-    /// 本轮落库入参:组采样 / 展示名 / 出生登记取本轮主干上下文,网络增量取本轮
-    /// 心跳(nil 记 0),磁盘增量整笔带走账本并清零。`now` 由壳给(采样时刻口径)。
+    /// 本轮落库入参:组采样(含组级磁盘增量)/ 展示名 / 出生登记取本轮主干上下文,
+    /// 网络增量取本轮心跳(nil 记 0),系统级磁盘增量整笔带走账本并清零。`now` 由壳给(采样时刻口径)。
     public mutating func takeIngest(from context: RoundContext, at now: Date) -> HistoryIngest {
+        let diskByGroup = groupDisk.advance(groups: context.groups)
         let ingest = HistoryIngest(
             at: now,
             systemLoad: context.update.systemCPULoad,
-            groups: context.groups.map(GroupSample.init(group:)),
+            groups: context.groups.map { group in
+                GroupSample(group: group, disk: diskByGroup[group.id] ?? .zero)
+            },
             displayNames: Dictionary(
                 context.groups.map { ($0.id, $0.name) },
                 uniquingKeysWith: { _, rhs in rhs }

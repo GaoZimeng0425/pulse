@@ -50,29 +50,6 @@ final class HistoryDatabaseTests: XCTestCase {
         XCTAssertEqual(tables, Set(HistoryDatabase.tableNames))
     }
 
-    /// 组级磁盘两列、系统级 net/disk 四列本阶段恒空(spec 拍板):列在,
-    /// 现阶段不写入任何值。
-    func testGroupDiskAndSystemThroughputColumnsExistButStayEmpty() throws {
-        let queue = try HistoryDatabase.openInMemory()
-        try queue.write { db in
-            try db.execute(
-                sql: "INSERT INTO sample_min (ts, group_id, cpu_avg, cpu_max, mem_max, procs) VALUES (1, 'orphan', 1, 1, 1, 1)"
-            )
-            try db.execute(
-                sql: "INSERT INTO system_min (ts, load_avg, load_max) VALUES (1, 1, 1)"
-            )
-        }
-
-        let diskR = try queue.read { db in
-            try Int.fetchOne(db, sql: "SELECT disk_r FROM sample_min")
-        }
-        let netRx = try queue.read { db in
-            try Int.fetchOne(db, sql: "SELECT net_rx FROM system_min")
-        }
-        XCTAssertNil(diskR)
-        XCTAssertNil(netRx)
-    }
-
     /// 重复打开同一文件:迁移幂等,表与数据俱在(重启 app 的常态路径)。
     func testReopeningSameFileIsIdempotent() throws {
         _ = try HistoryDatabase.open(at: temporaryURL)

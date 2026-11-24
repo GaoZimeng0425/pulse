@@ -515,17 +515,17 @@ public actor HistoryEngine {
 
     // MARK: 行写入与卷积
 
-    /// 分钟聚合 → sample_min + system_min 各一批行(组级磁盘两列本阶段恒空;
-    /// 系统级 net/disk 四列随聚合写入增量合计——net 自工单 06,disk 与其同款
-    /// 差分增量口径接线)。
+    /// 分钟聚合 → sample_min + system_min 各一批行:组级磁盘两列 = 组内进程累计计数
+    /// 的分钟增量合计(arch-review-2026-11-24/04);系统级 net/disk 四列随聚合写入
+    /// 增量合计——net 自工单 06,disk 与其同款差分增量口径接线。
     private static func insertMinute(_ aggregate: MinuteAggregate, in db: Database) throws {
         let ts = HistoryWindows.epochSeconds(of: aggregate.minuteStart)
         for group in aggregate.groups {
             try db.execute(
                 sql: """
                 INSERT OR REPLACE INTO sample_min
-                    (ts, group_id, cpu_avg, cpu_max, mem_max, procs)
-                VALUES (?, ?, ?, ?, ?, ?)
+                    (ts, group_id, cpu_avg, cpu_max, mem_max, procs, disk_r, disk_w)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 arguments: [
                     ts,
@@ -534,6 +534,8 @@ public actor HistoryEngine {
                     group.cpuPeak,
                     Int64(group.memoryPeak),
                     group.processPeak,
+                    Int64(bitPattern: group.disk.readBytes),
+                    Int64(bitPattern: group.disk.writeBytes),
                 ]
             )
         }
@@ -575,7 +577,7 @@ public actor HistoryEngine {
     /// 小时卷积(两级口径的下半):sample_min/system_min 中 `[lower, upper)`
     /// 的完整小时,SQL 聚合进对应小时表。幂等(INSERT OR REPLACE),可重放;
     /// 小时边界按 epoch 对齐(HistoryWindows)。组级 cpu 取分钟均值的均值、
-    /// 峰值取最大;mem/procs 取最大。
+    /// 峰值取最大;mem/procs 取最大;磁盘增量求和。
     private static func rollupHours(from lower: Int, through upper: Int, in db: Database) throws {
         guard upper > lower else { return }
         try db.execute(
@@ -584,7 +586,7 @@ public actor HistoryEngine {
                 (ts, group_id, cpu_avg, cpu_max, mem_max, procs, disk_r, disk_w)
             SELECT ts / 3600 * 3600, group_id,
                    AVG(cpu_avg), MAX(cpu_max), MAX(mem_max), MAX(procs),
-                   MAX(disk_r), MAX(disk_w)
+                   SUM(disk_r), SUM(disk_w)
             FROM sample_min
             WHERE ts >= ? AND ts < ?
             GROUP BY ts / 3600 * 3600, group_id

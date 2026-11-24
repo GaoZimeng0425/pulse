@@ -414,7 +414,7 @@ final class SystemMonitor {
         sampleHistory.advance(
             systemCPULoad: update.systemCPULoad,
             memoryUsedBytes: update.memory?.usedBytes,
-            groups: allGroups.map(GroupSample.init(group:)),
+            groups: allGroups.map { GroupSample(group: $0) },
             atSeconds: update.snapshot.takenAt.timeIntervalSince1970
         )
         let historyDuration = elapsedSince(historyStart)
