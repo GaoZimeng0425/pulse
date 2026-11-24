@@ -172,6 +172,8 @@ final class AlertCenterToastTests: XCTestCase {
             record(payload)
         }
 
+        func openSystemSettings() {}
+
         private func record(_ payload: AlertNotificationPayload) {
             lock.lock()
             defer { lock.unlock() }

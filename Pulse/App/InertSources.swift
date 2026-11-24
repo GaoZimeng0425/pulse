@@ -313,6 +313,7 @@ struct InertAlertNotificationSender: AlertNotificationSending {
     }
 
     func send(_ payload: AlertNotificationPayload) async {}
+    func openSystemSettings() {}
 }
 
 extension AlertCenter {

@@ -1,6 +1,6 @@
 # arch-clean/06 功能层不再引用 Live 层类型名(门禁收紧到「任何引用」)
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: —(05 已完成)
 
@@ -23,9 +23,18 @@ Blocked by: —(05 已完成)
 
 ## 验收
 
-- [ ] 功能层不引用任何 `Pulse/Live` 声明的类型名;门禁按「引用」口径通过
-- [ ] `sh scripts/check.sh` 全绿
+- [x] 功能层不引用任何 `Pulse/Live` 声明的类型名;门禁按「引用」口径通过
+- [x] `sh scripts/check.sh` 全绿
 
 ## Comments
 
 - 2026-11-24 立票(arch-clean/02 收尾时盘点出的剩余引用)。
+- 2026-11-24 完成。门禁收集口径加 protocol / typealias,匹配从 `类型名(` 改成任何词边界引用(注释不算),功能层与**视图层**同口径,豁免 0 条;变异验证(功能层写 Live 类型做属性类型、视图层引用 Live 里的 typealias)均报红。逐个处理:
+  - 告警:`NotificationAuthorization`(UN 原值映射留 Live 作 extension)/ `AlertNotificationSending` / `AlertNotificationPayload` / `AlertNotificationContent` → PulseCore `AlertNotificationPort.swift`;`NemoNotchToastSending` → PulseCore `NemoNotchToast.swift`。
+  - 系统通知设置深链:视图不再调 `SystemNotificationSettings.open()`,改 `AlertCenter.openSystemNotificationSettings()` → 发送缝新增 `openSystemSettings()`(Live 实现调 NSWorkspace)。
+  - 点通知路由:落点状态 + 开窗广播拆成功能层 `MainWindowLanding`(无 AppKit / UN);`AlertNotificationRouter` 只剩 UN delegate + 激活 app,持有 landing。视图 / 菜单栏控制器只认 landing。
+  - 音量:`AppVolumeScan` 与两个引擎协议 → PulseCore `AppVolumeModel.swift`(`AudioObjectID` 写成同义的 `UInt32`)。
+  - 蓝牙:`BluetoothAuthorization` / `BluetoothAccessControl` → PulseCore `BluetoothAccess.swift`。
+  - `LaunchdManifestProvider` → PulseCore(同 05 口径:去掉 Live 源默认值,组装点传 `LiveLaunchdPlistSource()`;日志改 CoreLog)。
+  - `BundleDisplayNameReader`(只用 Foundation 读 Info.plist)→ PulseCore,视图照用。
+  - 没有挪不动的类型。

@@ -92,7 +92,7 @@ final class RankingOverflowTests: XCTestCase {
     // MARK: - 冷开窗落点(路由 pending)
 
     func testRouterStashIsConsumedOnceThenCleared() {
-        let router = AlertNotificationRouter()
+        let router = MainWindowLanding()
         router.stash(tab: .battery, rankingID: "battery-energy")
         XCTAssertEqual(router.pendingTab, .battery)
         XCTAssertEqual(router.consumePendingTab(), .battery)
@@ -102,7 +102,7 @@ final class RankingOverflowTests: XCTestCase {
     }
 
     func testRouterClearPendingDropsBothSlots() {
-        let router = AlertNotificationRouter()
+        let router = MainWindowLanding()
         router.stash(tab: .cpu, rankingID: "cpu-group-ranking")
         router.clearPending()
         XCTAssertNil(router.pendingTab)

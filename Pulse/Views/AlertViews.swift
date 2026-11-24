@@ -29,7 +29,7 @@ struct AlertBannerView: View {
                             .foregroundStyle(.secondary)
                         // 拒绝后系统不再弹授权窗:一键直达 系统设置 → 通知 → Pulse。
                         Button("打开系统通知设置") {
-                            SystemNotificationSettings.open()
+                            center.openSystemNotificationSettings()
                         }
                         .buttonStyle(.link)
                     }
@@ -175,4 +175,5 @@ private struct PreviewDeniedAlertSender: AlertNotificationSending {
     }
 
     func send(_ payload: AlertNotificationPayload) async {}
+    func openSystemSettings() {}
 }

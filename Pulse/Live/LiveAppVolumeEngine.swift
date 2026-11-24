@@ -9,42 +9,6 @@ import PulseCore
 // 归因(HAL 客户端 → 宿主 app)Adapted from lishuangqiang/mixbar AudioMixer
 // (MIT),间接基于 pantafive/fader。See THIRD_PARTY_NOTICES.md.
 
-/// 一轮全量扫描的产物:输出设备身份(换设备 = 管线整批重建的判据)+ 已归因的
-/// 音频客户端列表(原始客户端内嵌在归因条目里,不重复搭乘)。
-struct AppVolumeScan: Sendable {
-    let outputID: UInt32
-    let outputUID: String
-    let attributed: [AttributedVolumeClient]
-}
-
-/// 引擎缝:产品运行期唯一真实现 = LiveAppVolumeEngine(CoreAudio tap/属性读);
-/// 测试 / 预览注入假引擎(InertSources),绝不碰 HAL——tap 在 hosted 测试宿主里
-/// 会触发 TCC 弹窗且有挂死前科(test-hang-cure),引擎一律不进自动化。
-protocol AppVolumeEngineProtocol: Sendable {
-    /// 全量扫描:HAL 快照在后台线程读(≈12ms,几十次 HAL 往返,不占主线程),
-    /// 宿主归因回主线程(NSWorkspace)。nil = 无音频子系统 / 无输出设备。
-    func scan() async -> AppVolumeScan?
-    /// 建一条接管管线(start/增益/停止由 feature 侧驱动)。
-    func makePipeline(
-        processIDs: [AudioObjectID],
-        outputID: AudioObjectID,
-        outputUID: String,
-        gain: Float
-    ) -> AppAudioPipelineProtocol
-}
-
-protocol AppAudioPipelineProtocol: AnyObject, Sendable {
-    var processIDs: [AudioObjectID] { get }
-    var outputID: AudioObjectID { get }
-    /// 只在音频线程渲染时前进;停走 = 聚合停了而 tap 还在掐原声(看门狗判据)。
-    var renderCallbacks: UInt64 { get }
-    var hasAudioSignal: Bool { get }
-    var isAlive: Bool { get }
-    func setGain(_ gain: Float)
-    func start() throws
-    func stop()
-}
-
 extension AppAudioPipeline: AppAudioPipelineProtocol {}
 
 /// Live 引擎:HAL 进程对象枚举 + NSWorkspace 归因 + 管线工厂。

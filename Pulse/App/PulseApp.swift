@@ -83,7 +83,8 @@ struct PulseApp: App {
         }
         _badgeDisplay = State(initialValue: badgeDisplay)
         // delegate 必须在通知到达前挂上(app 拉起即挂;点开横幅 → 路由到主窗口)。
-        let router = AlertNotificationRouter()
+        let landing = MainWindowLanding()
+        let router = AlertNotificationRouter(landing: landing)
         UNUserNotificationCenter.current().delegate = router
         _alertRouter = State(initialValue: router)
         // 菜单栏宿主:创建即接管状态项 / 弹窗 / 徽标与四件迁居事项。
@@ -91,7 +92,7 @@ struct PulseApp: App {
             monitor: monitor,
             badgeDisplay: badgeDisplay,
             rootsStore: store,
-            alertRouter: router
+            landing: landing
         ))
         // AI 清理(mcp-clean/01):影子模型与主窗口清理页同装配同源(排除/扫描根/
         // 历史/活动板/缓存 store),但只读缓存——永不扫描、不清删。拉起主窗口到
@@ -160,7 +161,7 @@ struct PulseApp: App {
         Window("Pulse", id: MainWindowSceneID.value) {
             MainWindowGate(
                 monitor: monitor,
-                alertRouter: alertRouter,
+                landing: alertRouter.landing,
                 cleanAssembly: cleanAssembly,
                 mcpClean: mcpClean
             )

@@ -146,7 +146,9 @@ extension SystemMonitor {
                     persistEnabled: { UserDefaults.standard.set($0, forKey: BluetoothFeature.enabledStorageKey) }
                 ),
                 containers: ContainerFeature(source: LiveContainerSource()),
-                launchdManifest: LaunchdManifestFeature(provider: LaunchdManifestProvider()),
+                launchdManifest: LaunchdManifestFeature(
+                    provider: LaunchdManifestProvider(source: LiveLaunchdPlistSource())
+                ),
                 energyImpact: EnergyImpactFeature(fetch: { try await EnergyHelperClient().fetchLatest() })
             )
         )

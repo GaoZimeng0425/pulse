@@ -221,3 +221,47 @@ public enum AppVolumeGrouping {
         }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 }
+
+// MARK: - 引擎缝(端口;HAL 对象 id 即 CoreAudio 的 AudioObjectID = UInt32,Live 实现在 app target)
+
+/// 一轮全量扫描的产物:输出设备身份(换设备 = 管线整批重建的判据)+ 已归因的
+/// 音频客户端列表(原始客户端内嵌在归因条目里,不重复搭乘)。
+public struct AppVolumeScan: Sendable {
+    public let outputID: UInt32
+    public let outputUID: String
+    public let attributed: [AttributedVolumeClient]
+
+    public init(outputID: UInt32, outputUID: String, attributed: [AttributedVolumeClient]) {
+        self.outputID = outputID
+        self.outputUID = outputUID
+        self.attributed = attributed
+    }
+}
+
+/// 引擎缝:产品运行期唯一真实现 = LiveAppVolumeEngine(CoreAudio tap/属性读);
+/// 测试 / 预览注入假引擎(InertSources),绝不碰 HAL——tap 在 hosted 测试宿主里
+/// 会触发 TCC 弹窗且有挂死前科(test-hang-cure),引擎一律不进自动化。
+public protocol AppVolumeEngineProtocol: Sendable {
+    /// 全量扫描:HAL 快照在后台线程读(≈12ms,几十次 HAL 往返,不占主线程),
+    /// 宿主归因回主线程(NSWorkspace)。nil = 无音频子系统 / 无输出设备。
+    func scan() async -> AppVolumeScan?
+    /// 建一条接管管线(start/增益/停止由 feature 侧驱动)。
+    func makePipeline(
+        processIDs: [UInt32],
+        outputID: UInt32,
+        outputUID: String,
+        gain: Float
+    ) -> AppAudioPipelineProtocol
+}
+
+public protocol AppAudioPipelineProtocol: AnyObject, Sendable {
+    var processIDs: [UInt32] { get }
+    var outputID: UInt32 { get }
+    /// 只在音频线程渲染时前进;停走 = 聚合停了而 tap 还在掐原声(看门狗判据)。
+    var renderCallbacks: UInt64 { get }
+    var hasAudioSignal: Bool { get }
+    var isAlive: Bool { get }
+    func setGain(_ gain: Float)
+    func start() throws
+    func stop()
+}

@@ -97,14 +97,15 @@ final class AlertNotificationSmokeTests: XCTestCase {
         // 路由 delegate 的可测切片:激活 → 记落点 → 广播。真实 openWindow 接线
         // 在常驻视图(真机走查),这里钉状态与广播载荷。
         MainActor.assumeIsolated {
-            let router = AlertNotificationRouter()
+            let landing = MainWindowLanding()
+            let router = AlertNotificationRouter(landing: landing)
             var received: MetricTab?
             let token = NotificationCenter.default.addObserver(
-                forName: AlertNotificationRouter.openMainWindowNotification,
+                forName: MainWindowLanding.openMainWindowNotification,
                 object: nil,
                 queue: .main
             ) { notification in
-                if let raw = notification.userInfo?[AlertNotificationRouter.tabUserInfoKey] as? String {
+                if let raw = notification.userInfo?[MainWindowLanding.tabUserInfoKey] as? String {
                     received = MetricTab(rawValue: raw)
                 }
             }
@@ -112,7 +113,7 @@ final class AlertNotificationSmokeTests: XCTestCase {
 
             router.activate(tab: .disk)
 
-            XCTAssertEqual(router.pendingTab, .disk, "主窗口出现时消费落点")
+            XCTAssertEqual(landing.pendingTab, .disk, "主窗口出现时消费落点")
             XCTAssertEqual(received, .disk, "广播载荷带 tab")
         }
     }

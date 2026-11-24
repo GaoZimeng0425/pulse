@@ -23,7 +23,7 @@ struct MainWindowView: View {
     /// 工具栏齿轮:设置窗(项目根目录)。
     @Environment(\.openSettings) private var openSettings
     /// 告警通知路由(工单 P1-07):消费点开通知落下的 tab(nil = 无路由场景,预览)。
-    var alertRouter: AlertNotificationRouter?
+    var landing: MainWindowLanding?
 
     /// 两窗共用呈现模型(评审 F4):卡模型 / 会话状态 / 处置请求同出处。
     @State private var model: DashboardModel
@@ -47,12 +47,12 @@ struct MainWindowView: View {
     init(
         monitor: SystemMonitor,
         initialTab: MetricTab = .overview,
-        alertRouter: AlertNotificationRouter? = nil,
+        landing: MainWindowLanding? = nil,
         cleanAssembly: CleanAssembly,
         mcpClean: McpCleanBridge? = nil
     ) {
         self.monitor = monitor
-        self.alertRouter = alertRouter
+        self.landing = landing
         self.mcpClean = mcpClean
         _model = State(initialValue: DashboardModel(monitor: monitor))
         _cleanerModel = State(initialValue: cleanAssembly.makeCleanerModel())
@@ -60,7 +60,7 @@ struct MainWindowView: View {
         // 展示轴随电池可用性(工单 02):无内建电池的机器不含电池页。
         // 窗口新建/重建时先取路由落点(点通知时窗口可能还没开)。
         _tabSelection = State(initialValue: MetricTabSelection(
-            current: alertRouter?.pendingTab ?? initialTab,
+            current: landing?.pendingTab ?? initialTab,
             axis: MetricTab.displayAxis(hasBattery: monitor.battery.hasBattery)
         ))
     }
@@ -104,22 +104,22 @@ struct MainWindowView: View {
         // ranking-limit/01):窗口存活时响应广播并清掉路由落点(发起方可能已记,留着会在
         // 下次冷开窗重放);窗口刚被 openWindow 拉起时 onAppear 消费落点。
         .onReceive(NotificationCenter.default.publisher(
-            for: AlertNotificationRouter.openMainWindowNotification
+            for: MainWindowLanding.openMainWindowNotification
         )) { notification in
-            if let raw = notification.userInfo?[AlertNotificationRouter.tabUserInfoKey] as? String,
+            if let raw = notification.userInfo?[MainWindowLanding.tabUserInfoKey] as? String,
                let tab = MetricTab(rawValue: raw) {
                 tabSelection.current = tab
             }
-            if let rankingID = notification.userInfo?[AlertNotificationRouter.rankingUserInfoKey] as? String {
+            if let rankingID = notification.userInfo?[MainWindowLanding.rankingUserInfoKey] as? String {
                 model.expandRanking(rankingID)
             }
-            alertRouter?.clearPending()
+            landing?.clearPending()
         }
         .onAppear {
-            if let tab = alertRouter?.consumePendingTab() {
+            if let tab = landing?.consumePendingTab() {
                 tabSelection.current = tab
             }
-            if let rankingID = alertRouter?.consumePendingRankingID() {
+            if let rankingID = landing?.consumePendingRankingID() {
                 model.expandRanking(rankingID)
             }
             // AI 清理桥挂接(mcp-clean/01):清理页模型归窗口存活期,关窗即摘。
