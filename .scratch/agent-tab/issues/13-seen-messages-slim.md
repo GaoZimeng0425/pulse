@@ -1,6 +1,6 @@
 # agent-tab/13 消息去重表瘦身
 
-Status: ready-for-agent
+Status: done
 Type: task
 
 ## 背景
@@ -63,7 +63,7 @@ Pulse 不照搬:Pulse 检查点只存每文件的**聚合桶**(day × project ×
 - [x] 既有 AgentIncrementalModelTests 全绿(追加 / 改写 / 删除 / resume 去重等价性)
 - [x] purgeFile 后该文件的 seen 行与文件行都清掉,不留孤儿
 - [x] 迁移后库文件变小(VACUUM 生效)
-- [ ] 装机后智能体页用量数字与改前一致
+- [x] 装机后智能体页用量数字与改前一致
 
 ## Comments
 
@@ -71,3 +71,5 @@ Pulse 不照搬:Pulse 检查点只存每文件的**聚合桶**(day × project ×
   并要求参考 tokscale 做法(见上)。
 - 2026-11-24 落地:新增 AgentSeenSlimMigrationTests 5 例(含文件库 VACUUM 收缩;去掉 VACUUM
   反证测试会红),全量 1445 例全绿。VACUUM 失败不挡启动(pulse-mcp 读连接可能 busy)。
+- 2026-11-24 装机核验(308ebf1):库 25.7MB → 9.0MB;迁移后 seen 6.5 万行 / 388 文件无损;
+  账本 claude 请求数 65159 → 65175(装机间隔内本机新增会话的正常增量,无重复计数),zcode 不变。
