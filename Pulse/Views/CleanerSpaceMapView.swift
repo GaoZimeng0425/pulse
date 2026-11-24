@@ -658,7 +658,7 @@ struct SpaceMapSection: View {
         return HStack(spacing: 4) {
             ForEach(Array(chain.enumerated()), id: \.element.id) { index, node in
                 if index > 0 {
-                    Text("›").font(.system(size: 11)).foregroundStyle(.tertiary)
+                    Text("›").foregroundStyle(.tertiary)
                 }
                 if index == chain.count - 1 {
                     Text(node.name).font(.system(size: 11, weight: .semibold))
