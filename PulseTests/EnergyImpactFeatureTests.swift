@@ -60,6 +60,38 @@ final class EnergyImpactFeatureTests: XCTestCase {
         )
     }
 
+    // MARK: 快照判龄(arch-review-2026-11-24/01)
+
+    /// 助手 60s 一采,单次采集失败保留旧时刻——2.5 拍内算新鲜,偶发一次失败不误判。
+    @MainActor
+    func testSnapshotFreshWithinThreshold() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        XCTAssertFalse(EnergyImpactFeature.isStale(collectedAt: now.addingTimeInterval(-149), now: now))
+        XCTAssertTrue(EnergyImpactFeature.isStale(collectedAt: now.addingTimeInterval(-151), now: now))
+        // 首轮就失败的助手写的是 distantPast。
+        XCTAssertTrue(EnergyImpactFeature.isStale(collectedAt: .distantPast, now: now))
+    }
+
+    /// 陈旧快照 = 助手没在正常采:不发布读数(卡片回空态)、记为拉取失败
+    /// (Gate 说实话 + 5s 快轮询),不往历史写冻结值。
+    @MainActor
+    func testStaleSnapshotClearsReadingAndCountsAsFailure() async {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let snapshot = SnapshotBox(collectedAt: now)
+        let feature = EnergyImpactFeature(
+            fetch: { ([(1, "Arc", 5.0)], snapshot.collectedAt) },
+            now: { now }
+        )
+        await feature.pollOnce()
+        XCTAssertNotNil(feature.reading)
+        XCTAssertFalse(feature.lastFetchFailed)
+
+        snapshot.collectedAt = now.addingTimeInterval(-300)
+        await feature.pollOnce()
+        XCTAssertNil(feature.reading)
+        XCTAssertTrue(feature.lastFetchFailed)
+    }
+
     @MainActor
     func testPollIntervalRegularWhenHealthyOrNotRegistered() {
         XCTAssertEqual(
@@ -71,5 +103,13 @@ final class EnergyImpactFeatureTests: XCTestCase {
             EnergyImpactFeature.pollInterval(fetchFailed: true, status: .notRegistered),
             .seconds(60)
         )
+    }
+}
+
+/// 测试用快照时刻盒(拉取闭包 @Sendable,经盒子改值)。
+private final class SnapshotBox: @unchecked Sendable {
+    var collectedAt: Date
+    init(collectedAt: Date) {
+        self.collectedAt = collectedAt
     }
 }
