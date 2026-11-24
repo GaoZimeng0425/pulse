@@ -2,7 +2,7 @@ import AppKit
 import PulseCore
 import SwiftUI
 
-// 清单行家族(行/档位 chip/在用 chip/年龄文案)——自 CleanerJunkViews 拆出(solid-split,纯搬运)。
+// 清单行家族:行(JunkRow)、档位 chip(TierChip)、在用 chip(InUseChip)、年龄文案(JunkAgeText)。
 
 // MARK: 行
 
@@ -11,14 +11,14 @@ struct JunkRow: View {
     let leader: Int64
     let accent: Color
     let isSelected: Bool
-    /// 在用保护原因(nil = 不在用;05)。在用行灰显、锁代替勾选、chip 换「在用保护 · 原因」。
+    /// 在用保护原因(nil = 不在用)。在用行灰显、锁代替勾选、chip 换「在用保护 · 原因」;
+    /// 点行不勾选,右键菜单照常。
     let inUseReasons: CleanActivityReason?
     let disabled: Bool
     let onToggle: () -> Void
     let onExclude: () -> Void
-    /// 项目产物行:住在项目大卡**内部**,只缩进不套小卡(2026-11-06 三次拍板:
-    /// 「项目产物应该是一个大卡片,包含住子项!子项只有缩进!」);工具缓存行
-    /// (`indented == false`)保持独立小卡。
+    /// 两种条目形态由它切换:项目大卡内的子项行(`true`)只缩进、不套小卡;
+    /// 工具缓存这类组的条目行(`false`)是一张独立小卡。
     var indented: Bool = false
 
     private var isInUse: Bool {
@@ -60,7 +60,7 @@ struct JunkRow: View {
                     .fill(accent.opacity(0.10))
             }
         } else {
-            // 独立小卡:常态 card-hi 抬升底,选中 = 强调色 12% 染底。
+            // 独立小卡:常态抬升底,选中 = 强调色染底。
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(isSelected ? accent.opacity(0.12) : Surface.cardHigh)
         }
@@ -70,7 +70,7 @@ struct JunkRow: View {
         HStack(spacing: CleanerListMetrics.spacing) {
             if isInUse {
                 Image(systemName: "lock.fill")
-                    .font(.system(size: 13))
+                    .font(.system(size: IconSize.inline))
                     .foregroundStyle(.tertiary)
                     .help("在用保护:该项目有进程活动,不参与本次清理")
             } else {
@@ -86,8 +86,9 @@ struct JunkRow: View {
                 Text(candidate.title)
                     .font(.system(size: CleanerListMetrics.titleFontSize, weight: .medium))
                     .lineLimit(1)
-                // 副标一律显示路径(2026-11-06 用户实报:同名 node_modules/build 无法
-                // 区分"是不是同一个目录")——rationale 每行同文案零信息量,降为悬停。
+                // 副标一律显示路径:同名的 node_modules / build 只靠路径区分。档位说明
+                // (rationale)每行同文案、零信息量,不上副标,降为行悬停;档位本身由
+                // TierChip 的悬停自解释。
                 Text(subtitle)
                     .font(.system(size: CleanerListMetrics.subFontSize))
                     .foregroundStyle(indented ? .tertiary : .secondary)
@@ -137,9 +138,9 @@ struct JunkRow: View {
     }
 }
 
-/// 清理清单「多久没动」的人话(行副标「N 天未动」/ 大卡头排「N 天前动过」,同档粒度:
-/// 天 / 月 / 年)。2026-11-08 修:大卡头排曾用 `timeIntervalSinceNow`——对过去时刻为负,
-/// 被 `<= 0` 分支全吞,恒显示「今天动过」。
+/// 清理清单「多久没动」的人话:行副标用 idle(「N 天未动」),大卡头排用 ago(「N 天前
+/// 动过」),两者同档粒度(天 / 月 / 年)。别改成对过去时刻取 `timeIntervalSinceNow`:
+/// 那是负数,会全落进「今天动过」。
 enum JunkAgeText {
     static func idle(sinceEpoch epoch: Double, now: TimeInterval) -> String {
         let days = Int((now - epoch) / 86400)
@@ -172,14 +173,13 @@ struct InUseChip: View {
     }
 }
 
-/// 安全档 chip(GLOSSARY「安全档」两态):状态 chip 配方——胶囊、tint 14~16% 底 + 同色文字。
-/// 可安全清理 → positive;先检查 → warning。这不是负载警示(那三处映射集中在
-/// StatusBadgeRules),是删除安全语义,只在这里出。
+/// 安全档 chip(GLOSSARY「安全档」两态):可安全清理 → positive,先检查 → caution。
+/// 这是删除安全语义,不是负载警示(那套映射在 StatusBadgeRules),只在清理页出。
 struct TierChip: View {
     let tier: CleanSafetyTier
 
     private var tint: Color {
-        // 08:「先检查」换 state-caution 琥珀(warning 是磁盘金别名,与页面 accent 撞色)。
+        // 「先检查」取档位专用的 caution 琥珀,不取 warning——warning 是磁盘指标金的别名。
         tier == .safe ? Surface.positive : Surface.caution
     }
 
@@ -188,8 +188,8 @@ struct TierChip: View {
             text: tier.title,
             tint: tint,
             profile: .regular,
-            // 档位人话(2026-11-06 用户实报「先检查是什么意思」):chip 自己解释自己,
-            // 不用翻 GLOSSARY;行悬停另有该条规则的具体 rationale。
+            // 档位人话挂在 chip 悬停:chip 自己解释自己,不用翻 GLOSSARY;行悬停另有
+            // 该条规则的具体 rationale。
             help: tier == .safe
                 ? "白名单担保过:重建即可或无个人数据,删了不影响使用"
                 : "大概率能删,但删前看一眼——这类目录可能藏着要保留的东西(如 build 下可能有源码、JetBrains 缓存含 Local History)。安全规则:永不进自动勾选,须逐个手勾"

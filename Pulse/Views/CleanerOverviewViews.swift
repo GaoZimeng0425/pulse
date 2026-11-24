@@ -1,18 +1,18 @@
 import PulseCore
 import SwiftUI
 
-// MARK: - 清理总览子页(p6-cleaner/03,丙案 v2):Hero + 七模块大卡 + 废纸篓卡
+// MARK: - 清理总览子页
 
 //
-// 数据面全部来自 PulseCore 纯值:`JunkOverviewAggregator.overview`(Hero 与模块卡)、
-// `TrashInventory`(废纸篓读数)、`JunkOverviewAggregator.safeAutoSelection`(一键清理,
-// 经 CleanerModel.selectAllSafeAndRequestClean 落勾选并弹既有确认单)。本文件只描边配色;
-// 数值令牌见 DESIGN.md §Components「清理总览页」。
+// 页面骨架:Hero 卡(可回收总量 + 一键清理)→ 模块大卡(每个有候选的品类一张,
+// 2 列自适应)→ 废纸篓卡(网格末位;清单为空时独占一行)。页内整页滚动。
+// 数据面全在 PulseCore 纯值,这里只排版:`JunkOverviewAggregator.overview` 出 Hero 与
+// 模块卡的数,`TrashInventory` 出废纸篓读数。
 
-// MARK: - 品类卡文案(蓝本 = 丙案 v2 原型;身份色在 MetricAccent.swift 单出处)
+// MARK: - 品类卡文案(身份色在 MetricAccent.swift 单出处)
 
 extension JunkGroup {
-    /// 总览模块大卡的一句人话(丙案 v2 原型文案蓝本)。
+    /// 总览模块大卡的一句人话。
     var overviewTagline: String {
         switch self {
         case .globalToolCache: "工具链与包管理器的下载缓存"
@@ -24,7 +24,7 @@ extension JunkGroup {
         }
     }
 
-    /// 总览图标瓦符号(42pt 大瓦);清单行 / 确认单的逐条符号仍取候选自带 symbolName。
+    /// 总览模块大卡图标瓦的符号;清单行 / 确认单的逐条符号仍取候选自带 symbolName。
     var overviewSymbolName: String {
         switch self {
         case .globalToolCache: "wrench.and.screwdriver"
@@ -46,7 +46,7 @@ enum JunkTrashCardCopy {
 
 // MARK: - 子页
 
-/// 总览子页:未扫描给 CTA,扫描中给提示,完成给 Hero + 模块大卡 + 废纸篓卡。
+/// 总览子页:按扫描态切三形状——未扫描给 CTA,扫描中给提示,完成给页面骨架里的三块。
 struct CleanerOverviewSection: View {
     let model: CleanerModel
     /// 点模块大卡 = 下钻全部清单按品类过滤(导航由壳层做,它持有 subTab / junkFilter)。
@@ -164,10 +164,10 @@ struct CleanerOverviewSection: View {
 
 // MARK: - 图例(Hero / 模块大卡 / 废纸篓卡共用)
 
-/// 总览图例的尺寸单出处(DESIGN.md §Components「清理总览页·图例」;p6-review-fixes:
-/// 此前三处各写一份,色块 8×8 r2.5 / 7×7 r2、块字距 5 / 4、项间 14 互相漂移)。
+/// 总览图例的尺寸单出处:Hero / 模块大卡 / 废纸篓卡三处都只经 `OverviewLegendItem`
+/// 取数,不各写一份——各写一份时色块与间距会悄悄漂移。
 private enum OverviewLegendMetrics {
-    /// 色块边长 / 圆角(DESIGN.md Hero 图例既有值 8×8 圆角 2.5,三处统一到它)。
+    /// 色块边长 / 圆角。
     static let swatchSize: CGFloat = 8
     static let swatchCornerRadius: CGFloat = 2.5
     /// 色块-文字间距 = {spacing.unit}。
@@ -193,7 +193,7 @@ private struct OverviewLegendItem: View {
 
 // MARK: - Hero 卡
 
-/// Hero 卡(丙案 v2):可回收总量大数字 + 三段构成条 + 图例(含废纸篓)+ 一键清理主按钮。
+/// Hero 卡:可回收总量大数字 + 三段构成条 + 图例(含废纸篓)+ 一键清理主按钮。
 private struct OverviewHeroCard: View {
     let overview: JunkOverview
     /// 废纸篓读数(nil = 没查 / 读不到,图例如实写「—」,不写 0)。
@@ -208,7 +208,6 @@ private struct OverviewHeroCard: View {
                 caption
             }
             VStack(alignment: .leading, spacing: 8) {
-                // 构成条:hero 高 8 圆角 4,inuse 段最小可见 2%(DESIGN.md 清理总览页)。
                 CompositionBar(
                     safeBytes: overview.safeBytes,
                     checkBytes: overview.checkBytes,
@@ -231,14 +230,13 @@ private struct OverviewHeroCard: View {
             .disabled(overview.safeBytes <= 0 || busy)
             .help("勾选全部「可安全清理」且不在用的项,并弹确认单——「先检查」与在用保护项永不在内")
         }
-        // 内距 24×28 随版式(DESIGN.md Hero 条目);卡壳走零件(padded: false 只给
-        // 底色圆角,圆角令牌 CardMetrics.cornerRadius——不再手写 18)。
+        // 内距随版式自定,所以卡壳要 padded: false——底色与圆角仍取零件,不另立卡壳。
         .padding(.vertical, 24)
         .padding(.horizontal, 28)
         .cardShell(compact: false, padded: false)
     }
 
-    /// 大数字(figure 族唯一实现 FigureText;hero 取既有最大档 44)。
+    /// 大数字走 figure 族唯一实现 FigureText,字号只取 FigureSize 档位。
     private func figureText(_ figure: (value: String, unit: String), size: CGFloat) -> some View {
         FigureText(value: figure.value, unit: figure.unit, size: size)
     }
@@ -255,7 +253,7 @@ private struct OverviewHeroCard: View {
             .foregroundStyle(.secondary)
     }
 
-    /// 图例(11):三段 + 废纸篓(磁盘金色块,读数没查 / 读不到时如实「—」)。
+    /// 图例:三段 + 废纸篓(色块取废纸篓身份色;读数没查 / 读不到时如实「—」)。
     private var legend: some View {
         HStack(spacing: OverviewLegendMetrics.itemSpacing) {
             OverviewLegendItem(text: "可安全清理 \(bytesText(overview.safeBytes))", tint: Surface.positive)
@@ -279,8 +277,8 @@ private struct OverviewHeroCard: View {
 
 // MARK: - 模块大卡
 
-/// 模块大卡:图标瓦 42 + 类名 17 bold + 一句人话 + 24pt 大数字 + 构成条 + 图例 +
-/// 最大一项行 + chevron;整卡可点 = 下钻(行内数值全走 DESIGN.md 令牌)。
+/// 模块大卡:图标瓦 + 类名 + 一句人话 + 大数字 + 构成条 + 图例 + 最大一项行;
+/// 整卡可点 = 下钻该品类清单。
 private struct OverviewModuleCard: View {
     let row: JunkOverviewGroupRow
     let onDrill: () -> Void
@@ -332,8 +330,7 @@ private struct OverviewModuleCard: View {
         }
     }
 
-    /// 图例(11,统一配方 OverviewLegendItem):先检查 / 在用只在 >0 时显(空段
-    /// 不画,原型同款);N 项无色块。
+    /// 图例走统一配方:先检查 / 在用只在 >0 时显,与构成条「空段不画」对应;N 项无色块。
     private var legendRow: some View {
         HStack(spacing: OverviewLegendMetrics.itemSpacing) {
             OverviewLegendItem(text: "可安全清理 \(bytesText(row.safeBytes))", tint: Surface.positive)
@@ -366,7 +363,7 @@ private struct OverviewModuleCard: View {
                 .monospacedDigit()
             Spacer(minLength: 8)
             Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: IconSize.inline, weight: .semibold))
                 .foregroundStyle(.tertiary)
         }
     }
@@ -382,7 +379,7 @@ private struct OverviewTrashCard: View {
     /// 读数状态:没查 / 清点中 / 读不到 / 查到了。「读不到」绝不是空或 0——
     /// 没查与读不到都走占位,数字只在查到了(或刷新在飞时的上次读数)出现。
     let phase: OverviewTrashPhase
-    /// inventorying / running 期间禁用(与原页头按钮同口径)。
+    /// 废纸篓流程没回到 idle 就禁用(清点中 / 确认单开着 / 清空中 / 结果横幅未关)。
     let busy: Bool
     /// 显式清点(用户动作——授权弹窗只许出现在这一下点击)。
     let onCount: () -> Void
@@ -420,9 +417,9 @@ private struct OverviewTrashCard: View {
         }
     }
 
-    /// 读数位:有读数给 24 档大数字;没读数时按状态给转圈或显式「清点」入口
-    /// (授权型能力动作 = CardEmptyState 同款 11pt `.link`,系统授权弹窗只出现在
-    /// 这一下点击;读不到不出数字,也不出 0)。
+    /// 读数位:有读数(含刷新在飞时的上次读数)给大数字;否则清点中转圈,没查 / 读不到
+    /// 给显式入口——`.link` 文字按钮,与 CardEmptyState 的授权型动作同款;系统授权弹窗
+    /// 只出现在这一下点击。
     @ViewBuilder private var readingSlot: some View {
         if let reading = phase.reading {
             let figure = PulseFormat.memoryFigure(UInt64(max(0, reading.totalBytes)))
@@ -495,7 +492,7 @@ private struct CompositionBar: View {
     let inUseBytes: Int64
     let height: CGFloat
     let cornerRadius: CGFloat
-    /// inuse 段最小可见宽(hero 2% / 卡 3%,DESIGN.md 清理总览页)。
+    /// inuse 段最小可见宽(占条宽的比例),Hero 与模块卡各给各的。
     let minInUseFraction: Double
 
     var body: some View {
@@ -537,15 +534,15 @@ private struct CompositionBar: View {
 // MARK: - 2 列自适应网格({layout.module-card-min-width})
 
 private enum OverviewCardGridMetrics {
-    /// 单卡最小宽(DESIGN.md `{layout.module-card-min-width}`)。
+    /// 单卡最小宽 = {layout.module-card-min-width}。
     static let minimumCardWidth: CGFloat = 340
-    /// 列距 = {spacing.group-gap}(原型 grid gap 12)。
+    /// 列距 = {spacing.group-gap}。
     static let spacing: CGFloat = 12
+    /// 列数封顶:卡只有六七张,不随超宽屏拉成三四列。
     static let maximumColumns = 2
 }
 
-/// 网格槽位(数据驱动):品类卡 + 废纸篓卡同一数组喂 `AdaptiveCardGrid`
-/// (2026-11-21 起网格逐行等高,ViewBuilder 闭包改数据轴)。
+/// 网格槽位:品类卡 + 废纸篓卡装进同一数组喂 `AdaptiveCardGrid`(它只收数据轴)。
 private enum OverviewCardSlot: Identifiable {
     case junk(JunkOverviewGroupRow)
     case trash

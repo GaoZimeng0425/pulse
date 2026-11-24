@@ -10,7 +10,7 @@ import SwiftUI
 /// 取代原先"每组一张大卡"的形态(用户拍板)。
 struct RankingCardView<Expanded: View>: View {
     enum Density {
-        /// 主窗口:卡内边距 16、圆角 18、图标 22。
+        /// 主窗口:卡内边距 16、圆角 18、行首图标 24(取 RowMetrics 舒适档)。
         case regular
         /// 弹窗:卡内边距 12、圆角 12、图标 18、meter 收窄。
         case compact
@@ -186,7 +186,7 @@ struct RankingRowView: View {
             Button(action: onEndGroup) {
                 let side = RankingListMetrics.endButtonSize(compact: isCompact)
                 Image(systemName: "xmark.octagon")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: IconSize.inline, weight: .semibold))
                     .foregroundStyle(Surface.negative)
                     .frame(width: side, height: side)
                     .contentShape(.rect)
@@ -196,7 +196,7 @@ struct RankingRowView: View {
             .help("结束整组(需确认)")
             .accessibilityLabel("结束整组 \(group.name)")
             Image(systemName: "chevron.right")
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: IconSize.inline, weight: .semibold))
                 .foregroundStyle(.tertiary)
                 .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 .frame(width: 10)

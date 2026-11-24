@@ -6,9 +6,8 @@ import SwiftUI
 
 // MARK: 确认清单 sheet
 
-// (08 票前的组头三态 checkbox 组件已随「全选安全项」文字按钮方案移除,注释一并清理。)
-
 /// 确认清单(ADR-0008 多重闸门之一):逐行 + 总量 + 实际占用口径注记。
+/// 逐行的列照清单行来(图标 / 名称 / 路径 / 档位 chip / 数值定宽列),去掉勾选框与大小条。
 /// 「移入废纸篓」按钮直接执行——常规二次确认就是这个 sheet 本身。
 struct CleanConfirmSheet: View {
     let model: CleanerModel

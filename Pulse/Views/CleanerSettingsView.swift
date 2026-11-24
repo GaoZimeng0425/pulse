@@ -2,19 +2,18 @@ import AppKit
 import PulseCore
 import SwiftUI
 
-/// 设置窗「清理」页(p4-cleaner/04 排除目录 + 05 清理扫描根):
+/// 设置窗「清理」页:清理扫描根 + 排除目录两节,页脚一段口径说明。
+/// - 清理扫描根:与「项目根目录」页的归组配置是两套独立配置,零共享,互不影响。出厂给
+///   常见开发目录建议清单(勾选即加),特殊位置(如 ~/Documents/Learn/macos)用文件夹
+///   选择器自添。根的直接子目录 = 项目;项目产物的匹配语义在 PulseCore。
 /// - 排除目录(GLOSSARY)图形化增删——添加用文件夹选择器,行内删除;清理页右键
 ///   「排除此目录」加进来的也在这里管理。排除只收窄,语义在 PulseCore.CleanExclusions。
-/// - 清理扫描根(05,用户拍板与归组的项目根**两套配置、零共享**):出厂给常见
-///   开发目录建议清单(勾选即加),特殊位置(如 ~/Documents/Learn/macos)用
-///   文件夹选择器自添。根的直接子目录 = 项目;项目产物的匹配语义在 PulseCore。
-/// 两个视图都只做呈现与转发,持久化在各自 Store(*Tests)。
+/// 只做呈现与转发,持久化在各自 Store。
 struct CleanerSettingsView: View {
     let store: CleanExclusionsStore
     let scanRoots: CleanScanRootsStore
 
-    /// 出厂建议(spec 用户故事 24:常见开发目录建议清单,勾选追加)。
-    /// 只当默认值提议,不做存在性探测——零 IO,配错顶多扫不出产物,界面有引导。
+    /// 出厂建议清单:只当提议,不做存在性探测——零 IO,配错顶多扫不出产物,界面有引导。
     private static let suggestedRoots: [(label: String, path: String)] = [
         ("文稿", "~/Documents"),
         ("下载", "~/Downloads"),
@@ -32,7 +31,7 @@ struct CleanerSettingsView: View {
             exclusionSection
             Section {
                 Text("清理扫描根与上方「项目根目录」页的归组配置互不影响(两套独立配置)。项目 = 扫描根的直接子目录;正在使用的项目(终端 / 构建 / git 活动在其中)永不进入清理,且每次清理前都会重查。")
-                    .font(.caption)
+                    .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
             }
         }
@@ -92,6 +91,7 @@ struct CleanerSettingsView: View {
     private func customRootRow(_ path: String) -> some View {
         HStack {
             Image(systemName: "folder.badge.gearshape")
+                .font(.system(size: IconSize.leading(compact: true)))
                 .foregroundStyle(.secondary)
             Text(path)
                 .lineLimit(1)
@@ -102,6 +102,7 @@ struct CleanerSettingsView: View {
                 scanRoots.remove(path)
             } label: {
                 Image(systemName: "minus.circle")
+                    .font(.system(size: IconSize.inline))
             }
             .buttonStyle(.borderless)
             .help("移除该扫描根")
@@ -130,7 +131,7 @@ struct CleanerSettingsView: View {
             }
             if store.paths.isEmpty {
                 Text("尚无排除目录。清理页右键任意清单行可排除该目录,或在这里添加。")
-                    .font(.caption)
+                    .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
             }
             Button {
@@ -145,6 +146,7 @@ struct CleanerSettingsView: View {
     private func exclusionRow(_ path: String) -> some View {
         HStack {
             Image(systemName: "folder.badge.minus")
+                .font(.system(size: IconSize.leading(compact: true)))
                 .foregroundStyle(.secondary)
             Text(path)
                 .lineLimit(1)
@@ -155,6 +157,7 @@ struct CleanerSettingsView: View {
                 store.remove(path)
             } label: {
                 Image(systemName: "minus.circle")
+                    .font(.system(size: IconSize.inline))
             }
             .buttonStyle(.borderless)
             .help("取消排除该目录")

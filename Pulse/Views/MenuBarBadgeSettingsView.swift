@@ -89,6 +89,7 @@ struct MenuBarBadgeSettingsView: View {
                 configurationRaw = configuration.movingSlot(at: index, direction: .up).rawValue
             } label: {
                 Image(systemName: "chevron.up")
+                    .font(.system(size: IconSize.chevron))
             }
             .disabled(index == slots.startIndex)
 
@@ -96,6 +97,7 @@ struct MenuBarBadgeSettingsView: View {
                 configurationRaw = configuration.movingSlot(at: index, direction: .down).rawValue
             } label: {
                 Image(systemName: "chevron.down")
+                    .font(.system(size: IconSize.chevron))
             }
             .disabled(index == slots.index(before: slots.endIndex))
         }
@@ -110,6 +112,7 @@ struct MenuBarBadgeSettingsView: View {
                 configurationRaw = configuration.removingSlot(at: index).rawValue
             } label: {
                 Image(systemName: "minus.circle")
+                    .font(.system(size: IconSize.inline))
             }
             .buttonStyle(.borderless)
             .accessibilityLabel("移除槽位 \(index + 1)")

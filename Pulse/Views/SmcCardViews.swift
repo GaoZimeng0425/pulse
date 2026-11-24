@@ -5,7 +5,7 @@ import SwiftUI
 
 // 数据形状(命名表/解码/坏值防御/派生/风扇归一)在核心层 SmcModel + SmcNamingTable
 // (纯逻辑,单测覆盖);本文件只做 SwiftUI 外观——派生读数卡 + 风扇卡 +
-// 温度明细折叠卡,走预览 + 手动验收。弹窗只放派生卡(p2-review/04 A 拍板,见
+// 温度明细折叠卡,走预览 + 手动验收。弹窗只放派生卡(p2-review/04,见
 // MetricTabStack `.sensors`),风扇卡与明细卡只在主窗口出现。
 
 /// 派生读数卡(GLOSSARY「派生传感器」):Average/Hottest × CPU/GPU/SoC 六行 + 最快风扇
@@ -76,7 +76,7 @@ struct SmcDerivedCardView: View {
     }
 }
 
-/// 风扇卡(主窗口):每扇一行,meter 按该扇上下限归一(p2-review/04 C 拍板,
+/// 风扇卡(主窗口):每扇一行,meter 按该扇上下限归一(p2-review/04,
 /// `SmcFanReading.speedFraction`)并标出上下限——全部风扇上下限相同时只在卡头注记写一次,
 /// 不同时逐行写在各扇行下(两处不同时出现);无扇机安静占位。
 struct SmcFansCardView: View {
@@ -105,7 +105,7 @@ struct SmcFansCardView: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// 风扇读数行 + 可选上下限副文(副文档字号随行两档,ui-unify 追改)。
+    /// 风扇读数行 + 可选上下限副文(副文字号随行两档制)。
     private func fanRow(_ fan: SmcFanReading, showsLimits: Bool) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             CardReadingRow(
@@ -142,7 +142,7 @@ private enum SmcFanText {
     }
 
     /// 转速:rpm 0 是真读数(低负载停转常态),写"停转"而非"0 rpm"——
-    /// 读者要的是"转没转",0 rpm 易被看成读失败(DESIGN.md §Components 传感器卡)。
+    /// 读者要的是"转没转",0 rpm 易被看成读失败。
     static func speed(_ fan: SmcFanReading) -> String {
         fan.rpm == 0 ? "停转" : "\(fan.rpm) rpm"
     }

@@ -17,7 +17,7 @@ struct MetricCardStat: Identifiable {
     }
 }
 
-/// 状态 chip(Vitals 的 `✓ Normal`):全圆 pill,tint 14% 底 + 同色文字。
+/// 状态 chip(Vitals 的 `✓ Normal`):全圆 pill,tint 15% 底 + 同色文字。
 struct MetricCardChip {
     let title: String
     let systemImage: String

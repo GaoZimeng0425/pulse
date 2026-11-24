@@ -2,17 +2,17 @@ import Charts
 import PulseCore
 import SwiftUI
 
-// MARK: - 消耗子页(agent-tab/06,定稿骨架 wireframe-agents-page.html)
+// MARK: - 消耗子页(agent-tab/06)
 
 //
-// 「每日消耗」外壳拆掉、四块平级成卡(用户拍板):数字卡排(四张一排,含
-// Claude 用量)→ 日历图 + 走势(≥1920 窗宽两列,否则一列;07 立 1280,11-16 修订)→ 项目宽卡
-// (媒体查询列数)。range(7/30)子页内共享,数字卡排随档位联动;「重新扫描」
-// 在日历图卡头(全量档手动触发,补漏天)。项目卡对齐 tokscale 参数:四桶 +
-// 缓存倍率 + 会话数(Cost / 精确 Last Active 用户点名不做)。数据派生全走
-// PulseCore `AgentUsageWindow`(纯值,UI 只描不算)。
+// 子页骨架:四张卡平级、上下排,外面不套统一的大卡(还没有账本数据时整页换成一张
+// 空态卡)——
+// 1. 数字卡排:一张卡,内含四张等宽小卡(今日消耗 / N 天合计 / 日均 / Claude 用量);
+// 2. 日历图(热力墙)与 3. 走势:内容宽够才并排两列,否则上下各一张;
+// 4. 项目大卡网格(默认截断,末行展开 / 收起)。
+// 数字与派生全在 PulseCore `AgentUsageWindow`(纯值),本文件只描不算。
 
-/// 消耗子页(智能体页三子 tab 之一)。
+/// 消耗子页(骨架见文件头)。
 struct AgentUsagePaneView: View {
     /// 账本全表(按天升序);空 = 还没扫过。
     let rows: [AgentDailyUsageRow]
@@ -31,7 +31,7 @@ struct AgentUsagePaneView: View {
     /// 「重新扫描」动作(日历图卡头按钮的唯一触发源)。
     var onRescan: () -> Void
 
-    /// 项目默认展示上限(超出走展开/收起;用户拍板 2026-11-14)。
+    /// 项目默认展示上限(超出走末行展开 / 收起)。
     private static let projectLimit = 10
 
     /// 走势 / 项目的范围切换(数字卡排随档位联动)。
@@ -54,7 +54,7 @@ struct AgentUsagePaneView: View {
     }
 
     @State private var range: Range = .week
-    /// 日历图粒度(agent-tab/11:天 / 周;替代 06 的「年」占位单选药丸)。
+    /// 日历图粒度(天 / 周)。
     @State private var heatGranularity: AgentHeatGranularity = .day
     /// 项目超过上限时的展开态(切 7/30 保持;重进子页回默认收起)。
     @State private var projectsExpanded = false
@@ -147,7 +147,7 @@ struct AgentUsagePaneView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
         .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
-        .frame(maxHeight: .infinity, alignment: .top) // 同行四卡等高(2026-11-13 用户拍板)
+        .frame(maxHeight: .infinity, alignment: .top) // 同行四卡等高
         .accessibilityElement(children: .combine)
     }
 
@@ -195,10 +195,9 @@ struct AgentUsagePaneView: View {
 
     // MARK: 卡 2/3:日历图 + 走势(≥1920 窗宽一排两列,否则一列)
 
-    /// 双列断点(agent-tab/07 立于 1280;2026-11-16 用户修订「1920 才变一行」):子页内容宽
-    /// ≥ 1872(= 窗宽 1920 − 两侧 `{spacing.window-padding}` 24)才并排,否则
-    /// 上下一列。06 的 `ViewThatFits` 按子视图理想宽判定,而热力墙 / Charts 都是
-    /// 弹性宽、理想宽不可预期——何时切换不可控,是「别扭」的来源之一。弹窗恒一列。
+    /// 日历图 + 走势并排的断点:量的是子页内容宽(窗宽减两侧窗口内距),不是窗宽。
+    /// 不要改回 `ViewThatFits`——热力墙与 Charts 都是弹性宽、理想宽不可预期,按它
+    /// 判定何时切换不可控。弹窗恒一列。
     static let chartTwoColumnMinWidth: CGFloat = 1872
     /// 弹窗紧凑档走势绘图区定高(热力墙在 330 宽下只有 ~45 高,不跟随)。
     private static let compactTrendPlotHeight: CGFloat = 100
@@ -208,8 +207,9 @@ struct AgentUsagePaneView: View {
         let chartTwoColumnMinWidth = Self.chartTwoColumnMinWidth
         return Group {
             if chartColumns == 2 {
-                // 并排两卡**结构同构**(agent-tab/10):卡头 → 图区(同宽同式等高)→
-                // 18pt 日期轴带 → 页脚,两卡天然等高、图区上下缘与日期标签基线逐行对齐。
+                // 并排时两卡靠**结构同构**等高(卡头 → 图区 → 日期轴带 → 页脚逐段同高),
+                // 不靠 fixedSize / frame 拉伸。同构落在哪几处,见 `AgentChartAxis` 与
+                // `AgentTrendChart`。
                 HStack(alignment: .top, spacing: 16) {
                     heatCard
                     trendCard
@@ -279,9 +279,9 @@ struct AgentUsagePaneView: View {
         }
     }
 
-    /// 重新扫描 = 卡头文字按钮(07 收编:06 用 `.bordered` 小号系统按钮,与全 app
-    /// 卡头动作「borderless 12 semibold secondary」配方不一致——空间地图「在 Finder
-    /// 中显示」、垃圾下钻「全选安全项」同款)。扫描中换转圈 + 「扫描中」并禁用。
+    /// 重新扫描:全量重扫 Claude 与 ZCode 的本地记录,补齐漏记的日子。按钮样式走
+    /// DESIGN.md「卡头文字按钮」组件规范,这里只定本页的状态——扫描中换成转圈 +
+    /// 「扫描中」并禁用,防重入。
     private var rescanButton: some View {
         Button {
             onRescan()
@@ -292,6 +292,7 @@ struct AgentUsagePaneView: View {
                         .controlSize(.mini)
                 } else {
                     Image(systemName: "arrow.clockwise")
+                        .font(.system(size: IconSize.inline, weight: .semibold))
                 }
                 Text(isScanning ? "扫描中" : "重新扫描")
             }
@@ -323,7 +324,7 @@ struct AgentUsagePaneView: View {
         .cardShell(compact: isCompact)
     }
 
-    // MARK: 卡 4:项目(宽卡,媒体查询列数)
+    // MARK: 卡 4:项目大卡网格
 
     private var projectCard: some View {
         let projects = AgentUsageWindow.projects(
@@ -340,13 +341,9 @@ struct AgentUsagePaneView: View {
             if projects.isEmpty {
                 CardEmptyState(title: "窗口内没有项目数据", detail: "只有粗粒度回填的日子没有项目维度")
             } else {
-                // 响应式多列(2026-11-13 三度修正,用户拍板「同行等高 + 宽了出多列」):
-                // 列数按容器实宽容纳的最多列(单卡保底 520、上限 3 列),逐行 HStack
-                // 排布——行内卡 .frame(maxHeight:.infinity) 等高、末行不满自动满宽;
-                // 不用 LazyVGrid(行内不拉齐高度)也不用 GridItem minimum(硬下限,
-                // 窄容器溢出裁剪,前案实锤),容器多窄单列都 100% 宽。
-                // 默认前 10 张 + 末行展开/收起(用户拍板 2026-11-14,排行截断同款
-                // 交互;上限 = {layout.agent-project-limit})。
+                // 列数、行内等高、末行满宽的规则都在 `AgentProjectCardGrid`。
+                // 这里只管截断:默认前 `projectLimit` 张,超出走末行展开 / 收起
+                // (排行截断同款交互)。
                 AgentProjectCardGrid(
                     projects: projectsExpanded ? projects : Array(projects.prefix(Self.projectLimit)),
                     windowDays: range.days

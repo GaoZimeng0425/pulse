@@ -1,12 +1,12 @@
 import Foundation
 
-// MARK: - 矩形树图布局(p4-cleaner/07 v3:用户拍板 treemap)
+// MARK: - 矩形树图布局(p4-cleaner/07)
 
 //
-// 空间地图从旭日图(卡顿+命中不可靠)→ 分层条形图(过渡)→ treemap(用户选定)。
-// 布局纯值在 PulseCore:当前根的直接子项按字节比例铺满归一化矩形,
-/// squarify 算法(Bruls et al. 2000)追求接近正方形的宽高比。
-// app:单个 Canvas 一次 draw call 渲染全部矩形;命中 = rect.contains(点)。
+// 空间地图方块形态的布局,纯值:当前根的直接子项按字节比例铺满归一化矩形,只布
+// 一层——下钻后以选中项为新根重新布局。squarify 算法(Bruls et al. 2000)追求
+// 接近正方形的宽高比。app 侧:单个 Canvas 一次 draw call 渲染全部矩形,命中 =
+// rect.contains(点)。
 
 /// treemap 的一个矩形(归一化 0-1 坐标;渲染时乘实际尺寸)。
 public struct TreemapRect: Sendable, Equatable {

@@ -45,3 +45,22 @@ custom_rules:
       - '.*/PulseTests/.*'
     message: "永久删除出口仅两处(废纸篓执行器/卸载域永久删除);新出口先过 ADR-0008 闸门再进白名单。"
     severity: error
+  # DESIGN.md:窗口 UI 文字只取五档显式字号,图标取 IconSize 档位。系统语义字体
+  # (.caption 等)不在档内、随系统版本漂移,预览块与图标同守,不设豁免。正则覆盖
+  # 五种写法:.font( 后同一行里任何位置的 .caption 这类(含三元分支)、
+  # .system(.body, design:) 形态、Font.system(.body…) 与 Font.caption 直用、
+  # `: Font = .caption` 这种独立成值。
+  # ★ SwiftLint 把正则套在**整个文件内容**上匹配,`.*` 会跨行——只报文件里第一个
+  # .font( 并吞掉后面的违规。这里必须用 `[^\n]*`。系统字体前限定为 ( ? : , 或空白,
+  # 免得把同一行别的修饰符里叫 title 的数据字段当成字体。
+  # match_kinds 把匹配起点限定在代码记号上:注释里举例写 .font(.caption) 不算违规。
+  # 局限:参数换行写的 `.font(` 抓不到,靠评审与结构查询兜底。
+  no_system_text_style_fonts:
+    name: "No System Text Style Fonts"
+    regex: '\.font\((?:[^\n]*[(?:,\s])?\.(caption2?|footnote|title2|title3|title|headline|subheadline|body|callout|largeTitle)\b|\bFont\.system\(\s*\.(caption2?|footnote|title2|title3|title|headline|subheadline|body|callout|largeTitle)\b|\bFont\.(caption2?|footnote|title2|title3|title|headline|subheadline|body|callout|largeTitle)\b|:\s*Font\s*=\s*\.(caption2?|footnote|title2|title3|title|headline|subheadline|body|callout|largeTitle)\b'
+    match_kinds: [identifier, keyword, number, typeidentifier, placeholder]
+    excluded:
+      - '.*/Tests/.*'
+      - '.*/PulseTests/.*'
+    message: "文字只取五档显式字号(10.5 / 11 / 12 / 14.5 / 17),图标取 IconSize 档位;不用系统语义字体。"
+    severity: error

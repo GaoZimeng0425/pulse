@@ -61,7 +61,7 @@ struct AlertBannerView: View {
     private func row(_ occurrence: AlertOccurrence) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: "bell.badge.fill")
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: IconSize.inline, weight: .semibold))
                 .foregroundStyle(Surface.warning)
             VStack(alignment: .leading, spacing: 1) {
                 Text(AlertNotificationContent.title(for: occurrence))
@@ -91,7 +91,7 @@ struct AlertHeaderIndicator: View {
         if !center.activeAlerts.isEmpty {
             HStack(spacing: 6) {
                 Image(systemName: "bell.badge.fill")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: IconSize.inline, weight: .semibold))
                     .foregroundStyle(Surface.warning)
                 Text(headline)
                     .font(.system(size: 12, weight: .semibold))

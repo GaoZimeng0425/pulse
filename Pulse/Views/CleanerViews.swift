@@ -1,20 +1,19 @@
 import PulseCore
 import SwiftUI
 
-// MARK: - 清理页(p4-cleaner/03 扫描闭环 + 04 删除管线 + p4-uninstaller/01 四子药丸壳)
+// MARK: - 清理页
 
 //
-// 子页内容:总览 = CleanerOverviewSection(p6-cleaner/03,Hero + 模块大卡 + 废纸篓卡)、
-// 全部清单(旧名「可清理」,更旧名「开发者垃圾」;2026-11-08 / p6-cleaner/03 两次改名,
-// 内部标识 `CleanerSubTab.junk` 不动)= JunkListSection(04,CleanerJunkViews.swift)、
-// 清理历史 = CleanHistorySection(04 列表 + 明细)、应用 = AppListSection(p4-uninstaller/01,
-// 清单只读;残留 / 卸载动作 02/03 票)。空间地图子页已整体迁磁盘页(tab-regroup/03,
-// 现为 `DiskSpaceMapSection`)。空态一律走 CardEmptyState(DESIGN.md 卡片家族,不手写空态)。
+// 页面骨架:页头(CleanerPageHeader)+ 子页药丸条 + 四个子页:总览
+// (CleanerOverviewViews.swift)、全部清单(JunkListSection,CleanerListCommonViews.swift)、
+// 应用(AppListSection,CleanerAppViews.swift)、清理历史(CleanHistorySection,
+// CleanerHistoryViews.swift)。这里只写壳层的路由,各块的做法在各自文件里。
+// 只出现在主窗口,弹窗没有这一页;主窗口也不给本页套外层滚动——各子页自己管滚动。
+// 文件后半的 DiskSpaceMapSection 属磁盘页。
 
 enum CleanerSubTab: String, CaseIterable, Hashable {
-    // 顺序 = 2026-11-04 拍板 Q13(动手门在前、档案门殿后)+ p6-cleaner/03 总览居首
-    // (丙案 v2:进清理页先看"能省多少");tab-regroup/03 缩编四子页——空间地图迁磁盘页,
-    // 余序不动。
+    // 顺序即药丸顺序:总览居首,因为它是默认落地子页(进页先看"能省多少"再动手);
+    // 之后是两个动手页(全部清单、应用),只读的清理历史殿后。
     case overview
     case junk
     case apps
@@ -23,6 +22,7 @@ enum CleanerSubTab: String, CaseIterable, Hashable {
     var title: String {
         switch self {
         case .overview: "总览"
+        // 标题只是文案,`junk` 这个标识不随它改名——下钻和跨页轻桥都按它落页。
         case .junk: "全部清单"
         case .apps: "应用"
         case .history: "清理历史"
@@ -41,8 +41,7 @@ struct CleanerPageHeader: View {
 
     var body: some View {
         PageHeader(title: MetricTab.cleaner.title, subtitle: subtitle, style: .full) {
-            // 页头动作按钮 B 档 .large(2026-11-05 清理页密度拍板)。「清空废纸篓」
-            // 已随 p6-cleaner/03 迁到总览废纸篓卡(页头按钮撤除,入口随读数走)。
+            // 「清空废纸篓」不在这里:入口随读数走,在总览的废纸篓卡上。
             HStack(spacing: 8) {
                 AlertHeaderIndicator(center: alerts)
                 if model.isScanning {
@@ -114,7 +113,7 @@ struct CleanerTabView: View {
     /// 跨页轻桥(tab-regroup/03):磁盘页空间地图「这块能清」落下的组;进页消费
     /// 后自清。地图迁磁盘页后唯一跨页入口,同页内轻桥仍是壳层 pendingJunkGroup。
     @Binding var pendingCrossPageJunkGroup: JunkGroup?
-    /// 默认落在总览(丙案 v2:先看"能省多少"再动手)。
+    /// 默认落地子页 = 总览。
     @State private var subTab: CleanerSubTab = .overview
     /// 轻桥(p4-uninstaller/05):地图「这块能清」→ 切垃圾子页并定位的组;
     /// JunkListSection 消费后自清。(地图已迁磁盘页 tab-regroup/03,本桥保留
@@ -146,7 +145,7 @@ struct CleanerTabView: View {
                     junkFilter = group
                     subTab = .junk
                 } onOneClickClean: {
-                    // 一键清理(原型行为):选完跳「全部清单」——确认单挂在那张卡上,
+                    // 一键清理:选完跳「全部清单」——确认单挂在那张卡上,
                     // 同一事务切页后 sheet 随 cleanPhase=.confirming 弹出。
                     pendingJunkGroup = nil
                     junkFilter = nil
@@ -223,6 +222,7 @@ struct CleanerTabView: View {
         case let .finished(summary):
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: IconSize.inline, weight: .medium))
                     .foregroundStyle(Surface.positive)
                 Text(trashFinishedText(summary))
                     .font(.system(size: 12, weight: .medium))
@@ -235,6 +235,7 @@ struct CleanerTabView: View {
             if let notice = model.trashNotice {
                 HStack(spacing: 8) {
                     Image(systemName: "info.circle")
+                        .font(.system(size: IconSize.inline))
                         .foregroundStyle(.secondary)
                     Text(notice)
                         .font(.system(size: 11))
@@ -253,6 +254,7 @@ struct CleanerTabView: View {
             model.dismissTrashFeedback()
         } label: {
             Image(systemName: "xmark.circle.fill")
+                .font(.system(size: IconSize.inline))
                 .foregroundStyle(.tertiary)
         }
         .buttonStyle(.plain)
@@ -317,6 +319,7 @@ struct CleanerTabView: View {
     private func stalenessBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "clock.badge.exclamationmark")
+                .font(.system(size: IconSize.inline))
                 .foregroundStyle(.secondary)
             Text(text)
                 .font(.system(size: 11))
@@ -332,6 +335,7 @@ struct CleanerTabView: View {
     private func fdaBanner(_ hint: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "lock.shield")
+                .font(.system(size: IconSize.inline))
                 .foregroundStyle(Surface.warning)
             Text(hint)
                 .font(.system(size: 11))
@@ -354,8 +358,8 @@ struct CleanerTabView: View {
     }
 
     private var subPillBar: some View {
-        // 舒适密度档(2026-11-05 拍板):清理页子页条用 comfortable,高≈34;
-        // 主窗口工具栏/历史页维持 regular 不受影响。
+        // 子页条走 comfortable 档(清理页全页舒适密度);主窗口工具栏 / 历史页
+        // 仍是 regular,不跟着改。
         PillTabBar(
             CleanerSubTab.allCases,
             selection: pillSelection,
@@ -381,16 +385,15 @@ struct CleanerTabView: View {
     // MARK: 子页
 }
 
-// MARK: - 磁盘页空间地图块(tab-regroup/03,自清理页子页整卡迁入)
+// MARK: - 磁盘页空间地图块(tab-regroup/03)
 
 /// 磁盘页的空间地图块:读清理扫描的同一条管线(CleanerModel),按扫描态切三形状——
 /// 空态引导(就地「扫描整台 Mac」,本页无页头按钮)/ 扫描中(进度卡)/ 完成
-/// (地图卡 + 结果摘要卡,上下堆叠 = space-map-forms/08 拍板原样)。
-/// 与原清理页子页的两处差异:①不套子页 ScrollView——磁盘页卡片流本就在主窗口外层
-/// 滚动里,嵌套滚动是 space-map-forms/10 前的旧坑(图表区高度仍按滚动视口钳制,
-/// `containerRelativeFrame` 语义不变);②「这块能清」变跨页轻桥——经
-/// `DashboardModel.pendingCleanerJunkGroup` 落到清理页全部清单定位,下钻位置
-/// 同样挂 DashboardModel(切 tab 不丢)。
+/// (地图卡 + 结果摘要卡,上下堆叠)。
+/// 两处要注意:①不套子页 ScrollView——磁盘页卡片流本就在主窗口外层滚动里,
+/// 图表区高度靠 `containerRelativeFrame` 按滚动视口钳制,本块不要再套滚动;
+/// ②「这块能清」是跨页轻桥——经 `DashboardModel.pendingCleanerJunkGroup` 落到
+/// 清理页全部清单定位,下钻位置同样挂 DashboardModel(切 tab 不丢)。
 struct DiskSpaceMapSection: View {
     let model: CleanerModel
     @Binding var drillPath: String?
@@ -450,8 +453,7 @@ struct DiskSpaceMapSection: View {
     /// 进度没有已知总量(全卷文件数因机器而异),条只做"有进展"的视觉信号:
     /// 用一个缓慢逼近 1 的伪进度(不伪造百分比数字——假数不上屏,防御性数据纪律)。
     private func scanProgressFraction(_ stats: ScanStats) -> Double {
-        // 真机 Data 卷(方案 A 扫描根)≈500 万项(2026-11-02 真引擎实测
-        // 433 万文件 + 60 万目录;旧 340 万全卷口径是探针 15 的 Data 外推错误)。
+        // 全盘扫描(Data 卷)约 500 万项的量级估计,机器而异。
         let guess = 5_000_000.0
         return min(0.95, Double(stats.entriesSeen) / guess)
     }
@@ -469,8 +471,8 @@ struct DiskSpaceMapSection: View {
                     .foregroundStyle(.tertiary)
                     .monospacedDigit()
             }
-            // 半宽卡(两列版式,space-map-forms/07)下整行放不下:ViewThatFits
-            // 折行(4 项 → 2+2、3 项 → 2+1);全宽堆叠形态首选仍是整行原样。
+            // 卡不够宽时整行放不下:ViewThatFits 折行(4 项 → 2+2、3 项 → 2+1),
+            // 放得下首选整行原样。
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 24) {
                     StatValue(label: "实际占用", value: totalAccountedText(result))

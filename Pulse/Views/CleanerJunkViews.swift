@@ -2,7 +2,10 @@ import AppKit
 import PulseCore
 import SwiftUI
 
-// 可清理清单卡(JunkListCard)——原 CleanerJunkViews 主体;solid-split 后本文件只留清单卡。
+// 清单卡(JunkListCard):卡头(「全部清单」+ 合计;下钻态不画)→ 结果卡(清理完成后
+// 的报告,平时不占位)→ 组列表(自己滚:组头 + 条目)→ 动作条(钉在卡底常驻)。
+// 确认单 CleanConfirmSheet 挂在这张卡上。行、档位 chip、年龄文案在
+// CleanerJunkRowViews.swift;尺寸表与勾选框在 CleanerListCommonViews.swift。
 
 // MARK: 清单卡
 
@@ -15,10 +18,10 @@ struct JunkListCard: View {
     /// 返回行回调(下钻态才有)。
     var onBackToOverview: (() -> Void)?
     @State private var flashGroup: JunkGroup?
-    /// 收起的项目产物子组(2026-11-06 二次拍板:项目卡可点击展开/收起;默认全展开)。
+    /// 收起的项目大卡;不在表里 = 展开,所以默认全展开。
     @State private var collapsedProjects: Set<String> = []
 
-    /// 清理页专属强调色(2026-11-06 拍板 Teal):不再借磁盘指标金。
+    /// 清理页专属强调色,不借指标色(单出处 `Surface.cleanAccent`)。
     private var accent: Color {
         Surface.cleanAccent
     }
@@ -41,7 +44,7 @@ struct JunkListCard: View {
             if displayedCandidates.isEmpty {
                 if let filter = groupFilter.wrappedValue {
                     drillBackRow(group: filter, items: [], safeItems: [])
-                    // 空态走卡片家族零件(与全量空态同族),不再裸 Text。
+                    // 下钻空态与全量空态同族,同走卡片家族零件。
                     CardEmptyState(
                         title: "该品类当前没有条目",
                         detail: "可能已排除、已移入废纸篓,或重新扫描后不再命中"
@@ -84,8 +87,7 @@ struct JunkListCard: View {
     }
 
     private var header: some View {
-        // 四子页卡头统一清理页强调色(2026-11-09);08 的「卡头中性」拍板 superseded
-        // ——当年变中性是为了躲磁盘金(「全页黄」源头),强调色已是 Teal,不再撞色。
+        // 卡头标题即子页名;卡头取清理页强调色,与其它子页卡头一致。
         CardHeader(symbolName: "trash", title: "全部清单", tint: Surface.cleanAccent) {
             Text(summaryText)
                 .font(.system(size: 11))
@@ -136,12 +138,12 @@ struct JunkListCard: View {
         let byGroup = Dictionary(grouping: displayedCandidates, by: \.group)
         // 活动条目每次渲染现查一次(判定永不缓存),行级原因复用同一份。
         let activity = model.currentActivityEntries()
-        // 2026-11-06 改版:每个条目一张小卡(卡间距 4);组与组之间 18 拉开;
-        // 项目产物 = 纯缩进层级(去三角箭头/去收起,拍板「不要三角展开组件」)。
+        // 条目区两种形态并存:工具缓存这类组 = 每个条目一张独立小卡;按所有者聚合的组
+        // (项目产物 / 卸载残留)= 项目大卡装卡内裸行子项(见 groupRows)。
         return LazyVStack(alignment: .leading, spacing: 18) {
             if let filter {
-                // 下钻态(p6-cleaner/03):「‹ 总览」返回行(组头的标题/合计/全选安全项
-                // 并入返回行,原型同款,不重复组头)+ 该品类条目;排序沿用该组既有偏好。
+                // 下钻态:「‹ 总览」返回行顶替组头(标题 / 合计 / 全选安全项并入返回行,
+                // 不再另画组头)+ 该品类条目;排序沿用该组既有偏好。
                 let items = (byGroup[filter] ?? []).sortedForDisplay(by: sortMode(for: filter))
                 // 组选资格单出处(CleanInUse.isSafeAutoSelectable):先检查、在用项不参与。
                 let safeItems = items.filter { CleanInUse.isSafeAutoSelectable($0, entries: activity) }
@@ -152,9 +154,7 @@ struct JunkListCard: View {
             } else {
                 ForEach(JunkGroup.allCases.filter { byGroup[$0] != nil }, id: \.self) { group in
                     let items = (byGroup[group] ?? []).sortedForDisplay(by: sortMode(for: group))
-                    // 组选只吃组内「可安全清理」且**非在用**的项(拍板 B + 在用保护):
-                    // 先检查项、在用项都不参与组选,组里没有可勾项就不给按钮
-                    // (资格谓词单出处 CleanInUse.isSafeAutoSelectable)。
+                    // 组选口径同下钻分支:只吃 safe 非在用,组里没有可勾项就不出按钮。
                     let safeItems = items.filter { CleanInUse.isSafeAutoSelectable($0, entries: activity) }
                     VStack(alignment: .leading, spacing: 4) {
                         groupHeader(group, items: items, safeItems: safeItems)
@@ -185,14 +185,10 @@ struct JunkListCard: View {
     ) -> some View {
         if group.groupsByOwner {
             // 按所有者分子组(同 projectName 聚合;项目产物 = 项目,卸载残留 =
-            // app 全 bundle id):一张大卡装头排 + 缩进的裸行子项(2026-11-06
-            // 三次拍板;p5-cleaner/02 复用到卸载残留)。
+            // app 全 bundle id):两种组共用同一张大卡形态,见 projectCard。
             ForEach(ProjectJunkGrouping.group(items)) { projectGroup in
-                // 项目级勾选两层口径(2026-11-06 用户连续拍板):
-                // 状态 = 反映全部非在用子项(手勾的「先检查」也算数,父级
-                // 如实显示半选/全选);动作 = 只全选/全清**安全档**子项
-                // ——没有安全项可勾(纯先检查/纯在用)时 checkbox 置灰
-                // 不给假按钮(资格谓词单出处 CleanInUse.isSafeAutoSelectable)。
+                // 勾选的两层口径、置灰与换锁的判据都在 projectCard;这里只算两个子集:
+                // nonInUse = 状态反映哪些子项,autoSelectable = 点击能勾哪些子项。
                 let nonInUse = projectGroup.items
                     .filter { model.inUseReasons(for: $0, entries: activity) == nil }
                 let autoSelectable = projectGroup.items
@@ -247,9 +243,8 @@ struct JunkListCard: View {
         }
     }
 
-    /// 下钻返回行(p6-cleaner/03,丙案 v2 原型 backrow):「‹ 总览」+ 品类标题 +
-    /// 「X · N 项」合计 + 「全选安全项」(与组头同口径:只吃 safe 非在用)。
-    /// 排序 seg 不进返回行(原型同款;全量视图里该组仍可调,偏好两组共用)。
+    /// 下钻返回行:「‹ 总览」+ 品类标题 + 「X · N 项」合计 + 「全选安全项」(与组头同口径:
+    /// 只吃 safe 非在用)。排序 seg 不进返回行——回全量视图再调,排序偏好两边共用。
     private func drillBackRow(
         group: JunkGroup,
         items: [JunkCandidate],
@@ -314,8 +309,9 @@ struct JunkListCard: View {
         model.sortOrder(for: group)
     }
 
-    /// 组头(2026-11-06 改版):组名 16 bold + 总量在左;右侧 = 「全选安全项」+
-    /// 大小|新旧 seg(seg 挪右、tint 清理页强调色与主按钮统一,拍板)。
+    /// 组头:组名 + 总量在左;右侧 = 「全选安全项」+ 大小|新旧 seg(seg 挪到右、tint 取
+    /// 清理页强调色,与主按钮统一)。「全选安全项」就是本组的整组勾选,口径只吃 safe
+    /// 非在用;组里没有可勾项时不出。
     private func groupHeader(
         _ group: JunkGroup,
         items: [JunkCandidate],
@@ -341,9 +337,8 @@ struct JunkListCard: View {
                 .disabled(isBusy)
                 .help("只勾「可安全清理」且不在用的项;「先检查」与在用保护项永远要你亲手勾")
             }
-            // 大小 ⇄ 新旧(05 拍板;08 扩到两组)。新旧 = 最久未动在前,未知排最后。
-            // 2026-11-06 拍板:右侧 + tint 强调色与主按钮统一;默认 regular、
-            // 自然宽(fixedSize;定宽曾把文字挤竖排)。
+            // 大小 ⇄ 新旧:新旧 = 最久未动在前、年龄未知排最后(口径在 JunkSortOrder)。
+            // 自然宽(fixedSize)——定宽会把文字挤成竖排。
             Picker(
                 "排序",
                 selection: Binding(
@@ -364,12 +359,12 @@ struct JunkListCard: View {
         .padding(.horizontal, CleanerListMetrics.rowInset)
     }
 
-    /// 项目大卡(2026-11-06 三次拍板:「项目产物应该是一个大卡片,包含住子项!
-    /// 子项只有缩进!」):一张 card-hi 大卡装头排 + 全部产物子项——子项是卡内
-    /// 裸行(JunkRow indented),只缩进不套小卡。点头排 = 展开/收起。
-    /// 勾选两层口径(同日连续拍板):**状态** = 反映全部非在用子项(手勾的
-    /// 「先检查」也算数,父级如实显示半选/全选);**动作** = 只全选/全清安全档
-    /// 子项——没有安全项可勾(纯先检查)时 checkbox 置灰,不给假按钮。全在用 → 换锁。
+    /// 项目大卡:头排 + 全部子项装在一张抬升底大卡里。子项是卡内裸行(JunkRow indented),
+    /// 只缩进不套小卡——与工具缓存组的独立小卡是并存的两种条目形态。项目产物与卸载
+    /// 残留共用本卡,名词随组换。点头排 = 展开 / 收起。
+    /// 勾选两层口径:**状态**反映全部非在用子项(手勾的「先检查」也算,父级如实半选 /
+    /// 全选);**动作**只全选 / 全清安全档子项。于是:子项全在用 = 勾选位换锁;其余情况
+    /// 下没有安全档可勾(只剩先检查)= 勾选框置灰,不给假按钮。
     private func projectCard(
         _ projectGroup: ProjectJunkGroup,
         group: JunkGroup,
@@ -391,7 +386,7 @@ struct JunkListCard: View {
             HStack(spacing: 8) {
                 if allInUse {
                     Image(systemName: "lock.fill")
-                        .font(.system(size: 13))
+                        .font(.system(size: IconSize.inline))
                         .foregroundStyle(.tertiary)
                         .help("在用保护:该\(owner)此刻有进程活动(终端/构建等),不参与本次清理")
                 } else {
@@ -399,8 +394,6 @@ struct JunkListCard: View {
                         guard !isBusy, !autoSelectable.isEmpty else { return }
                         model.toggleGroup(autoSelectable)
                     } label: {
-                        // 置灰判据 = 没有安全档可自动勾(纯先检查);状态照常显示
-                        // (手勾先检查后父级仍如实半选/全选,只是不可点)。
                         CleanerCheckBox(state: checkState, disabled: isBusy || autoSelectable.isEmpty)
                     }
                     .buttonStyle(.plain)
@@ -428,7 +421,7 @@ struct JunkListCard: View {
                         .truncationMode(.middle)
                     Spacer(minLength: 8)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: IconSize.inline, weight: .semibold))
                         .foregroundStyle(.tertiary)
                         .rotationEffect(.degrees(isCollapsed ? 0 : 90))
                 }
@@ -484,8 +477,8 @@ struct JunkListCard: View {
             .padding(.vertical, 10)
             .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
         case .idle, .finished, .confirming:
-            // CTA 常驻(用户实报:空选时按钮消失 = 不知道下一步干嘛):
-            // 空选灰显 + 注脚;有选则清选 + 强调色主按钮。按钮 B 档 .large(2026-11-05 密度拍板)。
+            // 动作条常驻:空选时主按钮灰显 + 注脚,不整条消失——按钮消失时看不出
+            // 下一步该干嘛;有选则出「清除勾选」+ 强调色主按钮。
             HStack(spacing: 12) {
                 if plan.isEmpty {
                     Text("默认全不勾 · 勾选后可清理,右键行可排除")
@@ -524,6 +517,7 @@ struct JunkListCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: IconSize.inline, weight: .medium))
                         .foregroundStyle(Surface.positive)
                     Text(report.failed.isEmpty
                         ? "已移入废纸篓 \(report.recycled.count) 项 · 释放 \(PulseFormat.memory(UInt64(max(0, report.freedBytes))))"

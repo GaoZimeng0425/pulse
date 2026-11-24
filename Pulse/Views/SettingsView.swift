@@ -55,7 +55,7 @@ struct SettingsView: View {
 
     private func sidebarRow(_ page: SettingsPage) -> some View {
         HStack(spacing: 8) {
-            SidebarIconView(symbol: page.symbol, tintA: page.tintA, tintB: page.tintB)
+            SidebarIconView(symbol: page.symbol, tint: page.iconTint)
             Text(page.label)
         }
     }
@@ -107,40 +107,29 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         }
     }
 
-    var tintA: Color {
+    /// 图标砖渐变色:取令牌 `{colors.settings-icon-*}`。
+    var iconTint: SettingsIconTint.Token {
         switch self {
-        case .general: Color(red: 0.62, green: 0.62, blue: 0.66)
-        case .alerts: Color(red: 0.95, green: 0.62, blue: 0.20)
-        case .projectRoots: Color(red: 0.30, green: 0.55, blue: 0.95)
-        case .menuBar: Color(red: 0.58, green: 0.40, blue: 0.92)
-        case .cleaner: Color(red: 0.98, green: 0.70, blue: 0.15)
-        }
-    }
-
-    var tintB: Color {
-        switch self {
-        case .general: Color(red: 0.42, green: 0.42, blue: 0.47)
-        case .alerts: Color(red: 0.85, green: 0.35, blue: 0.10)
-        case .projectRoots: Color(red: 0.15, green: 0.35, blue: 0.75)
-        case .menuBar: Color(red: 0.42, green: 0.22, blue: 0.78)
-        case .cleaner: Color(red: 0.85, green: 0.52, blue: 0.00)
+        case .general: SettingsIconTint.general
+        case .alerts: SettingsIconTint.alerts
+        case .projectRoots: SettingsIconTint.projectRoots
+        case .menuBar: SettingsIconTint.menuBar
+        case .cleaner: SettingsIconTint.cleaner
         }
     }
 }
 
-/// 系统设置风格的彩色渐变图标方块(参考 NemoNotch SettingsComponents):
-/// 渐变底 + 白色 SF Symbol + 0.5pt 高光描边 + 柔影。装饰性图标,行文本
-/// 自身即完整可访问性标签。
+/// 设置侧栏图标砖(DESIGN.md §Components「设置侧栏图标砖」):渐变底 + 白色 SF Symbol
+/// + 0.5pt 高光描边 + 柔影,仿系统设置。装饰性图标,行文本自身即完整可访问性标签。
 private struct SidebarIconView: View {
     let symbol: String
-    let tintA: Color
-    let tintB: Color
+    let tint: SettingsIconTint.Token
 
     var body: some View {
         RoundedRectangle(cornerRadius: 8, style: .continuous)
             .fill(
                 LinearGradient(
-                    colors: [tintA, tintB],
+                    colors: [tint.fromColor, tint.toColor],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )

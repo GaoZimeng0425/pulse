@@ -1,5 +1,6 @@
 @testable import Pulse
 @testable import PulseCore
+import SwiftUI
 import XCTest
 
 /// 菜单栏徽标槽位配置 → 渲染输入的映射(spec 测试决策钉死的纯函数缝):
@@ -164,6 +165,13 @@ final class MenuBarBadgeTests: XCTestCase {
                 colorScheme: .dark
             )
         )
+        // 定宽槽宽度也进键:同文案同强调级、仅槽宽不同的两枚徽标位图不同,不能互相命中。
+        let unpinned = [MenuBarBadgeContent(caption: "CPU", text: "100%", emphasis: .critical, slotWidth: nil)]
+        let pinned = [MenuBarBadgeContent(caption: "CPU", text: "100%", emphasis: .critical, slotWidth: 38)]
+        XCTAssertNotEqual(
+            MenuBarBadgeRenderer.cacheKey(for: unpinned, colorScheme: .dark),
+            MenuBarBadgeRenderer.cacheKey(for: pinned, colorScheme: .dark)
+        )
     }
 
     /// 渲染器容量锚点:策略常量(~20)与"网络速率几秒窗内来回切换仍命中"
@@ -255,7 +263,75 @@ final class MenuBarBadgeTests: XCTestCase {
         XCTAssertEqual(MenuBarBadgeSettingsView.displayedSlot([], at: 0), .cpu)
     }
 
+    // MARK: - 警示色取语义令牌(design-md-cleanup/03)
+
+    /// 警示 / 危险两级的数值文字取 app 的语义令牌(琥珀、红),并按**传入的**外观
+    /// 取深浅值,不依赖渲染环境。期望值是令牌表的十六进制原文,独立于代码常量。
+    @MainActor
+    func testEmphasisValueColorFollowsTokensPerColorScheme() {
+        let expected: [(emphasis: MenuBarBadgeContent.Emphasis, light: UInt32, dark: UInt32)] = [
+            (.warning, 0xEDA100, 0xC98500),
+            (.critical, 0xE0352B, 0xFF453A),
+        ]
+        for item in expected {
+            for (scheme, hex) in [(ColorScheme.light, item.light), (.dark, item.dark)] {
+                let content = MenuBarBadgeContent(
+                    caption: "CPU", text: "100%", emphasis: item.emphasis, slotWidth: nil
+                )
+                let image = MenuBarBadgeRenderer.image(for: [content], colorScheme: scheme)
+                let label = "\(item.emphasis) \(scheme)"
+                guard let pixel = Self.mostOpaquePixel(in: image) else {
+                    XCTFail("\(label):位图里没有可取样的像素")
+                    continue
+                }
+                XCTAssertEqual(pixel.red, Double((hex >> 16) & 0xFF) / 255, accuracy: 0.02, label)
+                XCTAssertEqual(pixel.green, Double((hex >> 8) & 0xFF) / 255, accuracy: 0.02, label)
+                XCTAssertEqual(pixel.blue, Double(hex & 0xFF) / 255, accuracy: 0.02, label)
+            }
+        }
+    }
+
     // MARK: - 夹具
+
+    /// 位图里 alpha 最高的像素(数值文字笔画的核心;小标签只有 55% 墨色),按 sRGB
+    /// 归一化。统一重绘进 8 位 RGBA 上下文再取,不依赖源位图的字节序与位深。
+    @MainActor
+    private static func mostOpaquePixel(in image: NSImage) -> (red: Double, green: Double, blue: Double)? {
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        let width = cgImage.width
+        let height = cgImage.height
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        let drawn = bytes.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(
+                data: buffer.baseAddress,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: width * 4,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else { return false }
+            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+            return true
+        }
+        guard drawn else { return nil }
+        var bestAlpha = -1.0
+        var bestIndex = 0
+        for index in 0 ..< width * height {
+            let alpha = Double(bytes[index * 4 + 3])
+            if alpha > bestAlpha {
+                bestAlpha = alpha
+                bestIndex = index
+            }
+        }
+        guard bestAlpha > 0 else { return nil }
+        let base = bestIndex * 4
+        return (
+            red: Double(bytes[base]) / bestAlpha,
+            green: Double(bytes[base + 1]) / bestAlpha,
+            blue: Double(bytes[base + 2]) / bestAlpha
+        )
+    }
 
     /// 合成数据(单测不制造真实负载):CPU 42.6% → "43%",RAM 恰好 50%。
     static let sampleData = MenuBarBadgeData(

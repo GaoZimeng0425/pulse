@@ -3,16 +3,16 @@ import Foundation
 // MARK: - 空间地图(p4-cleaner/07):扫描树 → 显示树 → 两环旭日几何(纯值)
 
 //
-// 地图层三件事,全部无 IO、可合成夹具测试(spec「旭日图两环几何为纯值计算」):
+// 地图层三件事,全部无 IO、可合成夹具测试:
 //
-// 1. firmlink 提升(真机探针 2026-11-01):根目录原始枚举序里 System 排在
+// 1. firmlink 提升:根目录原始枚举序里 System 排在
 //    Users/Applications/private/opt 之前,深度优先先在 /System/Volumes/Data/*
 //    抢占 (dev, fileID),顶层 firmlink 全被记 double-visit 跳过——扫描树里
 //    用户数据整棵埋在 System 之下。显示树把 Data 的直接子目录拼回顶层、路径
 //    改写为规范名(/System/Volumes/Data/Users → /Users),System 余量
 //    (SSV 文件 + Preboot/VM/Update 等其他系统卷)折叠为单个密封块。
-//    只动展示路径,不动扫描语义与去重账(那属于 02 票的引擎)。
-// 2. 密封折叠(/usr/share/firmlinks + mount 探针):/System(余量)、/bin、/sbin
+//    只动展示路径,不动扫描语义与去重账。
+// 2. 密封折叠:/System(余量)、/bin、/sbin
 //    都在只读密封系统卷上——不可删、不可下钻,地图上折成单块;点击解释交给视图。
 // 3. 弧几何:内环 = 当前根的子辈、外环 = 孙辈;叶子(无目录子辈)与密封块延伸
 //    占满外环;份额过小的尾部并入「其他」;百分比分母 = 整卷树(悬浮口径与环内

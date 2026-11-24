@@ -1,10 +1,18 @@
 import PulseCore
 import SwiftUI
 
-// MARK: - dev server 卡(工单 p1-history/08,总览页;2026-10-20 起弹窗同内容,紧凑档)
+// MARK: - 服务页:页面骨架 + dev server 卡(p1-history/08)
 
-/// 总览页 dev server 卡:列出在跑的开发服务进程(闲置时长/内存/监听端口),
-/// 「全部停止」上抛请求(确认流在 KillRequestFlow,绝不自动杀)。
+//
+// 服务页骨架(页面根视图在 `MetricTabStack`,主窗口与弹窗同一份卡序,弹窗走紧凑档):
+// 三张卡上下堆叠——
+// 1. dev server 卡(本文件):在跑的开发服务;
+// 2. 监听端口卡(`PortsCardView`):全机监听 TCP 端口与占用进程;
+// 3. 容器卡(`ContainersCardView`):容器盘点。
+// 页的标题、图标与强调色沿用容器页身份,定义在 PulseCore `MetricTab.services`。
+
+/// dev server 卡:列出在跑的开发服务进程(闲置时长 / 内存 / 监听端口),「全部停止」
+/// 上抛请求(确认流在 KillRequestFlow,绝不自动杀)。
 /// 空态安静文案——没有 dev server 是常态,不制造焦虑。
 struct DevServerCardView: View {
     let servers: [DevServerStatus]
@@ -53,8 +61,8 @@ struct DevServerCardView: View {
         .cardShell(compact: isCompact)
     }
 
-    /// 一行 server(实体行,ui-unify 追改):终端图标 + 名 + pid 副文;闲置 / 内存 /
-    /// 端口三列贴右,尺寸随行两档,内存为主数值(semibold)。
+    /// 一行 server(实体行):终端图标 + 名 + pid 副文;闲置 / 内存 / 端口三列贴右,
+    /// 尺寸随行两档,内存为主数值(semibold)。
     private func row(_ server: DevServerStatus) -> some View {
         let valueSize = RowMetrics.valueFontSize(compact: isCompact)
         return CardEntityRow(

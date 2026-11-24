@@ -1,15 +1,15 @@
 import PulseCore
 import SwiftUI
 
-// MARK: - 会话子页两卡(agent-tab/08 重设计;自 AgentViews.swift 拆出)
+// MARK: - 会话子页两卡(agent-tab/08)
 
 //
-// 08 重设计(2026-11-14 用户实报「会话 tab 不好看;右侧 23% 看不懂;ZCode 的
-// 6/10 6.9M 看不懂」):06 版沿用实体行,右侧两个裸数字没有标签也没有单位。
-// 终态 = 每个会话一张 lift 小块(cardHigh 底、圆角 10、内距 12),左「是谁、
-// 在干什么」(图标 + 名 + 状态 chip / 任务摘要 / 元信息)、右**带标签的读数块**
-// (标签 → 读数 → meter → 注脚):Claude =「上下文 48%」+ 480k / 1M;ZCode =
-// 「子代理 2 / 5 在跑」+ 累计 token。读数一律自带口径,不再裸数字。
+// 子页骨架:两家各一张卡(Claude Code / ZCode),卡头右侧计数,卡身每个会话一块
+// lift 小块。块分左右两半:
+// · 左 = 这是谁、在干什么:图标 + 项目名(后接 worktree / 分支 / 未提交 / 状态 chip)
+//   → 摘要 → 路径 → 元信息;
+// · 右 = 带标签的读数块(`AgentSessionMetric`:标签 → 读数 → meter → 注脚)。
+// 读数一律自带口径与单位,不出裸数字——单摆一个「23%」「6/10」,读者看不出是什么。
 
 /// 会话块右侧读数块:标签(micro tertiary)+ 读数(值 semibold)→ meter → 注脚。
 private struct AgentSessionMetric: View {
@@ -46,11 +46,11 @@ private struct AgentSessionMetric: View {
     }
 }
 
-/// 会话 lift 小块骨架:左图标 + 文字列(项目名 + ⑂ worktree + 分支 + 状态 /
-/// 摘要 / 路径 / 元信息),右读数块。09:标题恒为项目名(worktree 折回主仓),
-/// worktree 另挂标签、补缩写路径——用户实报「会话看不出是哪个项目」。分支 chip
-/// +「未提交」标记 = agent-git-status/01:会话工作目录当前 git 分支(detached
-/// 显短 SHA,非 git 仓库安静缺位)+ 工作区有未落盘改动(含未跟踪文件)时琥珀。
+/// 会话 lift 小块:左图标 + 文字列,右读数块。标题恒为项目名——工作目录先经
+/// PulseCore `AgentSessionLocation` 折回主仓;不折的话,worktree 里的会话只顶着
+/// 工作目录的末段名,看不出属于哪个项目。worktree 名另挂带分支图标的 chip,路径行
+/// 给缩写后的工作目录。分支与「未提交」chip 吃 `gitStatuses` 查表(PulseCore
+/// `SessionGitStatus`):非 git 仓库安静缺位,不占位。
 private struct AgentSessionTile<Badge: View, Metric: View>: View {
     let systemImage: String
     let tint: Color
@@ -68,7 +68,7 @@ private struct AgentSessionTile<Badge: View, Metric: View>: View {
     var body: some View {
         HStack(alignment: .top, spacing: RowMetrics.spacing(compact: compact)) {
             Image(systemName: systemImage)
-                .font(.system(size: compact ? 13 : 16, weight: .medium))
+                .font(.system(size: IconSize.leading(compact: compact), weight: .medium))
                 .foregroundStyle(tint)
                 .frame(width: RowMetrics.iconSize(compact: compact))
                 .padding(.top, 2)
@@ -119,6 +119,7 @@ private struct AgentSessionTile<Badge: View, Metric: View>: View {
                             .truncationMode(.middle)
                     } icon: {
                         Image(systemName: "folder")
+                            .font(.system(size: IconSize.inline))
                     }
                     .labelStyle(AgentSessionPathLabelStyle())
                     .help(path)

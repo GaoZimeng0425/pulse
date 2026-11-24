@@ -55,11 +55,11 @@ public struct JunkSelection: Sendable, Equatable {
         paths = paths.intersection(live)
     }
 
-    // MARK: 整组勾选(2026-10-30 用户拍板 B:组头 checkbox 一键勾/清组内「可安全清理」项,
+    // MARK: 整组勾选(组头一键勾 / 清组内「可安全清理」项;先检查项永不经组勾选
 
-    // 先检查项永不经组勾选进入——调用方只传 safe 档候选,这条约定钉死在这里)
+    // 进入——调用方只传 safe 档候选,这条约定钉死在这里)
 
-    /// 一组候选(或任意子集)的勾选三态:组头 checkbox 的显示与点击语义。
+    /// 一组候选(或任意子集)的勾选三态:整组勾选控件的显示与点击语义。
     public enum GroupState: Sendable, Equatable {
         case none
         case mixed

@@ -126,6 +126,7 @@
 		7EECD9B072C93FEBF647E76A /* LiveCleanTrashExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 402CDC78D088CCD268E214D9 /* LiveCleanTrashExecutor.swift */; };
 		7F19E400612A69AA2613B8C3 /* DevServerViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16D71F0A473C1329AEE02FF2 /* DevServerViews.swift */; };
 		7F9B2BCCDACD80F852FC20D3 /* HostInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = D363D25298EACE08DE4713DF /* HostInfo.swift */; };
+		825213350A0843605DB5B2F5 /* IconSizeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94A72B0FB2F55DD0F6233715 /* IconSizeTests.swift */; };
 		8328544835522E8F1A0BDCF7 /* ProcessDrilldownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8434AD3F303A7E024D2887D /* ProcessDrilldownView.swift */; };
 		848B3618CDF4F547B6619433 /* StripChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB4FA4027487EAA178DE6EC /* StripChartView.swift */; };
 		868B2FB599B4548C7FEB517B /* EnergyImpactTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0148962B15C35DBD46696E1 /* EnergyImpactTable.swift */; };
@@ -202,8 +203,10 @@
 		D58BA01E33941290CC66A462 /* HistoryFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D85BCEEF64EDEAAFC5AE256 /* HistoryFeature.swift */; };
 		D89BE77424B91E56B9FF1441 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0EEF346D1A5F99B6D75474EC /* Assets.xcassets */; };
 		D89F1D815D05E848BE31A83E /* AlertCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 556E90C2DDB739846AA22485 /* AlertCenter.swift */; };
+		DAC14CAC86464B948A73A7F5 /* IconSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBD0CCEAFE84607E95E04677 /* IconSize.swift */; };
 		DBBB83A52145048627D0E2D7 /* LiveBrewUninstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 865415F5B0ED2A2E5C81362F /* LiveBrewUninstallerTests.swift */; };
 		DC5C75FC243BB1F7EC9DE426 /* UiUnifyRowMetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC87A93839D6CA24CF501E16 /* UiUnifyRowMetricsTests.swift */; };
+		DD8D35885DD76C48027FA03D /* SettingsIconTintTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03A215A365249C3703536A3A /* SettingsIconTintTests.swift */; };
 		DE026A23A1D01EE77D742A8E /* AppAudioSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59E8C9C533F4F51112D551A2 /* AppAudioSupport.swift */; };
 		E0391947A668FC976A3C1FEC /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 992920D9BD4AE699DFE1A1B5 /* SettingsView.swift */; };
 		E193DEFD26CEB49C029AF9BC /* CleanScanRootsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48832042B66772435003651D /* CleanScanRootsStoreTests.swift */; };
@@ -262,6 +265,7 @@
 
 /* Begin PBXFileReference section */
 		02DA72B605936ABAB68101E8 /* AlertNotificationSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertNotificationSmokeTests.swift; sourceTree = "<group>"; };
+		03A215A365249C3703536A3A /* SettingsIconTintTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsIconTintTests.swift; sourceTree = "<group>"; };
 		040DE88C5838AA75D0409310 /* McpCleanBridgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = McpCleanBridgeTests.swift; sourceTree = "<group>"; };
 		05102129BE186A01609E2D26 /* AlertNotification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertNotification.swift; sourceTree = "<group>"; };
 		069E93667AAB8A93E43C7A26 /* LiveTrashInventoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTrashInventoryTests.swift; sourceTree = "<group>"; };
@@ -385,6 +389,7 @@
 		931F7070B78C75E7EF03B08A /* BluetoothSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothSensor.swift; sourceTree = "<group>"; };
 		9378B86940EBE30E057F718D /* MetricTabModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricTabModelTests.swift; sourceTree = "<group>"; };
 		9434FBDCD0EABA01ACDC0639 /* MetricTabViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricTabViews.swift; sourceTree = "<group>"; };
+		94A72B0FB2F55DD0F6233715 /* IconSizeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconSizeTests.swift; sourceTree = "<group>"; };
 		94AE23A1D17532F33018843D /* KillEndToEndTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KillEndToEndTests.swift; sourceTree = "<group>"; };
 		96FB829A3EA06990A9CA7721 /* PulseCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PulseCore; path = Packages/PulseCore; sourceTree = SOURCE_ROOT; };
 		986C77EF7853628E6A424165 /* LaunchdManifestSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchdManifestSensor.swift; sourceTree = "<group>"; };
@@ -415,6 +420,7 @@
 		B8B61FF7D57A239D0234D1A3 /* PowerCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerCardViews.swift; sourceTree = "<group>"; };
 		BA0853EEEEB0FB9F6834A00E /* AlertSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSettingsStore.swift; sourceTree = "<group>"; };
 		BA63CBA09D59DD528C7124CA /* StatusBadgeChipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadgeChipTests.swift; sourceTree = "<group>"; };
+		BBD0CCEAFE84607E95E04677 /* IconSize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconSize.swift; sourceTree = "<group>"; };
 		BC47165BC5F259312DF6927B /* CleanerOverviewViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanerOverviewViews.swift; sourceTree = "<group>"; };
 		BD20ED0880CE6DC5CC6EC575 /* AgentUsageCharts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentUsageCharts.swift; sourceTree = "<group>"; };
 		BD3B00277D6CF515AEA81E6C /* MenuBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarController.swift; sourceTree = "<group>"; };
@@ -712,6 +718,7 @@
 				75143473F1438552A6B29F53 /* DiskCardViews.swift */,
 				4C9E00667C343ED4FBBFF8AE /* GeneralSettingsView.swift */,
 				7139D7B174756F0CAD5B532C /* HistoryView.swift */,
+				BBD0CCEAFE84607E95E04677 /* IconSize.swift */,
 				8B93B7757A455F9566934A21 /* MainWindowGate.swift */,
 				689A729F03DE35CA0C9E3D5D /* MainWindowView.swift */,
 				ABC98F0C4A2054944D3B34AC /* MenuBarBadge.swift */,
@@ -789,6 +796,7 @@
 				32DF241AAD5F8798ADDE0FC2 /* GroupingPipelineSmokeTests.swift */,
 				F44D7895B66604D8AC37E77F /* HistoryEngineTests.swift */,
 				5A686C29DAEAD2AC1D94E833 /* HistoryFeatureTests.swift */,
+				94A72B0FB2F55DD0F6233715 /* IconSizeTests.swift */,
 				94AE23A1D17532F33018843D /* KillEndToEndTests.swift */,
 				C53D2D1E33AFAC1704FD224A /* KillServiceTests.swift */,
 				6B76926FB48518EBB58CAA6F /* LaunchdManifestFeatureTests.swift */,
@@ -818,6 +826,7 @@
 				29E406A1D678E2CAF14F3E30 /* RankingListMetricsTests.swift */,
 				1D62C614668136B62C900ECA /* RankingOverflowTests.swift */,
 				EA32BC4006AFA168EE6CF9B5 /* RoundSpineTests.swift */,
+				03A215A365249C3703536A3A /* SettingsIconTintTests.swift */,
 				D1C9148F4EC10E000CE96ABA /* SmcSensorTests.swift */,
 				126800DC1FC5FCB799DDA633 /* SoundSensorTests.swift */,
 				BA63CBA09D59DD528C7124CA /* StatusBadgeChipTests.swift */,
@@ -974,6 +983,7 @@
 				0B2D3F53EE597649EDE9B7B7 /* GroupingPipelineSmokeTests.swift in Sources */,
 				919C4BA1A892DF4D6040E5E4 /* HistoryEngineTests.swift in Sources */,
 				9373E71BC708506D35A85877 /* HistoryFeatureTests.swift in Sources */,
+				825213350A0843605DB5B2F5 /* IconSizeTests.swift in Sources */,
 				FA39C087AD11F34D92DFDDFF /* KillEndToEndTests.swift in Sources */,
 				CADC6FC231286ABD06F04C67 /* KillServiceTests.swift in Sources */,
 				AA528E9EE2DB20755AA5481C /* LaunchdManifestFeatureTests.swift in Sources */,
@@ -1004,6 +1014,7 @@
 				1F7A55CC3A6CF75D16DEF819 /* RankingListMetricsTests.swift in Sources */,
 				3BFAA3592B43CEAB2E4733D8 /* RankingOverflowTests.swift in Sources */,
 				3912CC7AE8C5DF0325342786 /* RoundSpineTests.swift in Sources */,
+				DD8D35885DD76C48027FA03D /* SettingsIconTintTests.swift in Sources */,
 				E9F71EE03BA7B4C44DD8DCC6 /* SmcSensorTests.swift in Sources */,
 				EF095DB50F12562588921E86 /* SoundSensorTests.swift in Sources */,
 				B6FEEBE806CD7DE27F672F4E /* StatusBadgeChipTests.swift in Sources */,
@@ -1092,6 +1103,7 @@
 				D58BA01E33941290CC66A462 /* HistoryFeature.swift in Sources */,
 				00782FC590CECF347756D123 /* HistoryView.swift in Sources */,
 				7F9B2BCCDACD80F852FC20D3 /* HostInfo.swift in Sources */,
+				DAC14CAC86464B948A73A7F5 /* IconSize.swift in Sources */,
 				BA9E9907C976B309C88632A0 /* InertSources.swift in Sources */,
 				4D23B751380D67B11ECC1EF7 /* KillRequestFlow.swift in Sources */,
 				060E22E8B6190A3495594D89 /* KillService.swift in Sources */,
