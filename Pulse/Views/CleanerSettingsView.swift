@@ -2,19 +2,18 @@ import AppKit
 import PulseCore
 import SwiftUI
 
-/// 设置窗「清理」页(p4-cleaner/04 排除目录 + 05 清理扫描根):
+/// 设置窗「清理」页:清理扫描根 + 排除目录两节,页脚一段口径说明。
+/// - 清理扫描根:与「项目根目录」页的归组配置是两套独立配置,零共享,互不影响。出厂给
+///   常见开发目录建议清单(勾选即加),特殊位置(如 ~/Documents/Learn/macos)用文件夹
+///   选择器自添。根的直接子目录 = 项目;项目产物的匹配语义在 PulseCore。
 /// - 排除目录(GLOSSARY)图形化增删——添加用文件夹选择器,行内删除;清理页右键
 ///   「排除此目录」加进来的也在这里管理。排除只收窄,语义在 PulseCore.CleanExclusions。
-/// - 清理扫描根(05,用户拍板与归组的项目根**两套配置、零共享**):出厂给常见
-///   开发目录建议清单(勾选即加),特殊位置(如 ~/Documents/Learn/macos)用
-///   文件夹选择器自添。根的直接子目录 = 项目;项目产物的匹配语义在 PulseCore。
-/// 两个视图都只做呈现与转发,持久化在各自 Store(*Tests)。
+/// 只做呈现与转发,持久化在各自 Store。
 struct CleanerSettingsView: View {
     let store: CleanExclusionsStore
     let scanRoots: CleanScanRootsStore
 
-    /// 出厂建议(spec 用户故事 24:常见开发目录建议清单,勾选追加)。
-    /// 只当默认值提议,不做存在性探测——零 IO,配错顶多扫不出产物,界面有引导。
+    /// 出厂建议清单:只当提议,不做存在性探测——零 IO,配错顶多扫不出产物,界面有引导。
     private static let suggestedRoots: [(label: String, path: String)] = [
         ("文稿", "~/Documents"),
         ("下载", "~/Downloads"),

@@ -156,6 +156,7 @@ struct AppUninstallConfirmSheet: View {
 
 /// 清理页子页搜索框:与同排分段控件(regular,实测 24pt)等高、同圆角;
 /// 视觉配方同主窗口工具栏搜索框(放大镜 secondary + plain 输入 12 + 清空钮)。
+/// 别换回系统 `.roundedBorder` 输入框:画出来比分段控件高,原生框底还会盖住内嵌的放大镜。
 struct CleanerSearchField: View {
     /// 分段控件 regular 实测高(NSHostingView 离屏量得;两者必须相等才对齐)。
     static let height: CGFloat = 24

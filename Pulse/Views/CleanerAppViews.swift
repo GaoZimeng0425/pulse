@@ -263,12 +263,7 @@ struct AppListSection: View {
         .background(Surface.cardHigh, in: .rect(cornerRadius: 10))
     }
 
-    /// 搜索 + 排序 + 操作提示(Q5:默认占用降序,可切按名;子页内过滤)。
-    /// 搜索框(agent-tab/08 改):11-08 换的系统 roundedBorder 输入框实测画出
-    /// 26pt(边框画在框外)vs 分段控件 24pt,且内嵌放大镜被原生框底盖住看不见
-    /// ——用户实报「input 高度不对,没和右侧切换对齐」。改走工具栏搜索框
-    /// (`MainSearchField`)同配方:放大镜 + 无边框输入 + primary 6% 底,
-    /// **定高 24 = 分段控件 regular 实测高**,圆角 7 与分段轨道同形。
+    /// 搜索 + 排序 + 操作提示(默认占用降序,可切按名;子页内过滤)。
     private var controlsBar: some View {
         @Bindable var model = model
         return HStack(spacing: 8) {

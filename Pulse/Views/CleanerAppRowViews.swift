@@ -21,7 +21,6 @@ struct AppRow: View {
     var body: some View {
         HStack(spacing: CleanerListMetrics.spacing) {
             // 灰行不给出可勾的假象:勾选框画在那但压暗(陈述「先退出/无权限」)。
-            // 2026-11-05 换统一自绘 CleanerCheckBox(此前 SF 方块与垃圾页系统框两套)。
             CleanerCheckBox(state: isSelected ? .on : .off, disabled: isDimmed)
             Image(nsImage: AppIconCache.icon(forBundle: entry.path, pointSize: CleanerListMetrics.iconSize))
                 .resizable()
@@ -168,8 +167,8 @@ struct LeftoverDisclosure: View {
         }
     }
 
-    /// 动作排(03):彻底删除勾选(Q6,红字行内、每次展开重置)+ 卸载主按钮。
-    /// 勾选框 = 统一自绘件、destructive 红 tint(2026-11-05)。
+    /// 动作排:彻底删除勾选(红字行内、每次展开重置)+ 卸载主按钮。
+    /// 勾选框用统一自绘件,tint 取红——destructive 动作与普通勾选一眼分得开。
     private var actionRow: some View {
         HStack(spacing: 8) {
             Button {

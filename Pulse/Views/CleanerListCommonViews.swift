@@ -2,23 +2,19 @@ import AppKit
 import PulseCore
 import SwiftUI
 
-// 清理清单共用件(尺寸表/勾选框/组分段)——自 CleanerJunkViews 拆出(solid-split,纯搬运)。
+// 清单家族:尺寸表(CleanerListMetrics)、勾选框(CleanerCheckBox)、全部清单子页的壳(JunkListSection)。
 
-// MARK: - 可清理清单(旧名「开发者垃圾」,2026-11-08 改名;p4-cleaner/04;DESIGN.md 卡片家族)
+// MARK: - 清单家族
 
 //
-// 本文件只做呈现与转发,状态全在 CleanerModel(PulseCore 纯值驱动):
-//   清单卡(组分段 → 行 → 动作条)→ 确认 sheet(逐行 + 总量 + 口径注记)→ 结果卡
-//   (失败如实报)→ 右键排除(持久化,再扫描 / 再列清单立即生效)。
-// 行配方 = 清理页「舒适密度档」CleanerListMetrics(2026-11-05 用户拍板,三档原型
-// 裁决 A:全页升密度;按钮与 segmented B 档;行左右内距加大)——不再借排行的
-// RankingListMetrics(那是弹窗/排行多轮拍板的紧凑档)。档位 chip 用状态 chip 配方
-// (胶囊、tint 14~16% 底 + 同色文字,DESIGN.md §状态 chip——此处映射的是
-// GLOSSARY「安全档」两态,不是负载警示)。
+// 清单卡本体(JunkListCard)在 CleanerJunkViews.swift;应用 / 清理历史子页也从这里取
+// 尺寸表与勾选框。
 
-/// 清理页行尺寸表:共享值(字号 / 图标 / meter / 内距)一律委托 `RowMetrics`
-/// 舒适档(ui-unify/01 全 app 行两档制;此前图标 28 / meter 130 / 上下距 14 与
-/// 排行两套并存),这里只留清理页专属参数(缩进 / 勾选框 / 数值列口径)。
+/// 清理页全页走舒适密度档,各张清单与确认单的行尺寸从这里取:共享值(字号 / 图标 /
+/// meter / 内距)全部委托 `RowMetrics` 舒适档——主窗口行两档制里的舒适档,与排行页
+/// 同档同源,不自己定数,也不借弹窗用的紧凑档。这里只留清理页专属参数(缩进 / 勾选框 /
+/// 数值列口径)。同一档里,带边框的动作按钮(bordered / borderedProminent)一律
+/// `.large`,segmented 保持 regular。
 enum CleanerListMetrics {
     /// 行内水平内距(组头/项目行/动作条与行对齐)。
     static let rowInset: CGFloat = RowMetrics.rowInset(compact: false)
@@ -30,14 +26,13 @@ enum CleanerListMetrics {
     static let valueFontSize: CGFloat = RowMetrics.valueFontSize(compact: false)
     static let meterWidth: CGFloat = RowMetrics.meterWidth(compact: false)
     static let rowVerticalPadding: CGFloat = RowMetrics.rowVerticalPadding(compact: false)
-    /// 项目产物子项在项目大卡**内部**的缩进量(2026-11-06 三次拍板:大卡包含子项,
-    /// 子项只缩进不套小卡)。
+    /// 大卡内子项行的缩进量:子项只缩进,不套小卡(项目大卡与应用卡的残留区同用)。
     static let indentLeading: CGFloat = 28
     /// 卡内裸行(项目产物子项)的上下内距——比独立小卡收一档,卡内更紧凑。
     static let bareRowVerticalPadding: CGFloat = 10
 
-    /// 数值**定宽列**(排行同法:按最宽现实读数以实际绘制字体量宽 + 2;
-    /// 清理读数上限 "999.9 GB")。同卡各行同一竖线,不许按内容撑宽。
+    /// 数值**定宽列**(排行同法:按最宽现实读数以实际绘制字体量宽)。同卡各行同一
+    /// 竖线,不许按内容撑宽。
     static let valueWidth: CGFloat = {
         let font = NSFont.monospacedDigitSystemFont(ofSize: valueFontSize, weight: .semibold)
         let widest = ["999.9 GB", "99.9 TB"]
@@ -49,15 +44,12 @@ enum CleanerListMetrics {
     /// 应用行的数值列(valueWidth + 「部分」附标留量;垃圾行不带附标用 valueWidth)。
     static let valueWidthWithMark: CGFloat = valueWidth + 30
 
-    /// 自绘勾选框边长(DESIGN.md §清理页舒适密度档)。
+    /// 自绘勾选框边长。
     static let checkBoxSize: CGFloat = 20
 }
 
-/// 清理页统一勾选框(2026-11-05 用户实报系统大号 checkbox 不好看,自绘替换;
-/// 此前垃圾页用系统框、应用页用 SF 方块,两套并存也不齐):20×20 圆角 5、
-/// 描边 1.5——off = 三级墨色描边空心;on/半选(mixed,项目行)= tint 填充 +
-/// 白勾/白横线;disabled 40% 透明。纯显示件:点击语义在宿主行(整行可点,
-/// 不逼用户点 20pt 小方块)。
+/// 清理页统一勾选框,自绘:off 空心、on 实心带勾、mixed 实心带横线、disabled 压暗。
+/// 纯显示件——点击语义在宿主(整行可点,不逼用户点小方块)。
 struct CleanerCheckBox: View {
     enum CheckState {
         case off
@@ -87,8 +79,8 @@ struct CleanerCheckBox: View {
     }
 }
 
-/// 清单子页(换掉 03 票的占位卡):未扫描给 CTA,扫描中给提示,完成给清单卡。
-/// `groupFilter` = 总览下钻品类(p6-cleaner/03,nil = 全量)。
+/// 全部清单子页:按扫描态切三形状——未扫描给 CTA,扫描中给提示,完成给清单卡。
+/// `groupFilter` = 总览下钻品类(nil = 全量)。
 struct JunkListSection: View {
     let model: CleanerModel
     /// 轻桥落点(p4-uninstaller/05):地图「这块能清」切过来时待定位的组;
