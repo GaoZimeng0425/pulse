@@ -1,13 +1,9 @@
 import SwiftUI
 
-// MARK: - 统一 chip(ui-unify/01,DESIGN.md v1.2)
+// MARK: - 统一状态芯片(规范见 DESIGN.md §Components「状态芯片」)
 
-///
 /// 全 app 状态 chip 的唯一实现:胶囊、tint 15% 底 + 同色文字、semibold。
-/// 此前五种手写(HotProcessChip / TierChip / InUseChip / StateChip / 指标卡
-/// 状态 chip)细节互相漂移(字号 10~11.5、内距 5×1~10×3、透明度 0.14~0.15),
-/// 2026-11-08 归一。语义 tint 由调用方给(positive / negative / caution /
-/// inkTertiary / 指标色),本组件只管形。
+/// 语义 tint 由调用方给(positive / negative / caution / inkTertiary / 指标色),本组件只管形。
 struct ChipView: View {
     enum Profile {
         /// 行内独立元素(11 semibold,内距 10×3)——安全档、在用保护、指标卡状态。

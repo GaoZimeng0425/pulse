@@ -1,13 +1,10 @@
 import SwiftUI
 
-// MARK: - 列表行两档制(ui-unify/01,DESIGN.md v1.2)
+// MARK: - 列表行两档制(规范见 DESIGN.md §Components「列表行两档制」)
 
-///
 /// 全 app 列表行的唯一尺寸出处:紧凑档(弹窗)/ 舒适档(主窗口一切列表行)。
-/// 此前排行(RankingListMetrics)、清理(CleanerListMetrics)、sheet 清单行三套
-/// 并存、字号漂移(12.5 / 13 / 13.5 / 14.5 混用),2026-11-08 用户拍板归一两档
-/// (方案 A:排行也升舒适档)。页面专属参数(排行行尾列、清理缩进 / 勾选框)留在
-/// 各自 enum,共享值一律来这里取,不再各自定数。
+/// 页面专属参数(排行行尾列、清理缩进 / 勾选框)留在各自 enum,共享值一律来这里取,
+/// 不再各自定数。
 enum RowMetrics {
     /// 名称字号:层级靠字重(名称 medium / 数值 semibold),不靠半号字。
     static func nameFontSize(compact: Bool) -> CGFloat {

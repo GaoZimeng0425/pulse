@@ -165,10 +165,9 @@ struct MetricTabStack<Ranking: View>: View {
                 PowerDomainsCardView(reading: monitor.power.reading, isCompact: isCompact)
             })
         case .services:
-            // 服务页(tab-regroup/01,2026-11-16 拍板):dev server 卡(自智能体页迁回)
-            // + 容器卡(p2-sensors/07,docker.sock 单发快照表;数据卷占用行刻意不做,
-            // 未拍板 Out of Scope 维持)——都是「本机跑着的服务」盘点。全部停止只上抛
-            // 请求,确认对话框(KillRequestFlow 关口)把关后才发信号。
+            // 服务页:三张卡上下堆叠(dev server 卡 / 监听端口卡 / 容器卡),都是「本机跑着
+            // 的服务」盘点;页面骨架见 DevServerViews.swift 文件头。全部停止只上抛请求,
+            // 确认对话框(KillRequestFlow 关口)把关后才发信号。容器卡不做数据卷占用行。
             builder.card(
                 "dev-servers",
                 DevServerCardView(servers: monitor.devServers.servers, isCompact: isCompact) {

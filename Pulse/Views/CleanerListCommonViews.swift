@@ -7,8 +7,7 @@ import SwiftUI
 // MARK: - 清单家族
 
 //
-// 清单卡本体(JunkListCard)在 CleanerJunkViews.swift;应用 / 清理历史子页也从这里取
-// 尺寸表与勾选框。
+// 清单卡本体(JunkListCard)在 CleanerJunkViews.swift;应用子页也从这里取尺寸表与勾选框。
 
 /// 清理页全页走舒适密度档,各张清单与确认单的行尺寸从这里取:共享值(字号 / 图标 /
 /// meter / 内距)全部委托 `RowMetrics` 舒适档——主窗口行两档制里的舒适档,与排行页
