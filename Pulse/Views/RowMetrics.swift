@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - 列表行两档制(ui-unify/01,DESIGN.md v1.1)
+// MARK: - 列表行两档制(ui-unify/01,DESIGN.md v1.2)
 
 ///
 /// 全 app 列表行的唯一尺寸出处:紧凑档(弹窗)/ 舒适档(主窗口一切列表行)。

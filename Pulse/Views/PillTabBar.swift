@@ -4,7 +4,7 @@ import SwiftUI
 // MARK: - 通用药丸 tab 条(用户拍板 2026-10-22:tab 是通用组件样式)
 
 /// 药丸 tab 的展示单元:标题 + 可选 SF Symbol + 选中态强调色。
-/// 视觉配方见 DESIGN.md §Components `PillTabBar`。
+/// 视觉配方见 DESIGN.md §Components「药丸页签条」。
 struct PillTabItem {
     /// 无障碍标签、悬停提示与(按模式)药丸文字共用一份文案。
     let title: String
@@ -39,9 +39,9 @@ struct PillTabBar<Item: Hashable>: View {
         case always
     }
 
-    /// 两档尺寸(DESIGN.md §PillTabBar):`.regular` = 现状(callout 12 + 9×5,
-    /// 工具栏/历史页);`.comfortable` = 清理页舒适密度档(2026-11-05 用户拍板,
-    /// 13.5 + 14×8,高≈34)——工具栏与弹窗的宽度预算不许被这档波及。
+    /// 两档尺寸(DESIGN.md §Components「药丸页签条」):`.regular` = 显式 12 medium +
+    /// 内距 9×5(工具栏/历史页);`.comfortable` = 清理页舒适密度档(14.5 medium +
+    /// 内距 14×8,高≈34)——工具栏与弹窗的宽度预算不许被这档波及。
     enum Size {
         case regular
         case comfortable

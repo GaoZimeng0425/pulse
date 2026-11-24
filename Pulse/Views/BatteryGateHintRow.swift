@@ -29,7 +29,7 @@ struct BatteryGateHintRow: View {
     /// 弹窗紧凑档。
     var isCompact = false
     /// 等读数态(btm-lwcr-fix/04):行尾小号转圈,点了开关后有「正在等」的
-    /// 反馈,数据到自动被排行替换(DESIGN.md「小号转圈+文案」同款)。
+    /// 反馈,数据到自动被排行替换(与 DESIGN.md「卡头文字按钮」的进行中形态同款)。
     var showsProgress = false
 
     var body: some View {

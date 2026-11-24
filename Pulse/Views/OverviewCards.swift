@@ -136,7 +136,8 @@ struct FigureText: View {
     }
 }
 
-/// 图标徽章(§1.3 `.badge`):22×22,tint 16% 底,圆角 7。
+/// 图标徽章(DESIGN.md §Components「卡片家族零件」的主卡头徽章):
+/// 22×22,tint 16% 底,圆角 8。
 struct MetricBadge: View {
     let symbolName: String
     let tint: Color
@@ -150,8 +151,8 @@ struct MetricBadge: View {
     }
 }
 
-/// 指标卡状态 chip:统一 `ChipView` 的薄封装(ui-unify/01 五种手写 chip 归一;
-/// 全尺寸 = regular,compact = inline 小号)。
+/// 指标卡状态 chip:统一 `ChipView` 的薄封装(ui-unify/01):默认走 regular 形态;
+/// `compact` 为 true 时改用 inline 形态,目前没有调用方传 true。
 struct MetricChipView: View {
     let chip: MetricCardChip
     var compact = false

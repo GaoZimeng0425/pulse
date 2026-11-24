@@ -10,7 +10,7 @@ import SwiftUI
 /// 取代原先"每组一张大卡"的形态(用户拍板)。
 struct RankingCardView<Expanded: View>: View {
     enum Density {
-        /// 主窗口:卡内边距 16、圆角 18、图标 22。
+        /// 主窗口:卡内边距 16、圆角 18、行首图标 24(取 RowMetrics 舒适档)。
         case regular
         /// 弹窗:卡内边距 12、圆角 12、图标 18、meter 收窄。
         case compact

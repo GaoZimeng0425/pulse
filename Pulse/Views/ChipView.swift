@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - 统一 chip(ui-unify/01,DESIGN.md v1.1)
+// MARK: - 统一 chip(ui-unify/01,DESIGN.md v1.2)
 
 ///
 /// 全 app 状态 chip 的唯一实现:胶囊、tint 15% 底 + 同色文字、semibold。

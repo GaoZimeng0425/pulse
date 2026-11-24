@@ -331,7 +331,7 @@ final class CleanerModel {
         return "上次扫描后排除配置已变——清单可能多列了新排除的目录,建议重新扫描"
     }
 
-    // MARK: 总览读数(p6-cleaner/03;读数三态与授权门卫 = p6-review-fixes;
+    // MARK: 总览读数(p6-cleaner/03;读数四态与授权门卫 = p6-review-fixes;
 
     // solid-split/02 步骤 2:清点子状态机抽 OverviewTrashCounter,此处只留转发面)
 
@@ -757,14 +757,15 @@ final class CleanerModel {
 
     // MARK: 整组勾选(2026-10-30 用户拍板 B)
 
-    /// 组头 checkbox 的三态。`safeCandidates` = 该组里「可安全清理」档的项——
-    /// 整组勾选只看、只动这些;「先检查」项永远要用户单独点,不参与组勾选。
+    /// 整组勾选的三态。`safeCandidates` = 该组里「可安全清理」档的项——整组勾选
+    /// 只看、只动这些;「先检查」项永远要用户单独点,不参与组勾选。
     /// (深查甄别:产品视图不直读,是 CleanerModelTests 钉组勾选语义的口——非死码。)
     func groupState(of safeCandidates: [JunkCandidate]) -> JunkSelection.GroupState {
         selection.state(of: safeCandidates)
     }
 
-    /// 组头 checkbox 点击:none / mixed → 全勾;all → 全清。只动传入的候选。
+    /// 整组勾选:none / mixed → 全勾;all → 全清。只动传入的候选。入口是品类组头的
+    /// 「全选安全项」文字按钮(下钻态并入返回行)与项目大卡卡头的三态勾选框。
     func toggleGroup(_ safeCandidates: [JunkCandidate]) {
         let selectAll = selection.state(of: safeCandidates) != .all
         selection.set(selectAll, for: safeCandidates)

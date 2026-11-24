@@ -38,7 +38,7 @@ final class UiUnifyRowMetricsTests: XCTestCase {
         XCTAssertGreaterThan(RowMetrics.iconSize(compact: false), RowMetrics.iconSize(compact: true))
     }
 
-    /// DESIGN.md v1.1 字号五档(窗口 UI):10.5 / 11 / 12 / 14.5 / 17。
+    /// DESIGN.md v1.2 字号五档(窗口 UI):10.5 / 11 / 12 / 14.5 / 17。
     /// 行两档字必须落在档内。
     func testRowFontSizesAreOnTheFiveStepScale() {
         let allowed: Set<CGFloat> = [10.5, 11, 12, 14.5]

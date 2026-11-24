@@ -10,7 +10,7 @@ import SwiftUI
 // meter),弹窗(紧凑)与主窗口共用,走预览 + 手动验收。
 
 /// 蓝牙设备卡:每台一行,已连接置顶;图标亮 = 已连接、灰 = 未连接(代替旧状态圆点)。
-/// 电量读不到整块留空(未知值安静原则,DESIGN.md「卡内行两形态边界」);RSSI 有读数
+/// 电量读不到整块留空(未知值安静原则,DESIGN.md §Components「卡片家族零件」);RSSI 有读数
 /// 进名称副文。无设备/蓝牙栈不可用安静占位;开闸后首轮在途显示「正在读取」
 /// (ui-unify 追改:此前空窗误显示「不可用」,用户实报"连三台一台不显示")。
 /// 授权型能力(权限原则):未开启 / 未授权 / 被拒三态各给一句话 + 一个 `.link`
@@ -155,7 +155,7 @@ struct BluetoothDevicesCardView: View {
         return connected ? nil : "未连接"
     }
 
-    /// 类型 → 图标(DESIGN.md 实体行;unknown = 通用蓝牙图标,不硬猜)。
+    /// 类型 → 图标(DESIGN.md「卡片家族零件」的实体行;unknown = 通用蓝牙图标,不硬猜)。
     private static func symbol(for kind: BluetoothDeviceKind) -> String {
         switch kind {
         case .keyboard: "keyboard"

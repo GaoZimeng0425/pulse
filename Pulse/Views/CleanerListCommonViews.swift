@@ -28,7 +28,7 @@ enum CleanerListMetrics {
     static let rowVerticalPadding: CGFloat = RowMetrics.rowVerticalPadding(compact: false)
     /// 大卡内子项行的缩进量:子项只缩进,不套小卡(项目大卡与应用卡的残留区同用)。
     static let indentLeading: CGFloat = 28
-    /// 卡内裸行(项目产物子项)的上下内距——比独立小卡收一档,卡内更紧凑。
+    /// 卡内裸行(项目产物子项)的上下内距,与独立小卡的行同为 10。
     static let bareRowVerticalPadding: CGFloat = 10
 
     /// 数值**定宽列**(排行同法:按最宽现实读数以实际绘制字体量宽)。同卡各行同一

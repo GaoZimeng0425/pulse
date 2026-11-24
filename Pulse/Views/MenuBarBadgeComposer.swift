@@ -20,9 +20,8 @@ struct MenuBarBadgeContent: Equatable {
     let emphasis: Emphasis
     /// 槽位定宽(nil = 自然宽):按该指标**最大现实读数**量好钉死,数字位数
     /// 逐轮变化(38%↔100%)不再改变位图宽——状态项宽度恒定,相邻菜单栏图标
-    /// 不被挤动(2026-10-17 用户反馈"menu 有时宽度会变")。网络槽不定宽:
-    /// 速率单位跨档(KB/MB/GB)文本长度本就跨档,按最坏情形钉死会长期大片
-    /// 留白,得不偿失。
+    /// 不被挤动。四枚都定宽:CPU / 内存 / 磁盘按 11.5pt 数值字号量 "100%",
+    /// 网络是叠两行版式,按 9pt 字号量 "↓999.9 KB/s"。
     var slotWidth: CGFloat?
     /// 版式:小标签 + 数字(默认),或不带标签的上下两行小字(网络上下行)。
     var layout: Layout = .captioned
@@ -127,10 +126,11 @@ enum MenuBarBadgeComposer {
         )
     }
 
-    /// 徽标数值字号(渲染器与槽位量宽共用的唯一出处,DESIGN.md 菜单栏特例)。
+    /// 徽标数值字号(渲染器与槽位量宽共用的唯一出处,
+    /// DESIGN.md §Components「菜单栏徽标」)。
     static let valueFontSize: CGFloat = 11.5
-    /// 叠两行版式的字号(DESIGN.md 菜单栏特例):两行合高不超过「7pt 标签 + 11.5pt
-    /// 数字」的徽标高。
+    /// 叠两行版式的字号(DESIGN.md §Components「菜单栏徽标」):两行合高不超过
+    /// 「7pt 标签 + 11.5pt 数字」的徽标高。
     static let stackedFontSize: CGFloat = 9
 
     /// 文本估算渲染宽(点):菜单栏字体实测——同字同字号必同宽,宽度判定

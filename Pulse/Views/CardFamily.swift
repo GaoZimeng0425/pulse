@@ -148,7 +148,7 @@ enum CardRowWidth {
     }
 }
 
-/// 卡内实体行(ui-unify 追改 2026-11-09,DESIGN.md §Components「卡内行两形态边界」):
+/// 卡内实体行(DESIGN.md §Components「卡片家族零件」):
 /// 行描述一台设备 / 一个对象(蓝牙设备、输出设备、容器、dev server)时用这形态——
 /// 行首类型图标 + 名称 + 可选副文(弱信号:RSSI / pid)+ 尾部自定义列(meter、数值列),
 /// 尺寸全走 `RowMetrics` 两档,与排行 / 清理列表行同语言。图标色由调用方给:
@@ -205,7 +205,7 @@ struct CardEntityRow<Trailing: View>: View {
     }
 }
 
-/// 卡内读数行(ui-unify 追改 2026-11-09,DESIGN.md「卡内行两形态边界」):行描述一个
+/// 卡内读数行(DESIGN.md §Components「卡片家族零件」):行描述一个
 /// 测量(派生温度 / 风扇 / 功率域 / 卷占用 / 流量累计 / 温度明细)——标签吃满剩余宽度、
 /// meter(可选,`RowMetrics.meterWidth` 定宽)与数值列贴右,与排行行同一竖线结构;
 /// 无图标。字号全走 RowMetrics 两档。

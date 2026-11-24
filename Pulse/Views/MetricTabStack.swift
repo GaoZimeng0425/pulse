@@ -1,16 +1,17 @@
 import PulseCore
 import SwiftUI
 
-// MARK: - 每个 tab 的内容栈(主窗口与弹窗共用,2026-10-20 用户拍板:每个 tab 两处一致)
+// MARK: - 每个 tab 的内容栈(主窗口与弹窗共用)
 
-// 唯一拍板例外:传感器 tab 弹窗只放派生卡(p2-review/04 A,2026-10-24;spec Story 17),
-// 见 `.sensors` 分支——不要按"两处一致"把风扇卡 / 明细卡加回弹窗。
+//
+// 这里是每个 tab 卡片组成与顺序的唯一出处:主窗口与弹窗同一套,只差排版档。
+// 两类内容只在主窗口——传感器的风扇卡与温度明细卡、磁盘页的空间地图,见
+// `.sensors` 与 `.disk` 分支;不要为了两处一致把它们加回弹窗。
 
 /// 一个 tab 的内容栈:主窗口与弹窗读同一份——卡片组成、顺序、数据出处全在这里,
 /// 两处只差排版档(`isCompact`:弹窗 360pt 定宽)。排版差异只有三种,全由宽度决定:
-/// 卡用紧凑档;主窗口并排的两卡(内存双环 / 各卷 + 快照)在弹窗里上下排;主窗口的
-/// 节标题(此刻,及智能体页的开发服务)弹窗不画,卡片各自带标题。排行卡一律卡内
-/// 标题,不配节标题。
+/// 卡用紧凑档;主窗口并排的两卡一组在弹窗里上下排;节标题(总览的「此刻」)
+/// 弹窗不画,卡片各自带标题。排行卡一律卡内标题,不配节标题。
 ///
 /// 组排行卡由宿主经 `ranking` 给:主窗口带搜索过滤与可排序进程表,弹窗是紧凑行与
 /// 简版下钻——只差交互深度,出现在哪些 tab、排在哪里由本栈决定。
@@ -21,7 +22,7 @@ struct MetricTabStack<Ranking: View>: View {
     let monitor: SystemMonitor
     let model: DashboardModel
     /// 清理扫描模型(tab-regroup/03):磁盘页空间地图块的数据源;弹窗不画地图
-    /// (360pt 塞不下旭日,传感器页「弹窗只放派生卡」同款拍板例外)→ 弹窗宿主传 nil。
+    /// (360pt 塞不下旭日;与传感器页「弹窗只放派生卡」同理)→ 弹窗宿主传 nil。
     let cleanerModel: CleanerModel?
     /// 当前 tab 的展示内容(内存分段等,DashboardModel.content 折叠)。
     let content: MetricTabContent
@@ -126,9 +127,8 @@ struct MetricTabStack<Ranking: View>: View {
             builder.groupRanking()
         case .sensors:
             // 传感器页(p2-sensors/04):主窗口 = 派生读数 + 风扇 pair,温度明细折叠其下。
-            // 弹窗是"两处一致"的**拍板例外**(p2-review/04 A,2026-10-24;spec Story 17
-            // 「弹窗温度组只放派生值」):只画派生卡(Average/Hottest + 最快风扇),
-            // 逐核明细会把 360pt 弹窗撑得不可用的高;风扇信息由派生卡的最快风扇行承载。
+            // 弹窗只画派生卡(Average/Hottest + 最快风扇):逐核明细会把 360pt 弹窗撑得
+            // 不可用的高;风扇信息由派生卡的最快风扇行承载。
             if isCompact {
                 builder.card("derived", SmcDerivedCardView(reading: monitor.smc.reading, isCompact: true))
             } else {
@@ -233,8 +233,8 @@ struct MetricTabStack<Ranking: View>: View {
             // 磁盘页:主卡 → 空间地图 → 各卷 + 快照 → 读写最多排行。地图紧跟主卡折线图
             // (容量总览与占用地图同族相邻),读的是清理扫描这条管线(tab-regroup/03)。
             builder.card("main", MetricMainCardView(model: model.diskModel, isCompact: isCompact))
-            // 地图只在主窗口画:旭日下限 360pt,弹窗塞不下。这是「主窗口与弹窗同一套
-            // 卡片组成」这条原则里写明的例外之一(另一处是传感器页),清单以该原则为准。
+            // 地图只在主窗口画:旭日下限 360pt,弹窗塞不下。它是「主窗口与弹窗同一套
+            // 卡片组成」里只在主窗口的两类内容之一(另一类是传感器的风扇卡与温度明细卡)。
             if !isCompact, let cleanerModel {
                 builder.card(
                     "spacemap",

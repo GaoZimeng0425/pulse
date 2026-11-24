@@ -380,16 +380,15 @@ struct CleanerTabView: View {
     // MARK: 子页
 }
 
-// MARK: - 磁盘页空间地图块(tab-regroup/03,自清理页子页整卡迁入)
+// MARK: - 磁盘页空间地图块(tab-regroup/03)
 
 /// 磁盘页的空间地图块:读清理扫描的同一条管线(CleanerModel),按扫描态切三形状——
 /// 空态引导(就地「扫描整台 Mac」,本页无页头按钮)/ 扫描中(进度卡)/ 完成
-/// (地图卡 + 结果摘要卡,上下堆叠 = space-map-forms/08 拍板原样)。
-/// 与原清理页子页的两处差异:①不套子页 ScrollView——磁盘页卡片流本就在主窗口外层
-/// 滚动里,嵌套滚动是 space-map-forms/10 前的旧坑(图表区高度仍按滚动视口钳制,
-/// `containerRelativeFrame` 语义不变);②「这块能清」变跨页轻桥——经
-/// `DashboardModel.pendingCleanerJunkGroup` 落到清理页全部清单定位,下钻位置
-/// 同样挂 DashboardModel(切 tab 不丢)。
+/// (地图卡 + 结果摘要卡,上下堆叠)。
+/// 两处要注意:①不套子页 ScrollView——磁盘页卡片流本就在主窗口外层滚动里,
+/// 图表区高度靠 `containerRelativeFrame` 按滚动视口钳制,本块不要再套滚动;
+/// ②「这块能清」是跨页轻桥——经 `DashboardModel.pendingCleanerJunkGroup` 落到
+/// 清理页全部清单定位,下钻位置同样挂 DashboardModel(切 tab 不丢)。
 struct DiskSpaceMapSection: View {
     let model: CleanerModel
     @Binding var drillPath: String?
@@ -449,8 +448,7 @@ struct DiskSpaceMapSection: View {
     /// 进度没有已知总量(全卷文件数因机器而异),条只做"有进展"的视觉信号:
     /// 用一个缓慢逼近 1 的伪进度(不伪造百分比数字——假数不上屏,防御性数据纪律)。
     private func scanProgressFraction(_ stats: ScanStats) -> Double {
-        // 真机 Data 卷(方案 A 扫描根)≈500 万项(2026-11-02 真引擎实测
-        // 433 万文件 + 60 万目录;旧 340 万全卷口径是探针 15 的 Data 外推错误)。
+        // 全盘扫描(Data 卷)约 500 万项的量级估计,机器而异。
         let guess = 5_000_000.0
         return min(0.95, Double(stats.entriesSeen) / guess)
     }
@@ -468,8 +466,8 @@ struct DiskSpaceMapSection: View {
                     .foregroundStyle(.tertiary)
                     .monospacedDigit()
             }
-            // 半宽卡(两列版式,space-map-forms/07)下整行放不下:ViewThatFits
-            // 折行(4 项 → 2+2、3 项 → 2+1);全宽堆叠形态首选仍是整行原样。
+            // 卡不够宽时整行放不下:ViewThatFits 折行(4 项 → 2+2、3 项 → 2+1),
+            // 放得下首选整行原样。
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 24) {
                     StatValue(label: "实际占用", value: totalAccountedText(result))

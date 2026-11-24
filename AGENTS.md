@@ -4,7 +4,7 @@
 
 - 流程技能唯一出处 `.zcode/skills/`(`.claude/skills` 是指向它的软链)。增删 / 升级技能只动 `.zcode/skills/`,不要在 `.claude/skills` 里另放副本。
 - 议题 = `.scratch/<feature-slug>/` 下的本地 markdown(细则见 `docs/agents/issue-tracker.md`);triage 标签固定五个:needs-triage / needs-info / ready-for-agent / ready-for-human / wontfix(`docs/agents/triage-labels.md`);领域文档 = 根目录 `GLOSSARY.md` + `docs/adr/`(`docs/agents/domain.md`)。
-- 写 / 改任何 SwiftUI 视图前先读根目录 `DESIGN.md`:数值不在令牌表里 = 先补表再写码;已拍板样式不得静默回退;已知偏差只许在改动对应文件时顺带收编。
+- 写 / 改任何 SwiftUI 视图前先读根目录 `DESIGN.md`(原则与组件规范)和所在页主视图文件开头的页面规格:数值不在令牌表里 = 先补表再写码;`DESIGN.md` 只收原则和组件规范,某一页怎么实现写在该页代码旁的注释里,不进 `DESIGN.md`(判定法与三个词的定义见 `docs/adr/0011`);规范与页面规格里已定的样式不得静默改,要改先问用户。
 
 ## 对用户的汇报与交互(NemoNotch 同款,2026-10-25 用户立规)
 

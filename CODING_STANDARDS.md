@@ -1,6 +1,7 @@
 # Pulse 编码标准(审查轴)
 
-> 实施时的流程 / 工具路由 / 分支纪律在 `AGENTS.md`;UI 视觉宪法在 `DESIGN.md`;
+> 实施时的流程 / 工具路由 / 分支纪律在 `AGENTS.md`;UI 原则与组件规范在 `DESIGN.md`
+> (某一页怎么实现写在该页代码旁的注释里);
 > 架构决策在 `docs/adr/`;术语在 `GLOSSARY.md`。本文件收**判断类代码标准**——
 > `/code-review` 的 Standards 轴以本文件为准(repo 标准覆盖其内置 smell 基线);
 > 机械可查的(SwiftLint / SwiftFormat / ast-grep / 测试)不在此重复。

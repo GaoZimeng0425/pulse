@@ -156,7 +156,7 @@ struct AreaTrendChartView: View {
             grid.move(to: CGPoint(x: 0, y: y))
             grid.addLine(to: CGPoint(x: size.width, y: y))
         }
-        // 网格线:--line 口径(浅色黑 8% / 深色白 10%),Color.primary.opacity 自适应。
+        // 网格线:primary 的 8% 不透明度——primary 浅色是黑、深色是白,两种外观同一式子。
         context.stroke(grid, with: .color(Color.primary.opacity(0.08)), lineWidth: 1)
 
         let count = Self.pointCount
@@ -232,12 +232,12 @@ extension View {
     }
 }
 
-/// 弹窗顶部图标 tab(工单 03,参考文档 §2.1:无文字、title 提示):
-/// 选中态 = 该指标强调色 15% 胶囊 + 强调色图标(§1.1 选中 tab 配方)。
-/// 渲染序 = 选中态的展示轴(工单 02:无电池机器不含电池页)。
-/// 槽位单行满宽均分(P2 扩到 11 枚后的修复):弹窗内容区 332pt,原 32pt 定宽
-/// 槽 11 枚要 392pt,右端被裁切;改由 HStack 均分——枚数再多只收窄不溢出,
-/// 与主窗口工具栏「720 预算优先,不触发溢出菜单」同一哲学。
+/// 弹窗顶部的图标页签条:每枚只有符号没有文字(13pt medium,槽最小高 26、槽间距
+/// 4),提示与无障碍标签用页签标题。选中 = 该页强调色 15% 胶囊底 + 强调色图标,
+/// 未选中 = secondary 图标;渲染序 = 展示轴(`MetricTabSelection.axis`,无电池机器
+/// 不含电池页)。槽位单行满宽等分:弹窗内容区 332pt 定宽而页签枚数随机器不同,
+/// 等分下枚数再多只收窄不溢出,与主窗口工具栏「720 预算优先,不触发溢出菜单」
+/// 同一原则。←/→ 切页的键盘接线由 `metricTabKeyboard` 给。
 struct MetricIconTabBar: View {
     @Binding var selection: MetricTabSelection
 
