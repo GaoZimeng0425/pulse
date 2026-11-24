@@ -18,6 +18,7 @@ arch-clean/01 落地分层门禁时发现:9 个功能模块在自己 init 里构
    `MonitorAssembly.live` 与 `InertSources` 负责构造。
 2. 适配器去掉构造系统监听的默认参数,由组装点显式传入。
 3. 从 `scripts/layer-baseline.txt` 删掉第一组 10 行(检查会逼着删)。
+4. `LaunchdManifestFeature` 的注入参数是具体类型 `LaunchdManifestProvider`(Live),一并改为协议(06 盘点出的同族项)。
 
 ## 验收
 

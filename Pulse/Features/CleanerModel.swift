@@ -406,7 +406,7 @@ final class CleanerModel {
         var result = payload.result
         result.ledger = result.ledger.map { entry in
             guard case .tccDenied = entry.reason,
-                  !LiveCleanDirectoryEnumerator.isUserDomain(entry.path)
+                  !CleanPathDomain.isUserDomain(entry.path)
             else { return entry }
             return CleanEnumerateError(path: entry.path, reason: .permissionDenied)
         }
