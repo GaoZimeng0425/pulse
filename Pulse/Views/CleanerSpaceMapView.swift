@@ -1,36 +1,33 @@
 import PulseCore
 import SwiftUI
 
-// MARK: - 空间地图(space-map-forms/01:双形态同画法,用户拍板 C 2026-11-09)
+// MARK: - 空间地图(space-map-forms/01)
 
 //
-// 形态史:旭日(逐弧 Shape,卡顿+命中不可靠,p4-cleaner/07 v1)→ 条形图(过渡)
-// → treemap(v3)→ 双形态(v4)。两形态同一种画法(用户拍板):单个 Canvas 一次
-// draw call,命中一律坐标反算(treemap = rect.contains;旭日 = atan2 角度 +
-// sqrt 半径,p4-cleaner/07 v2 的算法)——不依赖 SwiftUI 形状 hit test,不留两套
-// 渲染方案。交互两形态共享同一套:点块下钻 / 面包屑返回 / 密封与「其他」点击解释
-// (左上角浮层) / 「这块能清」悬浮轻桥 / 「可清理」角标 / Finder / v1 只读。
-// 版面纪律(ui-unify 追改,2026-11-09 用户实报三修,两形态同守):图表区弹性高、
-// 卡头不被挤压;悬停零重排——不出现/消失任何占行元素,信息与按钮都浮在图表内。
+// 磁盘页的空间地图卡,只在主窗口出现(弹窗不画,见 MetricTabStack `.disk`)。
+// 方块 / 旭日双形态同一种画法:单个 Canvas 一次 draw call,命中一律坐标反算、
+// 不依赖形状 hit test——不留两套渲染方案。
+// 组成:卡头(形态切换 + 在 Finder 中显示)→ 路径栏 → 图表区(方块 / 旭日二选一)。
+// 悬停读数、点击解释、「这块能清」都浮在图表区内。
+// 树变换与两种几何在 PulseCore(SpaceMap.swift / TreemapLayout.swift),这里只管
+// 描边、配色、命中与交互。
 
-/// 方块形态图表区最小高({layout.spacemap-chart-min-height})。注意:弹性区在
-/// ScrollView 里拿到无限高度提案、塌到最小高,所以这个值 ≈ 方块形态的实际高度。
+/// 方块形态图表区高下限({layout.spacemap-chart-min-height})。
 private let chartMinHeight: CGFloat = 220
 
 /// 旭日图表区高下限(= 直径下限,{layout.spacemap-sunburst-min-side},
 /// space-map-forms/05):窄窗防过小。宽度下限由主窗口最小宽 720 保障。
 private let sunburstMinSide: CGFloat = 360
 
-/// 旭日图表区高占可视高的份额(space-map-forms/08,用户拍板「旭日跟随宽高中
-/// 小的那个值画」):扣的两成留给页头 / 卡头 / 面包屑与下方摘要卡露头。
+/// 图表区高占滚动视口高的份额({layout.spacemap-sunburst-viewport-share}),两形态共用:
+/// 扣掉的两成留给页头、卡头、路径栏与下方摘要卡露头。
 private let sunburstViewportShare: CGFloat = 0.8
 
-/// 旭日图表区高上限(= 直径上限,{layout.spacemap-sunburst-max-side},
-/// space-map-forms/09 用户实报「旭日的时候卡片那么大,有没有最大高度」):
-/// 高/最大化窗口里卡片不再跟着可视高无限变长(卡总高 ≈ 图表区 + 头部 ~150)。
+/// 图表区高上限({layout.spacemap-sunburst-max-side};对旭日 = 直径上限):高窗 /
+/// 最大化时卡片不跟着视口无限变长(卡总高 ≈ 图表区 + 头部约 150)。
 private let sunburstMaxSide: CGFloat = 520
 
-/// 展示形态(用户偏好;@AppStorage 记住上次,默认 treemap = v3 既定形态)。
+/// 展示形态(用户偏好,@AppStorage 记住上次;默认方块)。
 private enum SpaceMapForm: String, CaseIterable {
     case treemap
     case sunburst
@@ -48,8 +45,8 @@ struct SpaceMapSection: View {
     let model: CleanerModel
     @Binding var drillPath: String?
     @Binding var treeIndex: Int
-    /// 命中白名单的块「去清理清单」动作(tab-regroup/03 起地图住磁盘页:宿主经
-    /// DashboardModel 跨页轻桥切清理页并定位组)。
+    /// 命中白名单的块「去清理清单」动作:宿主经 DashboardModel 跨页轻桥切清理页并定位组
+    /// (tab-regroup/03)。
     let onGoToJunk: (JunkGroup) -> Void
 
     @AppStorage("settings.spaceMapForm") private var formRaw = SpaceMapForm.treemap.rawValue
@@ -87,6 +84,10 @@ struct SpaceMapSection: View {
 
     // MARK: 卡片
 
+    /// 地图卡的版面纪律,两形态同守:
+    /// - 悬停零重排:卡内不出现 / 消失任何占行元素,悬停读数、解释与按钮都浮在图表区内;
+    /// - 高度紧张时挤只挤图表区,卡头与路径栏不被压缩截断;
+    /// - 块与弧不做动画(悬停提亮、下钻换图都直切,与 meter 条同款纪律)。
     private func mapCard(_ tree: SpaceMapNode) -> some View {
         let root = resolveDrill(in: tree)
         let isTopLevel = root.path == tree.path
@@ -94,11 +95,9 @@ struct SpaceMapSection: View {
         // 两形态同一个解析器。
         let resolve = model.mapCleanableResolver()
         return VStack(alignment: .leading, spacing: 12) {
-            // 窗口高度紧张时,标题区 shrink-0(layoutPriority):挤只挤弹性地图区,
-            // 不再压缩/截断卡头(2026-11-09 用户实报)。
             CardHeader(symbolName: "square.grid.3x3.square", title: "空间地图", tint: accent) {
                 // 页内头部动作按钮统一配方(与垃圾页组头「全选安全项」同款):
-                // borderless + 12 semibold secondary,不再独一份 .small bordered。
+                // borderless + 12 semibold secondary。
                 HStack(spacing: 10) {
                     formPicker
                     Button("在 Finder 中显示") { reveal(root) }
@@ -124,9 +123,9 @@ struct SpaceMapSection: View {
         .cardShell(compact: false)
     }
 
-    /// 形态切换 = 标准件 PillTabBar(.selectedOnly 图标形态;space-map-forms/02:
-    /// 原 segmented 被用户点名非标准件)。记住上次选择;切换不重置下钻位置——
-    /// 同一棵树换个透镜看,不是重新导航。
+    /// 形态切换 = 通用件 PillTabBar 的 `.selectedOnly` 形态(space-map-forms/02)。
+    /// 记住上次选择;切换不重置下钻位置——同一棵树换个透镜看,不是重新导航
+    /// (下钻位置由宿主 DashboardModel 持有,切 tab / 切页同样不丢)。
     private var formPicker: some View {
         PillTabBar(SpaceMapForm.allCases, selection: formBinding, textVisibility: .selectedOnly) { form in
             PillTabItem(title: form.pillTitle, symbol: form.pillSymbol, tint: accent)
@@ -152,6 +151,8 @@ struct SpaceMapSection: View {
 
     // MARK: 方块形态(Canvas 单次 draw call;命中 = rect.contains)
 
+    /// 「其他」合并线两形态同值:各是 TreemapLayout / SunburstLayout.layout 的默认参数
+    /// (占同级合计 1%),视图不传、各取默认——改一处要同步另一处。
     private func treemapArea(
         root: SpaceMapNode,
         tree: SpaceMapNode,
@@ -264,9 +265,9 @@ struct SpaceMapSection: View {
             treemapBridgeButton(rects: rects, cleanable: cleanable, in: geo.size)
             noticeOverlay
         }
-        // 高度与旭日同式(space-map-forms/10:子页自带滚动后,弹性 maxHeight 在
-        // 无限提案下塌到最小高(矮成一条)——改钳制:视口 × 0.8,下限 220,
-        // 上限 520,与旭日共用 {viewport-share} / {max-side} 令牌)。
+        // 图表区高 = clamp(滚动视口高 × 份额, 本形态下限, 上限),两形态同式(旭日处同此;
+        // containerRelativeFrame 量的是滚动视口,不是内容高)。不用弹性 maxHeight:卡在
+        // 页面滚动里,弹性区拿到无限高提案,会塌到最小高、矮成一条(space-map-forms/10)。
         .containerRelativeFrame(.vertical) { length, _ in
             min(max(length * sunburstViewportShare, chartMinHeight), sunburstMaxSide)
         }
@@ -286,11 +287,8 @@ struct SpaceMapSection: View {
         return rects.firstIndex { $0.rect.contains(p) }
     }
 
-    /// 块填充(两形态同一套配色出口):正常块 = 分区异色(rank 按序循环 accent,
-    /// 鲜亮 0.70 + 饱和 ×1.25),密封灰、「其他」浅灰;hover 一律 +0.08。文字色随
-    /// 基色深浅——密封与「其他」是浅面恒用墨色,正常块基色 0.70 白字成立。
-    /// 原形态是卡顶悬停信息行(路径 + 大小 + 按钮),出现/消失推动整卡重排
-    /// (2026-11-09 用户实报),改为地图内悬浮、零重排;路径与大小块内已有。
+    /// 方块的「这块能清」:悬停命中白名单块时浮在该块右上角。卡头不放悬停信息行
+    /// (路径与大小块内已有,读数不另起一行)。
     @ViewBuilder
     private func treemapBridgeButton(
         rects: [TreemapRect],
@@ -314,8 +312,6 @@ struct SpaceMapSection: View {
 
     // MARK: 旭日形态(Canvas 单次 draw call;命中 = atan2 角度 + sqrt 半径)
 
-    /// 环形几何(space-map-forms/03 加宽):中心圈 0–0.26、内环 0.28–0.65、
-    /// 外环 0.65–0.99(01 版中心圈 34% 太大、环带偏窄)。
     private func sunburstArea(
         root: SpaceMapNode,
         tree: SpaceMapNode,
@@ -332,6 +328,8 @@ struct SpaceMapSection: View {
         }
     }
 
+    /// 环形半径的比例(中心圈 / 内环 / 外环)没有具名常量:绘制(这里与 drawCenter)、
+    /// 命中(hitArc)、中心圈点按(handleSunburstTap)也各写一遍,改一处要同步其余。
     private func sunburstBody(
         arcs: [SunburstArc],
         root: SpaceMapNode,
@@ -350,7 +348,7 @@ struct SpaceMapSection: View {
                     let arc = item.arc
                     let inner = arc.ring == 1 ? radius * 0.28 : radius * 0.65
                     let outer = arc.ring == 1 ? radius * 0.65 : radius * 0.99
-                    // 角向留缝让相邻弧可见分离;窄弧按比例缩缝,不把弧吞没(v1 同款)。
+                    // 角向留缝让相邻弧可见分离;窄弧按比例缩缝,不把弧吞没。
                     let pad = min(0.012, arc.span / 4)
                     var path = Path()
                     path.addArc(
@@ -389,11 +387,9 @@ struct SpaceMapSection: View {
                     )
                 }
 
-                // 弧内标签(份额阈值内才显示;左半圆翻转 180° 外向可读——v1 规则,
-                // 字号归一 10.5;Canvas 里 Text 没有 maxWidth 约束,先量宽后截断)。
-                // 文字径向排布,长度上限 = 本环带宽(0.65−0.28 / 0.99−0.65),不是弧长
-                // ——按弧长量宽时大弧文字长过环带,伸出压到相邻环的名上(2026-11-11
-                // 用户实报「名字重叠」实案)。
+                // 弧内标签:份额阈值内才显示,文字沿半径排,左半圆翻转 180° 保持外向可读。
+                // 长度上限 = 本环带宽 ×0.9,不是弧长——按弧长量,大弧的文字会长过环带、
+                // 压到相邻环的名上。Canvas 里 Text 没有 maxWidth 约束,先量宽后截断。
                 for item in colored {
                     let arc = item.arc
                     guard arc.isLabelReadable, !arc.node.isSealed, !arc.node.isAggregate else { continue }
@@ -440,21 +436,15 @@ struct SpaceMapSection: View {
             sunburstBridgeButton(arcs: arcs, resolve: resolve, in: geo.size)
             noticeOverlay
         }
-        // 上下堆叠、圆随「宽高取小」(space-map-forms/08,用户拍板):图表区高 =
-        // clamp(可视高 × {sunburstViewportShare}, 下限 360, 上限 520)
-        // (containerRelativeFrame 量滚动视口),旭日直径 = min(卡内容宽, 图表区高)、
-        // 卡内居中——矮窗不顶天立地(06 教训),高窗卡片封顶不再整屏长
-        // (09 用户实报「卡片那么大」),宽窗不缩成一小块(03/04 固定值教训)。
+        // 图表区高与方块同式(见 treemapBody)。
         .containerRelativeFrame(.vertical) { length, _ in
             min(max(length * sunburstViewportShare, sunburstMinSide), sunburstMaxSide)
         }
     }
 
-    /// 分区异色着色(space-map-forms/03):内环每支一色(按序循环 accent,鲜亮
-    /// 0.70 + 饱和 ×1.25),外环 = 父色 −0.13;密封灰、「其他」浅灰(布局按父-子顺序产出)。
-    /// 中心圈 = 旭日的悬停读数位(零重排):悬停弧时显示该块名字 + 实际占用 +
-    /// 占当前根的份额;不悬停时显示当前根 + 「↩ 返回上级」(顶层为下钻提示)。
-    /// 小弧画不下标签,悬停中心读数就是它的名字与大小出处(方块形态块内已有)。
+    /// 中心圈 = 旭日的悬停读数位:悬停弧 → 该块名字 + 实际占用 + 占当前根的份额
+    /// (密封 / 「其他」换成只读 / 合并项数说明);不悬停 → 当前根 + 返回上级
+    /// (顶层换成下钻提示)。小弧画不下标签,名字与大小的全读数靠这里兜底。
     private func drawCenter(
         _ context: GraphicsContext,
         center: CGPoint,
@@ -507,8 +497,8 @@ struct SpaceMapSection: View {
         )
     }
 
-    /// 旭日轻桥:悬停命中白名单弧时,「这块能清」锚在该弧中角的外缘并钳制在图内
-    /// (弧带窄,块内右上角的方块配方套不进来;按钮仍浮在图表内,零重排)。
+    /// 旭日的「这块能清」:悬停命中白名单弧时锚在该弧中角的外缘并钳制在图内
+    /// (弧带窄,方块「浮在块右上角」的配方套不进来)。
     @ViewBuilder
     private func sunburstBridgeButton(
         arcs: [SunburstArc],
@@ -528,8 +518,11 @@ struct SpaceMapSection: View {
         }
     }
 
-    // MARK: 命中(极坐标反算,不依赖形状 hit test——p4-cleaner/07 v2 定谳写法)
+    // MARK: 命中(极坐标反算,不做形状 hit test)
 
+    /// 旭日半径:直径 = min(卡内容宽, 图表区高),卡内居中——固定直径在宽卡里太小,
+    /// 直径跟卡宽走又顶天立地,所以取两者的小值。别改成量图表自身的宽来定直径:
+    /// 它与内容宽互为因果,会正反馈把卡撑爆。
     private func sunburstRadius(in size: CGSize) -> CGFloat {
         min(size.width, size.height) / 2
     }
@@ -547,9 +540,9 @@ struct SpaceMapSection: View {
         let distance = sqrt(dx * dx + dy * dy)
         // 中心圆区域 → 无弧(中心有自己的交互:返回上级);图外 → 无弧。
         guard distance > radius * 0.26, distance <= radius * 0.995 else { return nil }
-        // atan2 的结果就是标准极角,与弧的 start/end 同一坐标系——直接比对
-        // (space-map-forms/05:旧代码在此多加 π/2「换算」到所谓「0 = 正上」坐标,
-        // 命中恒偏 90°、永远落到顺时针下一段;v1 起潜伏,用户实报 hover 偏移)。
+        // atan2 的结果就是标准极角,与弧的 start/end 同一坐标系,直接比对。不要换算到
+        // 「0 = 正上」:多加 π/2 会让命中恒偏 90°、落到顺时针下一段(space-map-forms/05,
+        // 回归测试钉在 SpaceMapTests)。
         let angle = atan2(dy, dx)
         let ring = distance <= radius * 0.65 ? 1 : 2
         return arcs.first { $0.ring == ring && $0.contains(angle: angle) }
@@ -566,7 +559,7 @@ struct SpaceMapSection: View {
             handleTap(arc.node, in: tree)
             return
         }
-        // 中心圈:下钻态点按 = 返回上级(顶层中心只有提示,点按不响应——v1 同款)。
+        // 中心圈:下钻态点按 = 返回上级(顶层中心只有提示,点按不响应)。
         guard !isTopLevel, drillPath != nil else { return }
         let radius = sunburstRadius(in: size)
         let center = sunburstCenter(in: size)
@@ -618,8 +611,8 @@ struct SpaceMapSection: View {
         return node
     }
 
-    /// 密封区/叶子提示(notice):浮在地图左上角,不占卡内一行——占位行曾让
-    /// 「整卷」面包屑与地图之间常年空一大截(2026-11-09 用户实报「删了路径没删距离」)。
+    /// 密封区 / 叶子 / 「其他」的点击解释(notice):浮在地图左上角的胶囊,不吃点击、
+    /// 不占卡内一行——做成占位行时,路径栏与地图之间会常年空一大截。
     @ViewBuilder
     private var noticeOverlay: some View {
         if let notice {
@@ -637,7 +630,8 @@ struct SpaceMapSection: View {
         }
     }
 
-    /// 「这块能清」浮层按钮(两形态同一配方;文案明示判定来源与地图只读立场)。
+    /// 「这块能清」浮层按钮,两形态同一配方。地图只读:卡上不放任何删除控件
+    /// (ADR-0008),它只带去清理清单定位对应组——help 文案明示判定来源与这一点。
     private func bridgeButton(_ group: JunkGroup) -> some View {
         Button {
             onGoToJunk(group)
@@ -657,8 +651,8 @@ struct SpaceMapSection: View {
 
     // MARK: 面包屑与多根选择(与形态无关)
 
-    /// 路径栏只有层级:非末级可点跳转,末级加粗。不设末尾「回到整卷」按钮——它前带
-    /// 「›」,被读成当前层级的下一层(2026-11-23 用户实报,拍板删除);回顶层点首级。
+    /// 路径栏(面包屑)是通用件,写法以 DESIGN.md 的面包屑组件规范为准;这里只把当前
+    /// 下钻链接给它。
     private func breadcrumbRow(_ tree: SpaceMapNode) -> some View {
         let chain = SpaceMapNode.breadcrumb(to: drillPath ?? tree.path, in: tree) ?? [tree]
         return HStack(spacing: 4) {
@@ -727,9 +721,8 @@ struct SpaceMapSection: View {
         return ""
     }
 
-    /// 弧内标签 = 名字优先(截断到可用宽),大小后缀放得下才带(2026-11-11 用户实报
-    /// 「…」过多:旧版恒给「· 大小」留位、名字被多截,小弧整条放弃;现在大小放不下
-    /// 就只显名字——悬停中心圈本就有名字 + 大小的完整读数兜底)。
+    /// 弧内标签 = 名字优先:名字截断到可用宽,大小后缀放得下才带。给大小预留位置会把
+    /// 名字多截成「…」、小弧整条放弃——放不下就只显名字,全读数由悬停时的中心圈兜底。
     private func arcLabel(_ node: SpaceMapNode, maxWidth: CGFloat) -> String {
         let font = NSFont.systemFont(ofSize: 10.5, weight: .semibold)
         let name = measuredTruncation(node.name, font: font, maxWidth: maxWidth)

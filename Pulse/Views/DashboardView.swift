@@ -2,19 +2,17 @@ import AppKit
 import PulseCore
 import SwiftUI
 
-/// 弹窗主页(工单 P0.6-05 对齐 OG 左图):图标 tab → "页名 + 本机一行 / 已运行时长" 头 →
-/// 各 tab 内容(与主窗口同一份 MetricTabStack,紧凑档)→ 底部操作排(打开主窗口 +
-/// 设置 + 退出)。tab 内容模型与会话状态在
-/// DashboardModel(与主窗口共用,评审 F4);组下钻(工单 06)与处置编排
-/// (工单 08)不变。
+/// 弹窗主页:图标 tab(`MetricIconTabBar`)→ 页头 → 各 tab 内容(与主窗口同一份
+/// MetricTabStack,紧凑档)→ 底部操作排(打开主窗口 + 设置 + 退出)。tab 内容模型与
+/// 会话状态在 DashboardModel。
 struct DashboardView: View {
     let monitor: SystemMonitor
 
-    /// 弹窗面板尺寸(DESIGN.md `{layout.popover-size}` 360×648;popover-header/01 用户拍板 A
-    /// 「面板定高」):AppKit 面板直接按此开窗,不再读内容的 fittingSize——面板高度与内容
-    /// 理想高度两边各算一次就会错位(面板高 → 内容被宿主居中悬空、底色铺不到边;面板矮 →
-    /// 刚性内容居中溢出、上下对称被裁)。中间滚动区弹性吃掉剩余高度(见 body),
-    /// tab 栏 / 页头钉顶、底排钉底,告警横幅出没只挤中间,切 tab 面板不动。
+    /// 弹窗面板定尺寸(DESIGN.md `{layout.popover-size}`;popover-header/01):AppKit 面板
+    /// 按此开窗,不读内容的 fittingSize——面板高与内容理想高各算一次必错位(面板高 →
+    /// 内容被宿主居中悬空、底色铺不到边;面板矮 → 刚性内容居中溢出、上下对称被裁)。
+    /// 中间滚动区弹性吃掉剩余高度:tab 栏 / 页头钉顶、底排钉底,告警横幅出没只挤中间,
+    /// 切 tab 面板不动。
     static let panelSize = CGSize(width: 360, height: 648)
     /// 弹窗宽度(OG 紧凑弹窗形态)。
     private static let width: CGFloat = panelSize.width
@@ -56,9 +54,8 @@ struct DashboardView: View {
         return VStack(spacing: 10) {
             MetricIconTabBar(selection: $tabSelection)
             pageHeader
-            // 滚动区弹性:面板定高(panelSize)后,中间吃掉头尾之外的全部高度——
-            // 原 520 定值是 MenuBarExtra 按内容理想尺寸定窗时代的权宜(ScrollView 理想高
-            // 恒 0 会压扁弹窗),换 NSPanel 自定尺寸后前提已不在(popover-header/01)。
+            // 滚动区弹性:面板定尺寸后,中间吃掉页头与底排之外的全部高度(ScrollView 的
+            // 理想高恒为 0,不给弹性高度弹窗会被压扁)。
             scrollContent
                 .frame(maxHeight: .infinity)
             // 触发中的告警(工单 P1-07):授权被拒的降级出口 + 常态状态展示;
@@ -261,9 +258,9 @@ struct DashboardView: View {
         model.content(tab: tabSelection.current)
     }
 
-    /// 页头(OG:"Overview" + 右侧 "⏱ Up 6d 4h"):统一组件 `PageHeader` 紧凑档
-    /// (popover-header/01)——标题 = tab 名;本机一行「芯片 · 核数 · 内存」**只有总览带**
-    /// (用户拍板 2026-11-02,判据在 PageHeader 单点);右侧运行时长每分钟刷新。
+    /// 页头:统一组件 `PageHeader` 紧凑档——标题 = tab 名;本机一行「芯片 · 核数 · 内存」
+    /// 只有总览带(判据在 PageHeader 单点,两窗不各写一份);右侧配件 = 运行时长,
+    /// 每分钟刷新。
     private var pageHeader: some View {
         PageHeader(tab: tabSelection.current, style: .compact) {
             TimelineView(.periodic(from: .now, by: 60)) { _ in
@@ -311,8 +308,8 @@ struct DashboardView: View {
         }
     }
 
-    /// 底部操作排(用户拍板):开窗靠左;齿轮 + 电源(退出)靠右。全纯图标,
-    /// 悬停提示与无障碍标签承载语义(开窗纯图标决定记录于工单 05 Comments)。
+    /// 底部操作排:开窗靠左,设置 + 退出靠右;三个都是纯图标,语义靠悬停提示与无障碍
+    /// 标签承载。
     private var footer: some View {
         HStack(spacing: 6) {
             Button {
@@ -325,11 +322,10 @@ struct DashboardView: View {
             Spacer()
             Button {
                 NSApplication.shared.activate(ignoringOtherApps: true)
-                // 场景环境的 openSettings 在 NSPanel 宿主里不可用(见头部注释);
-                // AppKit 私有选择子(showSettingsWindow:/showPreferencesWindow:)
-                // 在本系统上也不再响应(2026-11-02 用户实测点不动)。改走确定性桥:
-                // 发通知 → 常驻主窗场景的接收器(MainWindowGate,开窗桥同款常驻)
-                // 在 Scene 环境里调 openSettings()——与主窗口齿轮同一条已验证通路。
+                // 场景环境的 openSettings 在 NSPanel 宿主里不可用;AppKit 私有选择子
+                // (showSettingsWindow:/showPreferencesWindow:)在本系统上不响应。
+                // 改走确定性桥:发通知 → 常驻主窗场景的接收器(MainWindowGate,开窗桥
+                // 同款常驻)在 Scene 环境里调 openSettings()——与主窗口齿轮同一条通路。
                 NotificationCenter.default.post(name: .pulseOpenSettings, object: nil)
             } label: {
                 Image(systemName: "gearshape")

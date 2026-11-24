@@ -183,10 +183,9 @@ struct MainWindowView: View {
         .frame(minWidth: 720, minHeight: 560)
         .containerBackground(Surface.window, for: .window)
         .toolbar {
-            // 药丸 tab 居中挂工具栏 .principal。P2 扩到 11 枚仍装进 720 最小窗宽,
-            // 靠的是 `.selectedOnly`(未选中纯图标、只选中项带文字;用户拍板
-            // 2026-10-16 的宽度根治法,见 MetricPillTabBar);药丸内距 12→9 是 P1
-            // 早期的辅助收紧。
+            // 工具栏按 720 最小窗宽做预算(全局原则,见 DESIGN.md §Layout 与
+            // §Do's and Don'ts):药丸 tab、搜索框、齿轮之外再加项,先验证 720 宽下不触发
+            // >> 溢出菜单。药丸条装得下靠「只选中项带文字」,见 MetricPillTabBar。
             ToolbarItem(placement: .principal) {
                 MetricPillTabBar(selection: $tabSelection)
             }
@@ -395,8 +394,7 @@ private struct MainSearchField: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(Color.primary.opacity(0.06), in: .capsule)
-        // 132(原 168):右侧空间收紧后,工具栏在 720 最小窗宽也装得下,
-        // 不再触发 >> 溢出菜单(用户拍板:宁可框窄,不要溢出菜单)。
+        // 定长是 720 窗宽预算的一部分:宁可搜索框窄,不要工具栏溢出菜单。
         .frame(width: 132)
     }
 }

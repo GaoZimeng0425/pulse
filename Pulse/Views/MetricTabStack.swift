@@ -230,12 +230,11 @@ struct MetricTabStack<Ranking: View>: View {
                 )
             }
         case .disk:
-            // 磁盘页(工单 p1-history/05 + tab-regroup/03):主卡 + 空间地图(紧跟主卡
-            // 折线图之下,2026-11-16 用户目验改序——容量总览与占用地图同族相邻)+ 各卷
-            // 对账明细 + 快照列表 + 读写最多排行(地图自清理页迁入,读清理扫描管线)。
+            // 磁盘页:主卡 → 空间地图 → 各卷 + 快照 → 读写最多排行。地图紧跟主卡折线图
+            // (容量总览与占用地图同族相邻),读的是清理扫描这条管线(tab-regroup/03)。
             builder.card("main", MetricMainCardView(model: model.diskModel, isCompact: isCompact))
-            // 弹窗例外:360pt 塞不下旭日图,磁盘页地图只在主窗口画(tab-regroup/03
-            // 拍板默认细节,传感器页「弹窗只放派生卡」p2-review/04 同款先例)。
+            // 地图只在主窗口画:旭日下限 360pt,弹窗塞不下。这是「主窗口与弹窗同一套
+            // 卡片组成」这条原则里写明的例外之一(另一处是传感器页),清单以该原则为准。
             if !isCompact, let cleanerModel {
                 builder.card(
                     "spacemap",
