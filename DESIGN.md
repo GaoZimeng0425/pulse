@@ -1,5 +1,5 @@
 ---
-version: 1.1
+version: 1.2
 name: Pulse
 omitted: []
 colors:
@@ -17,6 +17,7 @@ colors:
   accent-sound: "#c2379b / #d955b3"
   accent-bluetooth: "#0891b2 / #22a8cc"
   accent-containers: "#eb6834 / #d95926"
+  accent-clean: "#0d9488 / #35c4b5"
   state-positive: = {accent-battery}
   state-negative: "#e0352b / #ff453a"
   state-warning: = {accent-disk}
@@ -37,6 +38,16 @@ colors:
   agent-model-lead: = {accent-bluetooth}
   agent-model-second: = {accent-memory}
   agent-model-rest: = {accent-disk}
+  settings-icon-general-from: "#9e9ea8"
+  settings-icon-general-to: "#6b6b78"
+  settings-icon-alerts-from: "#f29e33"
+  settings-icon-alerts-to: "#d9591a"
+  settings-icon-project-roots-from: "#4d8cf2"
+  settings-icon-project-roots-to: "#2659bf"
+  settings-icon-menu-bar-from: "#9466eb"
+  settings-icon-menu-bar-to: "#6b38c7"
+  settings-icon-cleaner-from: "#fab326"
+  settings-icon-cleaner-to: "#d98500"
 typography:
   font: "SF Pro(系统默认,不引第三方字体)"
   figure-overview: "34pt bold rounded, tabular"
@@ -54,9 +65,15 @@ typography:
   body: "12pt"
   caption: "11pt"
   micro: "10.5pt"
-  row-name: "14.5pt medium(舒适)/ 12pt(紧凑)——行名称与数值同号,层级靠字重"
-  row-value: "14.5pt semibold(舒适)/ 12pt semibold(紧凑)+ monospacedDigit"
+  row-name: "14.5pt medium(舒适)/ 12pt(紧凑)"
+  row-value: "14.5pt semibold(舒适)/ 12pt(紧凑), tabular"
   row-sub: "12pt(舒适)/ 10.5pt(紧凑)"
+icons:
+  chevron: "9pt"
+  inline: "11pt"
+  leading-compact: "13pt"
+  leading-comfortable: "16pt"
+  empty-state: "26pt"
 rounded:
   card: 18pt
   card-compact: 12pt
@@ -74,798 +91,563 @@ spacing:
   card-gap: 16pt
   window-padding: 24pt
 components:
-  metric-card: "总览指标卡,见 §Components"
-  metric-main-card: "指标 tab 主卡,见 §Components"
-  pill-tab: "药丸 tab,见 §Components"
+  card-family: "卡壳、卡头、统计值、空态、卡内行,见 §Components"
+  row-metrics: "列表行两档制,见 §Components"
+  chip: "状态芯片,见 §Components"
+  metric-card: "指标卡两形态,见 §Components"
+  card-grid: "自适应卡片网格,见 §Components"
+  ranking-list: "排行列表,见 §Components"
+  pill-tab-bar: "药丸页签条,见 §Components"
+  page-header: "页头,见 §Components"
   menubar-badge: "菜单栏徽标,见 §Components"
-  page-header: "页头(主窗口 / 弹窗 / 清理页统一组件),见 §Components"
-  row-metrics: "列表行两档制单一出处(紧凑=弹窗 / 舒适=主窗口一切列表行),见 §Components"
-  chip: "统一状态 chip(ChipView,两形态),见 §Components"
+  trend-chart: "走势图与条形图,见 §Components"
+  breadcrumb: "面包屑,见 §Components"
+  search-field: "搜索框,见 §Components"
+  check-box: "勾选框,见 §Components"
+  chart-hover: "图表悬停读数与浮层,见 §Components"
+  header-text-button: "卡头文字按钮,见 §Components"
+  settings-icon-tile: "设置侧栏图标砖,见 §Components"
 ---
 
 # Pulse DESIGN.md
 
-> 本文件是 Pulse 全部 UI 的**唯一视觉宪法**,格式遵循
-> [google-labs-code/design.md](https://github.com/google-labs-code/design.md) v1 规范
-> (YAML 令牌 + 叙述层)。任何代理(或人)写/改 SwiftUI 视图前先读这里;
-> 与本文件冲突的旧代码按 §已知偏差 清单在重构时收编,不得新增偏差。
+> 本文件是 Pulse 界面的**原则与通用组件规范**的唯一出处,格式遵循
+> [Google Labs DESIGN.md 开放规范](https://github.com/google-labs-code/design.md)
+> (YAML 令牌 + 叙述层)。任何代理或人写、改 SwiftUI 视图前先读这里。某一页怎么实现
+> 不在这里——写在该页主视图文件开头的页面规格和对应代码旁的注释里;一条规矩属于
+> 哪边,见 §Components 开头的判定法。
 > 令牌的**代码出处**永远优先于本文件的数值快照:颜色在 `Pulse/Views/MetricAccent.swift`,
-> 数值漂移以代码评审 + 本文件 §已知偏差 追踪。
+> 行尺寸在 `RowMetrics`,图标尺寸在 `IconSize`,大数字字号在 `FigureSize`。
 
 ## Overview
 
-Pulse 是 macOS 26+ 菜单栏系统监控 app(Vitals 克隆),三个展示面:
-菜单栏徽标(NSStatusItem 位图)、菜单栏弹窗(360pt 定宽)、主窗口(最小 720×560)。
-设计语言 = Vitals:深浅双外观、卡片化、每指标一色、无投影扁平层级。
-所有数值单位为 pt(SwiftUI 默认),颜色一律 `浅色 / 深色` 双值。
+Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
+菜单栏徽标、菜单栏弹窗(360pt 定宽)、主窗口(最小 720×560)。
+设计语言:深浅双外观、卡片化、每指标一色、层级靠底色差表达。
+数值单位一律 pt;颜色一律「浅色 / 深色」双值,只有明确标为固定色的除外。
 
 ## Colors
 
-语义键与**代码唯一出处**对照(视图层禁止直写 hex / `Color.orange` 等裸色):
-
 | 令牌 | 代码出处 | 用途 |
 |---|---|---|
-| `{colors.surface-window}` | `Surface.window` | 窗口 / 弹窗本体底 |
+| `{colors.surface-window}` | `Surface.window` | 窗口与弹窗的底 |
 | `{colors.surface-card}` | `Surface.card` | 卡片底 |
-| `{colors.surface-card-high}` | `Surface.cardHigh` | 卡内强调底、环形"其他/空闲"段 |
-| `{colors.ink-tertiary}` | `Surface.inkTertiary` | 三级墨色(缓存段、最弱文字) |
-| `{colors.accent-cpu}` … `{colors.accent-battery}`、`{colors.accent-gpu}`、`{colors.accent-sound}`、`{colors.accent-bluetooth}`、`{colors.accent-containers}` | `Metric.accentColor` | 每指标一色:tab、图表、徽章、大数字(GPU 入表 p2-sensors/02;Neural 与 Memory 同色,03 票再议;Sound/Bluetooth 入表 p2-sensors/05、Containers 取 §1.1 Projects 行(p2-sensors/07),均现成行零发明,外设页 tab 强调取 Bluetooth 青) |
-| `{colors.state-positive}` | `Surface.positive` | ✓正常、充电中 |
-| `{colors.state-warning}` | `Surface.warning`(= Disk 指标色别名) | 压力偏高、优化充电介入、触发中告警提示(琥珀语义;主窗口页头小条 / 弹窗横幅两形态) |
-| `{colors.state-caution}` | `Surface.caution` | 清理档位「先检查」chip(p4-uninstaller/08 立项:清理页 accent 即磁盘金,warning 别名与它全页撞色,故独立琥珀橙;不用于负载/告警) |
-| `{colors.accent-clean}` | `Surface.cleanAccent` | 清理页专属强调(2026-11-06 用户拍板 Teal;此前借磁盘金被评丑、指标色是 tab 身份色不跨页借):清理页主按钮 / 排序选中段 / 勾选框选中 / 选中条目卡底 / 子页药丸统一取此 |
-| `{colors.category-*}` | `GroupCategory.identityColor` | 非 App 组的图标瓦片底色;孤儿另作组行强调色(见下) |
-| `{colors.junk-*}` | `JunkGroup.identityColor`(MetricAccent.swift) | 清理品类身份色(p6-cleaner/03,丙案 v2 原型拍板映射):dev=CPU 蓝 / browser=GPU 粉 / app=App 棕 / project=内存紫 / ai=蓝牙青 / leftover=传感器橙红 / trash=磁盘金——清理总览模块大卡图标瓦与图例的类别底色。同空间地图按序循环 `accent-*` 的先例:指标色在此作**类别身份**借用,不作页面强调(清理页强调仍只有 accent-clean) |
-| `{colors.agent-model-*}` | `AgentModelTint`(MetricAccent.swift) | 智能体页每日消耗卡的模型 / harness 分区异色(agent-tab/05,原型示意色 青/紫/琥珀 映射既有令牌):lead=青(蓝牙,与页 accent 同源)/ second=紫(内存)/ rest=琥珀(磁盘);harness claude/zcode = 前两色。同 junk-* 先例:指标色在此作**类别身份**借用,不作页面强调 |
-| `{colors.state-negative}` | `Surface.negative` | 高负载、紧张、结束进程等负面偏差 |
-| `{colors.state-inactive}` | `Surface.inactive` | 行首状态点的"停 / 未连接"态(容器未运行、蓝牙设备未连接);亮起态取所在页指标色(p2-review/03 入表) |
+| `{colors.surface-card-high}` | `Surface.cardHigh` | 卡内抬升的底;环形图的「其他 / 空闲」段 |
+| `{colors.ink-tertiary}` | `Surface.inkTertiary` | 三级墨色:最弱的文字与图形 |
+| `{colors.accent-cpu}` … `{colors.accent-containers}` | `Metric.accentColor` | 每指标一色:tab、图表、徽章、大数字的身份色 |
+| `{colors.accent-clean}` | `Surface.cleanAccent` | 清理页专属强调色:主按钮、选中态、子页药丸 |
+| `{colors.state-positive}` | `Surface.positive` | 正常、充电中 |
+| `{colors.state-warning}` | `Surface.warning` | 偏高、优化充电介入、告警提示 |
+| `{colors.state-caution}` | `Surface.caution` | 清理的「先检查」档 |
+| `{colors.state-negative}` | `Surface.negative` | 高负载、紧张、结束进程、危险 |
+| `{colors.state-inactive}` | `Surface.inactive` | 「停 / 未连接」的状态点 |
+| `{colors.category-*}` | `GroupCategory.identityColor` | 非 App 分组的图标瓦底色 |
+| `{colors.junk-*}` | `JunkGroup.identityColor` | 清理品类的身份色 |
+| `{colors.agent-model-*}` | `AgentModelTint` | 智能体页按模型、按来源分区异色 |
+| `{colors.settings-icon-*-from}` / `-to` | `SettingsIconTint` | 设置侧栏图标砖的渐变起止色(固定色) |
 
 规则:
-- 文字层级用系统语义(`.primary/.secondary/.tertiary`),不自定义灰。
-- 指标色只允许从 `Metric` 枚举取——新增指标先入表(浅深互异、指标互异有单测钉死)。
-- **类别身份色**(arch-review-2026-10-18/02 立节):App 棕(理论兜底,App 组实际画真实
-  图标)/ 项目 = CPU 蓝 / 系统 中性灰 / 后台服务 = Network 绿 / **孤儿 橙**,唯一出处
-  `GroupCategory.identityColor`(与 `Metric` 同级,在 MetricAccent.swift)。孤儿橙是
-  **身份**不是强调级,有意不与 `{colors.state-warning}` 琥珀合并(GLOSSARY:橙色高亮)。
-- 强调级(正常/偏高/紧张)→ 色的映射只允许集中在三处:`StatusBadge.chip`(系统
-  负载)、`MetricCardModel` 的 chip 构造(内存压力、电池充电状态;两者都在 MetricCardModel.swift)
-  与 `MenuBarBadgeRenderer.color(for:ink:)`;色值一律取语义令牌(菜单栏例外见 §已知偏差)。
-  组排行行的高负载警示 = 行尾 CPU 数值红字 + 名称后最忙进程名 chip(见 §Components
-  排行列表,2026-10-30 用户拍板),色取 `{colors.state-negative}`。
-- 菜单栏位图颜色只能经 ImageRenderer 预绘(`.renderingMode(.original)`);
-  NSStatusItem 会剥掉 SwiftUI 前景色,这是实测结论不是风格偏好。
+
+- 文字层级用系统语义色(`.primary` / `.secondary` / `.tertiary`),不自定义灰。
+- 指标色只从 `Metric` 取。新增指标先入表:浅深互异、指标之间互异,有单测钉死。
+- 指标色是**身份**,不是强调级。分组、品类借用指标色只是为了区分「是谁」;页面
+  自己的强调色另定(清理页用 `{colors.accent-clean}`)。
+- 强调级(正常 / 偏高 / 危险)到颜色的映射只许出现在三处:`StatusBadge.chip`、
+  `MetricCardModel` 里的状态芯片构造、菜单栏徽标渲染器。取值一律是语义令牌。
+- 菜单栏位图里的颜色只能靠预绘位图带出去(系统会剥掉 SwiftUI 前景色)。位图里的
+  深浅值按当次传入的外观解析,不靠绘制时的环境外观。
 
 ## Typography
 
 | 角色 | 规格 | 用在哪 |
 |---|---|---|
-| `{typography.figure-main}` | 44pt bold `.rounded` + `monospacedDigit` | 指标 tab 主卡大数字 |
-| `{typography.figure-overview}` | 34pt bold `.rounded` + `monospacedDigit` | 总览卡大数字(单位半号 48%) |
-| `{typography.figure-main-compact}` | 30pt(同族) | 弹窗主卡大数字 |
-| `{typography.figure-stat}` | 28pt(同族) | 智能体页每日消耗数字卡大数字(agent-tab/05;原型 28 原值入表) |
-| `{typography.figure-card}` | 24pt(同族) | 清理总览模块大卡大数字(`FigureSize.card`,p6-cleaner/03;原型 24 原值入表) |
-| `{typography.figure-overview-compact}` | 22pt(同族) | 弹窗总览卡大数字 |
-| `{typography.figure-ring}` / `-compact` | 19 / 16pt(同族) | 环心数字(全尺寸 / 弹窗) |
-| `{typography.page-title}` | 26pt bold | 主窗口页名 |
-| `{typography.section-title}` | 17pt bold | 节标题("此刻"/"当前最忙") |
-| `{typography.figure-mini}` | 17pt semibold `.rounded` + `monospacedDigit` | 历史页均值/峰值等次级数字 |
-| `{typography.card-title}` | 12pt semibold,指标色 | 卡片标题行 |
-| `{typography.body}` | 12pt | 统计数值(semibold + `monospacedDigit`)、正文 |
+| `{typography.figure-main}` | 44pt bold 圆体,等宽数字 | 指标页主卡的大数字 |
+| `{typography.figure-overview}` | 34pt bold 圆体,等宽数字 | 总览卡的大数字(单位约半号) |
+| `{typography.figure-main-compact}` | 30pt bold 圆体,等宽数字 | 弹窗主卡的大数字 |
+| `{typography.figure-stat}` | 28pt bold 圆体,等宽数字 | 智能体页数字卡的大数字 |
+| `{typography.figure-card}` | 24pt bold 圆体,等宽数字 | 清理总览模块大卡的大数字 |
+| `{typography.figure-overview-compact}` | 22pt bold 圆体,等宽数字 | 弹窗总览卡的大数字 |
+| `{typography.figure-ring}` / `-compact` | 19 / 16pt bold 圆体,等宽数字 | 环形图中心的数字(主窗口 / 弹窗) |
+| `{typography.page-title}` | 26pt bold | 页头标题(主窗口) |
+| `{typography.section-title}` | 17pt bold | 节标题、下钻后的品类标题 |
+| `{typography.figure-mini}` | 17pt semibold 圆体,等宽数字 | 次一级的数字(历史页均值与峰值) |
+| `{typography.card-title}` | 12pt semibold | 卡头标题 |
+| `{typography.body}` | 12pt | 正文、按钮、统计值(配 semibold 与等宽数字) |
 | `{typography.caption}` | 11pt | 说明、表头、次级标签 |
-| `{typography.micro}` | 10.5pt | 统计列标签、最密排注 |
-| `{typography.row-name}` | 14.5pt medium(舒适)/ 12pt(紧凑) | 列表行名称(主窗口一切列表行 / 弹窗) |
-| `{typography.row-value}` | 14.5pt semibold(舒适)/ 12pt(紧凑) | 列表行数值(定宽列 + `monospacedDigit`) |
-| `{typography.row-sub}` | 12pt(舒适)/ 10.5pt(紧凑) | 列表行副文、路径 |
+| `{typography.micro}` | 10.5pt | 最密的注记、图例、图表轴字 |
+| `{typography.row-name}` | 14.5pt medium(舒适)/ 12pt(紧凑) | 列表行的名称 |
+| `{typography.row-value}` | 14.5pt semibold(舒适)/ 12pt(紧凑),等宽数字 | 列表行的数值(定宽列) |
+| `{typography.row-sub}` | 12pt(舒适)/ 10.5pt(紧凑) | 列表行的副文、路径 |
 
 规则:
-- **窗口 UI 文字只有五档**(ui-unify/01,2026-11-08 用户拍板"字号、组件都归一"):
-  10.5 / 11 / 12 / 14.5 / 17 + 大数字族(FigureSize)。此前 8.5~17 共 12 档
-  (11.5 / 12.5 / 13 / 13.5 / 14 / 16 已全量收编,映射见 §已知偏差)。新文字
-  不在五档内 = 先改本表再写码;列表行尺寸单一出处 `RowMetrics`(两档制,见
-  §Components 行两档制)。
-- **一切数字**读数(百分比、字节、速率、PID)必须 `monospacedDigit()`;
-  大数字另加 `.rounded` 设计族与负字距(`FigureText` 是唯一实现,不要复刻;字号只取
-  `FigureSize` 令牌)。统计值(标签 + 数字)不是大数字:`{typography.body}` 12 semibold
-  等宽,不走圆体(`StatValue` 是唯一实现)。卡内明细行的数值(名称 + meter + 数值行)
-  是 `{typography.body}` 12 **常规** + `monospacedDigit`(`CardRowValue` 是唯一实现,
-  p2-review/03)。
-- 不用整体等宽字形 `design: .monospaced`(SF Mono)——数字对齐只靠 `monospacedDigit`;
-  确需等宽字形的非数字内容须先在此登记例外。**登记例外(ui-unify/01)**:清理页
-  文件路径行(卸载残留 / 确认清单,11pt `.monospaced`)——同名 node_modules/build
-  靠路径区分,等宽有可辨识度价值;空间地图块内百分比小标(10.5pt `.monospaced`)。
-- 菜单栏徽标字号(11.5 / 7pt;网络上下行叠两行版式 9pt)是 NSStatusItem 尺寸约束下的特例,不外溢到窗口 UI。
+
+- **窗口 UI 文字只有五档**:10.5 / 11 / 12 / 14.5 / 17,另加一组大数字(figure-*)。
+  新文字不在五档内 = 先改本表再写码。
+- **不用系统自带的语义字体**(`.caption`、`.footnote`、`.title3` 这类):它们不在
+  五档内,还会随系统版本漂移。文字与图标都写显式字号;这条由 lint 把关。
+- **一切数字读数**用 `monospacedDigit()`。大数字另加圆体设计族与负字距,只有
+  `FigureText` 一个实现,字号只取 figure-* 令牌。统计值(标签 + 数字)不是大数字:
+  `{typography.body}` 12 semibold 加等宽数字,只有 `StatValue` 一个实现。
+- **整体等宽字形**只用于两类内容:需要逐字辨别的路径(清理页的文件路径行),和按列
+  对齐的百分比小标(空间地图块内)。其余对齐只靠 `monospacedDigit()`。
+- **菜单栏徽标的字号自成一组**(标签 7pt、数值 11.5pt、上下行叠放 9pt),只用于菜单栏
+  位图,不外溢到窗口。
+- **符号图标的尺寸走图标档位**,不受文字五档约束:
+
+  | 令牌 | 值 | 用在哪 |
+  |---|---|---|
+  | `{icons.chevron}` | 9pt | 排序、展开收起的上下小箭头 |
+  | `{icons.inline}` | 11pt | 行内符号:行尾右箭头、卡头符号、小按钮里的符号、状态符号、勾选框对勾、页签条图标 |
+  | `{icons.leading-compact}` / `{icons.leading-comfortable}` | 13 / 16pt | 行首的类型符号,随列表行的紧凑 / 舒适档 |
+  | `{icons.empty-state}` | 26pt | 空态里的大符号 |
+
+  随容器走的图标不归这五档,由所在组件给出:状态芯片里的符号随芯片档位;类别图标瓦
+  里的符号按瓦片边长折算;设置图标砖与弹窗图标页签条里的符号是各自规格里的定值。
 - 不引第三方字体;中英文混排依赖系统默认,不手动调字距。
 
 ## Layout
 
-4pt 网格:`{spacing.unit}`。允许值 = 网格整数倍,命名令牌优先:
+4pt 网格:`{spacing.unit}`。允许值 = 网格整数倍,命名令牌优先。
 
 | 令牌 | 值 | 用在哪 |
 |---|---|---|
-| `{spacing.micro}` | 2pt | 统计列"标签-值"行距等最紧排 |
-| `{spacing.inline}` | 6pt | 行内图标-文字、卡内小节间距 |
-| `{spacing.gap}` | 8pt | 相关元素组内间距 |
+| `{spacing.micro}` | 2pt | 最紧的「标签—数值」行距 |
+| `{spacing.inline}` | 6pt | 行内图标与文字、卡内小节 |
+| `{spacing.gap}` | 8pt | 相关元素之间 |
 | `{spacing.group-gap}` | 12pt | 卡内小节之间 |
-| `{spacing.card-padding}` | 16pt | 总览卡( full)内距 |
-| `{spacing.card-padding-compact}` | 12pt | 弹窗紧凑卡内距 |
-| `{spacing.card-gap}` | 16pt | 卡片网格的卡间 |
-| `{spacing.window-padding}` | 24pt | 主窗口内容左右/底部边距 |
-| `{layout.row-label-short}` | 36pt | 卡内明细行标签列(三字母域名 SoC / ANE,五路功率卡) |
-| `{layout.row-label}` | 64pt | 卡内明细行标签列(四汉字 / 一个英文词,传感器派生卡) |
-| `{layout.row-value-percent}` | 36pt | 卡内明细行数值列最小宽:整数百分比 `100%`(音量、设备电量) |
-| `{layout.row-value-decimal-percent}` | 48pt | 同上:一位小数百分比 `99.9%`(容器 CPU) |
-| `{layout.row-value-temperature}` | 52pt | 同上:温度 `99.9°C`(传感器派生卡) |
-| `{layout.row-value-quantity}` | 56pt | 同上:带单位量 `999 MB` / `99.9 W`(容器内存、五路功率) |
-| `{layout.row-value-rpm}` | 64pt | 同上:风扇转速 `9999 rpm` |
-| `{layout.row-value-rssi}` | 32pt | ~~同上:信号强度 `-99 dBm` / `—`(蓝牙设备行)~~ **superseded**(ui-unify 追改 2026-11-09):RSSI 改走行副文,不再是数值列 |
-| `{layout.row-meter-compact}` | 44pt | ~~行内电量条宽(紧凑档,蓝牙设备行)~~ **superseded**(ui-unify 追改 2026-11-09)→ `RowMetrics.meterWidth` 52 |
-| `{layout.row-meter}` | 64pt | ~~行内电量条宽(全尺寸档,蓝牙设备行)~~ **superseded**(ui-unify 追改 2026-11-09)→ `RowMetrics.meterWidth` 120 |
-| `{layout.row-host-icon}` | 14pt | 下钻进程行宿主 App 徽标图标边长(project-visibility/02;徽标文字随行 `{typography.caption}` secondary,图标-文字间距 `{spacing.inline}`) |
-| `{layout.overview-card-min-width}` | 340pt | 总览卡自适应网格的单卡最小宽(主窗口列数 1–3 由它派生:列数 = 内容宽容纳的最多列,340 + 列距 16,上限 3;4 列上限已废,agent-tab/06 用户拍板) |
-| `{layout.module-card-min-width}` | 340pt | 清理总览模块大卡自适应网格的单卡最小宽(p6-cleaner/03):列数 = min(2, 内容宽容纳列数)——720 最小窗 1 列、默认窗 880 起 2 列、**上限 2 列**(品类只有六卡,不随 ultrawide 拉列);列距 `{spacing.group-gap}` 12 |
-| `{layout.agent-project-card-min-width}` | ~~960pt~~ | **superseded**(agent-tab/06 二度修正):SwiftUI `GridItem(.flexible(minimum:))` 的 min 是硬下限,容器再窄不缩——960 在窄窗/弹窗把内容撑出容器右缘被裁(与 CSS min-width 会被轨道压缩不同)。项目大卡终态 = **恒单列满宽 VStack**,无网格参数 |
-| `{layout.agent-project-limit}` | 10 个 | 智能体页消耗子页项目默认展示上限(agent-tab/06,2026-11-14 用户拍板):超出末行「显示全部(另 N 个项目)⌄ / 收起,只看前 10 个⌃」,排行截断末行(`RankingOverflowRow`)同款交互与视觉 |
-| `{layout.port-row-limit}` | 20 行 | 服务页监听端口卡默认展示行上限(port-view/01):端口号升序,超出末行「显示全部(另 N 个端口)⌄ / 收起,只看前 20 个⌃」(`AgentProjectOverflowRow` 同款交互与视觉,文案按端口口径);代码侧单一出处 `PortsCardMetrics.rowLimit` |
-| `{layout.agent-chart-two-column-min-width}` | 1872pt | 智能体页消耗子页「日历图 + 走势」并排断点(agent-tab/07 立于窗宽 1280,2026-11-16 用户修订「1920 才变一行」):子页内容宽 ≥ 1872(= 窗宽 1920 − 两侧 `{spacing.window-padding}` 24)两列并排等高,否则上下一列;弹窗恒一列。替代 06 的 `ViewThatFits`(按弹性子视图理想宽判定,切换点不可控) |
-| `{layout.card-pair-two-column-min-width}` | 696pt | 两卡组(`AdaptiveCardPair`,MetricTabStack 的 pair:内存双环 / 传感器派生+风扇 / GPU ANE+功率 / 磁盘卷+快照)主窗口并排断点(2026-11-21 用户拍板响应式 + 同组等高):内容宽 ≥ 696(= `{layout.overview-card-min-width}` ×2 + 列距 16,与总览网格两列同档)并排**等高**、不足上下排;弹窗恒上下排。此前写死 HStack 两列,窄窗(720)每卡 ~328pt 图例被压截断 |
-| `{layout.agent-trend-height}` | ~~180pt / 120pt~~ | **superseded**(agent-tab/10,11-15 用户实报「两个 chart 高度应该一致,坐标水平对齐」):走势绘图区高 = `AgentHeatWall.gridHeight(forWidth:)`(与热力墙同宽同式,一列 / 两列都等高,下限 60);仅弹窗紧凑档定高 100 |
-| `{layout.ranking-limit}` | 20 行 | 各排行(弹窗与主窗口同规则)只列前 20 名,超出补末行:弹窗「查看全部(另 N 项)」跳主窗口并落地即展开,主窗口「显示全部(另 N 项)」原地展开 / 「收起」(ranking-limit/01,2026-11-02 用户拍板;原 11-01 `popover-ranking-limit` 只截弹窗)。主窗口搜索命中不截 |
-| `{layout.sheet-width}` | 460pt | 确认清单 sheet 定宽(清理页「清理…」,p4-cleaner/04;原型 B 变体同值) |
-| `{layout.sheet-list-max-height}` | 220pt | 确认清单 sheet 内逐行列表的最大高(超出滚动,总量与按钮恒在视口内) |
-| `{layout.spacemap-chart-min-height}` | 220pt | 空间地图**方块形态**图表区高下限(space-map-forms/10 起实际高 = clamp(子页视口 × 0.8, 220, 520),与旭日同式;01 入表,原语义「弹性区塌最小高」随子页滚动废弃) |
-| `{layout.sunburst-diameter}` | ~~400pt~~ | **superseded**(space-map-forms/04):旭日改为方形铺满卡宽,直径 = 卡内容宽,无固定值——340(01)与 400(03)两代固定直径分别被 220 最小高压制 / 宽卡里只占中间一点,均废;几何在 PulseCore `SunburstLayout`(p4-cleaner/07) |
-| `{layout.spacemap-sunburst-min-side}` | 360pt | 旭日直径下限(space-map-forms/05,08 起兼图表区高下限):窄窗防过小;实际直径 = min(卡内容宽, clamp(可视高 × `{layout.spacemap-sunburst-viewport-share}`, 360, `{layout.spacemap-sunburst-max-side}`));宽度下限由主窗口最小宽 720 保障 |
-| `{layout.spacemap-sunburst-viewport-share}` | 0.8 | 空间地图**两形态**图表区高占子页滚动视口高的份额(space-map-forms/08 立,10 起方块同用):扣的两成留给页头/卡头/面包屑与摘要卡露头 |
-| `{layout.spacemap-sunburst-max-side}` | 520pt | 旭日图表区高上限(= 直径上限,space-map-forms/09 用户实报「旭日时卡片那么大,有没有最大高度」):高/最大化窗口里卡片封顶不再随可视高整屏变长(卡总高 ≈ 图表区 + 头部 ~150) |
-| `{layout.popover-size}` | 360×648pt | 菜单栏弹窗面板**定尺寸**(`DashboardView.panelSize`;popover-header/01 用户拍板 A,2026-11-02):AppKit 面板直接按此开窗、不读内容 fittingSize;中间滚动区 `maxHeight: .infinity` 吃掉头尾之外的全部高度——tab 栏 / 页头钉顶、底排钉底,告警横幅出没只挤中间,切 tab 面板不动 |
+| `{spacing.card-padding}` | 16pt | 全尺寸卡片内距 |
+| `{spacing.card-padding-compact}` | 12pt | 紧凑卡片内距 |
+| `{spacing.card-gap}` | 16pt | 卡片网格的卡间距 |
+| `{spacing.window-padding}` | 24pt | 主窗口内容区的左右与底部边距 |
+| `{layout.row-label-short}` | 36pt | 项目大卡「模型 / 来源」行的标签列 |
+| `{layout.row-value-percent}` | 36pt | 卡内读数行数值列的最小宽:整数百分比 |
+| `{layout.row-value-decimal-percent}` | 48pt | 同上:一位小数的百分比 |
+| `{layout.row-value-temperature}` | 52pt | 同上:带摄氏度 |
+| `{layout.row-value-quantity}` | 56pt | 同上:带单位的量 |
+| `{layout.row-value-rpm}` | 64pt | 同上:风扇转速 |
+| `{layout.row-host-icon}` | 14pt | 下钻进程行里宿主 App 徽标的边长 |
+| `{layout.overview-card-min-width}` | 340pt | 自适应卡片网格的单卡最小宽(主窗口列数 1–3 由它派生) |
+| `{layout.module-card-min-width}` | 340pt | 清理总览模块大卡的单卡最小宽(列数上限 2) |
+| `{layout.card-pair-two-column-min-width}` | 696pt | 两卡并排的断点:内容宽达到就并排等高,否则上下排 |
+| `{layout.agent-project-limit}` | 10 个 | 智能体页项目大卡的默认展示上限 |
+| `{layout.port-row-limit}` | 20 行 | 监听端口卡的默认展示行上限 |
+| `{layout.agent-chart-two-column-min-width}` | 1872pt | 智能体页日历图与走势图并排的断点 |
+| `{layout.ranking-limit}` | 20 行 | 各排行默认展示的上限 |
+| `{layout.sheet-width}` | 460pt | 确认清单弹层的宽度 |
+| `{layout.sheet-list-max-height}` | 220pt | 确认清单弹层内列表的最大高 |
+| `{layout.spacemap-chart-min-height}` | 220pt | 空间地图方块形态的图表区高度下限 |
+| `{layout.spacemap-sunburst-min-side}` | 360pt | 空间地图旭日的直径与图表区高度下限 |
+| `{layout.spacemap-sunburst-viewport-share}` | 0.8 | 空间地图图表区高占滚动视口高的份额 |
+| `{layout.spacemap-sunburst-max-side}` | 520pt | 空间地图旭日的直径与图表区高度上限 |
+| `{layout.popover-size}` | 360×648pt | 菜单栏弹窗面板的定尺寸 |
 
-窗口:主窗口最小 **720×560**(spec 钉死),默认 880×620;弹窗面板 **360×648 定尺寸**
-(`{layout.popover-size}`,内容撑满、不随内容伸缩)。工具栏内容必须按 720 最小窗宽预算(见 §Do's and Don'ts)。
-主窗口总览网格是**响应式**的(用户拍板 2026-10-24;上限 1–3 为 agent-tab/06
-用户拍板,不再出 4 列):列数随窗宽自适应 1–3
-(720 最小宽下 1 列、744 起两列、约 1104 三列;`AdaptiveCardGrid`)。
+窗口:主窗口最小 **720×560**,默认 880×620;弹窗面板 **360×648 定尺寸**
+(`{layout.popover-size}`,内容撑满、不随内容伸缩)。工具栏内容必须按 720 最小窗宽
+预算(见 §Do's and Don'ts)。
 
 ## Elevation & Depth
 
-**无投影、不描边**。层级只有三级,靠底色差一档表达:
+层级只靠底色差表达,共三级:
 `{colors.surface-window}`(窗)> `{colors.surface-card}`(卡)> `{colors.surface-card-high}`(卡内抬升)。
-弹出的浮层(菜单栏弹窗、系统工具栏玻璃)交给系统材质,不自绘阴影。
+卡片、容器、弹层不加投影、不加描边;弹出的浮层交给系统材质。
+不在此列的三类:图表的线条与网格、控件自身的轮廓(勾选框)、装饰性的设置侧栏
+图标砖(带柔影与高光描边,见 §Components)。
 
 ## Shapes
 
 | 令牌 | 值 | 用在哪 |
 |---|---|---|
-| `{rounded.card}` | 18pt | 全尺寸卡片(总览卡、主卡、走势卡) |
-| `{rounded.card-compact}` | 12pt | 弹窗紧凑卡 |
-| `{rounded.inner}` | 10pt | 卡内嵌套表区 / 次级容器 |
-| `{rounded.chip}` | 8pt | 徽章底、行选中底 |
-| `{rounded.pill}` | 胶囊 | 状态 chip、药丸 tab、搜索框、meter 条 |
+| `{rounded.card}` | 18pt | 全尺寸卡片 |
+| `{rounded.card-compact}` | 12pt | 紧凑卡片、卡内的小卡 |
+| `{rounded.inner}` | 10pt | 卡内嵌套的表区、次级容器 |
+| `{rounded.chip}` | 8pt | 徽章底、行选中底、搜索框 |
+| `{rounded.pill}` | 胶囊 | 状态芯片、药丸页签、meter 条 |
 
-圆角不随尺寸缩放(小元素不自动变小圆角)——形状由容器语义决定,由本表查得。
+圆角不随尺寸缩放(小元素不自动变小圆角):形状由容器语义决定,由本表查得。
 
 ## Components
 
-**总规矩(2026-11-10 用户拍板「以后都应该使用这些标准组件」):新 UI 一律优先
-组装本节标准件;标准件覆盖不了的形态,先补本表再造,不私开同义新件。**
+本节只收**通用界面件**。每条四段:用途 → 形态与数值 → 状态与变体 → 什么时候用。
 
-- **卡片家族零件**(arch-review-2026-10-18/02 中4,`Pulse/Views/CardFamily.swift`):卡壳
-  `cardShell(compact:)`(底色 + 圆角 + 内距,两档;`padded: false` 只给内距随版式
-  变化、自己排内距的卡用——总览卡 16/12、指标主卡 20/12)、主卡头 `CardHeader`(22pt 徽章 +
-  card-title 指标色)、副卡头 `CardSubHeader`(10.5pt 指标色符号 + **12 semibold 指标色标题** +
-  10.5 tertiary 等宽注记;标题升彩色 12 semibold = ui-unify 追改 2026-11-09——卡头即卡片身份,
-  灰标题让 P2 批次卡与排行卡不同族)、统计值 `StatValue`、卡内空态 `CardEmptyState`(12.5 medium secondary 一句 +
-  10.5 tertiary 说明,居中;可带一个 11pt `.link` 动作——授权型能力卡的开启 / 授权 /
-  去系统设置,与告警横幅降级出口同款,其余空态不配按钮)、卡内明细行数值 `CardRowValue`
-  (默认 12 常规 `monospacedDigit` 右对齐;**尺寸随所在行走 RowMetrics 两档**——舒适档行传
-  14.5 semibold,紧凑档 12;最小宽取 `{layout.row-value-*}` 令牌即 `CardRowWidth`;标签列定宽取
-  `{layout.row-label*}`)、**卡内实体行 `CardEntityRow`**(ui-unify 追改 2026-11-09:行首类型
-  图标 + 名称 + 可选副文 + 尾部自定义列,尺寸全走 RowMetrics 两档;图标色由调用方给——
-  活跃态取所在页指标色、非活跃 `{colors.state-inactive}`,代替 6pt 状态圆点)。
-  **新卡一律组装这些零件,
-  不再手写卡壳 / 卡头 / 空态。**
+**判定法**:把一条规矩里的页面名遮掉,它还成立吗?
 
-- **卡内行两形态边界**(ui-unify 追改 2026-11-09,用户第二次问"到底有没有设计原则"后立规):
-  P2 批次明细卡(外设 / 容器 / 传感器 / 五路功率 / 磁盘明细 / 网络累计 / 开发服务)的行与
-  排行 / 清理的列表行**同一语言**,按内容分两形态:
-  **实体行**(行描述一台设备 / 一个对象:蓝牙设备、输出设备、容器、dev server)= `CardEntityRow`,
-  图标 + 名称 + 副文(RSSI、pid、路径等弱信号),尾部数值列 / meter;
-  **读数行**(行描述一个测量:派生温度、风扇、功率域、卷占用、流量累计)= 标签列(定宽
-  `{layout.row-label*}`)+ meter(`RowMetrics.meterWidth`)+ `CardRowValue` 数值。
-  两形态字号一律 RowMetrics 两档(舒适 14.5 / 紧凑 12),不再用 P2 时代的 12pt 全档小字。
-  **未知值安静原则**:逐行状态类未知(设备电量读不到)整块留空,不写"未知 / —"文案占位;
-  数值列里的未知读数(容器 CPU 无样本)仍写"—"——那是表格的诚实单元格,不是状态提示。
-  meter 条宽一律 `RowMetrics.meterWidth`(120 / 52),不随窗宽拉伸——弹窗与主窗口同一节奏。
+- **原则**:全 app 成立、不提任何页面的规矩(颜色、字号、间距、层级、该做不该做)。
+- **组件规范**:一个通用界面件长什么样、有哪些状态、什么时候用;不提它被哪一页使用。
+- **实现细节**:只对某一屏成立的摆法、交互、文案。不进本文件,写在该页代码旁。
 
-- **实体行真图标扩展**(app-volume/01,2026-11-21):`CardEntityRow` 增设可选
-  `image: NSImage?`——给得出真实物件图标(每应用音量卡的 app 图标)时行首画
-  图标本体(`RowMetrics.iconSize` 见方、圆角 5 continuous 收边),缺省回 SF Symbol
-  分支不动;既有调用点零改动(带默认值)。
-- **音量滑块行**(app-volume/01,2026-11-21):实体行的控制形态,首次用于外设页
-  「每应用音量」卡——实体行(真 app 图标 + 名称 + 副文"出声中/静音/接管中")尾部 =
-  原生 `Slider`(宽 `RowMetrics.meterWidth` 两档,与读数行 meter 同一节奏;
-  tint = 所在页指标色)+ `CardRowValue` 百分比(定宽 `CardRowWidth.percentValue`,
-  RowMetrics 数值档)+ 静音图标钮(`speaker.wave.2.fill` / `speaker.slash.fill`,
-  13/11pt,热区 = 行距×2 见方,`.plain` 无边框;静音态钮染指标色,常态
-  `{colors.state-inactive}`)。滑块是**用户驱动**件,不受"meter 无过渡动画"规矩
-  约束;接管失败行副文一句短话("接管失败 · 重拖滑块重试"),完整错误走悬停 help。
+只在一处使用的件再分两种:通用界面件(换一页也可能用)在这里立规范;业务专用的图和卡
+(换一页就没意义)按实现细节处理。本文件里没有「例外」和「偏差」:写着例外,说明规范
+没写完整,应改写成规则;代码没跟上,应改代码。
 
-- **行两档制 RowMetrics**(ui-unify/01,2026-11-08 用户拍板"功能相似组件长一个样",
-  `Pulse/Views/RowMetrics.swift`):全 app **列表行**共享值的单一出处——紧凑档(弹窗)/
-  舒适档(主窗口一切列表行:排行 / 清理 / sheet 清单)。字号 = 名称与数值**同号**
-  (14.5 / 12,层级靠字重 medium vs semibold)、副文 12 / 10.5;图标 24 / 18;
-  meter 120 / 52;行内距 14×10(舒适)/ 6×5(紧凑)。`RankingListMetrics` 与
-  `CleanerListMetrics` 只留页面专属参数(行尾列 / 数值列口径 / 缩进 / 勾选框),
-  共享值一律委托此处,委托关系有防漂移单测钉死(UiUnifyRowMetricsTests)。
-  菜单栏位图不在两档制内(尺寸特例,见上)。
+**总规矩**:新 UI 一律优先组装本节的标准件;标准件覆盖不了的形态,先在本节立规范再造,
+不私开同义新件。
 
-- **统一状态 chip ChipView**(ui-unify/01,`Pulse/Views/ChipView.swift`):胶囊、
-  tint 15% 底 + 同色文字、semibold,全 app 唯一实现。两形态:`.regular`(11pt,
-  内距 10×3,行内独立元素)/ `.inline`(10.5pt,内距 5×1,定宽不换形,挤在名称后)。
-  此前六种手写(HotProcessChip / TierChip / InUseChip / StateChip / BrewChip /
-  MetricChipView)字号 10~11.5、内距 5×1~10×3 互相漂移,已全部收编为 ChipView
-  薄封装;语义 tint 由调用方给(positive / negative / caution / inkTertiary / 指标色)。
+**跨组件的约定**
 
-- **MetricCardView(full)**:徽章 22×22 + 标题 + chevron / 34pt 大数字 + 状态 chip /
-  三列统计 / 36pt 高 44 柱 strip 走势——五张卡同形态(用户拍板 2026-10-20:撤 CPU
-  面积线特例,不再特殊化)。
-- **总览模块卡网格**(用户拍板 2026-10-17;列数 2026-10-24 改自适应):CPU/内存/
-  GPU/磁盘/网络/电池六卡(电池卡随有无内建电池),点卡跳对应 tab;主窗口列数
-  **自适应 1–3**(单卡最小宽 `{layout.overview-card-min-width}` 340,卡间距 16;上限 4 → 3 = agent-tab/06 用户拍板)
-  且**同行等高**、末行不满自动满宽(2026-11-21 用户拍板「多卡一组相同高度」;
-  `AdaptiveCardGrid` 逐行 HStack,每卡 `maxHeight ∞` 顶对齐——LazyVGrid 行内不
-  拉齐高度,不用),清理总览七卡同组件同语义;
-  弹窗 compact 定宽 360 固定 2 列、间距 8(弹窗卡单行内容天然等高,不走等高机制)。
-- **MetricMainCardView**:左列 200pt(标签 / 44pt 数字 / chip / 2×2 统计)+
-  右列 56 点面积图,卡高 176pt。compact(弹窗)竖排:数字行 / 64pt 面积图 / 四列统计;
-  底部走势组件 full / compact 同一(用户拍板:同一指标两处读数同观感)。
-- **排行列表(RankingListCard / RankingListRow,用户拍板 2026-10-20:各 tab 一个样)**:
-  组排行「当前最忙」(`RankingCardView`,可展开 / 悬停结束)与模块排行「能耗影响 /
-  读写最多 / 每进程流量」(`ModuleRankingCardView`,只读)是同一组件的两种用法,不另写卡
-  或行。卡 = 卡内标题 `{typography.card-title}`(12.5 semibold,**所在页指标色**)→ 表头
-  「应用 | 指标名」(10.5 medium tertiary,右列对齐数值列)→ 行 → 可选注脚(10.5 tertiary,
-  如"5 秒一档")→ 空态在卡内(12.5 medium secondary 一句 + 10.5 tertiary 说明;
-  battery-energy/01 起空态可带**一个 `.link` 动作**(授权型能力卡「去开启/去系统设置」
-  出口,`RankingEmptyMessage.actionTitle/action`,与 CardEmptyState 授权配方同一家规:
-  前置条件不在本 app 内完成的空态必须给出路,不留死空态——首例:电池页耗电排行两卡);
-  battery-energy/02 起,**同一前置条件喂多张排行卡**的空态可收成**一条紧凑引导行**
-  (`BatteryGateHintRow`:一行高 `cardShell` 两档 + 页指标色图标 16/13 + title 12
-  medium secondary + detail 10.5 tertiary 单行(hover 显全文)+ 尾部 11 `.link` 出口,
-  文案与动作走 `energyGateEmptyMessage` 同源;**展开触发 = rows 非空,数据说了算**,
-  不猜 gate「快有数据了」——首例:电池页耗电排行两卡在助手未批准/等读数时整段
-  收为一行,双胞胎死卡观感案)。
-  行 = 图标 22→**24** / 名称 13→**14.5 medium**(可挂徽章)/ 副文 10.5→**12 secondary** /
-  meter 110→**120 榜首归一** / 数值 13→**14.5 semibold** `monospacedDigit` **定宽列**
-  (尺寸全走 `RowMetrics` 舒适档,ui-unify/01 排行升舒适档;按口径最宽现实读数量宽 + 2:组排行
-  `.standard` = `9999%` / `99.9 GB` / `999 MB`,模块排行 `.rate` = `999.9 MB/s`;同卡各行同宽,
-  不许按内容撑宽——速率文案会逐行撑出不同宽度。2026-10-30 用户反馈:组排行共用速率宽时
-  CPU 读数右对齐、meter 与数字隔一大截且挤窄名称区,遂分两口径)/ **行尾恒留 30pt 列**(组排行放结束按钮 +
-  展开箭头,模块排行留空)——所有排行的 meter 与数值在同一竖线上。组排行行高负载警示
-  (组 CPU > 100%,阈值 `StatusBadgeRules` 同源)= **该行 CPU 数值 `{colors.state-negative}`
-  红字**(无描边)+ **名称后挂最忙进程 chip**(`HotProcessChip`,靠名称区最右贴 meter:状态 chip 配方,
-  state-negative 14% 底 + 同色字,只写组内 CPU 最高进程的显示名、无图标,10 / 10.5
-  semibold,按字数封顶 18(超出中间省略)、自身不压缩;组名吃剩余宽度尾部省略);仅 CPU 口径行,内存口径行不标(2026-10-30
-  用户拍板 B:要一眼看出"哪个进程在吃";此前 2026-10-26 的"高负载"文字 chip 与
-  数值圈红均已撤)。紧凑档(弹窗):
-  图标 18、名称 12.5→**12**、**数值 11.5→12**(同号,层级靠字重;数值列同法按 12pt 量宽)、meter 52 贴右、
-  **名称区→meter→数值→行尾列间距均 4**(名称区吃满剩余宽度)、**行尾列 24 = 结束按钮 14 + 0 + 箭头 10**
-  (2026-10-30 用户拍板收紧;全尺寸档仍 10 / 30 = 18 + 2 + 10)、行内距 5;卡 `{rounded.card-compact}` 12
-  + `{spacing.card-padding-compact}` 12;全尺寸卡 `{rounded.card}` 18 + `{spacing.card-padding}` 16。
-  排行卡不配节标题(主窗口也不配「当前最忙」节标题)。
-  **meter 条宽度无过渡动画**(读数到即重画;2026-10-29 用户拍板「体感不到的东西不应该
-  存在」——0.6s 缓动让面板开期 CPU 36.5% vs 无动画 8.4%,popover-layout-loop/01)。
-  **行容器与主窗口滚动区一律 `LazyVStack`**(2026-10-30 popover-appkit/10 实测:排行常上百行,
-  普通 VStack 全建 → 弹窗开期鼠标移动 ~33% / 滚动 ~41%,惰性后 ~7% / ~25%;不得退回 VStack)。
-  **排行截断(两处同规则)**:各排行只列前 `{layout.ranking-limit}` 20 名,末行 `RankingOverflowRow`
-  (`{typography.caption}` 11 medium secondary + chevron,居中,悬停底同排行行)按宿主处理溢出——
-  弹窗「查看全部(另 N 项)›」跳主窗口并落地即展开该卡;主窗口「显示全部(另 N 项)⌄」原地展开,
-  展开后「收起,只看前 20 名⌃」;展开态按卡 id 存 `DashboardModel.expandedRankingIDs`(切 tab 回前 20);
-  主窗口搜索命中不截。上限与末行行为单一出处 `RankingOverflow`,卡壳 `RankingListCard` 统一画末行
-  (ranking-limit/01,用户拍板 2026-11-02「直接经验复用,和弹窗一致」;11-01 popover-top20 只截弹窗)。
-  **弹窗滚动区是通用原生列表 `NativeList`**(2026-10-31 native-list,用户拍板):AppKit NSTableView
-  承载 SwiftUI 行——行视图按 kind 复用、行高缓存(排行行同 kind 量一次,卡片 / 展开行按 key 量)、
-  结构不变只换可见行内容、行宿主不参与键盘焦点链;卡片序列出自 `MetricTabStack.blocks`,排行拆卡头 /
-  每行 / 卡尾(`RankingListSlices`)。`popover.nativeList = NO` 回退到下述 List。
-  (回退形态)**弹窗滚动区 `List`**(2026-10-31 popover-list):每张卡一个 List 行,排行卡经
-  环境值 `rankingRowsInList` 拆成卡头 / 每行 / 卡尾各一行,底色按段 `cardSlice` 切开拼回整卡
-  (真机触控板滚动 LazyVStack 36–43%,sample 一半在每帧重出绘制指令、四分之一在重布局)。
-  卡外 8pt 间距 = 首尾段底色外各 4 透明边,不用 listRowInsets 的 bottom(macOS 上被忽略)。
-- **清理页子页命名**:四个子药丸 = **「总览 | 全部清单 | 应用 | 清理历史」**
-  (p6-cleaner/03,丙案 v2;总览居首且为默认落地子页;tab-regroup/03 空间地图迁磁盘页,
-  五子药丸缩编,余序不动)。清单子页标题 = **「全部清单」**
-  (2026-11-08 首改名「开发者垃圾」→「可清理」;p6-cleaner/03 再改「全部清单」——总览
-  已承担"能回收多少"的第一眼,清单页名回归"它是什么:一张全量清单";组名不变;内部标识
-  `CleanerSubTab.junk` 两次都不动,改名只是文案层,先例 p4-uninstaller/08)。
-- **清理总览页**(p6-cleaner/03,丙案 v2;原型 = `prototype/cleaner-reorg` 分支的
-  `cleaner-reorg-plan-c.html`,数值以本条为准——原型非 4pt 网格值在此收编):
-  Hero 卡 + 模块大卡 2 列自适应 + 废纸篓卡,页内整页滚动。
-  - **Hero 卡**:内距 24(上下)×28(左右)(原型 26×28 收 4pt 网格)、圆角
-    `{rounded.card}`;大数字 `{typography.figure-main}` 44(原型 52 收 FigureSize 族
-    既有最大档)+ caption 12「可回收 · 其中 X 可放心清」(X 染 `{colors.state-positive}`);
-    构成条高 8 圆角 4,三段 = safe `{colors.state-positive}` / check `{colors.state-caution}` /
-    inuse `{colors.ink-tertiary}`(段宽按三段合计归一,inuse 段最小可见宽 2%、为 0 不画);
-    图例 11(统一配方见下):可安全清理 / 先检查 / 在用保护 / **「另有废纸篓 X」**
-    (色块 `{colors.junk-trash}` 磁盘金;X 读不到 / 没查如实写「—」,不写 0);主按钮
-    「一键清理 X 安全项…」(accent-clean、
-    `.large` borderedProminent;X = safe 合计;一键 = 全选全部 safe 且**非在用**候选 →
-    既有确认单,默认勾选仍全不勾,「先检查」与在用项永不在内)。
-  - **图例统一配方**(p6-review-fixes 收编:Hero / 模块大卡 / 废纸篓卡三处同一
-    `OverviewLegendItem`,此前三副本参数漂移——色块 8×8 r2.5 / 7×7 r2、块字距
-    5 / 4、项间 14、Hero 条-图例纵距 7 全不在 4pt 网格):文字 11 secondary +
-    `monospacedDigit`;色块 8×8 圆角 2.5;色块-文字 `{spacing.unit}` 4;图例项间
-    `{spacing.group-gap}` 12;Hero 构成条与图例纵向 `{spacing.gap}` 8。
-  - **模块大卡**(六品类 + 废纸篓共七张):2 列自适应(`{layout.module-card-min-width}`
-    340、列距 12、上限 2 列);卡壳走 `cardShell` 全尺寸档(内距 16——原型 18×20 收编到
-    零件档,不另立卡壳);图标瓦 42pt(`CategoryIconTile` size 42、圆角随组件公式
-    size×0.24;类别身份色 `{colors.junk-*}` + 白符号);类名 `{typography.section-title}`
-    17 bold(原型 16 收五档)+ 一句人话 11 secondary(文案蓝本 = 原型);大数字
-    `{typography.figure-card}` 24;卡内构成条高 7 圆角 3.5(同三段色,空段不画、
-    inuse>0 最小可见宽 3%);图例 11(统一配方,见上):可安全清理 X / 先检查 X
-    (>0 才显)/ 在用 X
-    (>0 才显)/ N 项;「最大一项:名称 · 大小」行(顶部分隔线 + 上距 10,11,
-    名称 semibold primary)+ 右缘 chevron;**整卡可点 = 下钻**全部清单按品类过滤。
-    空组不出卡(该品类候选为空自然缺位,不硬造)。下钻空态(该品类被过滤后无
-    条目)走 `CardEmptyState`(与全量空态同族,p6-review-fixes 收编裸 Text)。
-  - **废纸篓卡**(变体,非白名单候选):无构成条;读数大数字同 24 档 + 「N 项」
-    (多卷才显「所有卷汇总」);独立「清空废纸篓…」按钮(普通 bordered、B 档;复用
-    `beginEmptyTrash` → 二次确认流,p6-cleaner/03 自页头迁来,页头原按钮撤除);
-    点卡不下钻。**读数四态**(p6-review-fixes;读不到 ≠ 空,只有查到了才出数字):
-    没查 = 读数位给「清点废纸篓」(11pt `.link`,卡片家族授权型能力动作同款)+ 副文
-    「尚未清点」;清点中 = 小号转圈 + 「正在清点…」(刷新时有上次读数则继续显示
-    数字,不闪占位);读不到 = 「重试清点」+ 副文「读不到(权限不足或宗卷不可用)」,
-    不出 0,Hero 图例同步写「—」;查到了 = 大数字 + 「N 项」。**进页不自动清点**:
-    清点要枚举外置宗卷的废纸篓,可能弹系统授权——首次读数只来自用户点击(「清点
-    废纸篓」或「清空废纸篓…」),本次打开期间清点成功过之后进页才自动刷新,读失败
-    后不自动重试(CODING_STANDARDS 权限纪律)。
-  - **下钻**:全部清单顶部「‹ 总览」返回行(12 accent 文字按钮 + 品类标题 17 bold +
-    「X · N 项」12 secondary + 「全选安全项」)+ 该品类条目(行形态零新,继续
-    RowMetrics / CleanerListMetrics 与项目大卡既有形态);总览↔清单切换不丢勾选
-    (勾选在 `CleanerModel.selection`,模型层天然保持);返回 / 药丸直切 = 回总览并清过滤。
-- **清理页舒适密度档**(2026-11-05 用户拍板,原型三档裁决:行 = A 档,按钮与
-  segmented = B 档,行左右内距加大;参考竞品 Purge 后全页从排行紧凑档升密度;
-  **ui-unify/01 起共享值改由 `RowMetrics` 舒适档单一出处**,与排行页同档同源):
-  清理页四子页(垃圾/应用/历史/地图周边)的行与控件,页面专属尺寸出处仍是
-  `CleanerListMetrics`(`CleanerJunkViews.swift`,委托 RowMetrics):行 = 图标
-  28→**24** / 名称 14.5 medium + 副文 12 secondary / meter 130→**120 榜首归一** /
-  数值 14.5 semibold 等宽**定宽列**(同法按 14.5pt 量最宽现实读数 "999.9 GB" + 2)/
-  行内距 14(左右)×**10(上下)** / 勾选框 `.controlSize(.large)`;安全档 chip =
-  `ChipView.regular`(11 semibold、内距 10×3);
-  **子页搜索框 `CleanerSearchField`**(agent-tab/08):放大镜 + plain 输入 12 +
-  清空钮、primary 6% 底、圆角 7、**定高 24 = 同排分段控件 regular 实测高**
-  (11-08 换的系统 roundedBorder 实测画 26pt 且内嵌放大镜被原生框底盖住,与分段
-  控件上下不齐,作废;配方同主窗口工具栏搜索框);
-  组头 14.5 bold + 总量 12;子页 tab 药丸 = `PillTabBar.comfortable`;**动作按钮与
-  「大小|新旧」segmented 一律 B 档**(按钮 `.controlSize(.large)`、seg 默认 regular
-  不再 mini);项目子组行 = 14.5 bold、上下距 10、**无背景**(权重靠字号与内距)。
-  **勾选框 = 自绘 `CleanerCheckBox`**(2026-11-05 用户实报系统大号 checkbox 不好看,
-  且此前垃圾页系统框 / 应用页 SF 方块两套并存):20×20 圆角 5、描边 1.5——
-  off = 三级墨色描边空心,on = tint 填充 + 白 checkmark,半选(项目行)= tint
-  填充 + 白 minus,禁用 40% 透明;destructive 场景(彻底删除)tint 取
-  `{colors.state-negative}`。纯显示件,点击语义在宿主行:整行可点即勾,
-  项目行点行 = 全选/全清该项目安全产物,收起/展开只归箭头按钮。
-  **2026-11-06 二次改版**:条目 = 小卡(`{colors.surface-card-high}` 底、
-  `{rounded.card-compact}` 12、卡间距 4、内距 14×14;选中 = accent-clean 12% 染底);
-  组头标题 16 bold + 总量在左,右侧 = 「全选安全项」+ 大小|新旧 seg(seg tint
-  accent-clean);组与组之间 18;清理页强调色 = `{colors.accent-clean}`,主窗口
-  工具栏清理 tab 同色(app 层覆写,PulseCore Metric 色表不动)。
-  **项目子组 = 一张大卡包含子项**(同日三次拍板:「项目产物应该是一个大卡片,
-  包含住子项!子项只有缩进!」):项目大卡(card-hi、12 圆角)装头排 + 全部产物
-  子项;子项是**卡内裸行**——只缩进 28、无小卡底(选中 = 强调色 10% 行底),
-  与工具缓存组的独立小卡两形态并存。点头排 = 展开/收起(右缘 chevron,默认展开)。
-  勾选两层口径(同日连续拍板):状态 = 反映全部非在用子项(手勾的「先检查」也让
-  父级如实半选/全选);动作 = 只全选/全清**安全档**子项,没有安全项可勾(纯先检查)
-  时 checkbox 置灰不给假按钮;全在用 → 勾选位换锁;组头「全选安全项」同口径。
-  **候选不过滤亚兆条目**(2026-11-06 用户拍板:0 KB 的产物也是该清的东西,
-  照列;`memory()` 补 KB 档给真实读数,不再显示成「0 MB」)。**产物行副标一律
-  显示完整路径**(同名 node_modules/build 靠路径区分,中段省略;rationale 每行
-  同文案零信息量,降为行悬停 + TierChip 悬停自解释档位)。项目行无可自动勾选项时
-  给**可见**原因:全在用 = 锁图标、全为先检查 = 灰 chip「须逐个勾」。
-  **卸载残留组**(p5-cleaner/02,殿后第三组)= 项目大卡同一配方原样复用(按
-  `JunkGroup.groupsByOwner` 走大卡,工具缓存独占小卡形态):分组键 = 完整 bundle id,
-  头排标题 = 尾段显示名(`com.tencent.qq` → `qq`),meta 前缀完整 id(同尾段的不同
-  app 靠它区分,中段省略);文案名词换「应用 / 残留」。大卡头排「N 天前动过」与行副标
-  「N 天未动」同档粒度(天 / 月 / 年)。全集不完整(某 Info.plist 读不了 / 扫描取消)
-  时不出组,组位给一行三级墨色说明「卸载残留未检测:原因」——**「没查」与「查了
-  没有」两态必须分开**(后者照空态规则不出组、不给说明)。页头副标注记「含卸载残留
-  检测」/「卸载残留未检测」。
-- **清理清单行**(p4-cleaner/04,`CleanerJunkViews.swift`):**舒适密度档**(上行)
-  之下的既有配方:行首系统 checkbox(large);行选中底 =
-  `{colors.surface-card-high}` 70% + `{rounded.inner}` 10。**安全档 chip**(`TierChip`)=
-  统一 `ChipView.regular`(胶囊、tint 15% 底 + 同色文字、11 semibold),两态:可安全清理 =
-  `{colors.state-positive}`、先检查 = `{colors.state-caution}`——映射的是
-  GLOSSARY「安全档」(删除安全语义),不是负载警示,只在此组件出。勾选动作条 =
-  `{colors.surface-card-high}` + `{rounded.card-compact}` 12,内距 8×12,右侧
-  「清除勾选」bordered + 「清理…」borderedProminent(所在页指标色);确认清单走
-  `{layout.sheet-width}` 460 定宽 sheet(标题 `{typography.section-title}`、逐行同清单行减
-  checkbox、页脚总量 `{typography.card-title}` + 口径注记,`{layout.sheet-list-max-height}`
-  220 滚动)。清单默认全不勾;右键行 = 排除该目录 / 在 Finder 中显示。**组头三态
-  checkbox**(2026-10-30 用户拍板 B,`GroupCheckBox`):组标题前一枚系统 checkbox
-  (NSButton allowsMixedState,SwiftUI `Toggle` 无混合态才包一层),**只吃组内「可安全
-  清理」且非在用的项**——none / mixed 点击全勾、all 点击全清,先检查项与在用项
-  永不被组勾选带上;组内无可勾项则不画。**项目产物组与在用灰行**(p4-cleaner/05):
-  组头多一枚 segmented Picker「大小|新旧」(默认大小、regular 档——2026-11-05
-  密度拍板升 B 档,不再 mini;新旧 = 最久未动在前,
-  年龄未知排最后),行副标末尾追加年龄人话(「今天动过 / N 天未动 / N 个月未动 /
-  N 年未动」,口径 = 项目内非产物文件的最后变动含 git 活动);未配扫描根时组位置
-  出一行 `{typography.caption}` 三级墨色引导文案(不硬造空组)。**在用保护行**:整行
-  55% 透明灰显、勾选位换锁形图标(`lock.fill` 三级墨色)、TierChip 位换 InUseChip
-  (同胶囊配方,`{colors.inkTertiary}` 灰——在用是客观状态,不是「先检查」的警示琥珀,
-  文案「在用保护 · 终端与构建正在此项目」由原因集拼出),点行无反应、右键排除保留。
-- **设置「清理」页**(04 排除目录 + 05 扫描根,`CleanerSettingsView.swift`):两节
-  Form。清理扫描根节 = 出厂建议清单(~/Documents / ~/Downloads / ~/Desktop /
-  ~/Developer / ~/Projects / ~/dev / ~/code / ~/src,展示 ~ 写法、存储展开归一后的
-  绝对路径)逐行 Toggle 勾选即加、取消即删,自添目录走文件夹选择器(自添行 =
-  目录图标 + 路径 + 减号删除,与排除行同款);**与「项目根目录」页的归组配置两套
-  独立、零共享**(用户拍板)。页脚说明文案钉死两条口径:项目 = 扫描根直接子目录、
-  在用项目永不进清理且每次清理前重查。
-- **空间地图卡**(p4-cleaner/07 + space-map-forms/01,`CleanerSpaceMapView.swift`;
-  **tab-regroup/03 起住磁盘页**——自清理页子页整卡迁入,为磁盘页**第二块**
-  「主卡 / **空间地图** / 各卷 / 快照 / 读写排行」(2026-11-16 用户目验改序:地图
-  紧跟主卡折线图之下,容量总览与占用地图同族相邻),读清理扫描同一条管线,卡带就地
-  「扫描整台 Mac / 重新扫描」按钮(与清理页头同一管线,一处开扫两处同步);
-  清理页子药丸缩编为四项;**弹窗磁盘页不画地图**(360pt 塞不下旭日——传感器页
-  「弹窗只放派生卡」p2-review/04 同款拍板例外)):
-  **双形态、同一画法**(用户拍板 2026-11-09:两种都要 Canvas 绘制,不要两种
-  方案)——单个 SwiftUI Canvas 一次 draw call,命中一律坐标反算、不依赖形状
-  hit test(方块 = rect.contains;旭日 = atan2 角度 + sqrt 半径)。形态切换 =
-  卡头 `PillTabBar` `.selectedOnly` 双项图标(「方块」square.grid.3x3 /
-  「旭日」chart.pie;space-map-forms/02——原 segmented 非标准件已废),
-  `settings.spaceMapForm` @AppStorage 记住
-  上次;切换不重置下钻位置(下钻 / 面包屑由 DashboardModel 持有——tab-regroup/03
-  随迁上提,切 tab / 切页都不丢)。
-  **版面纪律(ui-unify 追改,2026-11-09 用户实报三修,两形态同守)**:①地图块
-  住在磁盘页外层页面滚动里(清理页时代的子页自带 ScrollView 已随迁页废弃——
-  磁盘页卡片流本就整页滚,嵌套滚动是旧坑;space-map-forms/10「点开旭日文字都被
-  顶上去」由外层滚动兜住);两形态图表区高**同式** = **clamp(滚动视口 ×
-  `{layout.spacemap-sunburst-viewport-share}` 0.8, 形态下限, 上限
-  `{layout.spacemap-sunburst-max-side}` 520)**(下限:方块
-  `{layout.spacemap-chart-min-height}` 220 / 旭日
-  `{layout.spacemap-sunburst-min-side}` 360;`containerRelativeFrame` 量滚动
-  视口),旭日直径 = min(卡内容宽, 图表区高)、卡内居中(08 拍板「跟随宽高
-  中小的那个值」+ 09 上限;弹性 maxHeight 在滚动里塌最小高、07 前清理页无滚动
-  靠弹性区吸收压缩两案皆废)。
-  历代已废:03/04 固定直径 340/400(宽卡里太小)、04 aspectRatio(ScrollView
-  里不可靠)、05 测图表自身宽(与内容宽正反馈撑爆)、06 边长 = 卡宽(= 窗口宽,
-  顶天立地)、07 两列(用户拍板「应该是上下布局」)、09 前无子页滚动(定高页
-  放不下,文字被顶出)、tab-regroup/03 前清理页子页自滚形态;②**悬停零重排**——
-  卡内不出现 /
-  消失任何占行元素(原卡顶悬停信息行已废),悬停信息与按钮一律浮在图表内;
-  ③密封 / 叶子 / 「其他」点击解释 = 图表左上角浮层胶囊(cardHigh 90%,单行截断,
-  不吃点击),不占卡内一行;④**上下堆叠**(地图卡在上、扫描摘要卡在下;
-  07 两列版废;摘要卡统计行 `ViewThatFits` 折行保留——全宽首选整行,放不下折
-  2+2 / 2+1)。
-  - **方块(treemap,默认形态)**:squarify(`TreemapLayout`),块内 名字 + 实际
-    占用(放得下时),高块底部百分比 10.5pt `.monospaced` 小标(等宽登记例外);
-    「可清理」大块药丸 / 小块圆点(p4-uninstaller/05);悬停白名单块(≥140×48)
-    时「这块能清」浮在该块右上角。
-  - **旭日(两环,v1 形态以正确写法回归)**:内环 = 当前根的子辈、外环 = 孙辈,
-    叶子与密封块延伸占满外环(`SunburstLayout`);**直径 = min(卡内容宽,
-    clamp(可视高 × 0.8, 360, 520)),卡内居中**(08 拍板「跟随宽高中小的那个值」
-    + 09 上限「旭日时卡片那么大」;固定直径 / aspectRatio / 自测宽 / 卡宽即边长 /
-    两列半宽卡均废)。
-    **命中 = atan2 标准极角直接
-    比对**(`SunburstArc.contains(angle:)`,纯值可测)——弧角本身就是标准极角,
-    05 前视图层多加 π/2「换算」致悬停恒偏 90°(v1 起潜伏,回归测试钉死)。
-    环形半径 0.28–0.65 /
-    0.65–0.99、中心圈 0.26(01 版 0.34 中心过大环带窄,03 加宽);弧间角向留缝;
-    弧内标签 10.5pt semibold(份额阈值内才显示、左半圆翻转 180° 外向可读;
-    文字径向排布,长度上限 = **本环带宽 ×0.9**,2026-11-11 修正——旧版按弧长
-    量宽,大弧文字长过环带伸出压到相邻环的名上,用户实报「名字重叠」;
-    **名字优先**:大小后缀放得下才带,放不下只显名字,悬停中心圈兜底全读数,
-    同日用户实报「…过多」;文字色随弧深浅切换);「可清理」= 弧内小圆点(药丸弧里放不下)。**中心圈 =
-    悬停读数位**:悬停弧时显示该块名字 12 + 实际占用 14.5 + 「占当前 N%」(密封
-    「只读系统区」/ 合并块「含 N 项」);不悬停时显示当前根 + 「↩ 返回上级」
-    (顶层为「点击色块下钻」提示,点按中心圈 = 返回上级)。悬停白名单弧时
-    「这块能清」锚在该弧中角外缘、钳制在图内(弧带窄,块内右上角配方套不进)。
-  - **两形态共享**:配色 = **分区完全异色·鲜亮版**(三轮拍板:01 高饱和十色
-    0.75 被嫌「闹」,02 同色系深浅上线即被毙「为什么一个颜色了,不同的分区应该
-    完全不同颜色」,03 柔和 0.60 上线一天用户实报「发灰、想要鲜艳」——
-    2026-11-11 折中 = **基色不透明度 0.70 + 地图内局部提饱和 ×1.25**,饱和度
-    只作用于地图、不动全 app 的 accent 令牌;密封 /「其他」灰系不受饱和影响)——
-    顶层块按序循环十个 `{colors.accent-*}`
-    令牌;旭日内环每支一色、外环 = 父色 −0.13;hover 一律
-    +0.08(封顶 0.95);块内 / 弧内文字色 ≥0.5 白、其余墨。
-    「其他」合并块 = `{colors.surface-card-high}` 0.75、系统密封块 =
-    `{colors.inkTertiary}` 0.5(不可下钻);**「其他」合并线两形态统一 1%**——
-    小于整卷 1% 的目录不单独画出,画出来的都要够看清(space-map-forms/02)。
-    「这块能清」浮层按钮同一配方(borderless 10.5 semibold 青 +
-    cardHigh 90% 胶囊底,help 文案明示判定来源与地图只读);点块下钻 / 面包屑逐级
-    可跳(`›` 分隔,末级加粗;不设末尾返回按钮——「› 回到整卷」被读成下一层,
-    2026-11-23 用户拍板删除,回顶层点首级)/ 头部「在 Finder 中显示」。块与弧
-    **不做任何动画**(meter 条同款纪律)。**v1 只读:卡上没有任何删除控件**
-    (ADR-0008 的 UI 边界)。
-    树变换与两种几何全在 PulseCore `SpaceMap.swift` / `TreemapLayout.swift`
-    (firmlink 提升把 /System/Volumes/Data/* 拼回顶层、System 余量折叠为密封块),
-    视图只描边配色命中。
-- **AreaTrendChartView**:56 点、线 2px 指标色、线下渐变 32%→0、4 条 8% 网格线、
-  2% 左垫底;history-hover/02 起带悬停读数(与历史页曲线行为一致):竖线贴吸附点
-  + `AgentChartTooltip`「HH:mm:ss · 数值」两行,数值格式随所在指标(主卡装配点给
-  `valueText`)。**时刻轴与值同环同长才启用**(各采集点并行时间环,心跳 5s/1s
-  混合不按序号猜时刻);**左端 2% 垫底假点槽不出读数**;轴缺失/长度不齐安静收起。
-  **StripChartView**:44 柱、36pt 高,氛围件不查数,**无悬停**(2026-11-24 用户
-  拍板)。二者都是自绘 Canvas,不引 Charts。
-- **历史曲线悬停(HistoryCurveView,history-hover/01)**:历史页走势(自绘 Canvas,
-  空桶断线)带悬停读数——竖线**贴吸附点**(空桶吸最近非空点,等距取更早,全空不出)
-  横贯曲线区(1px 曲线 tint 70%),`AgentChartTooltip` 两行形态报「时刻 · 数值」
-  (时刻 = 桶结束时刻、序列锚推算不用悬停瞬间的钟;桶宽 <1h 到分钟、≥1h 到小时;
-  数值 = `statisticText` 与统计行同口径),定位 `ChartHoverGeometry.tooltipOrigin`
-  (钳位翻面,首帧未量到尺寸前隐藏)——智能体页热力墙同配方(坐标反算 + overlay,
-  竖线贴点不贴光标,agent-tab/07 同语义)。
-- **PillTabBar(通用药丸 tab 条,用户拍板 2026-10-22:tab 是通用组件样式)**:
-  唯一视觉配方在 `Pulse/Views/PillTabBar.swift`——选中 = 该项强调色 15% 胶囊底
-  + 同色前景,未选中 = secondary 前景无底;药丸间距 4;
-  切换动画 0.2s snappy(选中文字自图标侧展开、胶囊生长、其余药丸滑移让位)。
-  两档尺寸:`.regular`(默认 = 现状:callout 12 medium + 内距 9×5,高≈24,
-  工具栏/历史页用)与 `.comfortable`(13.5→**14.5 medium** + 内距 14×8,高≈34;
-  2026-11-05 用户拍板清理页整体升「舒适密度」;清理页子页条与智能体页子页条(agent-tab/06)用此档)。
-  两种文字形态:`.selectedOnly`(未选中纯图标 / 选中图标+文字;图标-only 必带
-  a11y label + help)与 `.always`(文字恒显)。六处用法同一组件:主窗口工具栏
-  tab(`MetricPillTabBar` 薄封装 = `.selectedOnly` + ←/→ 键盘 + 首尾再留 4pt
-  与系统玻璃底的间距;选中才展开文字是用户拍板 2026-10-16 的宽度根治法)、
-  历史页指标条(同工具栏形态:五项各指标色 + 与主窗口 tab 同符号,系统负载取
-  仪表盘符与 CPU 区分)、历史页分项条(p2-review/07,用户拍板 2026-10-24 形态 (a):
-  只在有分项的指标——温度、功率——出现,挂在指标条正下方,`.always` 无图标,一次
-  看一条线不叠加;各项取分项色——功率单域取五路功率卡域配色 `PowerDomain.tint`,
-  一个出处;间距沿用页面竖排间距 8 / 12,不另立数值)、历史页范围条(`.always` 无
-  图标,色调随所选指标 / 分项)、智能体页子页条(agent-tab/06「消耗|会话|开发服务」;
-  tab-regroup/01 dev server 迁服务页后为「消耗|会话」,页指标色)、
-  空间地图形态切换(space-map-forms/02:
-  `.selectedOnly` 双项图标「方块 square.grid.3x3 / 旭日 chart.pie」,卡头内,
-  原 segmented 非标准件已废)。
-  玻璃外裹(用户拍板 2026-10-22:历史页要同款包裹):工具栏胶囊是 macOS 26
-  工具栏给 `.principal` 自动套的系统玻璃;内容页用法传 `isGlassContainer: true`
-  自备同款——药丸外 4pt 内距 + 系统 Liquid Glass `glassEffect()` 胶囊(系统
-  材质,不自绘底/影);工具栏用法恒 false,避免双重玻璃。
-- **工具栏**:药丸 tab 挂 `.principal`,搜索框定宽 **132pt** + 齿轮挂
-  `.primaryAction`;标题不进工具栏(`.toolbar(removing: .title)`)。
-  任何新增工具栏项必须重新验证 720 最小窗宽不触发 `>>` 溢出菜单。
-- **MenuBarLoadLabel / MenuBarBadgeRenderer**:全部内容一次 ImageRenderer 合成
-  **单张**位图(多张 Image 只渲染第一张,实测);槽位 1–4 个(四项可同时上屏);
-  CPU/RAM/磁盘剩余% 槽按 `100%`、网络按 `↓999.9 KB/s`(9pt)**定宽**(`slotWidth`),
-  数字左对齐——状态项宽度恒定,相邻图标不被挤动。网络槽无小标签,↑上行 / ↓下行
-  叠两行(用户拍板 2026-10-20,Stats 同款),两行合高不超过「7pt 标签 + 11.5pt 数字」。
-- **主窗口 / 弹窗同内容**(用户拍板 2026-10-20,取代早先「排行卡 / dev server /
-  历史页弹窗不放」):每个 tab 的卡片组成与顺序只在 `MetricTabStack` 一处定义,两处
-  只差排版档——弹窗卡用紧凑档、主窗口并排的两卡改上下排、节标题不画;组排行卡的
-  交互深度(主窗口搜索 + 可排序进程表)由宿主给。新增卡片只改 `MetricTabStack`。
-  **拍板例外**(两处):传感器 tab 弹窗只放派生读数卡(Average/Hottest + 最快风扇),
-  风扇卡与温度明细卡只在主窗口——逐核明细会把 360pt 弹窗撑得不可用的高
-  (p2-review/04 A,2026-10-24;spec Story 17);磁盘 tab 弹窗不画空间地图——旭日
-  下限 360pt 起,弹窗塞不下(tab-regroup/03,2026-11-16;传感器例外同款)。
-- **传感器卡文案与风扇条**(p2-review/08):风扇转速 rpm 0 写「停转」(真读数,不写
-  「0 rpm」,也不是读失败的「—」);读不到 / 无风扇写「—」。风扇 meter 按该扇上下限归一
-  (rpm−min)/(max−min) 钳 0…1,上下限不可用(max ≤ min)给空条;上下限标注
-  「下限 N · 上限 M rpm」(`{typography.micro}` 10.5 tertiary):全部风扇相同时卡头注记写一次,
-  不同时逐扇行下各写,两处不同时出现。派生卡最快风扇行多扇时数值前带扇名(「名 · 3200 rpm」)。
-- **页头 PageHeader**(popover-header/01,用户拍板 2026-11-02「每个 tab 只有一个标题,且是
-  统一组件」,`Pulse/Views/PageHeader.swift`):主窗口页头 / 弹窗页头 / 清理页页头三处同一
-  出处,不再各自手写。结构 = 标题一行 + 可选副标题一行 + 右侧配件槽。两档:`.full` 主窗口 =
-  `{typography.page-title}` 26 bold + `{typography.body}` 12 secondary;`.compact` 弹窗 = 两行皆
-  `{typography.caption}` 11 secondary;行距 `{spacing.micro}` 2。**副标题「本机一行」(芯片 ·
-  核数 · 内存,`hostSummary`)只有总览带**,其余 tab 只有标题——判据在 `PageHeader.init(tab:)`
-  单点,两窗不许各写一份;清理页副标题 = 扫描状态、配件 = 扫描 / 取消按钮(`CleanerPageHeader`,
-  由主窗口页头槽位画,`CleanerTabView` 本体不画标题)。**主窗口配件槽含告警小条
-  `AlertHeaderIndicator`**(2026-11-16 用户实报:横幅在页头下方铺开、出现/消失把内容推
-  下移):单行「铃铛 + 首条标题(多条『… 等 N 项』)」,明细与归因进悬停;清理页与扫描按钮
-  同槽并排;弹窗仍走底部横幅 `AlertBannerView`(紧凑档,主窗口大字号形态已收编)。
-  **每个 tab 恰一个标题**:tab 内容(卡片 / 子页)不得再画与页名同级的大标题。
-- **弹窗 DashboardView**:面板 `{layout.popover-size}` 360×648 定尺寸;底部操作"开窗靠左、设置+退出靠右"
-  (退出 = 纯图标,用户拍板)。顶部图标 tab 槽位**单行满宽均分**(P2 扩到
-  11 枚后 32pt 定宽槽超出 332pt 内容区、右端裁切;均分只收窄不溢出,与主窗口
-  工具栏 720 预算同一哲学)。页头 = `PageHeader` 紧凑档(页名;本机一行只在总览)+ 右侧
-  运行时长。
-- **状态 chip**:统一 `ChipView`(见 §Components 统一状态 chip;胶囊、tint 15% 底 +
-  同色文字),两态语言(✓正常 / 高负载),阈值在 `StatusBadgeRules`(组 >100%、
-  系统 <30% / >70%)。现役用法 = 指标卡大数字旁(系统负载);排行行不挂"高负载"
-  文字 chip,组高负载 = 数值红字 + 最忙进程名 chip(见排行列表条,2026-10-30 用户拍板)。
-- **智能体页两子 tab**(agent-tab/06 三子页,tab-regroup/01 缩编——dev server 卡
-  迁服务页;定稿骨架 `.scratch/agent-tab/wireframe-agents-page.html` 是唯一视觉真相,
-  纯线稿约定见票):子药丸条 = `PillTabBar` comfortable 档 + 页指标色 + **玻璃外裹
-  `isGlassContainer`**(08 补:06 漏传,与清理页子页条外观不一致)(`AgentSubTabBar`,
-  清理页子页条之后第二个使用者),状态在 `DashboardModel.agentSubTab`(切 tab
-  不丢),默认落「消耗」。**「每日消耗」外壳拆掉,四块平级成卡**(用户拍板);
-  Claude 用量卡撤(用量并入数字卡排第 4 张)。两子页 = **消耗**(下条)/ **会话**
-  (Claude Code 会话卡 + ZCode 会话卡;agent-tab/08 重设计见下「会话子页」)。
-- **服务页**(tab-regroup/01,2026-11-16 拍板):前身容器页(p2-sensors/07),
-  标题「服务」、图标沿用 cube.box.fill、强调色沿用 containers 品类令牌——页的
-  主体仍是容器盘点。三卡上下堆叠:上 = dev server 卡(p1-history/08 配方原样,
-  自智能体页迁回,「全部停止」流不动;dev server 闲置告警落点跟卡走 → 本页),
-  中 = **监听端口卡**(port-view/01):全机监听 TCP 端口 + 占用进程,行 = 端口号
-  (等宽 `:5173`)+ 占用者副文(名字 · pid,多进程如实「等 N 个进程」)+ dev server
-  标注(种类 · 闲置,琥珀,与 dev server 卡同口径)+ 行级「结束」(= 该端口全部
-  占用进程,确认单逐个点名,复用 KillRequestFlow「结束进程」文案零新增);
-  号序 + `{layout.port-row-limit}` 截断展开;root 进程端口读不到、卡脚一行
-  tertiary 小字如实注明;`.ports` 传感器家族 10s 档可见才扫(探针 ≈2.9ms/轮),
-  下 = 容器卡(docker.sock 单发快照表,数据卷占用行维持不做)。
-  - **消耗子页**(agent-tab/05 视觉细节全保留,agent-tab/06 只改结构与归属):
-    ①数字卡排 = **四张一排**(今日消耗 / N 天合计 / 日均 / **Claude 用量**——
-    5 小时窗% 优先缺失退本周,副行「本周 N% · 重置 X 后」,快照缺失「—」不伪造);
-    lift 小卡规格同下;②**日历图 + 走势**:内容宽 ≥ `{layout.agent-chart-two-column-min-width}`
-    1872(窗宽 1920,2026-11-16 修订,原 1280)一排两列等高,否则上下一列(agent-tab/07 替代 `ViewThatFits`)
-    ——「重新扫描」在日历图卡头(与「天 / 周」粒度药丸并排——agent-tab/11 替代 06 的「年」占位单选;**卡头文字按钮配方** =
-    `arrow.clockwise` + 文字,borderless 12 semibold secondary,扫描中换 mini 转圈 +
-    「扫描中」禁用;07 收编 06 的 `.bordered` 小号系统按钮,与空间地图「在 Finder 中
-    显示」同款);
-    ③**项目大卡响应式网格**(三度修正终态,`AgentProjectCardGrid`):单卡保底
-    520、上限 3 列,列数按容器实宽算;**行内 HStack 等高**、末行不满自动满宽;
-    不用 GridItem minimum(flexible 硬下限窄容器溢出,前案)——容器多窄单列
-    都 100% 宽。同规则适用日历图+走势双列与数字卡排:同行卡片一律等高。
-  - **数字卡排**:等宽 lift 小卡(`{colors.surface-card-high}` 底 +
-    `{rounded.card-compact}` 12 + 内距 8×12 + 卡间 `{spacing.gap}` 8):标签
-    `{typography.micro}` secondary → 数值 `{typography.figure-stat}` 28(今日消耗
-    取页 accent 色;弹窗超宽读数 `minimumScaleFactor` 兜底)→ 副行 micro(环比
-    ▲=`{colors.state-positive}` / ▼=`{colors.state-negative}` / 无基准 tertiary;
-    日均副行是峰值不是环比)。随 7/30 档位联动(N 天合计 / 日均(N 天))。
-  - **热力墙**(自封装小组件;05 时代「固定边 14 + 横向滚动 + 每 8 周刻度」
-    被 2026-11-14 用户实报推翻,终态 = **等比缩放、不滚动、每月一刻度**):
-    格子边长 = (容器宽 − 51×间距 3)÷ 52,随窗口等比;52 列一年 364 天最新
-    在右;月刻度 = 列首日月份与前列不同的列标「N 月」;四档色阶(值/年峰值
-    ×4 向上取整,≤8% 灰档;**进行中的今天按时刻折算全天等效量再分档**
-    (折算下限 6h 防凌晨虚高)——进行中的天与完整天直接比天然吃亏,11-14
-    实报「今天没色」:16 点 152M ÷ 年峰 1.94B = 7.9% 恰卡灰档线下 `{colors.surface-card-high}`;accent 透明度
-    0.25/0.5/0.75/1)、图区底 6% 灰;**悬停读数** = 命中格 accent 描边 +
-    格正上方**图表浮层**(下条;锚定命中格,放不下翻下方——07 废「跟随光标
-    像素」,逐格吸附更稳;坐标反算不依赖形状 hit test,空间地图同款纪律)。
-    **按周档**(agent-tab/11,11-16 用户要「切换周,每一列都是一周,同一个颜色,
-    hover 是这一周的用量」):列 = 连续 7 天(末列以今天收尾,滚动周不是自然周),
-    一列 7 格同色、四档按**周峰值**归一(今天那份照样折算全天);悬停命中整列,
-    描边 = 整列外包框,浮层**侧放**(列右侧垂直居中,放不下翻左;整列上下没空间,
-    `ChartHoverGeometry.sideTooltipOrigin`),标题「近 7 天 · 11月8日 – 11月14日」/
-    「11月1日 – 11月7日」;页脚峰值随档「最多一天 / 最多一周」。量化式与按周聚合
-    在 PulseCore `AgentHeatScale`。切档清悬停。
-  - **两图同构**(agent-tab/10,11-15 实报「两个 chart 高度应该一致,左右坐标
-    水平对齐」):两卡结构 = 卡头 → 图区(primary 6% 圆角 8 底)→ **共用自绘日期
-    轴带 `AgentChartAxis`**(定高 18,标签 micro tertiary、中线距图区底 11,两图同一
-    绘制函数)→ 页脚 micro tertiary(热力墙「Claude 与 ZCode 合计 / 最多一天」、
-    走势「近 N 天 · 日均 / 最多一天」)。走势绘图区高 = 热力墙同宽图区高、Charts
-    自带 x 轴隐藏、y 标签挪进图内左上(只留网格线,绘图区铺满卡宽、左右缘与热力墙
-    齐);并排不再靠 fixedSize 拉伸,同构即等高。热力墙月签相邻不足 32pt 丢前一个
-    (首列残月与下月挤成「11月12月」)。
-  - **图表浮层 `AgentChartTooltip`**(agent-tab/07,两图共用,11-14 实报「tooltip
-    不好看」):两行——日期 micro secondary(「今天 · 11月14日」/「11月13日 周四」,
-    跨年补年)+ 8×8 圆角 2 色块 + 读数 `{typography.body}` 12 semibold 等宽;底 =
-    系统 `.regularMaterial`(浮层交给系统材质、不自绘阴影)、`{rounded.chip}` 8、
-    内距 6×8;定位走 PulseCore `ChartHoverGeometry`(锚点正上方居中、间距 6、
-    实测尺寸水平钳位,首帧未量到尺寸前隐藏)。06 的单行 cardHigh 90% 胶囊在
-    卡底上对比不足、宽度硬编码估算,作废。
-  - **走势** = 官方 Swift Charts(`LineMark` + 自定 `AxisMarks`;agent-tab/05
-    首次引入):**y 轴在左**三档 0/半值/峰值 + 网格线、域顶留 15% 头寸;
-    **x 轴 MM-DD 每天一格**(30 天图标签 -45° 斜排防重叠;2026-11-14 用户
-    拍板,替代「N 天前」抽样刻度);**悬停读数** = 吸附日 `RuleMark` 竖线 + 高亮点 + 点正上方图表浮层(07
-    根因修正后吸附即精确,竖线回到数据点上;06g/06h「竖线贴光标」是绕开症状)。
-    **07 根因**:①`.value(_, date, unit: .day)` 让 Charts 把点画在当天区间
-    中点(+12h),刻度与吸附按零点,三者差半天,且旧域 first−12h…last+12h
-    使首点离左缘一整天——**日期轴一律不带 unit,域 = 首…末日零点**,线贴绘图区
-    左右缘;②`proxy.value(atX:)` 吃**绘图区坐标**,overlay 本地坐标须先减
-    plotFrame 原点(漏减 = y 标签宽的系统性右偏);③x 标签 `rotationEffect`
-    不参与布局(斜字仍互压、伸出图外)——**每天一刻度保留,标签按宽抽稀横排**
-    (单签 ≥44pt,从今天倒数、末点恒标;`AxisValueLabel(centered: false, anchor:,
-    horizontalSpacing: 0)` 中间居中、首左末右锚,默认左锚会把末签挤出被丢弃);
-    线 2pt 页 accent + 单调插值、**线下渐变面积 32%→0**(11-14 用户要「带背景、
-    上浓下淡」,同 AreaTrendChartView 配方,替代图区 6% 平底)、末点圆点、缺天画 0;轴字 `{typography.micro}` tertiary。
-  - **token 读数格式**(agent-tab/08):唯一出处 PulseCore `AgentTokenFormat`
-    (app 层 `agentTokenText` / `agentTokenFigure` 仅转发)——999 / 556k / 6.9M /
-    **≥1000M 进 B**(1.9B,一位小数;M 档四舍五入到 1000.0M 时直接升 B)。
-  - **会话子页**(agent-tab/08 重设计,11-14 实报「不好看;23% 看不懂;6/10 6.9M
-    看不懂」——06 沿用实体行,右侧裸数字无标签无单位):每会话一块 lift 小块
-    (cardHigh 底、`{rounded.inner}` 10、内距 12 / 弹窗 10,块间 8);左 = 图标 +
-    **项目名**(row-name semibold;09:工作目录经 PulseCore `AgentSessionLocation`
-    折回主仓名,worktree 另挂 `ChipView.inline` ink-tertiary +
-    `arrow.triangle.branch`「⑂ slug」——11-14 实报「看不出是哪个项目」;**分支
-    chip**(agent-git-status/01):worktree 标签后同款 `ChipView.inline`
-    ink-tertiary 显会话工作目录当前 git 分支(detached 显 7 位短 SHA;非 git
-    仓库安静缺位),工作区有未提交改动(含未跟踪文件)再挂「未提交」
-    `ChipView.inline` `{colors.state-warning}`;数据 = 智能体页可见才采,15s 档
-    (cwd 集变化提前 5s),采集含 git 子进程全在后台任务)+ 状态 `ChipView.inline`(Claude 忙 = 页 accent、其余
-    ink-tertiary;ZCode 在跑 / 空闲)→ 摘要(row-sub secondary:Claude 任务摘要 /
-    ZCode 更新于 N 前)→ **路径行**(09:`folder` + home 缩写 `~` 的工作目录,
-    micro tertiary,中段截断,help 显全路径)→ 元信息 micro tertiary(Claude
-    会话名「…」(与项目 / worktree 同名不写)· 模型 · 运行时长 · 子代理 N ·
-    pid;ZCode 会话短 id);右 = **带标签读数块**(右对齐:标签 micro tertiary +
-    读数 row-value semibold → `MeterBar` 定宽 `RowMetrics.meterWidth` → 注脚 micro
-    tertiary):Claude「上下文 N%」+「已用 / 窗口上限」(无读数「—」+「尚无请求」),
-    ZCode「子代理在跑 a / b」+「累计 N tokens」。卡头右计数「N 个实例」/「近一天
-    N 个会话」caption secondary。读数一律自带口径与单位,不出裸数字。
-  - **项目大卡**(agent-tab/07 重设计,11-14 用户实报「有点丑」;06 版五层四条
-    分隔线 + 两条独立分段条 + 满屏 micro 灰字、无主次,作废):卡 = cardHigh 底 +
-    `{rounded.inner}` 10 + 内距 `{spacing.card-padding}` 16,**段间 16、段内 8**,
-    四段:①头 = `folder.fill` 12(在跑 / 今天活跃取页 accent,静了取
-    `{colors.state-inactive}`)+ 项目名 14.5 semibold + 在跑时 `ChipView.inline`
-    「在跑 N」`{colors.state-positive}`;右「占 N%」caption 11 secondary;下接主数值
-    `{typography.figure-card}` 24 + 环比 micro。②五格读数(Input / Output /
-    Cache R / Cache W / Cache× **两端对齐等间距**(08:首格贴左、末格贴右且
-    内部右对齐,格间 Spacer 均分;07 等宽列让末格悬在中段),标签 micro tertiary + **值 14.5 semibold
-    等宽**——06 的 12 与标签层级太近;倍率 = 缓存读 ÷ 净(输入+输出),分母 0 →
-    「—」)。③构成两行「模型 / 来源」:左标签列 `{layout.row-label-short}` 36
-    (caption secondary)+ 右分段条(**高 6 圆角 3、段间 2pt 缝**,轨道
-    `{colors.ink-tertiary}` 14%;模型色 `{colors.agent-model-*}` 按序、占比前二 +
-    「其他」;来源 Claude / ZCode = 前两色)+ 图例(6×6 圆角 2 色点 + 名 secondary +
-    占比 tertiary,micro;份额 0 不进图例)。④**全卡唯一一条 hairline**,下接元信息
-    尾行:SF 符号引导三项(calendar 活跃 N/窗口 天 · bubble 现存会话数 · 箭头
-    请求数,caption 11 secondary,符号 tertiary,项间 16)+ 右「今天活跃 / 静了 N 天」
-    tertiary。**现存会话数**口径不变(Claude≈近 30 天未删文件 + ZCode 有账全史,
-    扫描现数不落库;slug 末词与账本项目名做唯一尾段归并)。Cost 美元与精确
-    Last Active = 用户点名不做。
+- **图表分工**:环形图与带轴的折线图交给系统图表库(静态或低频重画);高频重画的迷你
+  走势与历史曲线自绘 Canvas,可控成本。带轴的折线图,日期轴不带单位、域取首末日的
+  零点,否则点会偏离刻度半天。
+- **动效纪律**:读数类的图形(meter 条、走势图、空间地图)不做过渡动画,读数到即重画;
+  体感不到的动画不该存在。全 app 的切换动效只有页签一种。
+- **主窗口与弹窗同一套卡片**:每个 tab 的卡片组成与顺序只在一处定义,两个窗口只差
+  排版档(弹窗走紧凑档)。弹窗里恒上下排、间距 `{spacing.gap}` 8;主窗口按断点并排
+  等高(见第 5 条)。两类内容只在主窗口:需要逐核明细的传感器卡,和空间地图。
+- **未知与未查分开**:读不到、没查、查了没有是三种不同的状态,界面必须分开呈现;
+  没查到的数字不上屏,读不到时不写 0。
+- **纯图标按钮**必带悬停提示与无障碍标签。
+
+### 1. 卡片家族零件
+
+**用途**:卡壳、卡头、统计值、空态、卡内行的唯一实现;所有卡片由这些零件组装。
+
+**形态与数值**
+
+- 卡壳 `cardShell(compact:)`:`{colors.surface-card}` 底;全尺寸 `{rounded.card}` 18 +
+  `{spacing.card-padding}` 16,紧凑档 `{rounded.card-compact}` 12 + `{spacing.card-padding-compact}` 12。
+  版式确需自定内距的卡传 `padded: false` 自己排。
+- 主卡头 `CardHeader`:徽章(22×22、`{rounded.chip}` 8、强调色 16% 底,内含
+  `{icons.inline}` semibold 的符号)+ `{typography.card-title}` 12 semibold 强调色标题,
+  右侧是配件槽。
+- 副卡头 `CardSubHeader`:`{icons.inline}` semibold 符号 + 12 semibold 标题(同强调色)
+  + `{typography.micro}` 10.5 tertiary 注记(等宽数字)。
+- 统计值 `StatValue`:标签 `{typography.micro}` 10.5 secondary(可带 6×6 色点),
+  数值 `{typography.body}` 12 semibold、等宽数字、单行。
+- 空态 `CardEmptyState`:12 medium secondary 一句 + 10.5 tertiary 说明,居中。
+- **实体行** `CardEntityRow`(行描述一台设备、一个对象):行首类型图标(外框取
+  `{icons.leading-*}` 一档,符号 `{icons.leading-compact}` / `{icons.leading-comfortable}`)
+  + 名称 + 副文(等宽数字、secondary)+ 尾部自定义列;名称与副文各单行。
+- **读数行** `CardReadingRow`(行描述一个测量):标签(单行、中段省略、弹性宽)+ meter
+  (定宽)+ 数值 `CardRowValue`(默认 12 常规 secondary、等宽数字、右对齐;最小宽取
+  `{layout.row-value-*}`)。
+- 行内一切尺寸取自第 2 条;meter 条见第 6 条。
+
+**状态与变体**
+
+- 卡壳两档:全尺寸 / 紧凑(弹窗)。
+- 空态可带一个 `{typography.caption}` 11 的文字动作:前置条件要在本 app 之外完成的空态
+  (开启、授权、去系统设置)必须给出路,不留死空态;其余空态不配按钮。
+- 未知值安静:逐行状态类的未知(设备电量读不到)整块留空,不写「未知」「—」占位;
+  数值列里的未知读数仍写「—」,那是表格的诚实单元格。
+- 实体行的图标色由调用方给:活跃取所在页的强调色,非活跃取 `{colors.state-inactive}`。
+
+**什么时候用**:新卡片一律组装这些零件,不手写卡壳、卡头、空态。实体的信息用实体行,
+测量的信息用读数行。
+
+### 2. 列表行两档制
+
+**用途**:全 app 列表行共享尺寸的唯一出处(`RowMetrics`),保证功能相似的行长一个样。
+
+**形态与数值**(舒适 / 紧凑)
+
+| 项 | 舒适(主窗口一切列表行) | 紧凑(弹窗) |
+|---|---|---|
+| 名称字号 | 14.5 medium | 12 medium |
+| 数值字号 | 14.5 semibold,等宽数字,定宽列 | 12 semibold,同上 |
+| 副文字号 | 12 | 10.5 |
+| 行首图标外框 | 24 | 18 |
+| meter 条宽 | 120 | 52 |
+| 行内元素间距 | 10 | 8 |
+| 行水平内距 | 14 | 6 |
+| 行上下内距 | 10 | 5 |
+| 卡内行之间的间距 | 20 | 10 |
+
+- 名称与数值**同号**,层级靠字重。
+- 卡内行(卡片里的实体行、读数行)没有悬停底、不带行内距,靠行间距复刻列表行的节奏。
+- 数值列定宽:按该列最宽的现实读数,以实际绘制字体量宽;同列各行等宽,不按内容撑宽。
+- 大卡里只缩进、不套小卡的子行(卡内裸行)统一缩进 28、上下内距 10。
+
+**状态与变体**
+
+- 两档:**舒适**给主窗口的一切列表行(排行、清单、确认单),**紧凑**给弹窗;同一份数据
+  在两个窗口只差档位。
+- 页面专属参数(行尾列、缩进、勾选框、数值列口径)留在各页自己的尺寸常量里,共享值
+  一律委托 `RowMetrics`;委托关系有防漂移单测。
+
+**什么时候用**:任何列表行、表头、清单。meter 条宽不随窗宽拉伸,弹窗与主窗口同一节奏。
+
+### 3. 状态芯片
+
+**用途**:行内或大数字旁的一枚状态标签,全 app 唯一实现(`ChipView`)。
+
+**形态与数值**:胶囊;强调色 15% 底 + 同色 semibold 文字;内容之间间距 3;可选的符号与
+文字同号同字重;文字单行。
+
+**状态与变体**
+
+- 两形态:`.regular`(11pt,内距 10×3,行内独立元素)与 `.inline`(10.5pt,内距 5×1,
+  定宽不换形,挤在名称后面)。
+- 语义色由调用方给:正常 `{colors.state-positive}`、危险 `{colors.state-negative}`、
+  「先检查」`{colors.state-caution}`、值得留意 `{colors.state-warning}`、页强调色。
+- **客观状态用灰**:在用保护、已退出、无权限、安装来源徽标、放电中,这些不是警示,
+  一律 `{colors.ink-tertiary}`。
+- 安全档是芯片的一种固定用法:可安全清理 = 正面色,先检查 = `{colors.state-caution}`;
+  它映射的是删除的安全语义,不是负载警示。
+- 高负载的警示(组 CPU 超过一个核)不在行里挂文字芯片:该行数值染负面色 + 名称后一枚
+  `.inline` 芯片,写组内 CPU 最高进程的名字(超长中间省略)。
+- 芯片本身不接点击;给了提示文案才挂悬停说明。
+
+**什么时候用**:任何「状态 / 类别 / 标签」语义的小标签。芯片里的符号字号随芯片档位,
+不取图标五档。
+
+### 4. 指标卡两形态
+
+**用途**:总览的指标卡与各指标页的主卡,两种固定版式。
+
+**形态与数值**
+
+- **总览指标卡**:主卡头(徽章 + 标题 + 行尾右箭头)→ `{typography.caption}` 11 的一句
+  说明 → `{typography.figure-overview}` 34 的大数字 + 状态芯片 → 最多三列统计值 →
+  36pt 高的条形走势;段间 12,内距 16。紧凑档换副卡头,大数字 22,说明退到大数字右侧,
+  内距 12。各指标同形态,不为某个指标特殊化。
+- **指标页主卡**:左列 200pt(11pt 说明、`{typography.figure-main}` 44 的大数字、状态
+  芯片、2×2 的统计值)+ 右侧撑满的面积走势;卡高 176,内距 16。紧凑档竖排:说明与
+  大数字一行、64pt 高的走势、统计值一行;内距 12。
+- 大数字只有 `FigureText` 一个实现:圆体加粗、等宽数字、负字距;单位约半号、次级色。
+
+**状态与变体**:全尺寸 / 紧凑两档;同一指标在主窗口与弹窗的读数同一观感。总览卡整卡
+可点(进入对应页);主卡不可点。图表对无障碍隐藏,数值由统计文字承载。
+
+**什么时候用**:一个指标的「当前值 + 状态 + 构成」概览。更细的构成与排行另起卡片。
+
+### 5. 自适应卡片网格
+
+**用途**:并排卡片的通用排法(`AdaptiveCardGrid` / `AdaptiveCardPair`),容器变窄时自动降列。
+
+**形态与数值**:列数 = 容器实宽容纳得下的最多列,单卡最小宽与列距是参数;总览用
+`{layout.overview-card-min-width}` 340、列距 `{spacing.card-gap}` 16、上限 3 列;清理总览
+的模块卡同最小宽、列距 12、上限 2 列。两卡一组的并排断点是
+`{layout.card-pair-two-column-min-width}` 696,不足就上下排、间距 16。
+
+**状态与变体**:并排时**同行等高、顶对齐**,末行不满自动满宽;容器再窄,单列也是 100% 宽。
+逐行用横向堆叠实现,不用 `GridItem` 的最小宽(它的下限是硬的,窄容器会被撑出右缘),
+也不用惰性网格(行内不拉齐高度)。列数的几何监听挂在网格外层的普通容器上。
+
+**什么时候用**:任何卡片并排;同一行里的卡片一律等高(数字卡排、两图并排、项目卡都守这条)。
+
+### 6. 排行列表
+
+**用途**:「谁最占」的榜单:组排行、模块排行、各页的排行榜同一套卡和行。
+
+**形态与数值**
+
+- 卡:卡内标题(`{typography.card-title}` 12 semibold,页强调色)→ 表头(应用 | 指标名,
+  `{typography.micro}` 10.5 medium tertiary,右列对齐数值列)→ 行 → 可选注脚(10.5 tertiary)。
+  排行卡不配节标题。
+- 行:行首图标、名称(可挂 `.inline` 芯片)、副文、meter 条、数值、行尾列。尺寸全取自
+  第 2 条;行尾恒留一列(舒适 30 / 紧凑 24),放结束按钮与展开箭头,所以所有排行的
+  meter 与数值在同一条竖线上。
+- meter 条:高 6、胶囊;轨道 = 强调色 14%,填充 = 强调色;对无障碍隐藏。
+- 截断末行:`{typography.caption}` 11 medium secondary,居中,带上下小箭头;悬停有底。
+
+**状态与变体**
+
+- 两种用法:**组排行**(行可展开,悬停显出结束按钮)与**只读的模块排行**。
+- 默认只列前 `{layout.ranking-limit}` 20 名,末行是「显示全部(另 N 项)」;主窗口原地
+  展开、可收起,弹窗点了跳主窗口并展开该卡;展开状态按卡记住;搜索命中时不截。
+- 空态在卡内。同一前置条件挡住多张排行卡时,收成一条紧凑的引导行(一行高:页强调色
+  符号 + 一句说明 + 文字动作),数据到来才展开——展开与否由数据决定,不猜。
+- 高负载只标 CPU 口径的行:数值染负面色 + 名称后最忙进程芯片。
+- 行容器与主窗口的滚动区一律惰性堆叠(排行常上百行)。
+
+**什么时候用**:按某个口径给对象排序并展示前若干名。表头、数值列、截断末行都复用,
+不各写一套。
+
+### 7. 药丸页签条
+
+**用途**:页内切换(`PillTabBar`),tab 是通用组件样式。
+
+**形态与数值**:选中 = 该项强调色 15% 胶囊底 + 同色前景;未选中 = secondary 前景、无底;
+药丸间距 4;图标与文字间距 5,图标 `{icons.inline}`。常规档文字 `{typography.body}`
+12 medium、内距 9×5;舒适档 14.5 medium、内距 14×8。
+
+**状态与变体**
+
+- 两档尺寸:`.regular`(工具栏、页内小切换)与 `.comfortable`(大一号的子页条)。
+- 两种文字形态:`.always`(文字恒显)与 `.selectedOnly`(未选中纯图标,选中才图标 + 文字;
+  这时每项必须有图标,并带无障碍标签与提示)。
+- 玻璃外裹:放在系统工具栏里由系统自动套玻璃;放在内容页里传 `isGlassContainer`
+  自备同款(条外 4pt 内距 + 系统 Liquid Glass 胶囊),不自绘底与影。
+- 切换动效 0.2 秒 snappy:选中文字自图标侧展开、胶囊生长、其余药丸滑移让位。
+
+**什么时候用**:指标页签、子页条、范围与粒度这类二选一或几选一的切换。工具栏里的页签
+必须按 720 最小窗宽预算,不能触发溢出菜单。
+
+### 8. 页头
+
+**用途**:每个 tab 顶部的标题行(`PageHeader`),主窗口、弹窗、清理页同一出处。
+
+**形态与数值**:标题一行 + 可选副标题一行(行距 `{spacing.micro}` 2)+ 右侧配件槽。
+全尺寸档标题 `{typography.page-title}` 26 bold、副标题 `{typography.body}` 12 secondary;
+紧凑档两行皆 11 secondary。
+
+**状态与变体**
+
+- 每个 tab 恰一个标题:页内的卡片、子页不得再画与页名同级的大标题。
+- 「本机一行」副标题只有总览带,判据在页头的初始化里单点决定。
+- 配件槽里放动作按钮、扫描状态、运行时长。主窗口的配件槽里有**告警小条**:单行
+  「铃铛 + 首条标题(多条时『… 等 N 项』)」,12 semibold、警示色 12% 底、`{rounded.inner}`
+  10 圆角;明细与归因进悬停;告警的出现与消失不推动下方内容。弹窗的告警走底部横幅。
+- 页头的高度优先级高于内容区:窗口再矮,先挤内容,不截标题。
+
+**什么时候用**:任何 tab、任何子页的顶部。标题只在页头出现一次。
+
+### 9. 菜单栏徽标
+
+**用途**:菜单栏上的读数位图,一个状态项里并排 1–4 枚。
+
+**形态与数值**:一次离屏渲染合成**单张**位图(多张图系统只画第一张),原样交给状态项
+——系统会剥掉 SwiftUI 前景色,只有位图保得住颜色。每枚 = 小标签(7pt semibold,
+55% 墨色)+ 数值(11.5pt medium,等宽数字);上下行叠放版式不带标签,两行 9pt medium;
+枚与枚之间间距 5。数值槽按各指标最宽的现实读数定宽、数字左对齐,状态项宽度不随读数
+抖动。
+
+**状态与变体**
+
+- 墨色随外观(深色白、浅色黑)。强调级三级:正常 = 墨色;偏高 = `{colors.state-warning}`;
+  危险 = `{colors.state-negative}`。位图里的深浅值按当次传入的外观解析。
+- 读数有 2 个百分点的死区:死区内不换数字,越红线立即换——防抖而不迟钝。
+- 缓存键 = 外观 + 全部内容(文案、强调级、版式、定宽槽、顺序),任何一项变化都重渲染;
+  缓存有界。
+- 字号与配色自成一组,只用于菜单栏位图,不外溢到窗口;窗口的五档与图标档位也不带进来。
+
+**什么时候用**:只有菜单栏状态项。徽标的字号与版式是 `NSStatusItem` 尺寸约束下的独立档。
+
+### 10. 迷你走势图
+
+**用途**:卡内「最近一段时间的形状」,两件都是自绘的 Canvas,无轴无标签。
+
+**形态与数值**
+
+- **面积走势图**(`AreaTrendChartView`):56 个点、线宽 2pt 强调色、线下渐变 32%→0、
+  4 条 8% 的网格线、左端 2% 垫底。
+- **条形走势图**(`StripChartView`):44 根柱、柱距 2、上缘圆角 2,轨道 = 强调色 9%。
+
+**状态与变体**:面积走势图带悬停读数(见第 14 条):竖线贴吸附点 + 浮层;时刻轴与数值
+同环同长时才启用,左端垫底的假点槽不出读数,轴缺失或长度不齐就安静收起。
+条形走势图是氛围件,不查数,不做悬停。
+
+**什么时候用**:卡内的概览走势。高度由所在卡给;两件都对无障碍隐藏,数值由卡上的文字承载。
+
+### 11. 面包屑
+
+**用途**:表示「现在在哪一层」并逐级返回的路径栏。
+
+**形态与数值**:层级之间用 `›`(tertiary)分隔,字号 `{typography.caption}` 11。
+非末级的层级是可点的文字按钮(secondary),点了跳到那一层;末级加粗,不可点。
+路径栏末尾不挂任何按钮——前面带分隔符的按钮会被读成下一层。
+
+**状态与变体**:层级链由数据模型按路径给出,路径不在树里时不猜、不画。下钻位置由
+页面的状态持有,切 tab、切展示形态都不丢。
+
+**什么时候用**:任何有层级的下钻导航。返回上一层点上一级,回顶层点第一级。
+
+### 12. 搜索框
+
+**用途**:列表与工具栏里的过滤输入。放大镜 + 无边框输入框 + 清空按钮,按宿主分两种版式。
+
+**形态与数值**:放大镜(`{icons.inline}`,secondary)+ 无边框输入框(`{typography.body}`
+12)+ 有内容时出现的清空按钮(`{icons.inline}`,secondary,带悬停提示与无障碍标签);
+底 = `primary` 6%、左右内距 8。
+
+**状态与变体**
+
+- **页面内版**:定高 24(与同排的分段控件等高),`{rounded.chip}` 8 圆角,宽度随容器。
+- **工具栏版**:定宽 132,胶囊底,⌘F 聚焦。
+- 按 Esc 清空;工具栏版内容为空时再按 Esc 失焦,清空后焦点留在框里。
+
+**什么时候用**:过滤一组列表。不用系统带边框的搜索样式:它的高度与分段控件对不齐。
+
+### 13. 勾选框
+
+**用途**:自绘的勾选框,替代系统控件,全 app 一套。
+
+**形态与数值**:20×20、圆角 5、描边 1.5。关 = `{colors.ink-tertiary}` 描边空心;
+开 = 强调色填充 + 白色对勾;半选 = 强调色填充 + 白色横线;对勾与横线 `{icons.inline}` bold。
+
+**状态与变体**
+
+- 三态:关 / 开 / 半选。半选只用在「一行管一组」的卡头。禁用时 40% 透明。
+  强调色默认 `{colors.accent-clean}`,破坏性场景(彻底删除)取 `{colors.state-negative}`。
+- 纯显示件:点击语义在宿主行——整行可点即勾选;勾选框本身对无障碍隐藏,由宿主行
+  宣布「已勾选 / 部分勾选 / 未勾选」,避免重复朗读。
+- 卡头的三态勾选框:半选 = 组里只勾了一部分;点它只全选或全清组里**可安全清理且不在用**
+  的项;组里没有可勾的项时置灰,不给假按钮。
+- 品类这一级的组头不设勾选框,用「全选安全项」文字按钮(见第 15 条)。
+
+**什么时候用**:清单里的逐行勾选,以及「一行管一组」的卡头。状态如实反映所有子项,
+动作只作用于安全档。
+
+### 14. 图表悬停读数与浮层
+
+**用途**:图表上悬停时的读数:一条贴在数据点上的竖线,加一个小浮层。
+
+**形态与数值**:悬停位置一律用坐标反算,不依赖形状的点击测试。竖线贴**吸附到的数据点**
+而不是光标:空桶吸最近的有效点,等距取更早的;竖线 1pt、图表色 70%。
+浮层(`AgentChartTooltip`):第一行微字号的时刻或名称(secondary,等宽数字),第二行
+8×8 圆角 2 的色块 + `{typography.body}` 12 semibold 的读数(等宽数字);系统材质底、
+`{rounded.chip}` 8 圆角、内距 6×8;不接鼠标。
+
+**状态与变体**
+
+- 定位:锚在被命中数据点的正上方居中、间距 6;上方放不下翻到下方;上下都没空间时
+  侧放(整列命中的周视图)。水平方向钳在图内;首帧还没量到浮层尺寸时不显示。
+- 浮层可在读数下追加一块 2×2 的四格明细(有分项数据时才有):标签 10.5 tertiary、
+  值 11 semibold、等宽数字。
+- 读数自带口径与单位,不出裸数字。时刻取吸附点自己的时刻,不取鼠标的瞬时位置。
+- 切换粒度或数据范围时清掉悬停态。
+
+**什么时候用**:历史页的曲线、智能体页的热力墙与走势图、指标页主卡的面积走势图。
+空间地图的悬停读数是同一思路的就地版本:读数画在旭日的中心圈里,不另起浮层。
+
+### 15. 卡头文字按钮
+
+**用途**:卡头右侧的次要动作,低存在感的文字按钮。
+
+**形态与数值**:无边框(`borderless`)、`{typography.body}` 12 semibold、secondary 前景;
+可带一个前置的系统符号。不用带边框的系统小按钮。
+
+**状态与变体**
+
+- 进行中换成小号转圈 + 状态文案并禁用;不可用时隐藏或置灰。
+- 返回上一级的文字(如「‹ 总览」)用页强调色,不用 secondary。
+
+**什么时候用**:卡头或组头上的「重新扫描」「在 Finder 中显示」「全选安全项」这类次要
+动作。页里的主行动作用带底色的强调按钮;浮在图表上的胶囊按钮、行尾的图标按钮各是
+别的件,不用它。
+
+### 16. 设置侧栏图标砖
+
+**用途**:设置窗侧栏每个设置页前面的彩色图标。
+
+**形态与数值**:26×26、`{rounded.chip}` 8 圆角;底 = 从左上到右下的线性渐变,起止色取
+`{colors.settings-icon-*-from}` / `-to`(固定色,不随明暗切换,每页一对);上面是白色
+系统符号 13pt semibold,符号带一层很淡的柔影;砖的外缘有 0.5pt 的白色高光描边,
+底下一点柔影。仿系统设置的侧栏图标。
+
+**状态与变体**:没有选中态与交互——它是装饰件,对无障碍隐藏,可访问性标签由旁边的
+页名文字承担。
+
+**什么时候用**:只有设置窗的侧栏。它是全 app 唯一带投影与高光描边的界面件(见
+§Elevation & Depth),不加进其它页面;新增设置页时在页清单里登记一对渐变色。
 
 ## Do's and Don'ts
 
 **Do**
-- 新视图先查本文件;数值不在令牌表里 = 需要新令牌(先改表再写码)。
-- 数字一律 `monospacedDigit()`;颜色一律语义键;圆角/内距一律查表。
-- 用户可见的新形态:实机截图验收交给用户(代理不循环截图),机械断言进单测。
+
+- 新视图先查本文件和所在页的页面规格;数值不在令牌表里 = 先补表再写码。
+- 数字一律 `monospacedDigit()`;颜色一律语义键;圆角与内距一律查表;文字只取五档,
+  图标只取五档。
+- 新的通用界面件先在 §Components 立规范,再实现。某一页的实现细节写在该页代码旁,
+  不进本文件。
+- 用户可见的新形态:实机验收交给用户(代理不循环截图),机械断言进单测或 lint。
 
 **Don't**
-- 不直写 `Color.orange/.red` 或 hex;不新增投影/描边;不引第三方 UI/图表/字体库。
-- 不把窗口 UI 的规格带进菜单栏位图(字号、颜色管线都是特例),反之亦然。
-- 已拍板的样式不静默回退:未选中 icon-only 药丸、总览卡底部 44 柱 strip(弹窗与
-  主窗口同形态,五张卡不分指标)、退出纯图标……要改先问用户。
-- 工具栏不做会触发溢出菜单的加项(720 窗宽预算优先级 > 功能堆叠)。
 
-## 已知偏差(重构时收编,不新增)
-
-2026-10-17 首轮收编已完成(rg 全量盘点 → 逐项落码):圆角 6/7/9pt → `{rounded.chip}`
-8pt(进程行选中底/设置图标砖/徽章/弹窗底排按钮);标签-值行距 3pt → `{spacing.micro}`
-2pt ×5 处;卡间 18pt → `{spacing.card-gap}` 16;弹窗紧凑卡与进程详情内距 10 →
-`{spacing.card-padding-compact}` 12;进程行水平内距 10 → 12(表头同步,列对齐不变);
-chip 图标 9.5pt → micro 10.5;排行行 chevron 9pt → 10。
-
-勘误(盘点时误报,实为合法形态,不改):12.5pt = `{typography.card-title}`;
-13pt/16pt 出现在 **图标与容器尺寸**(图标 tab、设置图标砖、图标砖边长),不受文字角色约束;
-17pt 已立为 `{typography.section-title}` / `{typography.figure-mini}` 两角色。
-
-2026-10-20 第二轮收编已完成(arch-review-2026-10-18/02):11.5pt 文字 13 处 → 说明类
-`{typography.caption}` 11、行标签 / 数值 / 按钮 `{typography.body}` 12;卡壳 / 卡头 / 统计值 /
-空态收进卡片家族零件(环形卡空态的 28pt 竖向内距随之消失);告警横幅裸橙 + 描边 →
-`Surface.warning` 淡底、无描边;类别色 `.brown/.gray/.orange` → 类别身份色;进程表结束
-按钮 `.red` → `Surface.negative`;大数字字号 → `FigureSize` 令牌。
-
-登记的有意例外(不是偏差):
-- **设置窗侧栏的彩色渐变图标砖**:仿系统设置风格(SettingsView),属系统外观对齐,不走
-  指标色 / 类别色。
-- **环形图用 Apple Charts(`SectorMark`),走势图自绘 Canvas**:环形的扇区几何与图例
-  交给 Charts 最省;走势是高频重绘的 44 柱 / 56 点,自绘可控成本——有意分工,不统一。
-  每日消耗卡的「走势」用 Charts `LineMark`(agent-tab/05:单图低频重绘,不是
-  高频多卡场景)——同一分工的第二个先例。
-- **菜单栏徽标强调色直写 `.orange/.red`**:位图经 ImageRenderer 预绘,本轮没有验证动态色
-  在离屏渲染里能否按外观正确解析,暂留系统色、集中在 `MenuBarBadgeRenderer.color` 一处;
-  要换成语义令牌须先实机验证深浅两种外观。
-
-仍挂账(动到对应文件时顺带收编):
-- ~~指标主卡全尺寸内距 `.padding(20)` 与 2×2 统计 `horizontalSpacing: 18`、弹窗外框
-  `.padding(14)`~~ —— 已收编(ui-unify/01,2026-11-08):20→`{spacing.card-padding}` 16、
-  18→16、14→`{spacing.card-padding-compact}` 12,全上 4pt 网格。
-
-2026-11-08 第三轮收编已完成(ui-unify/01,用户拍板"字号、组件都归一,功能相似组件
-长一个样",方案 A = 排行也升舒适档):
-
-- **字号 12 档 → 5 档**:`.caption/.caption2/.footnote/.title3` 语义字体一并换显式
-  字号。映射:8.5 / 9 / 10 → 10.5(空间地图角标/横幅图标/treemap 小标);11.5 按角色
-  → 11(说明)或 12(数值/按钮/横幅正文);12.5 → 12(卡题、空态、弹窗底排按钮、
-  弹窗排行名称);13 行级 → 14.5、杂项 → 12;13.5 → 14.5(sheet 清单行、PillTabBar
-  comfortable);14 → 14.5;16 bold 组头 → `{typography.section-title}` 17。
-- **行两档制**:`RowMetrics` 单一出处(上文);排行主窗口行升舒适档(图标 22→24、
-  名称/数值 13→14.5、副文 10.5→12、meter 110→120、行内距 6×7→14×10),弹窗紧凑档
-  名称 12.5→12 / 数值 11.5→12;清理行图标 28→24、meter 130→120、上下距 14→10;
-  sheet 清单行 13.5 档取消并入舒适档,残留/确认行定宽列 `frame(width: 78)` 改
-  `CleanerListMetrics.valueWidth`。
-- **chip 六合一**:`ChipView`(两形态)收编 HotProcessChip / TierChip / InUseChip /
-  StateChip / BrewChip / MetricChipView(后两处为薄封装),透明度统一 15%。
-- **防漂移**:`UiUnifyRowMetricsTests` 钉死两套 metrics 对 RowMetrics 的委托与五档
-  落档;`RankingListMetricsTests` 量宽改读 metrics 本身。
-- 例外(有意,不收):进程下钻组件簇(ProcessDrilldownView / SortableProcessTableView)
-  共用组件带 `.caption` 族,归一需跨文件结构迁移(加 compact 参数走两档制),留待
-  专项票;Image `.font` 的图标尺寸(7~26)不受文字五档约束。
-
-superseded 拍板记录(原值→新值,决议不删只标):2026-10-30 弹窗数值 11.5 → 12
-(ui-unify/01);2026-11-05 清理图标 28 / meter 130 / 上下距 14 → RowMetrics 舒适档
-(ui-unify/01);2026-11-05 comfortable 药丸 13.5 → 14.5(ui-unify/01);
-2026-11-09 蓝牙行 meter 44/64 + RSSI 数值列 → RowMetrics meter + 副文
-(ui-unify 追改);2026-11-09 副卡头标题 11 medium 灰 → 12 semibold 指标色(ui-unify 追改)。
-
-2026-11-09 第四轮收编已完成(ui-unify 追改,用户拍板 B = 八张旧卡一轮全换):
-P2 批次八张明细卡(蓝牙 / 声音 / 容器 / 传感器三卡 / 五路功率 / 磁盘两卡 / 流量累计 /
-dev server 行)的行升 RowMetrics 两档、状态圆点换类型图标(CardEntityRow)、副卡头标题
-升彩色;两形态边界与未知值安静原则见 §Components「卡内行两形态边界」。蓝牙设备行新增
-设备类型(CoD 主类 + BLE 走 IOHIDDevice usage,`BluetoothDeviceKind`),蓝牙卡开页即读
-(等下一 tick 的最长 30s 空窗改为立即快照 + 「正在读取…」占位),弹窗截断 6 行补
-「…共 N 台」尾行(容器卡同款)。
-
+- 不直写 `Color.orange` / `.red` 或十六进制色;不给卡片、容器加投影或描边;不引
+  第三方 UI、图表、字体库。
+- 不把窗口 UI 的规格带进菜单栏位图,反之亦然。
+- 不用系统自带的语义字体(`.caption` 等)。
+- 规范与页面规格里已定的样式不静默改,要改先问用户。
+- 工具栏不做会触发溢出菜单的加项(720 窗宽预算的优先级高于功能堆叠)。
+- 不在本文件记日期、工单号和改版经过,也不在代码注释里写历史:来历在提交记录
+  和票里。
