@@ -12,7 +12,7 @@ import GRDB
 // - `agent_file_checkpoints`:每文件的已消费字节偏移 + 前缀哈希 + 它对账本的
 //   **完整贡献**(day × project × model 五桶)——账本行 = Σ 全部检查点贡献,
 //   每轮完整重算(便宜),compact 缩水由此自愈;
-// - `agent_seen_messages`:全局 message-id 去重状态(resume 复制历史进新文件
+// - `agent_seen_messages` + `agent_seen_files`:全局 message-id 去重状态(resume 复制历史进新文件
 //   不双计;全史实测 ~15 万行,sqlite 量级轻松);
 // - `AgentUsageScan`:编排——库存 stat 快路径 → 增量读 → Σ 落账(含 ZCode 原
 //   路径与 stats-cache 回填)。
@@ -116,21 +116,6 @@ public struct AgentFileCheckpointRow: Codable, Equatable, FetchableRecord, Persi
     }
 }
 
-/// `agent_seen_messages` 行(全局 message-id 去重状态)。
-public struct AgentSeenMessageRow: Codable, Equatable, FetchableRecord, PersistableRecord {
-    public static let databaseTableName = "agent_seen_messages"
-
-    public var messageId: String
-    public var fileKey: String
-    public var day: String
-
-    enum CodingKeys: String, CodingKey {
-        case messageId = "message_id"
-        case fileKey = "file_key"
-        case day
-    }
-}
-
 // MARK: - store
 
 /// 已载入的检查点(内存形状;buckets 已解码)。
@@ -195,13 +180,18 @@ public final class AgentCheckpointStore: Sendable {
         try database.read { db in
             try String.fetchAll(
                 db,
-                sql: "SELECT message_id FROM agent_seen_messages WHERE file_key = ?",
+                sql: """
+                SELECT m.message_id FROM agent_seen_messages m
+                JOIN agent_seen_files f ON f.id = m.file_id
+                WHERE f.file_key = ?
+                """,
                 arguments: [fileKey]
             )
         }
     }
 
     /// 原子落一个文件的检查点 + 本轮新见的 message id(单事务)。
+    /// 文件路径只在 `agent_seen_files` 存一份,id 行只带整数 file_id(agent-tab/13)。
     public func replace(
         fileKey: String,
         consumedOffset: UInt64,
@@ -209,7 +199,7 @@ public final class AgentCheckpointStore: Sendable {
         savedAtMtime: Double,
         savedAtSize: Int64,
         buckets: [AgentCheckpointBucket],
-        newSeenMessages: [(messageId: String, day: String)]
+        newSeenMessageIDs: [String]
     ) throws {
         let row = AgentFileCheckpointRow(
             fileKey: fileKey,
@@ -221,9 +211,13 @@ public final class AgentCheckpointStore: Sendable {
         )
         try database.write { db in
             try row.save(db)
-            for seen in newSeenMessages {
-                try AgentSeenMessageRow(messageId: seen.messageId, fileKey: fileKey, day: seen.day)
-                    .insert(db, onConflict: .ignore)
+            guard !newSeenMessageIDs.isEmpty else { return }
+            let fileID = try Self.seenFileID(db, fileKey: fileKey)
+            for messageID in newSeenMessageIDs {
+                try db.execute(
+                    sql: "INSERT OR IGNORE INTO agent_seen_messages (message_id, file_id) VALUES (?, ?)",
+                    arguments: [messageID, fileID]
+                )
             }
         }
     }
@@ -242,11 +236,30 @@ public final class AgentCheckpointStore: Sendable {
     public func purgeFile(fileKey: String) throws {
         try database.write { db in
             _ = try AgentFileCheckpointRow.deleteOne(db, key: fileKey)
-            try db.execute(
-                sql: "DELETE FROM agent_seen_messages WHERE file_key = ?",
+            guard let fileID = try Int64.fetchOne(
+                db,
+                sql: "SELECT id FROM agent_seen_files WHERE file_key = ?",
                 arguments: [fileKey]
-            )
+            ) else { return }
+            try db.execute(sql: "DELETE FROM agent_seen_messages WHERE file_id = ?", arguments: [fileID])
+            try db.execute(sql: "DELETE FROM agent_seen_files WHERE id = ?", arguments: [fileID])
         }
+    }
+
+    /// 文件路径 → 整数 id(无则登记)。
+    private static func seenFileID(_ db: Database, fileKey: String) throws -> Int64 {
+        try db.execute(
+            sql: "INSERT OR IGNORE INTO agent_seen_files (file_key) VALUES (?)",
+            arguments: [fileKey]
+        )
+        guard let id = try Int64.fetchOne(
+            db,
+            sql: "SELECT id FROM agent_seen_files WHERE file_key = ?",
+            arguments: [fileKey]
+        ) else {
+            throw DatabaseError(message: "agent_seen_files 登记后查不到 \(fileKey)")
+        }
+        return id
     }
 
     static func encodeBuckets(_ buckets: [AgentCheckpointBucket]) -> Data {
@@ -520,7 +533,7 @@ public struct AgentUsageScan {
                     savedAtMtime: file.modifiedAt.timeIntervalSince1970,
                     savedAtSize: Int64(bitPattern: file.sizeBytes),
                     buckets: merged,
-                    newSeenMessages: parser.newSeenMessages
+                    newSeenMessageIDs: parser.newSeenIDs
                 )
                 perFileBuckets[file.key] = merged
                 seen.formUnion(parser.newSeenIDs)
@@ -548,7 +561,7 @@ public struct AgentUsageScan {
                         savedAtMtime: file.modifiedAt.timeIntervalSince1970,
                         savedAtSize: Int64(bitPattern: file.sizeBytes),
                         buckets: fullParser.buckets,
-                        newSeenMessages: fullParser.newSeenMessages
+                        newSeenMessageIDs: fullParser.newSeenIDs
                     )
                     perFileBuckets[file.key] = fullParser.buckets
                     seen.formUnion(fullParser.newSeenIDs)
@@ -586,7 +599,6 @@ struct CheckpointLineParser {
     /// 文件 slug(行内 cwd 缺失时的项目归组退路,同旧聚合器)。
     private let slug: String?
     private var byKey: [AgentCheckpointBucketKey: AgentCheckpointBucket] = [:]
-    private(set) var newSeenMessages: [(messageId: String, day: String)] = []
     private(set) var newSeenIDs: [String] = []
     /// 非 static(DateFormatter 非并发安全;单文件读单线程使用)。
     private let dayFormatter: DateFormatter
@@ -610,9 +622,6 @@ struct CheckpointLineParser {
             newSeenIDs.append(messageId)
         }
         let day = dayFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(sample.timestampMs) / 1000))
-        if let messageId = sample.messageId {
-            newSeenMessages.append((messageId, day))
-        }
         // 项目归组:行内 cwd 优先,退 slug 反解(同 AgentDailyAggregator.addClaude)。
         let project = sample.cwd.flatMap(AgentWorkspaceResolution.projectName(fromPath:))
             ?? slug.flatMap(AgentWorkspaceResolution.projectName(fromSlug:))
