@@ -111,7 +111,7 @@ struct PillTabBar<Item: Hashable>: View {
                         )
                 }
             }
-            .font(size == .comfortable ? .system(size: 14.5, weight: .medium) : .callout.weight(.medium))
+            .font(.system(size: size == .comfortable ? 14.5 : 12, weight: .medium))
             .padding(.horizontal, size == .comfortable ? 14 : 9)
             .padding(.vertical, size == .comfortable ? 8 : 5)
             .foregroundStyle(isSelected ? spec.tint : Color.secondary)
