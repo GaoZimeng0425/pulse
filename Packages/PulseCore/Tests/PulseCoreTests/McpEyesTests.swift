@@ -21,18 +21,16 @@ final class McpEyesTests: XCTestCase {
 
     // MARK: 夹具
 
-    private func insertSample(
-        _ ts: Int, _ groupID: String, mem: Int, procs: Int,
-        diskRead: Int?? = nil, diskWritten: Int?? = nil
-    ) throws {
-        // diskRead/diskWritten 用双层可选:nil 外层 = 不写列(行内 NULL)。
+    /// 组采样行;磁盘两列不写(NULL)——即升级前生产写出的存量形状。带账的行
+    /// 只经生产路径造(GroupDiskIOTests 闭环),不在这里手写。
+    private func insertSample(_ ts: Int, _ groupID: String, mem: Int, procs: Int) throws {
         try queue.write { db in
             try db.execute(
                 sql: """
-                INSERT INTO sample_min (ts, group_id, cpu_avg, cpu_max, mem_max, procs, disk_r, disk_w)
-                VALUES (?, ?, 0, 0, ?, ?, ?, ?)
+                INSERT INTO sample_min (ts, group_id, cpu_avg, cpu_max, mem_max, procs)
+                VALUES (?, ?, 0, 0, ?, ?)
                 """,
-                arguments: [ts, groupID, mem, procs, diskRead ?? nil, diskWritten ?? nil]
+                arguments: [ts, groupID, mem, procs]
             )
         }
     }
@@ -75,25 +73,18 @@ final class McpEyesTests: XCTestCase {
 
     // MARK: 磁盘排行(mcp-eyes/01)
 
-    func testTopDiskGroupsSumsWindowAndFlagsNullMinutes() throws {
-        try insertSample(base - 540, "a", mem: 0, procs: 1, diskRead: 100, diskWritten: 50)
-        try insertSample(base - 60, "a", mem: 0, procs: 1, diskRead: 300, diskWritten: 150)
-        // b:一行有账、一行 NULL(缺账分钟)
-        try insertSample(base - 540, "b", mem: 0, procs: 1, diskRead: 500, diskWritten: 0)
-        try insertSample(base - 60, "b", mem: 0, procs: 1) // disk 列 NULL
-        try insertSample(base - 540, "c", mem: 0, procs: 1) // 全 NULL → 总量 0 也如实列
+    /// 升级前的存量分钟行(磁盘列 NULL)按 0 计并如实标出,文案提示总量偏小。
+    func testTopDiskGroupsFlagsLegacyNullMinutes() throws {
+        try insertSample(base - 540, "legacy", mem: 0, procs: 1)
 
         let top = try queue.read { db in
             try InsightQuery.topDiskGroups(limit: 5, lookbackMinutes: 10, now: now, in: db)
         }
-        // b 总量 500 > a 总量 600?500 < 600——a 应第一;b 第二(缺账如实标)。
-        XCTAssertEqual(top.map(\.groupID), ["a", "b", "c"])
-        XCTAssertEqual(top[0].readBytes, 400)
-        XCTAssertEqual(top[0].writtenBytes, 200)
-        XCTAssertFalse(top[0].hasNullMinutes)
-        XCTAssertTrue(top[1].hasNullMinutes, "b 有一行缺磁盘账")
-        XCTAssertEqual(top[1].readBytes, 500)
-        XCTAssertTrue(top[2].hasNullMinutes, "全 NULL = 每分钟都缺账,同样如实标")
+        XCTAssertEqual(top.map(\.groupID), ["legacy"])
+        XCTAssertEqual(top[0].readBytes, 0)
+        XCTAssertTrue(top[0].hasNullMinutes)
+        let text = McpEyesText.diskRanking(top, lookbackMinutes: 10, now: now)
+        XCTAssertTrue(text.contains("缺磁盘账"), text)
     }
 
     // MARK: 进程档案(mcp-eyes/01)
@@ -270,7 +261,7 @@ final class McpEyesTests: XCTestCase {
         XCTAssertTrue(memoryText.contains("3.0 GB"), "峰值(GB 档带一位小数):\(memoryText)")
 
         let diskText = McpEyesText.diskRanking([], lookbackMinutes: 30, now: now)
-        XCTAssertTrue(diskText.contains("没有磁盘账"))
+        XCTAssertTrue(diskText.contains("没有组采样"))
 
         let profile = InsightQuery.ProcessProfile(
             pid: 100, parentPID: 1, executablePath: "/usr/local/bin/node",

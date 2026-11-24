@@ -41,19 +41,23 @@ public struct GroupMinuteAggregate: Equatable, Sendable {
     public let memoryPeak: UInt64
     /// 窗口内最多时的存活进程数(spec procs 列)。
     public let processPeak: Int
+    /// 窗口内磁盘读写增量合计(sample_min 的 disk_r/disk_w 列)。
+    public let disk: GroupDiskDelta
 
     public init(
         identity: GroupIdentity,
         cpuAverage: Double,
         cpuPeak: Double,
         memoryPeak: UInt64,
-        processPeak: Int
+        processPeak: Int,
+        disk: GroupDiskDelta = .zero
     ) {
         self.identity = identity
         self.cpuAverage = cpuAverage
         self.cpuPeak = cpuPeak
         self.memoryPeak = memoryPeak
         self.processPeak = processPeak
+        self.disk = disk
     }
 }
 
@@ -127,6 +131,8 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
         var cpuPeak = -Double.infinity
         var memoryPeak = UInt64(0)
         var processPeak = 0
+        var diskRead: UInt64 = 0
+        var diskWrite: UInt64 = 0
         var count = 0
 
         /// 两份同窗累计并成一份(改根换键撞上已有新键时)。
@@ -136,6 +142,8 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
                 cpuPeak: max(cpuPeak, other.cpuPeak),
                 memoryPeak: max(memoryPeak, other.memoryPeak),
                 processPeak: max(processPeak, other.processPeak),
+                diskRead: diskRead &+ other.diskRead,
+                diskWrite: diskWrite &+ other.diskWrite,
                 count: count + other.count
             )
         }
@@ -257,6 +265,8 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
             accumulator.cpuPeak = max(accumulator.cpuPeak, sample.cpuPercent)
             accumulator.memoryPeak = max(accumulator.memoryPeak, sample.memoryBytes)
             accumulator.processPeak = max(accumulator.processPeak, sample.processCount)
+            accumulator.diskRead &+= sample.disk.readBytes
+            accumulator.diskWrite &+= sample.disk.writeBytes
             accumulator.count += 1
             groupAccumulators[id] = accumulator
         }
@@ -273,7 +283,8 @@ public struct MinuteRollupBuffer: Sendable, Equatable {
                     cpuAverage: accumulator.cpuSum / Double(accumulator.count),
                     cpuPeak: accumulator.cpuPeak,
                     memoryPeak: accumulator.memoryPeak,
-                    processPeak: accumulator.processPeak
+                    processPeak: accumulator.processPeak,
+                    disk: GroupDiskDelta(readBytes: accumulator.diskRead, writeBytes: accumulator.diskWrite)
                 )
             }
             .sorted { $0.identity < $1.identity } // stableKey 字典序(Comparable 即此序)

@@ -197,12 +197,12 @@ public enum McpEyesText {
         now _: Date
     ) -> String {
         if rows.isEmpty {
-            return "最近 \(lookbackMinutes) 分钟历史库没有磁盘账(sample_min 的 disk_r/disk_w 为空——app 未运行或该时段无样本)。"
+            return "最近 \(lookbackMinutes) 分钟历史库没有组采样(Pulse 未运行或该时段无样本)。"
         }
         var lines = ["最近 \(lookbackMinutes) 分钟磁盘读写总量最高的 \(rows.count) 个组:"]
         let anyNull = rows.contains(where: \.hasNullMinutes)
         if anyNull {
-            lines.append("(部分分钟缺磁盘账,总量偏小,已如实计 0)")
+            lines.append("(部分分钟缺磁盘账——升级前的旧样本,总量偏小,已如实计 0)")
         }
         for (index, group) in rows.enumerated() {
             var line = "\(index + 1). \(group.name) — 读 \(PulseFormat.memory(UInt64(max(0, group.readBytes)))),写 \(PulseFormat.memory(UInt64(max(0, group.writtenBytes))))"

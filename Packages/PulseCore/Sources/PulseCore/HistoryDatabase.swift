@@ -12,10 +12,11 @@ public typealias PulseDatabase = Database
 ///
 /// 六张表(schema 按 spec;ts 一律整秒 epoch INTEGER,窗口口径见 HistoryWindows):
 /// - `sample_min` / `sample_hour`:组级,分钟留 7 天、小时留 30 天;
-///   磁盘两列(disk_r/disk_w)本阶段恒空(spec 拍板:每组 rusage 与采样成本
-///   优化直接冲突且 P1 无消费界面——建表保留列位,推迟 ≠ 放弃);
-/// - `system_min` / `system_hour`:系统级,同留存;net/disk 四列由工单 05
-///   的吞吐探针接入,本阶段恒空(NULL),不伪造 0;
+///   磁盘两列(disk_r/disk_w)= 组内进程累计读写字节的窗口增量合计
+///   (GroupDiskLedger 差分快照里已有的计数,零新增采集;arch-review-2026-11-24/04
+///   之前的存量行为 NULL);
+/// - `system_min` / `system_hour`:系统级,同留存;net/disk 四列 = 本分钟网络 /
+///   磁盘吞吐记账增量合计(工单 06 起写入;读缺失轮记 0,不伪造);
 /// - `lineage`:出生登记持久化(GLOSSARY)——spec 草案的 parent_chain 落为
 ///   行间 parent_pid 链接(链由各进程自己的记录串联,与内存登记表同构);
 ///   uniqid 列暂缺:登记表按 pid 键、ProcessIdentity 不携带唯一号

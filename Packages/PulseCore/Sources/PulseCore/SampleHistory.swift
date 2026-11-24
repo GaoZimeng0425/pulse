@@ -124,21 +124,31 @@ public struct GroupSample: Equatable, Sendable {
     public let memoryBytes: UInt64
     /// 组内存活进程数(分钟卷积取窗口峰值)。缺省 1:采到即至少一进程。
     public let processCount: Int
+    /// 本轮组内磁盘读写增量(GroupDiskLedger 差分;内存环不用,只进历史落库)。
+    public let disk: GroupDiskDelta
 
-    public init(id: GroupIdentity, cpuPercent: Double, memoryBytes: UInt64, processCount: Int = 1) {
+    public init(
+        id: GroupIdentity,
+        cpuPercent: Double,
+        memoryBytes: UInt64,
+        processCount: Int = 1,
+        disk: GroupDiskDelta = .zero
+    ) {
         self.id = id
         self.cpuPercent = cpuPercent
         self.memoryBytes = memoryBytes
         self.processCount = processCount
+        self.disk = disk
     }
 
     /// 组的本轮采样值:内存环(SystemMonitor)与历史落库(HistoryFeed)共用这一个折算。
-    public init(group: ProcessGroup) {
+    public init(group: ProcessGroup, disk: GroupDiskDelta = .zero) {
         self.init(
             id: group.id,
             cpuPercent: group.cpuPercent,
             memoryBytes: group.memoryBytes,
-            processCount: group.processes.count
+            processCount: group.processes.count,
+            disk: disk
         )
     }
 }
