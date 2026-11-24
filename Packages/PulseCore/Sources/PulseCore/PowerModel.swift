@@ -205,3 +205,47 @@ public protocol PowerSource: Sendable {
     /// 采一次;nil = 读失败(订阅缺席 / 采样失败)。
     func read() -> PowerRawReading?
 }
+
+/// 五路功率传感器:分档单循环(p2-review/06)——一条驱动两个节奏,可见 5s /
+/// 不可见 30s(`adaptiveInterval`);差分(首读/断档轮不交读数/负差钳 0)在核心包
+/// PowerAccumulator。读失败与基线轮都交 nil,调度器重投 lastGood 不白屏。
+/// @unchecked Sendable:accumulator 与源的订阅状态靠**单驱动串行**保证——
+/// 每 provider 只登记一条 SensorDriver(调度器一登记一子任务),p2-review/06
+/// 收编双档后 p2-audit/01 ② / p2-review/01 ① 的串行锁随之删除(根治替补丁)。
+public final class EnergyModelSensorProvider: SensorProvider, @unchecked Sendable {
+    public typealias Reading = PowerReading
+
+    public let cadence: SensorCadence = .every(seconds: 5)
+
+    private let source: any PowerSource
+    /// 可见性闸(p2-review/06 起只驱动节奏分档,不再挡读——历史档本就 30s 恒采)。
+    private let gate = SensorVisibilityGate()
+    private let slot = SensorLastGoodBox<PowerReading>()
+    private var accumulator = PowerAccumulator()
+
+    public var lastGood: PowerReading? {
+        slot.current
+    }
+
+    public init(source: any PowerSource) {
+        self.source = source
+    }
+
+    /// 可见性切换(与 GPU 传感同闸:任一窗口停在展示功率家族的 tab)。
+    public func setVisible(_ visible: Bool) {
+        _ = gate.setVisible(visible)
+    }
+
+    public var adaptiveInterval: (@Sendable () -> TimeInterval)? {
+        { [gate] in gate.isVisible ? SensorTier.ui : SensorTier.history }
+    }
+
+    public func snapshot() async -> PowerReading? {
+        // 读失败与基线轮(首读/断档)都交 nil:lastGood 不动,调度器按读失败重投。
+        // 单循环下差分窗 = 实测时差(可见 5s / 不可见 30s)——旧双档形状里
+        // 可见期历史档只拿到"最近 5s 的窗"的口径问题就此根治。
+        guard let raw = source.read(), let reading = accumulator.record(raw) else { return nil }
+        slot.store(reading)
+        return reading
+    }
+}

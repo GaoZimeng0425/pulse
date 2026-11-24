@@ -258,3 +258,40 @@ public extension BatteryRawReading {
         }
     }
 }
+
+/// 电池传感器(工单 02):事件驱动(`.onEvent`,IOPS 电源状态通知,不轮询);
+/// 读数 = 原始读数经纯逻辑折叠(健康回退链 / 状态映射 / 功率)。读失败保留
+/// lastGood(ADR-0004);无内建电池的机器源恒返 nil → 永无交付,消费方
+/// (SystemMonitor.hasBattery)保持电池页整页隐藏。
+public final class BatterySensorProvider: SensorProvider {
+    public typealias Reading = BatteryReading
+
+    public let cadence: SensorCadence = .onEvent
+
+    private let source: any BatterySource
+    private let makeWakeups: @Sendable () -> AsyncStream<Void>?
+    private let slot = SensorLastGoodBox<BatteryReading>()
+
+    public var lastGood: BatteryReading? {
+        slot.current
+    }
+
+    public init(
+        source: any BatterySource,
+        wakeups: @escaping @Sendable () -> AsyncStream<Void>?
+    ) {
+        self.source = source
+        makeWakeups = wakeups
+    }
+
+    public func snapshot() async -> BatteryReading? {
+        guard let raw = source.read() else { return nil } // 无内建电池:不动 lastGood
+        let reading = BatteryReading.make(from: raw)
+        slot.store(reading)
+        return reading
+    }
+
+    public func wakeups() -> AsyncStream<Void>? {
+        makeWakeups()
+    }
+}

@@ -97,3 +97,42 @@ public protocol GpuSource: Sendable {
     /// 读一次;nil = 读失败(无加速器条目 / 字典缺失)。
     func read() -> GpuRawReading?
 }
+
+/// GPU 传感器:分档单循环(p2-review/06)——一条驱动两个节奏,可见 5s /
+/// 不可见 30s(`adaptiveInterval`),历史广播由 feature 侧 HistoryThrottle 节流。
+/// 旧形状(5s UI 档 + 30s 历史档两条驱动并发读同一 provider)就此收编:
+/// 单循环天然串行,读失败交付 lastGood 不白屏(nettop 同款形状)。
+public final class GpuSensorProvider: SensorProvider {
+    public typealias Reading = GpuReading
+
+    public let cadence: SensorCadence = .every(seconds: 5)
+
+    private let source: any GpuSource
+    /// 可见性闸(p2-review/06 起只驱动节奏分档,不再挡读——历史档本就 30s 恒采)。
+    private let gate = SensorVisibilityGate()
+    private let slot = SensorLastGoodBox<GpuReading>()
+
+    public var lastGood: GpuReading? {
+        slot.current
+    }
+
+    public init(source: any GpuSource) {
+        self.source = source
+    }
+
+    /// 可见性切换(任一窗口停在展示 GPU 家族的 tab,GpuFeature 折算下发)。
+    public func setVisible(_ visible: Bool) {
+        _ = gate.setVisible(visible)
+    }
+
+    public var adaptiveInterval: (@Sendable () -> TimeInterval)? {
+        { [gate] in gate.isVisible ? SensorTier.ui : SensorTier.history }
+    }
+
+    public func snapshot() async -> GpuReading? {
+        guard let raw = source.read() else { return nil }
+        let reading = GpuReading.make(from: raw)
+        slot.store(reading)
+        return reading
+    }
+}

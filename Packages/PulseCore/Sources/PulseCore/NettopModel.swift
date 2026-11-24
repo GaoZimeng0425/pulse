@@ -195,3 +195,46 @@ public final class ProcessNetworkRateAccumulator: @unchecked Sendable {
 
     public init() {}
 }
+
+/// 网络每进程 provider(工单 01,ADR-0004):低频档 5s,仅窗口可见时跑;
+/// 子进程成本由门控挡住,读失败交付 lastGood 不白屏。时钟注入:CSV 不带
+/// 采样时刻,差分对墙钟的"墙钟"由此来(测试用假时间轴,零真实等待)。
+public final class ProcessNetworkRateProvider: SensorProvider {
+    public typealias Reading = [pid_t: ProcessNetworkRates]
+    public typealias Clock = @Sendable () -> Date
+
+    public let cadence: SensorCadence = .every(seconds: 5)
+
+    private let source: any NettopCSVSource
+    private let clock: Clock
+    private let gate = SensorVisibilityGate()
+    private let accumulator = ProcessNetworkRateAccumulator()
+    private let slot = SensorLastGoodBox<Reading>()
+
+    public var lastGood: Reading? {
+        slot.current
+    }
+
+    public init(
+        source: any NettopCSVSource,
+        clock: @escaping Clock = { Date() }
+    ) {
+        self.source = source
+        self.clock = clock
+    }
+
+    /// 可见性切换(同能耗影响)。
+    public func setVisible(_ visible: Bool) {
+        if gate.setVisible(visible), !visible {
+            accumulator.reset()
+        }
+    }
+
+    public func snapshot() async -> Reading? {
+        guard gate.isVisible, let csv = await source.read() else { return nil }
+        let table = NettopCSVParser.parse(csv, takenAt: clock())
+        guard let reading = accumulator.record(table) else { return nil }
+        slot.store(reading)
+        return reading
+    }
+}

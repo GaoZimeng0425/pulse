@@ -529,3 +529,118 @@ public protocol BluetoothSource: Sendable {
     /// (只读注册表属性、不打开设备;ui-unify 追改 2026-11-09)。
     func readHidUsages() -> [HidUsageEntry]
 }
+
+/// 蓝牙传感器:**可见 30s / 不可见完全停**(spec 节奏矩阵——蓝牙电量是慢变量,
+/// 不为常驻成本买单)。可见快照 = 三源合并(锚 IOBluetooth + HID + 缓存 + 上一轮
+/// GATT 收账);有缺电量的设备才起 GATT 探针,结果进缓冲供**下一轮**合并
+/// (探针异步,不当轮阻塞)。睡眠停扫天然成立(进程随睡眠挂起,30s tick 不跑);
+/// 唤醒后下一个可见 tick 自动重启扫描。
+public final class BluetoothSensorProvider: SensorProvider {
+    public typealias Reading = BluetoothReading
+
+    public let cadence: SensorCadence = .every(seconds: 30)
+
+    private let source: any BluetoothSource
+    private let gate = SensorVisibilityGate()
+    private let slot = SensorLastGoodBox<BluetoothReading>()
+    private let probe: any GattBatteryProbing
+    private let gattBuffer = GattBatteryBuffer()
+
+    public var lastGood: BluetoothReading? {
+        slot.current
+    }
+
+    /// 当前是否在采(闸开)。诊断与单测读,不参与采样路径。
+    public var isCollecting: Bool {
+        gate.isVisible
+    }
+
+    public init(
+        source: any BluetoothSource,
+        probe: any GattBatteryProbing
+    ) {
+        self.source = source
+        self.probe = probe
+    }
+
+    /// 采集闸(BluetoothFeature 折算下发:可见 ∧ 用户已开启 ∧ 系统已授权——三者缺一
+    /// 即关;关闸时 snapshot 一个源都不碰,IOBluetooth / CoreBluetooth 的 TCC 路径
+    /// 完全不被触及)。闸关同时取消在途 GATT 探针("关开关立即停采"含这一路,
+    /// p2-review/02);先落闸再取消,与 snapshot 尾部的复核配成对,见那里。
+    public func setVisible(_ visible: Bool) {
+        gate.setVisible(visible)
+        if !visible {
+            probe.cancel()
+        }
+    }
+
+    public func snapshot() async -> BluetoothReading? {
+        // 门控关:一个源都不碰(验收:不可见零扫描)。
+        guard gate.isVisible, let paired = source.readPaired() else { return nil }
+        let reading = BluetoothMerge.merge(
+            paired: paired,
+            hid: source.readHidBatteries(),
+            cache: source.readCachedBatteries(),
+            gatt: drainGattBuffer(),
+            usages: source.readHidUsages()
+        )
+        slot.store(reading)
+        // 按需 GATT:还有缺电量的已配对设备 → 起探针(设备在场才可能读到,
+        // 不在场超时安静放弃)。中文名设备(平板/键盘广播名)常无 GATT BAS,
+        // 探针空转一轮即弃,下轮再试。
+        let lacking = reading.devices.filter { $0.batteryPercent == nil }.compactMap(\.name)
+        if !lacking.isEmpty {
+            probe.start(wanting: lacking) { [weak self] entry in
+                self?.appendGatt(entry)
+            }
+            // 竞态补口:本轮开闸检查之后、start 之前闸可能已关(setVisible(false)
+            // 的 cancel 先于这次 start 入探针队列 = 取消落空)。start 后复核闸,关了
+            // 就补一次 cancel——start / cancel 在探针串行队列上按入队序执行,
+            // 两种交错都以"取消"收场。
+            if !gate.isVisible {
+                probe.cancel()
+            }
+        }
+        return reading
+    }
+
+    /// GATT 收账入口(探针 deliver 回调;@testable 测试直接投样本钉收账行为)。
+    public func appendGatt(_ entry: GattBatteryEntry) {
+        gattBuffer.append(entry)
+    }
+
+    private func drainGattBuffer() -> [GattBatteryEntry] {
+        gattBuffer.drain()
+    }
+}
+
+/// GATT 样本收账盒(SensorLastGoodBox 同款纪律:锁保护微小盒子,协议要求
+/// provider 非隔离可 Sendable)。
+public final class GattBatteryBuffer: @unchecked Sendable {
+    private let lock = NSLock()
+    private var entries: [GattBatteryEntry] = []
+
+    public func append(_ entry: GattBatteryEntry) {
+        lock.lock()
+        defer { lock.unlock() }
+        entries.append(entry)
+    }
+
+    /// 取走制:一次取全并清空(样本只进一轮合并)。
+    public func drain() -> [GattBatteryEntry] {
+        lock.lock()
+        defer { lock.unlock() }
+        let drained = entries
+        entries = []
+        return drained
+    }
+}
+
+/// GATT 探针接缝(p2-review/02):provider 只认"起 / 取消"两个动作——产品唯一实现
+/// = `GattBatteryProbe`,单测注入假探针钉"闸关 → 取消",不转真蓝牙栈。
+public protocol GattBatteryProbing: Sendable {
+    /// 起一轮探针(已在跑 = no-op);交付走 deliver,异步完成。
+    func start(wanting names: [String], deliver: @escaping @Sendable (GattBatteryEntry) -> Void)
+    /// 取消在途一轮:停扫、断开在连外设、释放 central;没在跑 = no-op。
+    func cancel()
+}

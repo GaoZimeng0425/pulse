@@ -362,11 +362,11 @@ extension SystemMonitor {
                     capacitySource: InertDiskCapacitySource(),
                     throughputSource: InertDiskThroughputSource()
                 ),
-                battery: BatteryFeature(source: InertBatterySource()),
+                battery: BatteryFeature(source: InertBatterySource(), wakeups: { nil }),
                 gpu: GpuFeature(source: InertGpuSource()),
                 power: PowerFeature(source: InertPowerSource(), chipName: HostInfo.current.chipName ?? ""),
                 smc: SmcFeature(source: InertSmcSource()),
-                sound: SoundFeature(source: InertSoundSource()),
+                sound: SoundFeature(source: InertSoundSource(), wakeups: { nil }),
                 appVolume: .inert(),
                 bluetooth: .inert(),
                 containers: ContainerFeature(source: InertContainerSource()),

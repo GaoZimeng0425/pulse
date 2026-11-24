@@ -128,11 +128,11 @@ extension SystemMonitor {
                     capacitySource: LiveDiskCapacitySource(),
                     throughputSource: LiveDiskThroughputSource.adoptingBestPath(fallbackHeartbeat: relay)
                 ),
-                battery: BatteryFeature(source: LiveBatterySource()),
+                battery: BatteryFeature(source: LiveBatterySource(), wakeups: { IOPSWakeupStream.make() }),
                 gpu: GpuFeature(source: LiveGpuSource()),
                 power: PowerFeature(source: LiveEnergyModelSource(), chipName: HostInfo.current.chipName ?? ""),
                 smc: SmcFeature(source: LiveSmcSource()),
-                sound: SoundFeature(source: LiveSoundSource()),
+                sound: SoundFeature(source: LiveSoundSource(), wakeups: { CoreAudioWakeupStream.make() }),
                 appVolume: AppVolumeFeature(
                     engine: LiveAppVolumeEngine(),
                     store: AppVolumeSettingsStore(),

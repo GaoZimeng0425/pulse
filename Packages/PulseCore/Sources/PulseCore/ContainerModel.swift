@@ -219,3 +219,36 @@ public protocol ContainerSource: Sendable {
     /// engineReachable false 空表;引擎在但列表失败 = nil(读失败,不动 lastGood)。
     func read() async -> ContainersReading?
 }
+
+/// 容器传感器:**页可见 30s / 不可见完全停**(spec 节奏矩阵)。socket 缺席 =
+/// engineReachable false 空表(安静空态,不重试风暴——重试就是 30s 后的下一
+/// 发,天然有界)。读失败保留 lastGood(ADR-0004)。
+public final class ContainerSensorProvider: SensorProvider {
+    public typealias Reading = ContainersReading
+
+    public let cadence: SensorCadence = .every(seconds: 30)
+
+    private let source: any ContainerSource
+    private let gate = SensorVisibilityGate()
+    private let slot = SensorLastGoodBox<ContainersReading>()
+
+    public var lastGood: ContainersReading? {
+        slot.current
+    }
+
+    public init(source: any ContainerSource) {
+        self.source = source
+    }
+
+    /// 可见性切换(弹窗在场 ∨ 主窗口容器页在场,ContainerFeature 折算下发)。
+    public func setVisible(_ visible: Bool) {
+        _ = gate.setVisible(visible)
+    }
+
+    public func snapshot() async -> ContainersReading? {
+        guard gate.isVisible else { return nil } // 不可见:零请求
+        guard let reading = await source.read() else { return nil }
+        slot.store(reading)
+        return reading
+    }
+}

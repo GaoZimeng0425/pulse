@@ -1,15 +1,4 @@
 # 分层门禁存量豁免(scripts/check-layers.sh)——只许变短:修掉一条就删一行,检查会逼着删。
 # 格式:<文件> <在该文件里被构造的 Live 层类型>
-
-# 功能模块在内部构造传感器适配器(ADR-0003 早期写法,适配器默认参数还会建系统事件监听)。
-# 清理:arch-clean/05——适配器由 MonitorAssembly 构造后注入。
-Pulse/Features/BatteryFeature.swift BatterySensorProvider
-Pulse/Features/BluetoothFeature.swift BluetoothSensorProvider
-Pulse/Features/ContainerFeature.swift ContainerSensorProvider
-Pulse/Features/DiskFeature.swift DiskCapacityProvider
-Pulse/Features/DiskFeature.swift DiskThroughputProvider
-Pulse/Features/GpuFeature.swift GpuSensorProvider
-Pulse/Features/PowerFeature.swift EnergyModelSensorProvider
-Pulse/Features/RankingsFeature.swift ProcessNetworkRateProvider
-Pulse/Features/SmcFeature.swift SmcSensorProvider
-Pulse/Features/SoundFeature.swift SoundSensorProvider
+#
+# 2026-11-24 清零(arch-clean/01 → 02 → 05)。新越界一律不进本清单:由组装点构造后注入。

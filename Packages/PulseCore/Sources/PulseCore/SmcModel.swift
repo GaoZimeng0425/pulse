@@ -303,3 +303,46 @@ public protocol SmcSource: Sendable {
     /// 读一次本轮键集(T*/F*/电池顺手键);nil = 读失败(无 SMC / 连接失败)。
     func read() -> SmcSnapshot?
 }
+
+/// SMC 传感器:分档单循环(p2-review/06)——一条驱动两个节奏,可见 5s /
+/// 不可见 30s(`adaptiveInterval`)。坏值防御的"沿用旧值"档需要上一轮读数,
+/// provider 持有 previous;previous 与源的 io_connect 靠**单驱动串行**保证——
+/// 每 provider 只登记一条 SensorDriver,p2-audit/01 ② / p2-review/01 ① 的
+/// 串行锁随之删除(根治替补丁)。
+public final class SmcSensorProvider: SensorProvider, @unchecked Sendable {
+    public typealias Reading = SmcReading
+
+    public let cadence: SensorCadence = .every(seconds: 5)
+
+    private let source: any SmcSource
+    /// 可见性闸(p2-review/06 起只驱动节奏分档,不再挡读——历史档本就 30s 恒采)。
+    private let gate = SensorVisibilityGate()
+    private let slot = SensorLastGoodBox<SmcReading>()
+    private var previous: SmcReading?
+
+    public var lastGood: SmcReading? {
+        slot.current
+    }
+
+    public init(source: any SmcSource) {
+        self.source = source
+    }
+
+    public func setVisible(_ visible: Bool) {
+        _ = gate.setVisible(visible)
+    }
+
+    public var adaptiveInterval: (@Sendable () -> TimeInterval)? {
+        { [gate] in gate.isVisible ? SensorTier.ui : SensorTier.history }
+    }
+
+    public func snapshot() async -> SmcReading? {
+        guard let raw = source.read() else { return nil }
+        guard let reading = SmcReadingBuilder.make(from: raw, previous: previous) else {
+            return nil // 折算失败不动 previous:沿用链不被一次坏载荷清零(审计②顺带)
+        }
+        previous = reading
+        slot.store(reading)
+        return reading
+    }
+}
