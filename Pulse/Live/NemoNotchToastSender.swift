@@ -12,12 +12,6 @@ import PulseCore
 // 端点发现拆成吃目录 URL 的纯函数(单测注入临时目录);HTTP 走 URLSession
 // 瞬时会话、3 秒请求超时。回路地址不受 ATS 限制,无需 Info.plist 例外。
 
-/// 发送缝:AlertCenter 只认此协议;单测注入假 sender 记录调用。
-protocol NemoNotchToastSending: Sendable {
-    /// 发一条 toast(fire-and-forget:实现保证不抛、不阻塞调用方)。
-    func send(_ payload: NemoNotchToastPayload) async
-}
-
 /// Darwin 薄适配器(与 LiveAlertNotificationSender 同一角色)。
 struct LiveNemoNotchToastSender: NemoNotchToastSending {
     /// 端点三件套:NemoNotch 契约的运行时发现结果。

@@ -1,5 +1,4 @@
 import Foundation
-import PulseCore
 
 /// bundle 显示名读取器(GroupingConfiguration.bundleDisplayName 的 UI 层注入实现):
 /// 读 `<bundle>/Contents/Info.plist` 的 `CFBundleName`(spec 实现决策);
@@ -7,13 +6,15 @@ import PulseCore
 ///
 /// 按 bundle 路径缓存(nil 也是有效缓存结果):采样每秒跑一遍归组,
 /// 不能让重复的 plist 读盘进热路径。线程安全——归组可能在任意执行器上跑。
-final class BundleDisplayNameReader: @unchecked Sendable {
-    static let shared = BundleDisplayNameReader()
+public final class BundleDisplayNameReader: @unchecked Sendable {
+    public static let shared = BundleDisplayNameReader()
 
     private let lock = NSLock()
     private var cache: [String: String?] = [:]
 
-    func displayName(forBundleDirectory bundleDirectory: String) -> String? {
+    public init() {}
+
+    public func displayName(forBundleDirectory bundleDirectory: String) -> String? {
         lock.lock()
         if let cached = cache[bundleDirectory] {
             lock.unlock()

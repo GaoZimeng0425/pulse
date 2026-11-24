@@ -24,7 +24,7 @@ extension Notification.Name {
 /// 主窗口内容根:可见性门控 + 启动接线。
 struct MainWindowGate: View {
     let monitor: SystemMonitor
-    let alertRouter: AlertNotificationRouter
+    let landing: MainWindowLanding
     /// 清理 / 卸载模型工厂(arch-clean/01:唯一组装点,与 AI 清理影子模型同源)。
     let cleanAssembly: CleanAssembly
     /// AI 清理桥(mcp-clean/01):窗口可见期把清理页模型挂给它(列清单活数据 /
@@ -38,7 +38,7 @@ struct MainWindowGate: View {
             if monitor.mainWindowVisible {
                 MainWindowView(
                     monitor: monitor,
-                    alertRouter: alertRouter,
+                    landing: landing,
                     cleanAssembly: cleanAssembly,
                     mcpClean: mcpClean
                 )
@@ -47,7 +47,7 @@ struct MainWindowGate: View {
                 Color.clear.frame(width: 880, height: 620)
             }
         }
-        .onAppear { monitor.setMainWindowTab(alertRouter.pendingTab ?? .overview) }
+        .onAppear { monitor.setMainWindowTab(landing.pendingTab ?? .overview) }
         .onDisappear { monitor.setMainWindowTab(nil) }
         // 菜单栏标签拉起即启动采样(start 幂等);此处再提一次,让预览 /
         // 理论上的窗口先行场景同样有数据。

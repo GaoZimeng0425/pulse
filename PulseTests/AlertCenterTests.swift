@@ -82,6 +82,8 @@ final class AlertCenterTests: XCTestCase {
             record(payload)
         }
 
+        func openSystemSettings() {}
+
         private func countRequest() {
             lock.lock()
             defer { lock.unlock() }

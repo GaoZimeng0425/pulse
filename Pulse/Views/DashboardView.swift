@@ -241,13 +241,13 @@ struct DashboardView: View {
         NSApplication.shared.activate(ignoringOtherApps: true)
         var userInfo: [String: Any] = [:]
         if let tab {
-            userInfo[AlertNotificationRouter.tabUserInfoKey] = tab.rawValue
+            userInfo[MainWindowLanding.tabUserInfoKey] = tab.rawValue
         }
         if let rankingID {
-            userInfo[AlertNotificationRouter.rankingUserInfoKey] = rankingID
+            userInfo[MainWindowLanding.rankingUserInfoKey] = rankingID
         }
         NotificationCenter.default.post(
-            name: AlertNotificationRouter.openMainWindowNotification,
+            name: MainWindowLanding.openMainWindowNotification,
             object: nil,
             userInfo: userInfo.isEmpty ? nil : userInfo
         )

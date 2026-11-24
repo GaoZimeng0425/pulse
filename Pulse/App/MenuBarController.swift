@@ -26,7 +26,7 @@ final class MenuBarController: NSObject {
     private let badgeDisplay: MenuBarBadgeDisplayModel
     private let rootsStore: ProjectRootsStore
     /// 开主窗口的落点簿(与主窗口共用一份):冷开窗时把广播里的 tab / 排行卡先记进去。
-    private let alertRouter: AlertNotificationRouter
+    private let landing: MainWindowLanding
     private let statusItem: NSStatusItem
     /// 面板懒创建:首开才建。常驻菜单栏 app 启动即零可见窗,提前把
     /// NSVisualEffectView + NSHostingView 塞进一个隐藏面板,等于让窗口服务
@@ -56,12 +56,12 @@ final class MenuBarController: NSObject {
         monitor: SystemMonitor,
         badgeDisplay: MenuBarBadgeDisplayModel,
         rootsStore: ProjectRootsStore,
-        alertRouter: AlertNotificationRouter
+        landing: MainWindowLanding
     ) {
         self.monitor = monitor
         self.badgeDisplay = badgeDisplay
         self.rootsStore = rootsStore
-        self.alertRouter = alertRouter
+        self.landing = landing
         badgeConfigRaw = UserDefaults.standard.string(forKey: Self.badgeConfigKey)
             ?? MenuBarBadgeConfiguration.default.rawValue
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -217,10 +217,10 @@ final class MenuBarController: NSObject {
         // 这里不记——记了没人清,下次冷开窗会重放。
         // userInfo 键先取局部:@Sendable 观察闭包不得直引 actor 隔离 static(值类型
         // 局部捕获无约束)。
-        let tabKey = AlertNotificationRouter.tabUserInfoKey
-        let rankingKey = AlertNotificationRouter.rankingUserInfoKey
+        let tabKey = MainWindowLanding.tabUserInfoKey
+        let rankingKey = MainWindowLanding.rankingUserInfoKey
         center.addObserver(
-            forName: AlertNotificationRouter.openMainWindowNotification,
+            forName: MainWindowLanding.openMainWindowNotification,
             object: nil,
             queue: .main
         ) { [weak self] note in
@@ -230,7 +230,7 @@ final class MenuBarController: NSObject {
             Task { @MainActor in
                 guard let self else { return }
                 if let tab, !self.monitor.mainWindowVisible {
-                    self.alertRouter.stash(tab: tab, rankingID: rankingID)
+                    self.landing.stash(tab: tab, rankingID: rankingID)
                 }
                 self.closePanel()
                 MainWindowBridge.open()
@@ -416,7 +416,7 @@ final class KeepAliveAppDelegate: NSObject, NSApplicationDelegate {
         // 弹回主窗(清理页):让「正在移入废纸篓…」可见,清完广播落地后退出即恢复。
         NSApplication.shared.activate(ignoringOtherApps: true)
         NotificationCenter.default.post(
-            name: AlertNotificationRouter.openMainWindowNotification,
+            name: MainWindowLanding.openMainWindowNotification,
             object: nil
         )
         return .terminateCancel
@@ -432,7 +432,7 @@ final class KeepAliveAppDelegate: NSObject, NSApplicationDelegate {
         if !visibleWindowsFlag {
             NSApplication.shared.activate(ignoringOtherApps: true)
             NotificationCenter.default.post(
-                name: AlertNotificationRouter.openMainWindowNotification,
+                name: MainWindowLanding.openMainWindowNotification,
                 object: nil
             )
         }

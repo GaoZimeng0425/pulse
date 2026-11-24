@@ -71,6 +71,11 @@ final class AlertCenter {
         self.clock = clock
     }
 
+    /// 打开 系统设置 → 通知 → Pulse(授权被拒后的恢复入口,经发送缝,不碰系统框架)。
+    func openSystemNotificationSettings() {
+        sender.openSystemSettings()
+    }
+
     /// 启动时现查授权:系统还没问过且已有规则开着 → 补一次真请求(只认系统
     /// 三态,不信本地标记——2026-10-19 真机:本地标记与系统现状脱节)。全关时
     /// 不弹窗;系统通知出口关着也不请求——横幅权限只为该出口服务。

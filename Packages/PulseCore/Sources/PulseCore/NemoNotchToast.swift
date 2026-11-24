@@ -158,3 +158,11 @@ public enum NemoNotchToastContent {
         text.count <= limit ? text : String(text.prefix(limit))
     }
 }
+
+// MARK: - 发送缝(端口;Live 实现在 app target 的 NemoNotchToastSender)
+
+/// 发送缝:AlertCenter 只认此协议;单测注入假 sender 记录调用。
+public protocol NemoNotchToastSending: Sendable {
+    /// 发一条 toast(fire-and-forget:实现保证不抛、不阻塞调用方)。
+    func send(_ payload: NemoNotchToastPayload) async
+}
