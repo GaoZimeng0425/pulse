@@ -356,6 +356,9 @@ struct MainWindowView: View {
 /// Esc 先清空、再按一次失焦。药丸 tab 占了 principal,搜索框与齿轮同为
 /// primaryAction(声明序在前 → 摆齿轮左侧);宽度定长,药丸 tab 在 720
 /// 最小窗宽下不挤。⌘F / Esc 行为属手动验收。
+/// 不用系统 `.searchable(placement: .toolbar)`(2026-11-24 实测,用户拍板留自绘):
+/// macOS 窗口工具栏里系统搜索框自占一块玻璃底、固定排最右,`DefaultToolbarItem(kind: .search)`
+/// 在 Mac 上只支持底栏,指定 primaryAction 被忽略——做不到「输入框 + 齿轮同组、齿轮在右」。
 private struct MainSearchField: View {
     @Binding var query: String
     @FocusState private var isFocused: Bool
