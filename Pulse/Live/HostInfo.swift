@@ -4,14 +4,8 @@ import PulseCore
 
 // MARK: - 主机信息(工单 P0.6-05:主窗口副标题 / 弹窗运行时长)
 
-/// 主机静态信息:芯片名 · 核数 · 物理内存。启动后不变,读一次即可。
-/// 格式化出口在 PulseFormat.hostSummary(单测见 SystemStatsTests),
-/// 读到的实机值以走查验收(硬件不会热变)。
-struct HostInfo: Equatable, Sendable {
-    let chipName: String?
-    let coreCount: Int
-    let physicalMemoryBytes: UInt64
-
+/// 实机读取(sysctl / ProcessInfo);数据类型本身在 PulseCore(arch-clean/02)。
+extension HostInfo {
     static let current = HostInfo(
         chipName: sysctlString("machdep.cpu.brand_string"),
         coreCount: ProcessInfo.processInfo.processorCount,

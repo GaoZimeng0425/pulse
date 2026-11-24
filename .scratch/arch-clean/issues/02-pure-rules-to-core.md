@@ -1,6 +1,6 @@
 # arch-clean/02 纯规则与纯数据类型挪回 Core
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: 01
 
@@ -27,10 +27,17 @@ Blocked by: 01
 
 ## 验收
 
-- [ ] `Pulse/Features/` 不再引用任何 `Live*` 类型名
-- [ ] 挪过去的规则有包内测试;新增运行中分支测试
-- [ ] `sh scripts/check.sh` 全绿
+- [x] `Pulse/Features/` 不再引用任何 `Live*` 类型名
+- [x] 挪过去的规则有包内测试;新增运行中分支测试
+- [x] `sh scripts/check.sh` 全绿
 
 ## Comments
 
 - 2026-11-24 立票,取代 arch-review-2026-11-24/10(收窄:不新开活动数据接口)。
+- 2026-11-24 落地:`CleanPathDomain.isUserDomain`、`AppCatalogFacts`(去 Live 前缀)、`CleanActivityBoard`、
+  `HostInfo`(数据类型;sysctl 读取留 Live 作扩展)挪入 PulseCore;`InertNemoNotchToastSender` 挪
+  `Pulse/App/InertSources.swift`;门禁豁免清单删 4 行(14 → 10)。新增测试:用户域判定 2 例(包内);
+  卸载「运行中」两道关各 1 例——实施时发现列清单时已有一道(灰行不受理),执行前重查是第二道,
+  此前两道都无覆盖。
+  验收第一条按「Live 前缀」口径达成;不带前缀的剩余引用(通知内容 / 音量扫描 / 蓝牙授权等,与系统
+  框架代码同文件)盘点后另开 arch-clean/06,未在本票扩张。

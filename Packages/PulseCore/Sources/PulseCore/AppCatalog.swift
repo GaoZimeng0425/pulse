@@ -10,6 +10,26 @@ import Foundation
 // 清单」是硬要求,判定不可靠时宁可少列)——两者进台账计数,界面如实披露。
 
 /// Live 收集到的一个候选 app 的原始事实(全部可合成夹具)。
+/// 应用清单三件事实(Live 收集,Core / 功能层消费;arch-clean/02 从 Live 挪入)。
+public struct AppCatalogFacts: Sendable {
+    public var candidates: [AppCatalogCandidate]
+    /// "Bitwarden.app" → cask 名(目录名全等;冲突名已在 Core 侧丢弃)。
+    public var brewAppNames: [String: String]
+    /// cask 名 → zap 段残留路径(02 票残留候选的优先来源;parse 时已展开 ~,
+    /// Core 的 probes 对幂等输入再展开一次无副作用)。
+    public var brewZapPaths: [String: [String]]
+
+    public init(
+        candidates: [AppCatalogCandidate],
+        brewAppNames: [String: String],
+        brewZapPaths: [String: [String]]
+    ) {
+        self.candidates = candidates
+        self.brewAppNames = brewAppNames
+        self.brewZapPaths = brewZapPaths
+    }
+}
+
 public struct AppCatalogCandidate: Sendable, Equatable {
     /// .app 目录全路径,如 "/Applications/Bitwarden.app"。
     public var path: String

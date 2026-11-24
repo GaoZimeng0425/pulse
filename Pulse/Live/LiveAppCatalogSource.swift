@@ -16,15 +16,6 @@ import Security
 //   .metadata/<version>/<hash>/ 层级已不存在,缺收据 = 漏标不误标)。
 // 大小聚合不在此文件:复用 SpaceScanEngine(roots = app 路径集),口径与空间地图一致。
 
-struct LiveAppCatalogFacts: Sendable {
-    var candidates: [AppCatalogCandidate]
-    /// "Bitwarden.app" → cask 名(目录名全等;冲突名已在 Core 侧丢弃)。
-    var brewAppNames: [String: String]
-    /// cask 名 → zap 段残留路径(02 票残留候选的优先来源;parse 时已展开 ~,
-    /// Core 的 probes 对幂等输入再展开一次无副作用)。
-    var brewZapPaths: [String: [String]]
-}
-
 struct LiveAppCatalogSource {
     /// 清单根(spec):/Applications(Utilities 单列)+ ~/Applications。顺序即清单顺序候选源。
     static let applicationRoots = [
@@ -36,7 +27,7 @@ struct LiveAppCatalogSource {
     /// 全量收集。同步重活(数百次 SecStaticCode / Info.plist 读)由调用方放后台 Task。
     /// 无存储属性(struct 纯函数集合,Sendable 由编译器自动合成;FileManager 不做
     /// 存储正是为此——它非 Sendable,存了整 struct 就过不了跨 actor 检查)。
-    func collectFacts() -> LiveAppCatalogFacts {
+    func collectFacts() -> AppCatalogFacts {
         let fileManager = FileManager.default
         var candidates: [AppCatalogCandidate] = []
         var seenPaths = Set<String>()
@@ -51,7 +42,7 @@ struct LiveAppCatalogSource {
             }
         }
         let receipts = collectReceipts()
-        return LiveAppCatalogFacts(
+        return AppCatalogFacts(
             candidates: candidates,
             brewAppNames: CaskReceiptIndex.build(receipts),
             brewZapPaths: Dictionary(

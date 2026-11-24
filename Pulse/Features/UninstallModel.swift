@@ -58,7 +58,7 @@ final class UninstallModel {
     /// 取消旗:扫描引擎的 isCancelled 回调在 worker 线程高频触发,不走 MainActor
     /// 属性(跨 actor 跳跃每目录一次会放大开销),用锁保护的 Bool 盒。
     @ObservationIgnored private let cancelFlag = CancelFlag()
-    @ObservationIgnored private let collectFacts: @Sendable () async -> LiveAppCatalogFacts
+    @ObservationIgnored private let collectFacts: @Sendable () async -> AppCatalogFacts
     @ObservationIgnored private let scanSizes:
         @Sendable (
             [String],
@@ -79,7 +79,7 @@ final class UninstallModel {
     @ObservationIgnored private let recordHistory: @Sendable (CleanRunReport) async -> Void
 
     init(
-        collectFacts: @escaping @Sendable () async -> LiveAppCatalogFacts,
+        collectFacts: @escaping @Sendable () async -> AppCatalogFacts,
         scanSizes: @escaping @Sendable (
             [String],
             (@Sendable (ScanStats) -> Void)?,

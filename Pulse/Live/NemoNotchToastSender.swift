@@ -101,10 +101,3 @@ struct LiveNemoNotchToastSender: NemoNotchToastSending {
         }
     }
 }
-
-// MARK: - 惰性替身(预览 / 单测缺省)
-
-/// 什么都不发的假 sender(预览与 Inert 装配缺省;断言型替身在各自测试文件里)。
-struct InertNemoNotchToastSender: NemoNotchToastSending {
-    func send(_ payload: NemoNotchToastPayload) async {}
-}

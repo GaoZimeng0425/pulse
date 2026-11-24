@@ -13,10 +13,3 @@ Pulse/Features/PowerFeature.swift EnergyModelSensorProvider
 Pulse/Features/RankingsFeature.swift ProcessNetworkRateProvider
 Pulse/Features/SmcFeature.swift SmcSensorProvider
 Pulse/Features/SoundFeature.swift SoundSensorProvider
-
-# 预览里构造的纯数据 / 惰性件,放错了目录(不碰 IO)。清理:arch-clean/02——
-# HostInfo 挪 PulseCore,惰性发送器挪 Pulse/App/InertSources。
-Pulse/Views/AlertSettingsView.swift InertNemoNotchToastSender
-Pulse/Views/AlertViews.swift InertNemoNotchToastSender
-Pulse/Views/MetricTabViews.swift HostInfo
-Pulse/Views/OverviewCards.swift HostInfo

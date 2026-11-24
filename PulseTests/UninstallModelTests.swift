@@ -9,7 +9,7 @@ final class UninstallModelTests: XCTestCase {
     private func makeModel() -> UninstallModel {
         UninstallModel(
             collectFacts: {
-                LiveAppCatalogFacts(
+                AppCatalogFacts(
                     candidates: [
                         AppCatalogCandidate(
                             path: "/Applications/Bitwarden.app",
@@ -171,11 +171,12 @@ final class UninstallModelTests: XCTestCase {
         prober: @escaping @Sendable ([LeftoverProbe]) async -> [AppLeftoverRow] = { _ in [] },
         leftoverState: @escaping @Sendable (String) async -> PathSnapshot = { _ in
             .present(modifiedEpoch: 100)
-        }
+        },
+        activityBoard: CleanActivityBoard? = nil
     ) -> UninstallModel {
         UninstallModel(
             collectFacts: {
-                LiveAppCatalogFacts(
+                AppCatalogFacts(
                     candidates: [
                         AppCatalogCandidate(
                             path: "/Applications/Demo.app", directoryName: "Demo.app",
@@ -188,7 +189,7 @@ final class UninstallModelTests: XCTestCase {
             scanSizes: { paths, _, _ in
                 ["/Applications/Demo.app": (bytes: 1000, partial: false)].filter { paths.contains($0.key) }
             },
-            activityBoard: nil,
+            activityBoard: activityBoard,
             prober: prober,
             recycle: recycle,
             deletePermanently: { paths in
@@ -205,6 +206,50 @@ final class UninstallModelTests: XCTestCase {
             await Task.yield()
         }
     }
+
+    /// 运行中拒卸(arch-clean/02 补测:此前三处测试都传 nil 活动板,两道关都无覆盖)。
+    /// 第一道:列清单时已在运行 → 灰行,请求卸载直接不受理。
+    func testRunningAtListTimeIsGrayedAndNotRequestable() async {
+        let board = CleanActivityBoard()
+        board.update([Self.demoRunning])
+        let model = makeExecModel(activityBoard: board)
+        model.loadIfNeeded()
+        await waitForFinished(model)
+        let entry = model.displayedEntries[0]
+        XCTAssertNotEqual(entry.rowState, .normal, "运行中应灰行")
+        model.requestUninstall(entry)
+        XCTAssertEqual(model.uninstallPhase, .idle, "灰行不受理")
+    }
+
+    /// 第二道:列清单后、点确认前才启动 → 执行前重查拒绝,零文件动作。
+    func testStartedRunningBeforeConfirmIsRejectedWithoutTouchingFiles() async {
+        let board = CleanActivityBoard()
+        let recycled = LockedPaths()
+        let model = makeExecModel(
+            recycle: { paths in
+                recycled.append(paths)
+                return TrashRecycleOutcome()
+            },
+            activityBoard: board
+        )
+        model.loadIfNeeded()
+        await waitForFinished(model)
+        let entry = model.displayedEntries[0]
+        model.requestUninstall(entry)
+        board.update([Self.demoRunning])
+        model.confirmUninstall()
+        await waitIdle(model)
+        guard case let .aborted(reason) = model.uninstallPhase else {
+            return XCTFail("运行中应拒绝,得到 \(model.uninstallPhase)")
+        }
+        XCTAssertTrue(reason.contains("正在运行"))
+        XCTAssertTrue(recycled.all.isEmpty, "零文件动作")
+        XCTAssertFalse(model.removedAppPaths.contains(entry.path))
+    }
+
+    private static let demoRunning = CleanActivitySample(
+        executablePath: "/Applications/Demo.app/Contents/MacOS/Demo", cwd: nil, argv: []
+    )
 
     func testConfirmFlowCompletesRemovesRowAndClearsSelection() async {
         let model = makeExecModel()
@@ -230,7 +275,7 @@ final class UninstallModelTests: XCTestCase {
     func testBrewMissingAbortsAndKeepsRow() async {
         let model = UninstallModel(
             collectFacts: {
-                LiveAppCatalogFacts(
+                AppCatalogFacts(
                     candidates: [
                         AppCatalogCandidate(
                             path: "/Applications/Demo.app", directoryName: "Demo.app",
@@ -353,5 +398,22 @@ private actor BatchBox {
 
     func append(_ batch: [String]) {
         batches.append(batch)
+    }
+}
+
+/// 回收调用记录(执行闭包 @Sendable,经锁盒子记)。
+private final class LockedPaths: @unchecked Sendable {
+    private let lock = NSLock()
+    private var paths: [String] = []
+    func append(_ more: [String]) {
+        lock.lock()
+        defer { lock.unlock() }
+        paths += more
+    }
+
+    var all: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return paths
     }
 }
