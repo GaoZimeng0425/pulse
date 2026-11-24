@@ -91,11 +91,14 @@ final class SampleHistoryTests: XCTestCase {
             groups: [
                 GroupSample(id: .app(bundlePath: "x"), cpuPercent: 320, memoryBytes: 2_400_000_000),
                 GroupSample(id: .project(root: "y", worktreeName: nil), cpuPercent: 7, memoryBytes: 30_000_000),
-            ]
+            ],
+            atSeconds: 0
         )
         store.advance(
             systemCPULoad: 55,
-            groups: [GroupSample(id: .app(bundlePath: "x"), cpuPercent: 445, memoryBytes: 2_500_000_000)]
+            groups: [GroupSample(id: .app(bundlePath: "x"), cpuPercent: 445, memoryBytes: 2_500_000_000)],
+
+            atSeconds: 0
         )
 
         XCTAssertEqual(store.systemCPULoad.values, [42, 55])
@@ -109,8 +112,12 @@ final class SampleHistoryTests: XCTestCase {
     func testVanishedGroupStopsAppendingAndIsEvicted() {
         // 组消失 = 组内进程全部退场:本轮起停止追加,序列随即逐出(内存不无限增长)。
         var store = SampleHistoryStore(capacity: 10)
-        store.advance(systemCPULoad: 10, groups: [GroupSample(id: .orphan, cpuPercent: 100, memoryBytes: 1)])
-        store.advance(systemCPULoad: 20, groups: [])
+        store.advance(
+            systemCPULoad: 10,
+            groups: [GroupSample(id: .orphan, cpuPercent: 100, memoryBytes: 1)],
+            atSeconds: 0
+        )
+        store.advance(systemCPULoad: 20, groups: [], atSeconds: 0)
 
         XCTAssertNil(store.series(forGroup: .orphan))
         XCTAssertTrue(store.groups.isEmpty)
@@ -119,9 +126,17 @@ final class SampleHistoryTests: XCTestCase {
     func testReturningGroupRestartsItsSeries() {
         // 同 id 组去而复返:视为新 incarnation,序列从头累计(旧窗口不复活)。
         var store = SampleHistoryStore(capacity: 10)
-        store.advance(systemCPULoad: 10, groups: [GroupSample(id: .orphan, cpuPercent: 5, memoryBytes: 10)])
-        store.advance(systemCPULoad: 20, groups: [])
-        store.advance(systemCPULoad: 30, groups: [GroupSample(id: .orphan, cpuPercent: 9, memoryBytes: 20)])
+        store.advance(
+            systemCPULoad: 10,
+            groups: [GroupSample(id: .orphan, cpuPercent: 5, memoryBytes: 10)],
+            atSeconds: 0
+        )
+        store.advance(systemCPULoad: 20, groups: [], atSeconds: 0)
+        store.advance(
+            systemCPULoad: 30,
+            groups: [GroupSample(id: .orphan, cpuPercent: 9, memoryBytes: 20)],
+            atSeconds: 0
+        )
 
         let series = store.series(forGroup: .orphan)
         XCTAssertEqual(series?.cpuPercent.values, [9])
@@ -136,14 +151,16 @@ final class SampleHistoryTests: XCTestCase {
             groups: [
                 GroupSample(id: .app(bundlePath: "a"), cpuPercent: 12, memoryBytes: 100),
                 GroupSample(id: .app(bundlePath: "b"), cpuPercent: 34, memoryBytes: 200),
-            ]
+            ],
+            atSeconds: 0
         )
         store.advance(
             systemCPULoad: 20,
             groups: [
                 GroupSample(id: .app(bundlePath: "a"), cpuPercent: 56, memoryBytes: 150),
                 GroupSample(id: .app(bundlePath: "b"), cpuPercent: 78, memoryBytes: 250),
-            ]
+            ],
+            atSeconds: 0
         )
 
         XCTAssertEqual(store.series(forGroup: .app(bundlePath: "a"))?.cpuPercent.values, [12, 56])
@@ -154,7 +171,7 @@ final class SampleHistoryTests: XCTestCase {
         // 系统负载序列同受容量约束:容量 2,四轮后只剩最后两个值。
         var store = SampleHistoryStore(capacity: 2)
         [10, 60, 90, 30].forEach { load in
-            store.advance(systemCPULoad: load, groups: [])
+            store.advance(systemCPULoad: load, groups: [], atSeconds: 0)
         }
 
         XCTAssertEqual(store.systemCPULoad.values, [90, 30])

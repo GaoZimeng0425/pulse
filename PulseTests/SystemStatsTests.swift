@@ -117,9 +117,9 @@ final class SystemStatsTests: XCTestCase {
 
     func testHistoryRecordsMemoryUsedWhenProvided() {
         var store = SampleHistoryStore(capacity: 3)
-        store.advance(systemCPULoad: 10, memoryUsedBytes: 5000, groups: [])
-        store.advance(systemCPULoad: 20, memoryUsedBytes: nil, groups: [])
-        store.advance(systemCPULoad: 30, memoryUsedBytes: 7000, groups: [])
+        store.advance(systemCPULoad: 10, memoryUsedBytes: 5000, groups: [], atSeconds: 0)
+        store.advance(systemCPULoad: 20, memoryUsedBytes: nil, groups: [], atSeconds: 0)
+        store.advance(systemCPULoad: 30, memoryUsedBytes: 7000, groups: [], atSeconds: 0)
 
         // 缺读数的轮次不追加(不伪造 0 拉低走势)。
         XCTAssertEqual(store.memoryUsed.values, [5000, 7000])

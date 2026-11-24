@@ -330,7 +330,9 @@ final class DiskThroughputProvider: SensorProvider {
 
     func snapshot() async -> DiskThroughputReading? {
         guard let counters = source.readCounters() else { return nil }
-        let reading = accumulator.record(counters)
+        // 时刻取 snapshot 到达钟(SensorDelivery 不带 takenAt;snapshot 在心跳内
+        // 同步读,毫秒级偏差,HH:mm:ss 口径可接受——GPU/Power 同款,GpuFeature 注释)。
+        let reading = accumulator.record(counters, atSeconds: Date().timeIntervalSince1970)
         slot.store(reading)
         return reading
     }

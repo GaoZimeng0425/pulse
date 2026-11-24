@@ -328,6 +328,9 @@ public struct DiskRatePoint: Equatable, Sendable {
 public struct DiskThroughputReading: Equatable, Sendable {
     public let current: DiskRates
     public let trend: [DiskRatePoint]
+    /// 与 trend 对齐的采样时刻(epoch 秒,旧 → 新;history-hover/02 主卡悬停
+    /// 用——分档节奏混合,时间与值同环同长,不按序号猜)。空 = 老调用方。
+    public var trendTimes: [Double] = []
     /// 本轮记账增量(字节;历史落库消费,UI 形状不读,默认 0 让展示构造方
     /// 免于关心):差分成功轮 = 计数差,首读/回退/丢弃轮 = 0——与网络增量
     /// 同口径,落库只信增量,不信"速率 × 窗宽"折算。
@@ -343,12 +346,14 @@ public struct DiskThroughputReading: Equatable, Sendable {
         current: DiskRates,
         trend: [DiskRatePoint],
         readBytesDelta: UInt64 = 0,
-        writeBytesDelta: UInt64 = 0
+        writeBytesDelta: UInt64 = 0,
+        trendTimes: [Double] = []
     ) {
         self.current = current
         self.trend = trend
         self.readBytesDelta = readBytesDelta
         self.writeBytesDelta = writeBytesDelta
+        self.trendTimes = trendTimes
     }
 }
 
@@ -495,8 +500,9 @@ public final class DiskThroughputAccumulator: @unchecked Sendable {
     private var previous: DiskIOCounters?
     private var readRates = RingSeries<Double>(capacity: DiskThroughputAccumulator.trendCapacity)
     private var writeRates = RingSeries<Double>(capacity: DiskThroughputAccumulator.trendCapacity)
+    private var times = RingSeries<Double>(capacity: DiskThroughputAccumulator.trendCapacity)
 
-    public func record(_ counters: DiskIOCounters) -> DiskThroughputReading {
+    public func record(_ counters: DiskIOCounters, atSeconds: Double) -> DiskThroughputReading {
         lock.lock()
         defer { lock.unlock() }
         let rates = DiskThroughputDiffer.rates(previous: previous, current: counters)
@@ -515,13 +521,15 @@ public final class DiskThroughputAccumulator: @unchecked Sendable {
         previous = counters
         readRates.append(rates.readBytesPerSecond)
         writeRates.append(rates.writeBytesPerSecond)
+        times.append(atSeconds)
         let reads = readRates.values
         let writes = writeRates.values
         return DiskThroughputReading(
             current: rates,
             trend: (0 ..< reads.count).map { DiskRatePoint(read: reads[$0], write: writes[$0]) },
             readBytesDelta: readBytesDelta,
-            writeBytesDelta: writeBytesDelta
+            writeBytesDelta: writeBytesDelta,
+            trendTimes: times.values
         )
     }
 

@@ -328,7 +328,10 @@ final class NetworkModelTests: XCTestCase {
     func testTrendBufferEvictsOldestBeyondCapacity() {
         var buffer = NetworkTrendBuffer()
         for index in 0 ..< (NetworkTrendBuffer.capacity + 5) {
-            buffer.append(NetworkRates(upBytesPerSecond: Double(index), downBytesPerSecond: 1))
+            buffer.append(
+                NetworkRates(upBytesPerSecond: Double(index), downBytesPerSecond: 1),
+                at: Date(timeIntervalSince1970: TimeInterval(index))
+            )
         }
         let totals = buffer.totalBytesPerSecond
         XCTAssertEqual(totals.count, NetworkTrendBuffer.capacity)

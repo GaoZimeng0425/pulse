@@ -21,6 +21,11 @@ struct AreaTrendChartView: View {
 
     /// 时间序采样值(旧 → 新)。
     let values: [Double]
+    /// 与 values 对齐的采样时刻(旧 → 新;空或长度不齐 = 不出悬停,不按
+    /// 序号猜时刻——心跳 5s/1s 混合,猜会错到分钟级,history-hover/02)。
+    var times: [Date] = []
+    /// 悬停数值文案(按所在指标格式化,装配点给)。
+    var valueText: (Double) -> String = { PulseFormat.cpuPercent($0) }
     /// 线与面积色。
     var tint: Color
     /// 归一化上限(系统负载固定 0–100 语义域;内存 = 物理总量)。
@@ -28,20 +33,121 @@ struct AreaTrendChartView: View {
 
     init(
         values: [Double],
+        times: [Date] = [],
+        valueText: @escaping (Double) -> String = { PulseFormat.cpuPercent($0) },
         tint: Color = Metric.cpu.accentColor,
         domainMax: Double = 100
     ) {
         self.values = values
+        self.times = times
+        self.valueText = valueText
         self.tint = tint
         self.domainMax = max(domainMax, 1)
+    }
+
+    /// 悬停读数(history-hover/02,与历史页同款行为):吸附槽序号;nil = 未
+    /// 悬停 / 垫底槽(2% 假点不是读数)/ 时刻轴缺失——都安静收起不编数。
+    @State private var hoverSlot: Int?
+    @State private var plotSize: CGSize = .zero
+    @State private var tooltipSize: CGSize = .zero
+
+    /// 悬停可用:时刻轴与值等长且非空(诚实降级面)。
+    private var hoverEnabled: Bool {
+        times.count == values.count && !times.isEmpty
+    }
+
+    /// 值窗(与绘制同一 suffix 口径)。
+    private var window: ArraySlice<Double> {
+        values.suffix(Self.pointCount)
+    }
+
+    private var timeWindow: [Date] {
+        hoverEnabled ? Array(times.suffix(Self.pointCount)) : []
     }
 
     var body: some View {
         Canvas { context, size in
             draw(in: &context, size: size)
         }
+        .contentShape(.rect)
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { newValue in
+            if abs(newValue.width - plotSize.width) > 0.5
+                || abs(newValue.height - plotSize.height) > 0.5 {
+                plotSize = newValue
+            }
+        }
+        .onContinuousHover(coordinateSpace: .local) { phase in
+            guard hoverEnabled else { return }
+            switch phase {
+            case let .active(location):
+                let slot = HistoryCurveHover.edgeIndex(
+                    atX: location.x, width: plotSize.width, count: Self.pointCount
+                )
+                let next = HistoryCurveHover.windowIndex(
+                    forSlot: slot, paddingCount: Self.pointCount - window.count
+                )
+                if next != hoverSlot {
+                    hoverSlot = next
+                }
+            case .ended:
+                hoverSlot = nil
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            // 残留态守卫(01 同款教训):数据换窗后越界/垫底槽安静收起。
+            if let hoverSlot, window.indices.contains(hoverSlot), !timeWindow.isEmpty,
+               timeWindow.indices.contains(hoverSlot) {
+                hoverOverlay(hoverSlot)
+            }
+        }
         .accessibilityHidden(true) // 数值信息由主卡统计文字承载
     }
+
+    // MARK: - 悬停读数
+
+    /// 槽点坐标(与绘制同一 x 式:i/(count-1)·width;y 同归一)。
+    private func slotPoint(_ slot: Int, value: Double, in size: CGSize) -> CGPoint {
+        let normalized = min(max(value / domainMax, 0), 1)
+        let fraction = max(Self.floorFraction, CGFloat(normalized))
+        return CGPoint(
+            x: size.width * CGFloat(slot) / CGFloat(Self.pointCount - 1),
+            y: size.height * (1 - fraction)
+        )
+    }
+
+    private func hoverOverlay(_ windowIndex: Int) -> some View {
+        let value = window[windowIndex]
+        let center = slotPoint(
+            windowIndex + (Self.pointCount - window.count), value: value, in: plotSize
+        )
+        let anchor = CGRect(x: center.x - 4, y: center.y - 4, width: 8, height: 8)
+        let origin = ChartHoverGeometry.tooltipOrigin(
+            anchor: anchor, size: tooltipSize, bounds: plotSize, gap: 6
+        )
+        return ZStack(alignment: .topLeading) {
+            Rectangle()
+                .fill(tint.opacity(0.7))
+                .frame(width: 1, height: max(plotSize.height, 0))
+                .position(x: center.x, y: plotSize.height / 2)
+            AgentChartTooltip(
+                title: Self.timeFormatter.string(from: timeWindow[windowIndex]),
+                value: valueText(value),
+                swatch: tint
+            )
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { tooltipSize = $0 }
+            .opacity(tooltipSize == .zero ? 0 : 1)
+            .offset(x: origin.x, y: origin.y)
+        }
+        .allowsHitTesting(false)
+    }
+
+    /// 主卡窗口只有几分钟,时刻到秒(静态缓存:DateFormatter 已知贵)。
+    private static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter
+    }()
 
     private func draw(in context: inout GraphicsContext, size: CGSize) {
         var grid = Path()
@@ -236,8 +342,14 @@ struct MetricMainCardView: View {
                 }
             }
             .frame(width: 200, alignment: .leading)
-            AreaTrendChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
-                .frame(maxWidth: .infinity)
+            AreaTrendChartView(
+                values: model.trend,
+                times: model.trendTimes,
+                valueText: model.trendValueText,
+                tint: model.tint,
+                domainMax: model.domainMax
+            )
+            .frame(maxWidth: .infinity)
         }
         .frame(height: 176)
         .padding(16)
@@ -257,8 +369,14 @@ struct MetricMainCardView: View {
                     MetricChipView(chip: chip)
                 }
             }
-            AreaTrendChartView(values: model.trend, tint: model.tint, domainMax: model.domainMax)
-                .frame(height: 64)
+            AreaTrendChartView(
+                values: model.trend,
+                times: model.trendTimes,
+                valueText: model.trendValueText,
+                tint: model.tint,
+                domainMax: model.domainMax
+            )
+            .frame(height: 64)
             HStack(alignment: .top, spacing: 6) {
                 ForEach(model.stats) { stat in
                     statCell(stat)

@@ -46,3 +46,30 @@ final class HistoryCurveHoverTests: XCTestCase {
         XCTAssertNil(HistoryCurveHover.nearestFilled(anchor: 0, values: []))
     }
 }
+
+// MARK: - 端点锚定网格(history-hover/02:主卡面积图)
+
+final class HistoryCurveEdgeHoverTests: XCTestCase {
+    func testEdgeIndexAtAnchors() {
+        // count=56、width=110:x = i/55·110;首尾贴缘。
+        XCTAssertEqual(HistoryCurveHover.edgeIndex(atX: 0, width: 110, count: 56), 0)
+        XCTAssertEqual(HistoryCurveHover.edgeIndex(atX: 110, width: 110, count: 56), 55)
+        XCTAssertEqual(HistoryCurveHover.edgeIndex(atX: 40, width: 110, count: 56), 20)
+    }
+
+    func testEdgeIndexClampsOutOfRangeAndDegenerate() {
+        XCTAssertEqual(HistoryCurveHover.edgeIndex(atX: -3, width: 110, count: 56), 0)
+        XCTAssertEqual(HistoryCurveHover.edgeIndex(atX: 999, width: 110, count: 56), 55)
+        XCTAssertEqual(HistoryCurveHover.edgeIndex(atX: 50, width: 0, count: 56), 0)
+        XCTAssertEqual(HistoryCurveHover.edgeIndex(atX: 50, width: 110, count: 1), 0)
+    }
+
+    func testWindowIndexExcludesPaddingSlots() {
+        // 满窗(56/56)无垫底:槽即窗序号。
+        XCTAssertEqual(HistoryCurveHover.windowIndex(forSlot: 0, paddingCount: 0), 0)
+        // 半窗(30/56):左 26 槽是垫底假点,悬停不出读数。
+        XCTAssertNil(HistoryCurveHover.windowIndex(forSlot: 25, paddingCount: 26))
+        XCTAssertEqual(HistoryCurveHover.windowIndex(forSlot: 26, paddingCount: 26), 0)
+        XCTAssertEqual(HistoryCurveHover.windowIndex(forSlot: 55, paddingCount: 26), 29)
+    }
+}

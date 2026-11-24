@@ -167,12 +167,19 @@ public struct SampleHistoryStore: Equatable, Sendable {
     /// 系统内存已用(工单 P0.6-05 总览内存卡 strip / 内存 tab 面积图)。
     public private(set) var memoryUsed: RingSeries<UInt64>
     public private(set) var groups: [GroupIdentity: GroupSeries] = [:]
+    /// 与值环同批推进的采样时刻(epoch 秒,history-hover/02 主卡悬停用):
+    /// 心跳节奏 5s/1s 混合,按序号猜时刻会错到分钟级——时间与值同环同长,
+    /// 悬停按点报真实时刻。
+    public private(set) var systemCPULoadTimes = RingSeries<Double>(capacity: defaultCapacity)
+    public private(set) var memoryUsedTimes = RingSeries<Double>(capacity: defaultCapacity)
 
     public init(capacity: Int = SampleHistoryStore.defaultCapacity) {
         precondition(capacity > 0, "历史窗口容量必须为正")
         self.capacity = capacity
         systemCPULoad = RingSeries<Double>(capacity: capacity)
         memoryUsed = RingSeries<UInt64>(capacity: capacity)
+        systemCPULoadTimes = RingSeries<Double>(capacity: capacity)
+        memoryUsedTimes = RingSeries<Double>(capacity: capacity)
     }
 
     /// 读取某组的历史序列;组已被逐出(或从未出现)返回 nil。
@@ -186,11 +193,14 @@ public struct SampleHistoryStore: Equatable, Sendable {
     public mutating func advance(
         systemCPULoad load: Double,
         memoryUsedBytes: UInt64? = nil,
-        groups present: [GroupSample]
+        groups present: [GroupSample],
+        atSeconds: Double
     ) {
         systemCPULoad.append(load)
+        systemCPULoadTimes.append(atSeconds)
         if let memoryUsedBytes {
             memoryUsed.append(memoryUsedBytes)
+            memoryUsedTimes.append(atSeconds)
         }
 
         var presentByID = [GroupIdentity: GroupSample]()

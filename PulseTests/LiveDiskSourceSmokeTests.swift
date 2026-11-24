@@ -62,7 +62,7 @@ final class LiveDiskSourceSmokeTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(second.writeBytes, first.writeBytes, "计数器应单调不减")
         // 差分一次(读数含走势点)。
         let accumulator = DiskThroughputAccumulator()
-        let rates = accumulator.record(second)
+        let rates = accumulator.record(second, atSeconds: Date().timeIntervalSince1970)
         XCTAssertEqual(rates.trend.count, 1)
         XCTAssertGreaterThanOrEqual(rates.current.readBytesPerSecond, 0)
     }
