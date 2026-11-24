@@ -16,8 +16,9 @@ final class BatteryFeature: MonitorFeature {
 
     private let provider: BatterySensorProvider
 
-    init(source: any BatterySource) {
-        provider = BatterySensorProvider(source: source)
+    /// - Parameter wakeups: 电源事件唤醒流工厂(生产 = IOPS 通知,组装点注入;惰性 = nil)。
+    init(source: any BatterySource, wakeups: @escaping @Sendable () -> AsyncStream<Void>?) {
+        provider = BatterySensorProvider(source: source, wakeups: wakeups)
     }
 
     func sensorDrivers() -> [SensorDriver] {

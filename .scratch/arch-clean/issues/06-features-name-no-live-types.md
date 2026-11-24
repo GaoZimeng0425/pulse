@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 Type: task
-Blocked by: 05
+Blocked by: —(05 已完成)
 
 ## 背景
 

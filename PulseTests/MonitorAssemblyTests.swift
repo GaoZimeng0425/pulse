@@ -25,11 +25,11 @@ final class MonitorAssemblyTests: XCTestCase {
                 capacitySource: InertDiskCapacitySource(),
                 throughputSource: InertDiskThroughputSource()
             ),
-            battery: BatteryFeature(source: InertBatterySource()),
+            battery: BatteryFeature(source: InertBatterySource(), wakeups: { nil }),
             gpu: GpuFeature(source: InertGpuSource()),
             power: PowerFeature(source: InertPowerSource(), chipName: ""),
             smc: SmcFeature(source: InertSmcSource()),
-            sound: SoundFeature(source: InertSoundSource()),
+            sound: SoundFeature(source: InertSoundSource(), wakeups: { nil }),
             // app-volume/01:Inert 引擎(测试宿主不碰 HAL/tap,权限纪律见工单)。
             appVolume: .inert(),
             // 惰性构造:不走 Live 授权控制 + UserDefaults.standard 的生产便利构造器

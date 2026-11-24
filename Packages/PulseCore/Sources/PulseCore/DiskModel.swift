@@ -542,3 +542,62 @@ private extension String {
         hasPrefix(prefix) ? String(dropFirst(prefix.count)) : nil
     }
 }
+
+/// 磁盘容量 provider(工单 05):低频档 `.every(seconds: 30)`(卷少变,30s
+/// 足跟 Finder 对账;30–60s 区间取低值,换卷事件触发留待卷卡后续)。读失败
+/// 交付 lastGood,不白屏(ADR-0004);非 APFS 系统(读数恒 nil)整卡占位。
+public final class DiskCapacityProvider: SensorProvider {
+    public typealias Reading = DiskCapacityReading
+
+    public let cadence: SensorCadence = .every(seconds: 30)
+
+    private let source: any DiskCapacitySource
+    private let slot = SensorLastGoodBox<DiskCapacityReading>()
+
+    public var lastGood: DiskCapacityReading? {
+        slot.current
+    }
+
+    public init(source: any DiskCapacitySource) {
+        self.source = source
+    }
+
+    public func snapshot() async -> DiskCapacityReading? {
+        guard let raw = source.read(), let reading = DiskCapacity.make(from: raw) else { return nil }
+        slot.store(reading)
+        return reading
+    }
+}
+
+/// 磁盘吞吐 provider(工单 05):短档 5s(主路径)或低频档 30s(回退),
+/// 节奏随源路径(cadenceSeconds);差分状态与走势由 Accumulator 持有
+/// (锁保护——provider 须 Sendable,与 SensorLastGoodBox 同款纪律)。
+public final class DiskThroughputProvider: SensorProvider {
+    public typealias Reading = DiskThroughputReading
+
+    public var cadence: SensorCadence {
+        .every(seconds: source.cadenceSeconds)
+    }
+
+    private let source: any DiskThroughputSource
+    private let accumulator = DiskThroughputAccumulator()
+    private let slot = SensorLastGoodBox<DiskThroughputReading>()
+
+    public var lastGood: DiskThroughputReading? {
+        slot.current
+    }
+
+    /// 源由调用方选定(SystemMonitor 经 adoptingBestPath 带心跳中继构造)。
+    public init(source: any DiskThroughputSource) {
+        self.source = source
+    }
+
+    public func snapshot() async -> DiskThroughputReading? {
+        guard let counters = source.readCounters() else { return nil }
+        // 时刻取 snapshot 到达钟(SensorDelivery 不带 takenAt;snapshot 在心跳内
+        // 同步读,毫秒级偏差,HH:mm:ss 口径可接受——GPU/Power 同款,GpuFeature 注释)。
+        let reading = accumulator.record(counters, atSeconds: Date().timeIntervalSince1970)
+        slot.store(reading)
+        return reading
+    }
+}

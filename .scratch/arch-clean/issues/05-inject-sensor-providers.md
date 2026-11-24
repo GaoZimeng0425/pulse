@@ -1,6 +1,6 @@
 # arch-clean/05 传感器适配器由组装点注入
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: 01
 
@@ -22,9 +22,16 @@ arch-clean/01 落地分层门禁时发现:9 个功能模块在自己 init 里构
 
 ## 验收
 
-- [ ] 豁免清单第一组清空,`sh scripts/check-layers.sh` 通过
-- [ ] 各传感器卡片读数照常;`sh scripts/check.sh` 全绿
+- [x] 豁免清单第一组清空,`sh scripts/check-layers.sh` 通过
+- [x] 各传感器卡片读数照常;`sh scripts/check.sh` 全绿
 
 ## Comments
 
 - 2026-11-24 立票(arch-clean/01 落地门禁时发现,存量 10 处入豁免清单)。
+- 2026-11-24 落地,**改法偏离票面(更彻底)**:没有把适配器改成由组装点构造后注入,而是发现 10 个适配器
+  本身都是纯包装(只套注入的数据源 + Core 已有的闸门/累加器),碰 Live 的只有默认参数——于是整段挪进
+  PulseCore 各自的模型文件(连同蓝牙用的 `GattBatteryBuffer` / `GattBatteryProbing`),去掉构造 Live 源
+  与系统监听的默认参数。功能模块照旧自己包适配器,但包的已是 Core 类型,分层上不再越界;
+  电池 / 声音的系统事件唤醒流改由组装点传入。豁免清单 10 → 0。
+  顺带:惰性装配(预览 / 测试宿主)的电池模块原先默认会挂真 IOPS 电源通知,现在传 nil,不再碰系统。
+  未做:`LaunchdManifestProvider` 内部用 app 的 LogService,挪不进 Core,留给 06。

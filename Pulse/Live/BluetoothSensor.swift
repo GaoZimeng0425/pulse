@@ -149,15 +149,6 @@ struct LiveBluetoothSource: BluetoothSource {
 
 // MARK: - GATT 电量探针(源③,按需建连)
 
-/// GATT 探针接缝(p2-review/02):provider 只认"起 / 取消"两个动作——产品唯一实现
-/// = `GattBatteryProbe`,单测注入假探针钉"闸关 → 取消",不转真蓝牙栈。
-protocol GattBatteryProbing: Sendable {
-    /// 起一轮探针(已在跑 = no-op);交付走 deliver,异步完成。
-    func start(wanting names: [String], deliver: @escaping @Sendable (GattBatteryEntry) -> Void)
-    /// 取消在途一轮:停扫、断开在连外设、释放 central;没在跑 = no-op。
-    func cancel()
-}
-
 /// 有界 GATT 探针:为"缺电量的已配对设备名"扫描 → 名字命中才建连 → 读
 /// 0x180F/0x2A19 → 交付后断连(p2-sensors/01 探针⑥实证:设备须在场,连接可
 /// 超时——超时/失败安静放弃,下轮 30s 再试)。全部状态锁在自有串行队列
@@ -316,112 +307,6 @@ extension GattBatteryProbe: CBCentralManagerDelegate, CBPeripheralDelegate {
 }
 
 // MARK: - 蓝牙传感器 provider(p2-sensors/06,ADR-0004)
-
-/// 蓝牙传感器:**可见 30s / 不可见完全停**(spec 节奏矩阵——蓝牙电量是慢变量,
-/// 不为常驻成本买单)。可见快照 = 三源合并(锚 IOBluetooth + HID + 缓存 + 上一轮
-/// GATT 收账);有缺电量的设备才起 GATT 探针,结果进缓冲供**下一轮**合并
-/// (探针异步,不当轮阻塞)。睡眠停扫天然成立(进程随睡眠挂起,30s tick 不跑);
-/// 唤醒后下一个可见 tick 自动重启扫描。
-final class BluetoothSensorProvider: SensorProvider {
-    typealias Reading = BluetoothReading
-
-    let cadence: SensorCadence = .every(seconds: 30)
-
-    private let source: any BluetoothSource
-    private let gate = SensorVisibilityGate()
-    private let slot = SensorLastGoodBox<BluetoothReading>()
-    private let probe: any GattBatteryProbing
-    private let gattBuffer = GattBatteryBuffer()
-
-    var lastGood: BluetoothReading? {
-        slot.current
-    }
-
-    /// 当前是否在采(闸开)。诊断与单测读,不参与采样路径。
-    var isCollecting: Bool {
-        gate.isVisible
-    }
-
-    init(
-        source: any BluetoothSource = LiveBluetoothSource(),
-        probe: any GattBatteryProbing = GattBatteryProbe()
-    ) {
-        self.source = source
-        self.probe = probe
-    }
-
-    /// 采集闸(BluetoothFeature 折算下发:可见 ∧ 用户已开启 ∧ 系统已授权——三者缺一
-    /// 即关;关闸时 snapshot 一个源都不碰,IOBluetooth / CoreBluetooth 的 TCC 路径
-    /// 完全不被触及)。闸关同时取消在途 GATT 探针("关开关立即停采"含这一路,
-    /// p2-review/02);先落闸再取消,与 snapshot 尾部的复核配成对,见那里。
-    func setVisible(_ visible: Bool) {
-        gate.setVisible(visible)
-        if !visible {
-            probe.cancel()
-        }
-    }
-
-    func snapshot() async -> BluetoothReading? {
-        // 门控关:一个源都不碰(验收:不可见零扫描)。
-        guard gate.isVisible, let paired = source.readPaired() else { return nil }
-        let reading = BluetoothMerge.merge(
-            paired: paired,
-            hid: source.readHidBatteries(),
-            cache: source.readCachedBatteries(),
-            gatt: drainGattBuffer(),
-            usages: source.readHidUsages()
-        )
-        slot.store(reading)
-        // 按需 GATT:还有缺电量的已配对设备 → 起探针(设备在场才可能读到,
-        // 不在场超时安静放弃)。中文名设备(平板/键盘广播名)常无 GATT BAS,
-        // 探针空转一轮即弃,下轮再试。
-        let lacking = reading.devices.filter { $0.batteryPercent == nil }.compactMap(\.name)
-        if !lacking.isEmpty {
-            probe.start(wanting: lacking) { [weak self] entry in
-                self?.appendGatt(entry)
-            }
-            // 竞态补口:本轮开闸检查之后、start 之前闸可能已关(setVisible(false)
-            // 的 cancel 先于这次 start 入探针队列 = 取消落空)。start 后复核闸,关了
-            // 就补一次 cancel——start / cancel 在探针串行队列上按入队序执行,
-            // 两种交错都以"取消"收场。
-            if !gate.isVisible {
-                probe.cancel()
-            }
-        }
-        return reading
-    }
-
-    /// GATT 收账入口(探针 deliver 回调;@testable 测试直接投样本钉收账行为)。
-    func appendGatt(_ entry: GattBatteryEntry) {
-        gattBuffer.append(entry)
-    }
-
-    private func drainGattBuffer() -> [GattBatteryEntry] {
-        gattBuffer.drain()
-    }
-}
-
-/// GATT 样本收账盒(SensorLastGoodBox 同款纪律:锁保护微小盒子,协议要求
-/// provider 非隔离可 Sendable)。
-final class GattBatteryBuffer: @unchecked Sendable {
-    private let lock = NSLock()
-    private var entries: [GattBatteryEntry] = []
-
-    func append(_ entry: GattBatteryEntry) {
-        lock.lock()
-        defer { lock.unlock() }
-        entries.append(entry)
-    }
-
-    /// 取走制:一次取全并清空(样本只进一轮合并)。
-    func drain() -> [GattBatteryEntry] {
-        lock.lock()
-        defer { lock.unlock() }
-        let drained = entries
-        entries = []
-        return drained
-    }
-}
 
 // MARK: - 蓝牙授权(权限原则:默认关 + 用户动作处才弹 + 静默预检 + 被拒不重试)
 

@@ -15,8 +15,9 @@ final class SoundFeature: MonitorFeature {
 
     private let provider: SoundSensorProvider
 
-    init(source: any SoundSource) {
-        provider = SoundSensorProvider(source: source)
+    /// - Parameter wakeups: 音频设备变更唤醒流工厂(生产 = CoreAudio 监听,组装点注入;惰性 = nil)。
+    init(source: any SoundSource, wakeups: @escaping @Sendable () -> AsyncStream<Void>?) {
+        provider = SoundSensorProvider(source: source, wakeups: wakeups)
     }
 
     func sensorDrivers() -> [SensorDriver] {

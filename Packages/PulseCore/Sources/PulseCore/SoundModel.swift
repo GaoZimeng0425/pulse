@@ -53,3 +53,40 @@ public protocol SoundSource: Sendable {
     /// 读一次;nil = 读失败(无音频子系统 / 默认设备缺席)。
     func read() -> SoundRawReading?
 }
+
+/// 声音传感器:**事件驱动**(`.onEvent`,CoreAudio 属性变更通知,零轮询——
+/// spec 节奏矩阵);读数 = 原始读数经纯逻辑折叠(标量→百分数、钳位)。
+/// 读失败保留 lastGood(ADR-0004)。事件便宜且稀少(改音量/插拔才有),不设
+/// 可见性闸——关两窗也不多花一分钱(采样只在事件到达时发生)。
+public final class SoundSensorProvider: SensorProvider {
+    public typealias Reading = SoundReading
+
+    public let cadence: SensorCadence = .onEvent
+
+    private let source: any SoundSource
+    private let makeWakeups: @Sendable () -> AsyncStream<Void>?
+    private let slot = SensorLastGoodBox<SoundReading>()
+
+    public var lastGood: SoundReading? {
+        slot.current
+    }
+
+    public init(
+        source: any SoundSource,
+        wakeups: @escaping @Sendable () -> AsyncStream<Void>?
+    ) {
+        self.source = source
+        makeWakeups = wakeups
+    }
+
+    public func snapshot() async -> SoundReading? {
+        guard let raw = source.read() else { return nil }
+        let reading = SoundReading.make(from: raw)
+        slot.store(reading)
+        return reading
+    }
+
+    public func wakeups() -> AsyncStream<Void>? {
+        makeWakeups()
+    }
+}
