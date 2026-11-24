@@ -56,13 +56,10 @@ struct AreaTrendChartView: View {
         times.count == values.count && !times.isEmpty
     }
 
-    /// 值窗(与绘制同一 suffix 口径)。
-    private var window: ArraySlice<Double> {
-        values.suffix(Self.pointCount)
-    }
-
-    private var timeWindow: [Date] {
-        hoverEnabled ? Array(times.suffix(Self.pointCount)) : []
+    /// 值窗点数(与绘制同一 suffix 口径:最近 pointCount 个点)。悬停取值一律走
+    /// `HistoryCurveHover.edgeHoverSample`,这里不留切片下标口。
+    private var windowCount: Int {
+        min(values.count, Self.pointCount)
     }
 
     var body: some View {
@@ -84,7 +81,7 @@ struct AreaTrendChartView: View {
                     atX: location.x, width: plotSize.width, count: Self.pointCount
                 )
                 let next = HistoryCurveHover.windowIndex(
-                    forSlot: slot, paddingCount: Self.pointCount - window.count
+                    forSlot: slot, paddingCount: Self.pointCount - windowCount
                 )
                 if next != hoverSlot {
                     hoverSlot = next
@@ -94,10 +91,12 @@ struct AreaTrendChartView: View {
             }
         }
         .overlay(alignment: .topLeading) {
-            // 残留态守卫(01 同款教训):数据换窗后越界/垫底槽安静收起。
-            if let hoverSlot, window.indices.contains(hoverSlot), !timeWindow.isEmpty,
-               timeWindow.indices.contains(hoverSlot) {
-                hoverOverlay(hoverSlot)
+            // 取值唯一出口:越界 / 垫底槽 / 时刻轴不齐由它返回 nil 安静收起。
+            if let hoverSlot,
+               let sample = HistoryCurveHover.edgeHoverSample(
+                   values: values, times: times, slot: hoverSlot, pointCount: Self.pointCount
+               ) {
+                hoverOverlay(hoverSlot, sample: sample)
             }
         }
         .accessibilityHidden(true) // 数值信息由主卡统计文字承载
@@ -115,10 +114,12 @@ struct AreaTrendChartView: View {
         )
     }
 
-    private func hoverOverlay(_ windowIndex: Int) -> some View {
-        let value = window[windowIndex]
+    private func hoverOverlay(
+        _ windowIndex: Int,
+        sample: HistoryCurveHover.EdgeHoverSample
+    ) -> some View {
         let center = slotPoint(
-            windowIndex + (Self.pointCount - window.count), value: value, in: plotSize
+            windowIndex + (Self.pointCount - windowCount), value: sample.value, in: plotSize
         )
         let anchor = CGRect(x: center.x - 4, y: center.y - 4, width: 8, height: 8)
         let origin = ChartHoverGeometry.tooltipOrigin(
@@ -130,8 +131,8 @@ struct AreaTrendChartView: View {
                 .frame(width: 1, height: max(plotSize.height, 0))
                 .position(x: center.x, y: plotSize.height / 2)
             AgentChartTooltip(
-                title: Self.timeFormatter.string(from: timeWindow[windowIndex]),
-                value: valueText(value),
+                title: Self.timeFormatter.string(from: sample.time),
+                value: valueText(sample.value),
                 swatch: tint
             )
             .onGeometryChange(for: CGSize.self) { $0.size } action: { tooltipSize = $0 }

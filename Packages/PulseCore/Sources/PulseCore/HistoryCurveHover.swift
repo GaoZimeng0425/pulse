@@ -53,3 +53,38 @@ public extension HistoryCurveHover {
         slot >= paddingCount ? slot - paddingCount : nil
     }
 }
+
+// MARK: - 主卡面积图悬停取值(history-hover/02)
+
+public extension HistoryCurveHover {
+    /// 主卡面积图一个悬停槽的真实读数与采样时刻。
+    struct EdgeHoverSample: Equatable, Sendable {
+        public let value: Double
+        public let time: Date
+
+        public init(value: Double, time: Date) {
+            self.value = value
+            self.time = time
+        }
+    }
+
+    /// 槽序号 → 悬停样本;nil = 垫底槽 / 时刻轴与值长度不齐 / 无数据(不出读数)。
+    /// 视图取悬停读数的**唯一出口**:实犯(2026-11-24)是视图直接下标
+    /// `values.suffix(n)`——那是 ArraySlice,下标从 values.count − n 起而非 0,
+    /// 满环后拿 0 起的槽序号去取会往前错位(前 4 槽还取不到)。这里物化成
+    /// 0 起数组再取,值与时刻同一下标出自同一次换窗。
+    static func edgeHoverSample(
+        values: [Double],
+        times: [Date],
+        slot: Int,
+        pointCount: Int
+    ) -> EdgeHoverSample? {
+        guard !values.isEmpty, values.count == times.count else { return nil }
+        let padding = pointCount - min(values.count, pointCount)
+        guard let index = windowIndex(forSlot: slot, paddingCount: padding) else { return nil }
+        let window = Array(values.suffix(pointCount))
+        let timeWindow = Array(times.suffix(pointCount))
+        guard window.indices.contains(index), timeWindow.indices.contains(index) else { return nil }
+        return EdgeHoverSample(value: window[index], time: timeWindow[index])
+    }
+}

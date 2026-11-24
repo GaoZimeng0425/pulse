@@ -73,3 +73,64 @@ final class HistoryCurveEdgeHoverTests: XCTestCase {
         XCTAssertEqual(HistoryCurveHover.windowIndex(forSlot: 55, paddingCount: 26), 29)
     }
 }
+
+// MARK: - 主卡悬停取值(history-hover/02 回归:切片下标错位)
+
+final class HistoryCurveEdgeSampleTests: XCTestCase {
+    private let base = Date(timeIntervalSince1970: 1_800_000_000)
+    private let pointCount = 56
+
+    /// 满环 60 点:值 = 序号,时刻 = 基准 + 序号秒;窗 = 最近 56 点(序号 4…59)。
+    private var fullRing: (values: [Double], times: [Date]) {
+        let values = (0 ..< 60).map { Double($0) }
+        let times = (0 ..< 60).map { base.addingTimeInterval(Double($0)) }
+        return (values, times)
+    }
+
+    /// 实犯回归(2026-11-24 用户截图:GPU 折线 57% 而浮层报 0%):suffix 的
+    /// ArraySlice 下标从 4 起,拿 0 起的槽序号去取会往前错 4 点、前 4 槽取不到。
+    func testFullRingReadsTheHoveredSlotItself() {
+        let ring = fullRing
+        let slot3 = HistoryCurveHover.edgeHoverSample(
+            values: ring.values, times: ring.times, slot: 3, pointCount: pointCount
+        )
+        XCTAssertEqual(slot3?.value, 7)
+        XCTAssertEqual(slot3?.time, base.addingTimeInterval(7))
+        let slot10 = HistoryCurveHover.edgeHoverSample(
+            values: ring.values, times: ring.times, slot: 10, pointCount: pointCount
+        )
+        XCTAssertEqual(slot10?.value, 14)
+        XCTAssertEqual(slot10?.time, base.addingTimeInterval(14))
+        let last = HistoryCurveHover.edgeHoverSample(
+            values: ring.values, times: ring.times, slot: 55, pointCount: pointCount
+        )
+        XCTAssertEqual(last?.value, 59)
+    }
+
+    func testUnfilledRingSkipsPaddingSlots() {
+        let values = (0 ..< 10).map { Double($0) }
+        let times = (0 ..< 10).map { base.addingTimeInterval(Double($0)) }
+        // 左端 46 槽是 2% 垫底假点,不出读数。
+        XCTAssertNil(
+            HistoryCurveHover.edgeHoverSample(values: values, times: times, slot: 45, pointCount: pointCount)
+        )
+        let first = HistoryCurveHover.edgeHoverSample(
+            values: values, times: times, slot: 46, pointCount: pointCount
+        )
+        XCTAssertEqual(first?.value, 0)
+        XCTAssertEqual(first?.time, base)
+    }
+
+    func testMismatchedOrEmptyAxesYieldNil() {
+        let values = (0 ..< 60).map { Double($0) }
+        XCTAssertNil(
+            HistoryCurveHover.edgeHoverSample(values: values, times: [], slot: 10, pointCount: pointCount)
+        )
+        XCTAssertNil(
+            HistoryCurveHover.edgeHoverSample(values: values, times: [base], slot: 10, pointCount: pointCount)
+        )
+        XCTAssertNil(
+            HistoryCurveHover.edgeHoverSample(values: [], times: [], slot: 10, pointCount: pointCount)
+        )
+    }
+}
