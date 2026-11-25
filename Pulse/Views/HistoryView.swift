@@ -4,7 +4,7 @@ import SwiftUI
 // MARK: - 历史页(工单 04):指标 × 时间范围 Canvas 走势
 
 // 取数口径(表档/列/聚合/空段)全在 HistoryQueries.swift,本文件只消费
-// HistorySeries——查询经 monitor.history.series 走引擎 actor(UI 线程零 SQL,
+// HistorySeries——查询经 history.series 走引擎 actor(UI 线程零 SQL,
 // spec User Story 10);UI 不单测,预览 + 真机验收(spec 既定)。
 
 extension HistoryMetricKey {
@@ -47,7 +47,8 @@ extension HistorySeries {
 /// 不补零(User Story 8);网络/磁盘的记录列要等工单 06 接入,此前如实显示
 /// "暂无数据"不伪造。
 struct HistoryTabView: View {
-    let monitor: SystemMonitor
+    /// 历史模块:本页只读它(arch-clean/03,不持有整个 monitor)。
+    let history: HistoryFeature
     /// 弹窗紧凑档(2026-10-20 起弹窗也有历史页):指标条未选中纯图标、
     /// 选中才展开文字,360pt 里放得下;曲线 160 高、卡 {rounded.card-compact} 12
     /// + {spacing.card-padding-compact} 12。
@@ -126,7 +127,7 @@ struct HistoryTabView: View {
 
     /// 重查当前选择(最新时刻取窗)。
     private func reload() async {
-        series = await monitor.history.series(
+        series = await history.series(
             metric: metric, breakdown: activeBreakdown, range: range
         )
     }
@@ -450,7 +451,7 @@ struct HistoryCurveView: View {
         }
     }
     let monitor = SystemMonitor.preview(historyEngine: HistoryEngine(database: queue))
-    return HistoryTabView(monitor: monitor)
+    return HistoryTabView(history: monitor.features.history)
         .padding(24)
         .frame(width: 680)
         .containerBackground(Surface.window, for: .window)

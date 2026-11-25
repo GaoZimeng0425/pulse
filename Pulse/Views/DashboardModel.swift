@@ -60,14 +60,14 @@ final class DashboardModel {
             .settingTrendTimes(monitor.sampleHistory.memoryUsedTimes.values.map(Date.init(timeIntervalSince1970:)))
     }
 
-    /// 电池卡(p1-history/02;p2-sensors/04 顺手活):六项读数读 monitor.battery
+    /// 电池卡(p1-history/02;p2-sensors/04 顺手活):六项读数读 monitor.features.battery
     /// (lastGood 语义);功率优先 SMC PPBR(更准,探针⑤实证可读),读不到或
     /// 过了新鲜窗回退 V×A(p2-review/01 ②:只开电池页时 SMC 不刷新,不显示冻结值)
     /// ——合流在取数层,两个功能模块互不持引用(ADR-0003)。
     var batteryModel: MetricCardModel {
         .battery(
-            monitor.battery.reading,
-            powerWattsOverride: monitor.smc.reading?.freshBatteryPowerWatts(asOf: Date())
+            monitor.features.battery.reading,
+            powerWattsOverride: monitor.features.smc.reading?.freshBatteryPowerWatts(asOf: Date())
         )
     }
 
@@ -75,41 +75,41 @@ final class DashboardModel {
     /// 读写速率与走势读吞吐 provider——两个 provider 两条节奏,卡模型在此合流;
     /// 容量未首读时全占位(MetricCardModel.disk 兜底)。
     var diskModel: MetricCardModel {
-        .disk(capacity: monitor.disk.capacity, throughput: monitor.disk.throughput)
+        .disk(capacity: monitor.features.disk.capacity, throughput: monitor.features.disk.throughput)
             .settingTrendTimes(
-                (monitor.disk.throughput?.trendTimes ?? []).map(Date.init(timeIntervalSince1970:))
+                (monitor.features.disk.throughput?.trendTimes ?? []).map(Date.init(timeIntervalSince1970:))
             )
     }
 
-    /// GPU 卡(p2-sensors/02):读数与走势环都读 monitor.gpu(LastGood 语义);
+    /// GPU 卡(p2-sensors/02):读数与走势环都读 monitor.features.gpu(LastGood 语义);
     /// 未首读时全占位(MetricCardModel.gpu 兜底)。
     var gpuModel: MetricCardModel {
-        .gpu(monitor.gpu.reading, trend: monitor.gpu.trend)
-            .settingTrendTimes(monitor.gpu.trendTimes)
+        .gpu(monitor.features.gpu.reading, trend: monitor.features.gpu.trend)
+            .settingTrendTimes(monitor.features.gpu.trendTimes)
     }
 
-    /// ANE 卡(p2-sensors/03):功率读 monitor.power,归一化随芯片上限折算;
+    /// ANE 卡(p2-sensors/03):功率读 monitor.features.power,归一化随芯片上限折算;
     /// 未首读/ANE 通道缺席时全占位(MetricCardModel.ane 兜底)。
     var aneModel: MetricCardModel {
         .ane(
-            power: monitor.power.reading,
-            normalizedPercent: monitor.power.aneNormalizedPercent,
-            trend: monitor.power.aneTrend
+            power: monitor.features.power.reading,
+            normalizedPercent: monitor.features.power.aneNormalizedPercent,
+            trend: monitor.features.power.aneTrend
         )
-        .settingTrendTimes(monitor.power.aneTrendTimes)
+        .settingTrendTimes(monitor.features.power.aneTrendTimes)
         .settingTrendValueText { PulseFormat.watts($0) }
     }
 
-    /// 网络卡(工单 06):实时速率读心跳差分(monitor.network.reading,LastGood),
-    /// Today/7 天累计读历史库聚合(monitor.history.networkTotals),走势 = 速率环;
+    /// 网络卡(工单 06):实时速率读心跳差分(monitor.features.network.reading,LastGood),
+    /// Today/7 天累计读历史库聚合(monitor.features.history.networkTotals),走势 = 速率环;
     /// 未首读时全占位(MetricCardModel.network 兜底)。
     var networkModel: MetricCardModel {
         .network(
-            reading: monitor.network.reading,
-            trend: monitor.network.trend.totalBytesPerSecond,
-            totals: monitor.history.networkTotals
+            reading: monitor.features.network.reading,
+            trend: monitor.features.network.trend.totalBytesPerSecond,
+            totals: monitor.features.history.networkTotals
         )
-        .settingTrendTimes(monitor.network.trend.times)
+        .settingTrendTimes(monitor.features.network.trend.times)
     }
 
     // MARK: 会话状态与处置请求(工单 08;确认 + 执行在 KillRequestFlow)

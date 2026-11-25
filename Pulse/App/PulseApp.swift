@@ -76,9 +76,9 @@ struct PulseApp: App {
             MenuBarBadgeData(
                 cpuLoadPercent: monitor.systemCPULoad,
                 memory: monitor.memory,
-                diskAvailableBytes: monitor.disk.capacity?.availableForImportantUsageBytes,
-                diskTotalBytes: monitor.disk.capacity?.containerTotalBytes,
-                networkRate: monitor.network.reading?.rates
+                diskAvailableBytes: monitor.features.disk.capacity?.availableForImportantUsageBytes,
+                diskTotalBytes: monitor.features.disk.capacity?.containerTotalBytes,
+                networkRate: monitor.features.network.reading?.rates
             )
         }
         _badgeDisplay = State(initialValue: badgeDisplay)

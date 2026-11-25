@@ -45,7 +45,7 @@ struct DashboardView: View {
         // 展示轴随电池可用性(工单 p1-history/02),与主窗口同轴(含历史页)。
         _tabSelection = State(initialValue: MetricTabSelection(
             current: initialTab,
-            axis: MetricTab.popoverAxis(hasBattery: monitor.battery.hasBattery)
+            axis: MetricTab.popoverAxis(hasBattery: monitor.features.battery.hasBattery)
         ))
     }
 
@@ -60,8 +60,8 @@ struct DashboardView: View {
                 .frame(maxHeight: .infinity)
             // 触发中的告警(工单 P1-07):授权被拒的降级出口 + 常态状态展示;
             // 无告警时不渲染。弹窗专用紧凑档;主窗口走页头小条(2026-11-16)。
-            if !monitor.alerts.activeAlerts.isEmpty {
-                AlertBannerView(center: monitor.alerts)
+            if !monitor.features.alerts.activeAlerts.isEmpty {
+                AlertBannerView(center: monitor.features.alerts)
             }
             footer
         }
@@ -71,7 +71,7 @@ struct DashboardView: View {
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Surface.window)
         // 首次电池读数落地 → 电池页入轴(工单 02);被隐藏的当前 tab 回落总览。
-        .onChange(of: monitor.battery.hasBattery) { _, hasBattery in
+        .onChange(of: monitor.features.battery.hasBattery) { _, hasBattery in
             tabSelection.setAxis(MetricTab.popoverAxis(hasBattery: hasBattery))
         }
         // tab 变更单点回报(图标条 / ←/→ / 内容切换都汇到这里)。

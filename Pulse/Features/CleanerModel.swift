@@ -160,7 +160,7 @@ final class CleanerModel {
     /// - Parameters:
     ///   - exclusions: 排除目录(设置页同一实例;默认不落盘的空表给预览 / 测试)。
     ///   - scanRoots: 清理扫描根(05;与归组项目根两套配置,零共享;设置页同一实例)。
-    ///   - history: 清理历史(`monitor.history.cleanHistory`;nil = 历史库不可用)。
+    ///   - history: 清理历史(`monitor.features.history.cleanHistory`;nil = 历史库不可用)。
     ///   - trash: 废纸篓执行器(生产 Live;测试 spy——核心测试纪律:绝不真删)。
     ///   - activity: 进程活动源(在用保护输入;生产 = monitor 的采样快照投影,
     ///     测试 FakeCleanActivitySource;nil = 无活动源,在用保护按无活动处理)。

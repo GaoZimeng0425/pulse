@@ -38,101 +38,6 @@ final class SystemMonitor {
     /// 最近一轮采样留下的下钻输入(工单 06):组卡展开 / 进程详情从这里只读取数,
     /// 下钻不触发额外采集;首轮采样前为 nil。
     private(set) var drilldown: DrilldownState?
-    /// 模块排行(工单 module-rankings/01,MonitorFeature):电池/磁盘/网络三页的排行行
-    /// 与主干同轮出,自带 nettop 传感器与采样成本闸门。主窗口排行卡直读这里。
-    var rankings: RankingsFeature {
-        features.rankings
-    }
-
-    /// 历史功能模块(工单 p1-history/03、04、06,ADR-0003):每轮落库(串行写入)、出生
-    /// 登记回灌、网络 Today/7 天累计与历史页查询都在它那里。库打开失败(引擎缺席)
-    /// 时整体降级,实时页不受影响。
-    var history: HistoryFeature {
-        features.history
-    }
-
-    /// 告警编排(工单 p1-history/07,MonitorFeature:AlertCenter 薄壳 + AlertEngine 内核)。
-    /// 设置页也读它(alerts.store)。
-    var alerts: AlertCenter {
-        features.alerts
-    }
-
-    /// 网络页读数与走势(工单 p1-history/06)。
-    var network: NetworkFeature {
-        features.network
-    }
-
-    /// 磁盘容量与吞吐(工单 p1-history/05)。
-    var disk: DiskFeature {
-        features.disk
-    }
-
-    /// 电池读数(工单 p1-history/02)。
-    var battery: BatteryFeature {
-        features.battery
-    }
-
-    /// GPU 读数与走势(工单 p2-sensors/02)。
-    var gpu: GpuFeature {
-        features.gpu
-    }
-
-    /// 五路功率读数(工单 p2-sensors/03,GLOSSARY「五路功率」)。
-    var power: PowerFeature {
-        features.power
-    }
-
-    /// SMC 温度/风扇读数(工单 p2-sensors/04)。
-    var smc: SmcFeature {
-        features.smc
-    }
-
-    /// 声音读数(工单 p2-sensors/05)。
-    var sound: SoundFeature {
-        features.sound
-    }
-
-    /// 每应用音量混音(app-volume/01)。
-    var appVolume: AppVolumeFeature {
-        features.appVolume
-    }
-
-    /// 蓝牙三源合并读数(工单 p2-sensors/06)。
-    var bluetooth: BluetoothFeature {
-        features.bluetooth
-    }
-
-    /// 容器读数(工单 p2-sensors/07)。
-    var containers: ContainerFeature {
-        features.containers
-    }
-
-    /// dev server 盘点(工单 p1-history/08)。
-    var devServers: DevServerFeature {
-        features.devServers
-    }
-
-    /// 全局端口盘点(工单 port-view/01):服务页「监听端口」卡直读。
-    var ports: PortsFeature {
-        features.ports
-    }
-
-    /// AI 助手会话聚合(智能体 tab,agent-tab/01)。
-    var agentSessions: AgentSessionFeature {
-        features.agentSessions
-    }
-
-    /// 每日 token 账本(智能体 tab,agent-tab/02)。
-    var agentUsage: AgentUsageFeature {
-        features.agentUsage
-    }
-
-    /// 特权助手能耗读数(p3-root-mcp/03):root Energy Impact 聚合,电池页
-    /// 「AI 助手」卡与设置页助手状态直读(p3-root-mcp/04)。
-    var energyImpact: EnergyImpactFeature {
-        features.energyImpact
-    }
-
     private let sampler: Sampler
     /// 唤醒通知观察者(与 app 同寿命,start 建立一次;monitor 是 app 唯一的
     /// @State 管线持有者,观察者随进程结束——闭包 weak self,无保留环,
@@ -160,8 +65,10 @@ final class SystemMonitor {
     /// 清理页的活动源按需读(零新采集)。@unchecked Sendable 自带锁,无需隔离。
     @ObservationIgnored let activityBoard = CleanActivityBoard()
     /// 功能模块(ADR-0003 扩展点):工厂构造后整份传入;每轮 onRound、可见性变化、
-    /// 磁盘读数、传感器登记与启停都按 `registry` 顺序派发。组装接线,不参与观察。
-    @ObservationIgnored private let features: MonitorFeatures
+    /// 磁盘读数、传感器登记与启停都按 `registry` 顺序派发。视图经 `monitor.features.x`
+    /// 取模块(arch-clean/03:不再逐个转发);只用一个模块的视图直接收那个模块。
+    /// 本属性是不变的接线,不参与观察——观察追踪落在各模块实例自身。
+    @ObservationIgnored let features: MonitorFeatures
     private let killService: any KillService
     private var samplingTask: Task<Void, Never>?
     private var scanTask: Task<Void, Never>?

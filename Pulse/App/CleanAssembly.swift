@@ -19,7 +19,7 @@ struct CleanAssembly {
         return CleanerModel(
             exclusions: exclusions,
             scanRoots: scanRoots,
-            history: monitor.history.cleanHistory,
+            history: monitor.features.history.cleanHistory,
             trash: LiveCleanTrashExecutor(),
             directoryEnumerator: enumerator,
             activity: LiveCleanActivitySource(board: monitor.activityBoard),
@@ -35,7 +35,7 @@ struct CleanAssembly {
 
     func makeUninstallModel() -> UninstallModel {
         // 先取值再捕获(monitor 属性带 actor 隔离,闭包里直读过不了并发检查)。
-        let cleanHistory = monitor.history.cleanHistory
+        let cleanHistory = monitor.features.history.cleanHistory
         return UninstallModel(
             collectFacts: { LiveAppCatalogSource().collectFacts() },
             scanSizes: { paths, progress, isCancelled in

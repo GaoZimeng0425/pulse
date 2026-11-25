@@ -55,8 +55,8 @@ struct GeneralSettingsView: View {
             // 「权限 / TCC 纪律」):开的那一刻才可能弹系统蓝牙权限框。
             Section("外设") {
                 Toggle("蓝牙外设监控", isOn: Binding(
-                    get: { monitor.bluetooth.isEnabled },
-                    set: { monitor.bluetooth.setEnabled($0) }
+                    get: { monitor.features.bluetooth.isEnabled },
+                    set: { monitor.features.bluetooth.setEnabled($0) }
                 ))
                 Text("读取已配对设备的连接状态与电量。开启时请求一次蓝牙权限,只在你操作时弹出;关闭则完全不读取蓝牙。")
                     .font(.system(size: 11))

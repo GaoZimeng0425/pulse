@@ -66,7 +66,7 @@ struct MetricTabStack<Ranking: View>: View {
             // 智能体页两子 tab(agent-tab/06 三子页结构被 tab-regroup/01 缩编:
             // 消耗(账本)/ 会话(在跑)——dev server 卡迁服务页):清理页子药丸
             // 同款模式,默认落「消耗」;子页切换状态在 DashboardModel(切 tab 不丢)。
-            let snapshot = monitor.agentSessions.snapshot
+            let snapshot = monitor.features.agentSessions.snapshot
             builder.card(
                 "agent-subtabs",
                 AgentSubTabBar(selection: Binding(
@@ -81,22 +81,22 @@ struct MetricTabStack<Ranking: View>: View {
                 builder.card(
                     "agent-usage-pane",
                     AgentUsagePaneView(
-                        rows: monitor.agentUsage.rows,
-                        projectRows: monitor.agentUsage.projectRows,
-                        modelRows: monitor.agentUsage.modelRows,
-                        sessionCounts: monitor.agentUsage.sessionCounts,
+                        rows: monitor.features.agentUsage.rows,
+                        projectRows: monitor.features.agentUsage.projectRows,
+                        modelRows: monitor.features.agentUsage.modelRows,
+                        sessionCounts: monitor.features.agentUsage.sessionCounts,
                         usage: snapshot.usage,
                         liveProjectCounts: AgentUsageWindow.liveProjectCounts(
                             claudeSessions: snapshot.claudeSessions,
                             zcodeSessions: snapshot.zcodeSessions
                         ),
                         isCompact: isCompact,
-                        isScanning: monitor.agentUsage.isScanning,
-                        onRescan: { monitor.agentUsage.requestFullRescan() }
+                        isScanning: monitor.features.agentUsage.isScanning,
+                        onRescan: { monitor.features.agentUsage.requestFullRescan() }
                     )
                 )
             case .sessions:
-                let gitStatuses = monitor.agentSessions.gitStatuses
+                let gitStatuses = monitor.features.agentSessions.gitStatuses
                 builder.card(
                     "claude-sessions",
                     ClaudeSessionsCardView(
@@ -130,14 +130,14 @@ struct MetricTabStack<Ranking: View>: View {
             // 弹窗只画派生卡(Average/Hottest + 最快风扇):逐核明细会把 360pt 弹窗撑得
             // 不可用的高;风扇信息由派生卡的最快风扇行承载。
             if isCompact {
-                builder.card("derived", SmcDerivedCardView(reading: monitor.smc.reading, isCompact: true))
+                builder.card("derived", SmcDerivedCardView(reading: monitor.features.smc.reading, isCompact: true))
             } else {
                 builder.card("pair", pair {
-                    SmcDerivedCardView(reading: monitor.smc.reading, isCompact: false)
+                    SmcDerivedCardView(reading: monitor.features.smc.reading, isCompact: false)
                 } second: {
-                    SmcFansCardView(reading: monitor.smc.reading, isCompact: false)
+                    SmcFansCardView(reading: monitor.features.smc.reading, isCompact: false)
                 })
-                builder.card("temps", SmcTempsDetailCardView(reading: monitor.smc.reading, isCompact: false))
+                builder.card("temps", SmcTempsDetailCardView(reading: monitor.features.smc.reading, isCompact: false))
             }
         case .peripherals:
             // 外设页(p2-sensors/05/06 + app-volume/01):蓝牙设备表(三源电量合并,
@@ -145,15 +145,15 @@ struct MetricTabStack<Ranking: View>: View {
             // + 声音区(读数纯展示、事件驱动零轮询;每应用混音卡 1.5s 枚举走
             // shows(.sound) 可见性闸,已接管管线不随可见性拆)。
             builder.card("bluetooth", BluetoothDevicesCardView(
-                reading: monitor.bluetooth.reading,
-                accessState: monitor.bluetooth.accessState,
+                reading: monitor.features.bluetooth.reading,
+                accessState: monitor.features.bluetooth.accessState,
                 isCompact: isCompact,
-                isAwaitingRead: monitor.bluetooth.isAwaitingRead,
-                onEnable: { monitor.bluetooth.setEnabled(true) },
-                onAuthorize: { monitor.bluetooth.requestAuthorization() }
+                isAwaitingRead: monitor.features.bluetooth.isAwaitingRead,
+                onEnable: { monitor.features.bluetooth.setEnabled(true) },
+                onAuthorize: { monitor.features.bluetooth.requestAuthorization() }
             ))
-            builder.card("sound", SoundCardView(reading: monitor.sound.reading, isCompact: isCompact))
-            builder.card("app-volume", AppVolumeCardView(feature: monitor.appVolume, isCompact: isCompact))
+            builder.card("sound", SoundCardView(reading: monitor.features.sound.reading, isCompact: isCompact))
+            builder.card("app-volume", AppVolumeCardView(feature: monitor.features.appVolume, isCompact: isCompact))
         case .gpu:
             // GPU 页(p2-sensors/02/03):利用率主卡 + ANE 卡与五路功率区
             // (同一 Energy Model 订阅,一鱼五吃);每 App GPU 归因是 P3(root
@@ -162,7 +162,7 @@ struct MetricTabStack<Ranking: View>: View {
             builder.card("pair", pair {
                 MetricMainCardView(model: model.aneModel, isCompact: isCompact)
             } second: {
-                PowerDomainsCardView(reading: monitor.power.reading, isCompact: isCompact)
+                PowerDomainsCardView(reading: monitor.features.power.reading, isCompact: isCompact)
             })
         case .services:
             // 服务页:三张卡上下堆叠(dev server 卡 / 监听端口卡 / 容器卡),都是「本机跑着
@@ -170,19 +170,22 @@ struct MetricTabStack<Ranking: View>: View {
             // 确认对话框(KillRequestFlow 关口)把关后才发信号。容器卡不做数据卷占用行。
             builder.card(
                 "dev-servers",
-                DevServerCardView(servers: monitor.devServers.servers, isCompact: isCompact) {
-                    model.requestStopAllDevServers(monitor.devServers.servers)
+                DevServerCardView(servers: monitor.features.devServers.servers, isCompact: isCompact) {
+                    model.requestStopAllDevServers(monitor.features.devServers.servers)
                 }
             )
             // 监听端口卡(port-view/01):全机监听 TCP 口 + 占用者,行「结束」
             // 上抛该端口全部占用进程(同一 KillRequestFlow 关口)。
             builder.card(
                 "ports",
-                PortsCardView(inventory: monitor.ports.inventory, isCompact: isCompact) { targets in
+                PortsCardView(inventory: monitor.features.ports.inventory, isCompact: isCompact) { targets in
                     model.requestEndPortHolders(targets)
                 }
             )
-            builder.card("containers", ContainersCardView(reading: monitor.containers.reading, isCompact: isCompact))
+            builder.card(
+                "containers",
+                ContainersCardView(reading: monitor.features.containers.reading, isCompact: isCompact)
+            )
         case .battery:
             // 电池页(p1-history/02 + battery-energy/01+02):六项读数主卡 + 耗电排行
             // 成对——全部应用 / AI 助手同走 root 能耗指数口径(占比主值 + 指数副文,
@@ -190,9 +193,9 @@ struct MetricTabStack<Ranking: View>: View {
             // (battery-energy/02,双胞胎空卡观感案),读到数据自动还原。组排行与
             // 电池无关,不放。
             builder.card("main", MetricMainCardView(model: model.batteryModel, isCompact: isCompact))
-            let impact = monitor.energyImpact.reading
+            let impact = monitor.features.energyImpact.reading
             let totalImpact = impact?.totalImpact ?? 0
-            let gate = monitor.energyImpact.helperGate
+            let gate = monitor.features.energyImpact.helperGate
             let allAppsRows = EnergyImpactTable.allAppsRows(impact?.top ?? [], totalImpact: totalImpact)
             let agentRows = EnergyImpactTable.agentRows(impact?.agents ?? [], totalImpact: totalImpact)
             switch BatteryRankingsLayout.resolve(
@@ -257,31 +260,34 @@ struct MetricTabStack<Ranking: View>: View {
                 )
             }
             builder.card("pair", pair {
-                DiskVolumeBreakdownView(capacity: monitor.disk.capacity, isCompact: isCompact)
+                DiskVolumeBreakdownView(capacity: monitor.features.disk.capacity, isCompact: isCompact)
             } second: {
-                DiskSnapshotsCardView(listing: monitor.disk.capacity?.snapshots, isCompact: isCompact)
+                DiskSnapshotsCardView(listing: monitor.features.disk.capacity?.snapshots, isCompact: isCompact)
             })
             builder.moduleRanking("disk", ModuleRankingSpec(
                 title: "读写最多",
                 valueLabel: "读写",
-                rows: monitor.rankings.diskRows,
+                rows: monitor.features.rankings.diskRows,
                 accent: Metric.disk.accentColor,
                 cadenceNote: "30 秒一档"
             ))
         case .network:
             // 网络页(工单 p1-history/06):主卡 + 流量累计明细 + 每进程流量排行(nettop 归组)。
             builder.card("main", MetricMainCardView(model: model.networkModel, isCompact: isCompact))
-            builder.card("totals", NetworkTotalsCardView(totals: monitor.history.networkTotals, isCompact: isCompact))
+            builder.card(
+                "totals",
+                NetworkTotalsCardView(totals: monitor.features.history.networkTotals, isCompact: isCompact)
+            )
             builder.moduleRanking("network", ModuleRankingSpec(
                 title: "每进程流量",
                 valueLabel: "流量",
-                rows: monitor.rankings.networkRows,
+                rows: monitor.features.rankings.networkRows,
                 accent: Metric.network.accentColor,
                 cadenceNote: "5 秒一档"
             ))
         case .history:
             // 历史页(工单 p1-history/04):指标 × 时间范围走势,查询走引擎 actor。
-            builder.card("history", HistoryTabView(monitor: monitor, isCompact: isCompact))
+            builder.card("history", HistoryTabView(history: monitor.features.history, isCompact: isCompact))
         case .cleaner:
             // 清理页整页自持(p4-cleaner/03):主窗口在 MainWindowView 直接特例、
             // 不进本栈;弹窗轴已排除。此分支理论不可达,空序列仅保 switch 完备。
@@ -331,7 +337,7 @@ struct MetricTabStack<Ranking: View>: View {
             OverviewCardItem(model: model.diskModel, tab: .disk),
             OverviewCardItem(model: model.networkModel, tab: .network),
         ]
-        if monitor.battery.hasBattery {
+        if monitor.features.battery.hasBattery {
             items.append(OverviewCardItem(model: model.batteryModel, tab: .battery))
         }
         return items
