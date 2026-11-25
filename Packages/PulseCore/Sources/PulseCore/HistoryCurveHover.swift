@@ -46,45 +46,34 @@ public extension HistoryCurveHover {
         let raw = x / width * CGFloat(count - 1)
         return min(max(Int(raw.rounded()), 0), count - 1)
     }
-
-    /// 槽序号 → 真实数据窗内序号:主卡图右对齐,左端 paddingCount 个槽是
-    /// 2% 垫底假点(不是读数)——垫底槽返回 nil,悬停不出读数不编数。
-    static func windowIndex(forSlot slot: Int, paddingCount: Int) -> Int? {
-        slot >= paddingCount ? slot - paddingCount : nil
-    }
 }
 
-// MARK: - 主卡面积图悬停取值(history-hover/02)
+// MARK: - 主卡面积图定长窗口(chart-hover-partial,2026-11-25 用户拍板)
 
 public extension HistoryCurveHover {
-    /// 主卡面积图一个悬停槽的真实读数与采样时刻。
-    struct EdgeHoverSample: Equatable, Sendable {
+    /// 主卡面积图的一个点:值 + 采样时刻(补位点没有时刻 = nil)。
+    struct EdgePoint: Equatable, Sendable {
         public let value: Double
-        public let time: Date
+        public let time: Date?
 
-        public init(value: Double, time: Date) {
+        public init(value: Double, time: Date?) {
             self.value = value
             self.time = time
         }
     }
 
-    /// 槽序号 → 悬停样本;nil = 垫底槽 / 时刻轴与值长度不齐 / 无数据(不出读数)。
-    /// 视图取悬停读数的**唯一出口**:实犯(2026-11-24)是视图直接下标
-    /// `values.suffix(n)`——那是 ArraySlice,下标从 values.count − n 起而非 0,
-    /// 满环后拿 0 起的槽序号去取会往前错位(前 4 槽还取不到)。这里物化成
-    /// 0 起数组再取,值与时刻同一下标出自同一次换窗。
-    static func edgeHoverSample(
-        values: [Double],
-        times: [Date],
-        slot: Int,
-        pointCount: Int
-    ) -> EdgeHoverSample? {
-        guard !values.isEmpty, values.count == times.count else { return nil }
-        let padding = pointCount - min(values.count, pointCount)
-        guard let index = windowIndex(forSlot: slot, paddingCount: padding) else { return nil }
-        let window = Array(values.suffix(pointCount))
-        let timeWindow = Array(times.suffix(pointCount))
-        guard window.indices.contains(index), timeWindow.indices.contains(index) else { return nil }
-        return EdgeHoverSample(value: window[index], time: timeWindow[index])
+    /// 定长窗口:取最近 `count` 个点;不足时**前面补 0**,补出来的点没有时刻。
+    /// 图拿到的就是恰好 `count` 个点的 list,第 i 格 = list[i],悬停到哪格显示哪格——
+    /// 视图里不再有「格子序号 ↔ 数据序号」的换算(旧的垫底换算曾被扣两次,
+    /// 未满窗的 GPU / 磁盘图悬停全失)。时刻轴与值不等长 = 时刻全部缺省(不按序号猜)。
+    /// 空输入返回空:没有任何读数时图只画网格,不画一条 0 线冒充数据。
+    static func edgeWindow(values: [Double], times: [Date], count: Int) -> [EdgePoint] {
+        guard !values.isEmpty, count > 0 else { return [] }
+        let aligned = times.count == values.count
+        let recentValues = Array(values.suffix(count))
+        let recentTimes: [Date?] = aligned ? Array(times.suffix(count)) : recentValues.map { _ in nil }
+        let padding = count - recentValues.count
+        let padded = Array(repeating: EdgePoint(value: 0, time: nil), count: padding)
+        return padded + zip(recentValues, recentTimes).map { EdgePoint(value: $0, time: $1) }
     }
 }
