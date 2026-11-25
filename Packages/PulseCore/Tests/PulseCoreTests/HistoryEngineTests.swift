@@ -1,5 +1,4 @@
 import GRDB
-@testable import Pulse
 @testable import PulseCore
 import XCTest
 
