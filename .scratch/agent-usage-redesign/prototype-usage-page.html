@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pulse · 智能体「消耗」页重构 · 骨架原型</title>
+<!--
+  一次性原型(不是产品代码)。回答的问题:消耗页重排成「主卡 → 日历 → 项目榜单」后长什么样,
+  配色往哪个方向走。四个样子用 ?mode= 切换:wire(线稿)/ a / b / c(三套配色);
+  数据全是按种子生成的假数据,口径照产品(今天没过完、按已过时间折算)。
+-->
+<style>
+/* scoped:根节点真挂前缀类 */
+.pu-root * { box-sizing: border-box; margin: 0; padding: 0; }
+.pu-root {
+  --window: #ffffff; --card: #f5f5f7; --card-high: #e8e8ed;
+  --ink-1: #1d1d1f; --ink-2: rgba(60, 60, 67, 0.62); --ink-3: rgba(60, 60, 67, 0.34);
+  --pos: #248a3a; --neg: #d70015; --grid: rgba(0, 0, 0, 0.08); --glass: rgba(0, 0, 0, 0.05);
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  font-size: 12px; color: var(--ink-1); background: #000; min-height: 100vh; padding: 16px 16px 96px;
+}
+.pu-root[data-appearance="dark"] {
+  --window: #1a1a1d; --card: #1f1f22; --card-high: #27272b;
+  --ink-1: #f2f2f7; --ink-2: rgba(235, 235, 245, 0.62); --ink-3: rgba(235, 235, 245, 0.32);
+  --pos: #3cc24a; --neg: #ff5a4f; --grid: rgba(255, 255, 255, 0.08); --glass: rgba(255, 255, 255, 0.08);
+}
+/* 三套配色:页强调色(今日数字 / 选中 / 日历色阶)+ 两家来源 + 模型三色 */
+.pu-root[data-palette="a"] { --accent: #8f7cf5; --claude: #e8946a; --zcode: #58a8e8; --m1: #e070a8; --m2: #62c48c; --m3: #cfab4a; }
+.pu-root[data-palette="b"] { --accent: #a06bff; --claude: #f5885c; --zcode: #3fa9f5; --m1: #f264ae; --m2: #4fdc9c; --m3: #e6b545; }
+.pu-root[data-palette="c"] { --accent: #a6d94a; --claude: #e8946a; --zcode: #8f7cf5; --m1: #58a8e8; --m2: #e070a8; --m3: #cfab4a; }
+.pu-root[data-appearance="light"][data-palette="a"] { --accent: #6a4fe0; --claude: #c9622f; --zcode: #1a78bd; --m1: #bd3a7c; --m2: #258a57; --m3: #93730f; }
+.pu-root[data-appearance="light"][data-palette="b"] { --accent: #7a3ff2; --claude: #d4551f; --zcode: #0680d8; --m1: #d41f7c; --m2: #0a9a5f; --m3: #aa7f08; }
+.pu-root[data-appearance="light"][data-palette="c"] { --accent: #5a921a; --claude: #c9622f; --zcode: #6a4fe0; --m1: #1a78bd; --m2: #bd3a7c; --m3: #93730f; }
+/* 线稿:整页去色 + 卡片描边,只看结构 */
+.pu-root[data-mode="wire"] .pu-stage { filter: grayscale(1); }
+.pu-root[data-mode="wire"] .pu-card { background: transparent; border: 1.5px solid #8a8a8a; }
+.pu-root[data-mode="wire"] .pu-stats, .pu-root[data-mode="wire"] .pu-detail, .pu-root[data-mode="wire"] .pu-trend { outline: 1px dashed #7a7a7a; outline-offset: 4px; }
+
+.pu-root .pu-hint { max-width: 1280px; margin: 0 auto 16px; color: #bbb; line-height: 1.7; }
+.pu-root .pu-hint b { color: #fff; font-weight: 600; }
+.pu-root .pu-hint kbd { background: #2a2a2a; border-radius: 4px; padding: 0 5px; color: #fff; }
+.pu-root .pu-stage { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; justify-content: center; }
+.pu-root .pu-window { width: 880px; max-width: 100%; background: var(--window); border-radius: 10px; padding: 0 24px 24px; overflow: hidden; }
+.pu-root[data-width="1280"] .pu-window { width: 1280px; }
+.pu-root .pu-spacer { flex: 1; }
+.pu-root .pu-trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.pu-root .pu-toolbar { height: 52px; display: flex; align-items: center; justify-content: space-between; }
+.pu-root .pu-icotabs { display: flex; gap: 14px; color: var(--ink-3); }
+.pu-root .pu-ico { width: 14px; height: 14px; border-radius: 4.5px; background: currentColor; display: block; }
+.pu-root .pu-ico.on { background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); }
+.pu-root .pu-search { width: 132px; height: 22px; border-radius: 999px; background: var(--glass); }
+.pu-root .pu-pagehead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.pu-root .pu-page-title { font-size: 26px; font-weight: 700; letter-spacing: 0.2px; }
+.pu-root .pu-subtabs { display: flex; justify-content: center; margin: 12px 0 4px; }
+.pu-root .pu-glass { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--glass); }
+.pu-root .pu-subtabs .pu-pill { font-size: 14.5px; font-weight: 500; padding: 8px 14px; }
+.pu-root .pu-subtabs .pu-pill.on { color: var(--accent); }
+
+.pu-root .pu-card { background: var(--card); border-radius: 18px; padding: 16px; margin-top: 16px; }
+.pu-root .pu-card-head { display: flex; align-items: center; gap: 8px; }
+.pu-root .pu-card-head.pu-gap { margin-bottom: 12px; }
+.pu-root .pu-card-title { font-size: 12px; font-weight: 600; color: var(--accent); }
+.pu-root .pu-caption { font-size: 11px; color: var(--ink-2); }
+.pu-root .pu-micro { font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.pu-root .pu-glassbtn { font: inherit; font-size: 12px; font-weight: 600; color: var(--ink-1); padding: 5px 11px; border-radius: 999px; border: 0; cursor: pointer; background: color-mix(in srgb, var(--ink-1) 8%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink-1) 12%, transparent); }
+.pu-root .pu-glassbtn:hover { background: color-mix(in srgb, var(--ink-1) 14%, transparent); }
+.pu-root .pu-pills { display: inline-flex; gap: 4px; }
+.pu-root .pu-pill { font-size: 12px; font-weight: 500; padding: 5px 9px; border-radius: 999px; color: var(--ink-2); cursor: pointer; white-space: nowrap; }
+.pu-root .pu-pill.on { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+.pu-root .up { color: var(--pos); } .pu-root .down { color: var(--neg); } .pu-root .flat { color: var(--ink-3); }
+
+/* 主卡:左列(今日大数字 + 小读数)+ 右侧走势 */
+.pu-root .pu-hero-body { display: flex; gap: 20px; margin-top: 6px; }
+.pu-root .pu-hero-left { width: 250px; flex: none; }
+.pu-root .pu-figure { font-family: ui-rounded, "SF Pro Rounded", -apple-system, sans-serif; font-size: 44px; font-weight: 700; letter-spacing: -0.9px; line-height: 1.12; font-variant-numeric: tabular-nums; }
+.pu-root .pu-figure i { font-style: normal; font-size: 21px; font-weight: 600; color: var(--ink-2); margin-left: 3px; }
+.pu-root .pu-today-delta { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pu-root .pu-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-top: 12px; }
+.pu-root .pu-stat b { display: block; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 1px; }
+.pu-root .pu-stat.wide { grid-column: 1 / -1; }
+.pu-root .pu-sub { display: block; font-size: 10.5px; font-variant-numeric: tabular-nums; color: var(--ink-3); margin-top: 1px; }
+.pu-root .pu-trend { flex: 1; min-width: 0; position: relative; height: 196px; }
+.pu-root .pu-axis { font-size: 10.5px; fill: var(--ink-3); font-variant-numeric: tabular-nums; }
+.pu-root .pu-tip { position: absolute; left: 0; top: 0; display: none; pointer-events: none; background: var(--card-high); border-radius: 8px; padding: 6px 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18); z-index: 3; white-space: nowrap; }
+.pu-root .pu-tip b { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pu-root .pu-tip-grid { display: grid; grid-template-columns: auto auto; gap: 2px 14px; margin-top: 3px; }
+.pu-root .pu-tip-grid span { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.pu-root .pu-swatch { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+
+/* 日历 */
+.pu-root .pu-heat { display: grid; grid-template-columns: repeat(52, 1fr); gap: 3px; margin-top: 12px; padding: 0 3px; }
+.pu-root .pu-heat i { display: block; aspect-ratio: 1; border-radius: 2.5px; background: var(--card-high); }
+.pu-root .pu-heat i.l1 { background: color-mix(in srgb, var(--accent) 26%, var(--card)); }
+.pu-root .pu-heat i.l2 { background: color-mix(in srgb, var(--accent) 48%, var(--card)); }
+.pu-root .pu-heat i.l3 { background: color-mix(in srgb, var(--accent) 74%, var(--card)); }
+.pu-root .pu-heat i.l4 { background: var(--accent); }
+.pu-root .pu-heat i.today { outline: 1.5px solid var(--ink-1); outline-offset: 0.5px; }
+.pu-root .pu-months { position: relative; height: 18px; margin-top: 3px; padding: 0 3px; }
+.pu-root .pu-months span { position: absolute; top: 3px; white-space: nowrap; }
+.pu-root .pu-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; }
+
+/* 项目榜单 */
+.pu-root .pu-rank-head, .pu-root .pu-row { display: grid; grid-template-columns: minmax(0, 1fr) 120px 44px 68px 96px 16px; align-items: center; gap: 10px; }
+.pu-root .pu-rank-head { font-size: 10.5px; font-weight: 500; color: var(--ink-3); text-align: right; padding: 8px 8px 4px; }
+.pu-root .pu-row { padding: 10px 8px; border-radius: 8px; font-size: 14.5px; cursor: pointer; }
+.pu-root .pu-row:hover { background: color-mix(in srgb, var(--ink-1) 5%, transparent); }
+.pu-root .pu-name { display: flex; align-items: center; gap: 6px; min-width: 0; font-weight: 500; text-align: left; }
+.pu-root .pu-folder { font-size: 12px; flex: none; }
+.pu-root .pu-chip { flex: none; font-size: 10.5px; font-weight: 600; padding: 1px 5px; border-radius: 999px; background: color-mix(in srgb, var(--pos) 15%, transparent); color: var(--pos); }
+.pu-root .pu-share { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--ink-3) 14%, transparent); display: flex; gap: 2px; overflow: hidden; }
+.pu-root .pu-share i { display: block; height: 100%; border-radius: 2px; }
+.pu-root .pu-num { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pu-root .pu-rank-head .pu-num, .pu-root .pu-row .pu-num { font-size: 12px; }
+.pu-root .pu-delta { text-align: right; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.pu-root .pu-chevron { text-align: center; color: var(--ink-3); }
+.pu-root .pu-detail { margin: 0 0 10px; padding: 14px 16px; background: var(--card-high); border-radius: 10px; }
+.pu-root .pu-buckets { display: flex; justify-content: space-between; gap: 12px; }
+.pu-root .pu-buckets b { display: block; font-size: 14.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pu-root .pu-comp { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; }
+.pu-root .pu-comp-label { width: 36px; flex: none; font-size: 11px; color: var(--ink-2); padding-top: 3px; }
+.pu-root .pu-comp-body { flex: 1; min-width: 0; }
+.pu-root .pu-seg { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--ink-3) 14%, transparent); display: flex; gap: 2px; overflow: hidden; }
+.pu-root .pu-seg i { display: block; height: 100%; border-radius: 2px; }
+.pu-root .pu-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; }
+.pu-root .pu-legend span { font-size: 10.5px; color: var(--ink-2); }
+.pu-root .pu-legend em { font-style: normal; color: var(--ink-3); font-variant-numeric: tabular-nums; margin-left: 3px; }
+.pu-root .pu-meta { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--grid); font-size: 11px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.pu-root .pu-more { text-align: center; font-size: 11px; font-weight: 500; color: var(--ink-2); padding: 9px 0; border-radius: 8px; cursor: pointer; }
+.pu-root .pu-more:hover { background: color-mix(in srgb, var(--ink-1) 5%, transparent); }
+
+/* 弹窗:同一套卡片的紧凑档 */
+.pu-root .pu-popover { width: 360px; flex: none; background: var(--window); border-radius: 12px; padding: 12px; display: none; }
+.pu-root[data-popover="1"] .pu-popover { display: block; }
+.pu-root .pu-popover .pu-icotabs { justify-content: space-between; padding: 0 4px 8px; }
+.pu-root .pu-popover .pu-card { border-radius: 12px; padding: 12px; }
+.pu-root .pu-popover .pu-hero-left { width: auto; }
+.pu-root .pu-popover .pu-hero-body { flex-direction: column; gap: 8px; margin-top: 8px; }
+.pu-root .pu-popover .pu-hero-top { display: flex; align-items: baseline; justify-content: space-between; }
+.pu-root .pu-popover .pu-figure { font-size: 30px; letter-spacing: -0.6px; }
+.pu-root .pu-popover .pu-trend { height: 84px; }
+.pu-root .pu-popover .pu-stats { grid-template-columns: repeat(3, 1fr); gap: 6px 10px; margin-top: 4px; }
+.pu-root .pu-popover .pu-stat.wide { grid-column: auto; }
+/* 弹窗榜单窄:去掉占比条一列,只留 名称 | 占比 | 消耗 | 环比 | 箭头 */
+.pu-root .pu-popover .pu-row, .pu-root .pu-popover .pu-rank-head { grid-template-columns: minmax(0, 1fr) 40px 52px 74px 14px; gap: 6px; }
+.pu-root .pu-popover .pu-share, .pu-root .pu-popover .pu-barhead { display: none; }
+.pu-root .pu-popover .pu-row { font-size: 12px; padding: 5px 4px; }
+.pu-root .pu-popover .pu-detail { padding: 10px; margin: 0 0 6px; }
+.pu-root .pu-popover .pu-buckets { flex-wrap: wrap; gap: 6px 12px; }
+.pu-root .pu-popover .pu-buckets b { font-size: 12px; }
+
+.pu-root .pu-switch { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; background: #111; color: #fff; border: 1px solid #555; border-radius: 999px; padding: 6px 10px; z-index: 9; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); max-width: calc(100vw - 24px); flex-wrap: wrap; justify-content: center; }
+.pu-root .pu-switch button { background: #2a2a2a; color: #fff; border: 0; border-radius: 999px; padding: 5px 10px; font: inherit; cursor: pointer; white-space: nowrap; }
+.pu-root .pu-switch button:hover { background: #3d3d3d; }
+.pu-root #puModeLabel { min-width: 132px; text-align: center; font-weight: 600; }
+</style>
+</head>
+<body class="pu-root" data-mode="wire" data-appearance="dark" data-palette="a" data-width="880" data-popover="1">
+<div class="pu-hint">
+  <b>骨架原型 · 智能体「消耗」页</b>(一次性原型,不是产品代码;数据是按种子生成的假数据)<br>
+  ① 先看 <b>线稿</b> 定结构(主卡 → 日历 → 项目榜单);② 按 <kbd>←</kbd> <kbd>→</kbd> 或底栏切到 <b>配色 A / B / C</b> 看颜色方向;<kbd>S</kbd> 切深浅。<br>
+  可点:主卡卡头的「7 天 | 30 天」(标准药丸页签条,同时管走势、小读数、项目榜单)、日历的「天 | 周」、「重新扫描」(Liquid Glass 按钮)、项目行点开明细、「显示全部」。右边是同一套卡片的弹窗紧凑档。<br>
+  <b>定稿方向:</b>配色 C(青柠主色)· 结构照本原型。
+</div>
+<div class="pu-stage">
+  <main class="pu-window" id="puPage"></main>
+  <aside class="pu-popover" id="puPop"></aside>
+</div>
+<div class="pu-switch">
+  <button data-act="prev" title="上一个">◀</button>
+  <span id="puModeLabel"></span>
+  <button data-act="next" title="下一个">▶</button>
+  <button data-act="appearance">深色 / 浅色</button>
+  <button data-act="width">窗宽 880 / 1280</button>
+  <button data-act="popover">弹窗 开 / 关</button>
+</div>
+<script>
+(function () {
+  'use strict';
+  var root = document.body;
+  var params = new URLSearchParams(location.search);
+  var MODES = [['wire', '线稿(只看结构)'], ['a', '配色 A · 靛紫'], ['b', '配色 B · 靛紫 · 明快'], ['c', '配色 C · 青柠']];
+  var DAY = 86400000;
+  // 演示用的「此刻」钉在 19:11:不管什么时候打开,看到的都是白天进行中的典型状态。
+  var now = new Date();
+  now.setHours(19, 11, 0, 0);
+  var startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  var elapsed = (now.getTime() - startToday) / DAY;
+  var pad2 = function (n) { return (n < 10 ? '0' : '') + n; };
+  var mmdd = function (t) { var d = new Date(t); return pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); };
+
+  function rng(seed) { return function () { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; }; }
+  function total(x) { return x.claude + x.zcode; }
+
+  // 近 400 天两家每日用量:周末低、有起伏、缓慢增长;今天是按昨天进度折出来的半天。
+  var random = rng(42), days = [];
+  for (var i = 399; i >= 0; i--) {
+    var t = startToday - i * DAY, d = new Date(t);
+    var weekend = (d.getDay() === 0 || d.getDay() === 6) ? 0.45 : 1;
+    var growth = 1 + (399 - i) / 399 * 0.6;
+    var wave = 0.72 + 0.56 * Math.abs(Math.sin((399 - i) / 4.3));
+    var claude = 380e6 * weekend * growth * wave * (0.8 + random() * 0.4);
+    var zcode = claude * (0.3 + random() * 0.25);
+    days.push({ t: t, claude: claude, zcode: zcode });
+  }
+  var yesterdayTotal = total(days[days.length - 2]);
+  days[days.length - 1] = { t: startToday, claude: yesterdayTotal * 1.18 * elapsed * 0.72, zcode: yesterdayTotal * 1.18 * elapsed * 0.28 };
+
+  // name, 权重, Claude 占比, 相位, 模型, 模型权重
+  var PROJECTS = [
+    ['pulse', 0.40, 0.74, 1, ['claude-opus-5-5', 'GLM-5.3', 'claude-sonnet-5'], [6, 3, 1]],
+    ['octok-client', 0.17, 0.62, 2, ['claude-opus-5-5', 'GLM-5.3'], [7, 3]],
+    ['NemoNotch', 0.11, 0.5, 3, ['claude-sonnet-5', 'GLM-5.3'], [6, 4]],
+    ['sage', 0.07, 0.28, 4, ['GLM-5.3'], [10]],
+    ['waifud', 0.055, 0.55, 5, ['GLM-5.3', 'claude-haiku-5'], [5, 5]],
+    ['tokscale', 0.045, 0.8, 6, ['claude-opus-5-5'], [10]],
+    ['petal', 0.035, 0.45, 7, ['GLM-5.3', 'claude-sonnet-5'], [7, 3]],
+    ['dust', 0.03, 0.66, 8, ['claude-sonnet-5'], [10]],
+    ['ftop', 0.025, 0.35, 9, ['GLM-5.3'], [10]],
+    ['abtop', 0.02, 0.7, 10, ['claude-haiku-5'], [10]],
+    ['stats', 0.015, 0.5, 11, ['GLM-5.3'], [10]],
+    ['mole', 0.012, 0.58, 12, ['claude-sonnet-5'], [10]],
+    ['purrge', 0.008, 0.4, 13, ['GLM-5.3'], [10]]
+  ];
+  var LIVE = { pulse: 2, 'octok-client': 1, sage: 1 };
+
+  function trim(s) { return s.replace(/\.0$/, ''); }
+  function fmt(n) {
+    if (n >= 1e9) return trim((n / 1e9).toFixed(1)) + 'B';
+    if (n >= 1e6) return trim((n / 1e6).toFixed(0)) + 'M';
+    if (n >= 1e3) return trim((n / 1e3).toFixed(1)) + 'k';
+    return String(Math.round(n));
+  }
+  function figure(n) { var m = fmt(n).match(/^([\d.]+)([A-Za-z%]*)$/); return { v: m[1], u: m[2] }; }
+  function ratio(cur, prev) { return prev > 0 ? (cur - prev) / prev : null; }
+  function deltaHTML(d, label) {
+    if (d === null) return '<span class="flat">' + (label ? label + ' ' : '') + '—</span>';
+    var p = Math.round(Math.abs(d) * 100);
+    if (p === 0) return '<span class="flat">' + (label ? label + ' ' : '') + '持平</span>';
+    return '<span class="' + (d > 0 ? 'up' : 'down') + '">' + (d > 0 ? '▲' : '▼') + (label ? ' ' + label : '') + ' '
+      + (d > 0 ? '+' : '-') + p + '%</span>';
+  }
+  function pills(items, current, act) {
+    return '<div class="pu-pills">' + items.map(function (it) {
+      return '<span class="pu-pill' + (it[0] === current ? ' on' : '') + '" data-act="' + act + '" data-v="' + it[0] + '">' + it[1] + '</span>';
+    }).join('') + '</div>';
+  }
+  function windowStats(n) {
+    var cur = 0, prev = 0, peak = 0, arr = [], last = days.length - 1;
+    for (var k = 0; k < n; k++) {
+      var d = days[last - k];
+      cur += total(d); arr.unshift(d); prev += total(days[last - n - k]);
+      if (k > 0) peak = Math.max(peak, total(d));
+    }
+    return { cur: cur, prev: prev, avg: cur / n, peak: peak, days: arr };
+  }
+
+  var state = {
+    mode: 'wire', appearance: 'dark', width: '880', popover: '1',
+    range: 7, gran: 'day', open: {}, all: false
+  };
+  MODES.forEach(function (m) { if (m[0] === params.get('mode')) state.mode = m[0]; });
+
+  // ---------- 卡片 ----------
+  function hero() {
+    var n = state.range, s = windowStats(n), fig = figure(total(days[days.length - 1]));
+    var prorated = elapsed >= 0.25 ? total(days[days.length - 1]) / elapsed : total(days[days.length - 1]);
+    return '<section class="pu-card pu-hero">'
+      + '<header class="pu-card-head pu-gap"><span class="pu-card-title">消耗</span><span class="pu-spacer"></span>'
+      + pills([[7, '7 天'], [30, '30 天']], n, 'range') + '</header>'
+      + '<div class="pu-hero-body"><div class="pu-hero-left">'
+      + '<div class="pu-hero-top"><span class="pu-caption">今日消耗</span></div>'
+      + '<div class="pu-figure">' + fig.v + '<i>' + fig.u + '</i></div>'
+      + '<div class="pu-today-delta" title="今天还没过完:按已过的时间折算成全天进度再和昨天比(不足 6 小时不折算)">'
+      + deltaHTML(ratio(prorated, yesterdayTotal), '较昨日') + '</div>'
+      + '<div class="pu-stats">'
+      + '<div class="pu-stat"><span class="pu-micro">' + n + ' 天合计</span><b>' + fmt(s.cur) + '</b>'
+      + '<span class="pu-sub">' + deltaHTML(ratio(s.cur, s.prev), n === 7 ? '较上周' : '较上月') + '</span></div>'
+      + '<div class="pu-stat"><span class="pu-micro">日均(' + n + ' 天)</span><b>' + fmt(s.avg) + '</b>'
+      + '<span class="pu-sub">峰值 ' + fmt(s.peak) + '/天</span></div>'
+      + '<div class="pu-stat wide"><span class="pu-micro">Claude 用量</span><b>17%</b>'
+      + '<span class="pu-sub">本周 17% · 重置 3 小时后</span></div>'
+      + '</div></div><div class="pu-trend"></div></div></section>';
+  }
+
+  function levelOf(v, peak) { var f = v / peak; return f <= 0 || f < 0.08 ? 0 : f < 0.25 ? 1 : f < 0.5 ? 2 : f < 0.8 ? 3 : 4; }
+  function calendar(compact) {
+    var cells = days.slice(-364), peak = 0, weekTotals = [], weekPeak = 0, html = '<div class="pu-heat">';
+    cells.forEach(function (d, i) {
+      var isToday = i === 363, v = total(d);
+      if (!isToday) peak = Math.max(peak, v);
+      if (i % 7 === 0) weekTotals.push(0);
+      weekTotals[Math.floor(i / 7)] += v;
+    });
+    weekTotals.pop();
+    weekPeak = Math.max.apply(null, weekTotals);
+    cells.forEach(function (d, i) {
+      var isToday = i === 363, v = total(d), wk = Math.floor(i / 7);
+      if (isToday && elapsed >= 0.25) v /= elapsed;
+      var level = state.gran === 'week' ? levelOf(weekTotals[wk] || 0, weekPeak) : levelOf(v, peak);
+      html += '<i class="l' + level + (isToday ? ' today' : '') + '" title="' + mmdd(d.t) + (isToday ? '(进行中,已折算)' : '')
+        + ' · ' + fmt(total(d)) + ' tokens"></i>';
+    });
+    var months = '', lastMonth = -1, lastX = -100;
+    // 相邻月签太近就丢前一个:主窗口 800 宽按 6.2%,弹窗 312 宽按 13%(约 40pt)。
+    var minGap = compact ? 13 : 6.2;
+    cells.forEach(function (d, i) {
+      if (i % 7) return;
+      var m = new Date(d.t).getMonth(), x = (i / 7) / 52 * 100;
+      if (m !== lastMonth) {
+        if (x - lastX >= minGap) {
+          var shift = x > 92 ? ';transform:translateX(-100%)' : '';
+          months += '<span class="pu-micro" style="left:' + x.toFixed(2) + '%' + shift + '">' + (m + 1) + '月</span>';
+          lastX = x;
+        }
+        lastMonth = m;
+      }
+    });
+    return '<section class="pu-card"><header class="pu-card-head"><span class="pu-card-title">日历</span><span class="pu-spacer"></span>'
+      + '<button class="pu-glassbtn" data-act="rescan">↻ 重新扫描</button>'
+      + pills([['day', '天'], ['week', '周']], state.gran, 'gran') + '</header>'
+      + html + '</div><div class="pu-months">' + months + '</div>'
+      + '<footer class="pu-foot"><span class="pu-micro">Claude 与 ZCode 合计</span><span class="pu-micro">'
+      + (state.gran === 'week' ? '最多一周 ' : '最多一天 ') + fmt(state.gran === 'week' ? weekPeak : peak) + '</span></footer></section>';
+  }
+
+  function projectStats(p, n) {
+    var cur = 0, prev = 0, active = 0, last = days.length - 1;
+    for (var k = 0; k < days.length; k++) {
+      var amt = total(days[k]) * p[1] * (0.55 + 0.9 * Math.abs(Math.sin(k / 5 + p[3])));
+      var ago = last - k;
+      if (ago < n) { cur += amt; if (ago > 0 && amt > 1e6) active++; } else if (ago < 2 * n) { prev += amt; }
+    }
+    return { cur: cur, prev: prev, active: active };
+  }
+  function bucket(label, value) { return '<div><span class="pu-micro">' + label + '</span><b>' + value + '</b></div>'; }
+  function comp(label, entries) {
+    var seg = entries.map(function (e) { return '<i style="width:' + (e[1] * 100).toFixed(1) + '%;background:' + e[2] + '"></i>'; }).join('');
+    var legend = entries.filter(function (e) { return e[1] > 0; }).map(function (e) {
+      return '<span><i class="pu-swatch" style="background:' + e[2] + '"></i>' + e[0] + '<em>' + Math.round(e[1] * 100) + '%</em></span>';
+    }).join('');
+    return '<div class="pu-comp"><span class="pu-comp-label">' + label + '</span><div class="pu-comp-body">'
+      + '<div class="pu-seg">' + seg + '</div><div class="pu-legend">' + legend + '</div></div></div>';
+  }
+  function detailHTML(p, s, n) {
+    var input = s.cur * 0.12, output = s.cur * 0.05, cacheRead = s.cur * 0.70, cacheWrite = s.cur * 0.08;
+    var weights = p[5], sum = weights.reduce(function (a, b) { return a + b; }, 0);
+    var models = p[4].map(function (m, i) { return [m, weights[i] / sum, 'var(--m' + Math.min(i + 1, 3) + ')']; });
+    return '<div class="pu-detail"><div class="pu-buckets">'
+      + bucket('Input', fmt(input)) + bucket('Output', fmt(output)) + bucket('Cache R', fmt(cacheRead))
+      + bucket('Cache W', fmt(cacheWrite)) + bucket('Cache×', (cacheRead / (input + output)).toFixed(1) + 'x') + '</div>'
+      + comp('模型', models)
+      + comp('来源', [['Claude', p[2], 'var(--claude)'], ['ZCode', 1 - p[2], 'var(--zcode)']])
+      + '<div class="pu-meta"><span>活跃 ' + Math.min(s.active, n) + '/' + n + ' 天</span><span>' + Math.round(p[1] * 700) + ' 个会话</span><span>'
+      + fmt(p[1] * 30000 * n / 7) + ' 次请求</span><span class="pu-spacer"></span><span>今天活跃</span></div></div>';
+  }
+  function ranking() {
+    var n = state.range;
+    var list = PROJECTS.map(function (p) { return { p: p, s: projectStats(p, n) }; }).sort(function (a, b) { return b.s.cur - a.s.cur; });
+    var totalCur = list.reduce(function (a, x) { return a + x.s.cur; }, 0), maxCur = list[0].s.cur;
+    var shown = state.all ? list : list.slice(0, 10), html = '';
+    shown.forEach(function (x, index) {
+      var p = x.p, s = x.s, key = p[0], open = state.open[key], share = s.cur / totalCur, barW = s.cur / maxCur * 100;
+      html += '<div class="pu-row" data-act="toggle" data-v="' + key + '">'
+        + '<div class="pu-name"><span class="pu-folder" style="color:var(' + (p[2] >= 0.5 ? '--claude' : '--zcode') + ')">▣</span><span class="pu-trunc">' + key + '</span>'
+        + (LIVE[key] ? '<span class="pu-chip">在跑 ' + LIVE[key] + '</span>' : '') + '</div>'
+        + '<div class="pu-share"><i style="width:' + (barW * p[2]).toFixed(1) + '%;background:var(--claude)"></i>'
+        + '<i style="width:' + (barW * (1 - p[2])).toFixed(1) + '%;background:var(--zcode)"></i></div>'
+        + '<div class="pu-num">' + Math.round(share * 100) + '%</div><div class="pu-num">' + fmt(s.cur) + '</div>'
+        + '<div class="pu-delta">' + deltaHTML(ratio(s.cur, s.prev)) + '</div><div class="pu-chevron">' + (open ? '⌃' : '⌄') + '</div></div>'
+        + (open ? detailHTML(p, s, n) : '');
+    });
+    if (list.length > 10) {
+      html += '<div class="pu-more" data-act="toggleAll">' + (state.all ? '收起,只看前 10 个 ⌃' : '显示全部(另 ' + (list.length - 10) + ' 个项目)⌄') + '</div>';
+    }
+    return '<section class="pu-card"><header class="pu-card-head"><span class="pu-card-title">项目 · 近 ' + n + ' 天</span></header>'
+      + '<div class="pu-rank-head"><span></span><span class="pu-barhead"></span><span>占比</span><span>消耗</span><span>环比</span><span></span></div>' + html + '</section>';
+  }
+  function pageHTML(compact) {
+    var icons = '<div class="pu-icotabs">' + [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(function (i) {
+      return '<span class="pu-ico' + (i === 9 ? ' on' : '') + '"></span>';
+    }).join('') + '</div>';
+    return icons
+      + '<div class="pu-pagehead"><span class="pu-page-title">智能体</span></div>'
+      + '<div class="pu-subtabs"><div class="pu-glass"><span class="pu-pill on">消耗</span><span class="pu-pill">会话</span></div></div>'
+      + hero() + calendar(compact) + ranking();
+  }
+
+  // ---------- 走势:Claude / ZCode 两层面积 ----------
+  function drawTrend(el) {
+    var s = windowStats(state.range), arr = s.days, w = el.clientWidth || 500, h = el.clientHeight || 180;
+    var top = 16, plotH = h - top - 18, step = w / (arr.length - 1), peak = 0;
+    arr.forEach(function (d) { peak = Math.max(peak, total(d)); });
+    var max = peak * 1.15;
+    function px(i) { return i * step; }
+    function py(v) { return top + plotH * (1 - v / max); }
+    function line(get) {
+      var pts = arr.map(function (d, i) { return [px(i), py(get(d))]; }), d = 'M' + pts[0][0].toFixed(1) + ',' + pts[0][1].toFixed(1);
+      for (var i = 0; i < pts.length - 1; i++) {
+        var p0 = pts[Math.max(i - 1, 0)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(i + 2, pts.length - 1)];
+        d += 'C' + (p1[0] + (p2[0] - p0[0]) / 6).toFixed(1) + ',' + (p1[1] + (p2[1] - p0[1]) / 6).toFixed(1)
+          + ' ' + (p2[0] - (p3[0] - p1[0]) / 6).toFixed(1) + ',' + (p2[1] - (p3[1] - p1[1]) / 6).toFixed(1)
+          + ' ' + p2[0].toFixed(1) + ',' + p2[1].toFixed(1);
+      }
+      return d;
+    }
+    var base = top + plotH, zPath = line(function (d) { return d.zcode; }), tPath = line(total);
+    function area(p) { return p + 'L' + w + ',' + base + 'L0,' + base + 'Z'; }
+    var gid = 'g' + Math.random().toString(36).slice(2), svg = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">'
+      + '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">'
+      + '<stop offset="0" stop-color="var(--claude)" stop-opacity="0.5"/><stop offset="1" stop-color="var(--claude)" stop-opacity="0.08"/></linearGradient></defs>';
+    [max / 2, max].forEach(function (v) {
+      svg += '<line x1="0" x2="' + w + '" y1="' + py(v).toFixed(1) + '" y2="' + py(v).toFixed(1) + '" stroke="var(--grid)"/>';
+    });
+    svg += '<path d="' + area(zPath) + '" fill="var(--zcode)" fill-opacity="0.42"/>'
+      + '<path d="' + area(tPath) + '" fill="url(#' + gid + ')"/>'
+      + '<path d="' + zPath + '" fill="none" stroke="var(--zcode)" stroke-width="1.5" stroke-linejoin="round"/>'
+      + '<path d="' + tPath + '" fill="none" stroke="var(--claude)" stroke-width="2" stroke-linejoin="round"/>';
+    // 刻度字画在面积之上,不然被盖住。
+    [max / 2, max].forEach(function (v) {
+      svg += '<text class="pu-axis" x="4" y="' + (py(v) - 4).toFixed(1) + '">' + fmt(v) + '</text>';
+    });
+    var every = arr.length > 10 ? 5 : 1;
+    arr.forEach(function (d, i) {
+      if (i % every && i !== arr.length - 1) return;
+      var anchor = i === 0 ? 'start' : (i === arr.length - 1 ? 'end' : 'middle');
+      svg += '<text class="pu-axis" x="' + px(i).toFixed(1) + '" y="' + (h - 4) + '" text-anchor="' + anchor + '">' + mmdd(d.t) + '</text>';
+    });
+    svg += '<line class="pu-cursor" x1="0" x2="0" y1="' + top + '" y2="' + base + '" stroke="var(--ink-2)" stroke-width="1" opacity="0"/></svg>'
+      + '<div class="pu-tip"></div>';
+    el.innerHTML = svg;
+    var cursor = el.querySelector('.pu-cursor'), tip = el.querySelector('.pu-tip');
+    el.onmousemove = function (e) {
+      var box = el.getBoundingClientRect(), i = Math.max(0, Math.min(arr.length - 1, Math.round((e.clientX - box.left) / step)));
+      var d = arr[i], x = px(i), y = py(total(d));
+      cursor.setAttribute('x1', x); cursor.setAttribute('x2', x); cursor.setAttribute('opacity', '1');
+      tip.innerHTML = '<div class="pu-micro">' + mmdd(d.t) + (i === arr.length - 1 ? '(今天)' : '') + '</div>'
+        + '<b>' + fmt(total(d)) + ' tokens</b>'
+        + '<div class="pu-tip-grid">'
+        + '<span><i class="pu-swatch" style="background:var(--claude)"></i>Claude ' + fmt(d.claude) + '</span>'
+        + '<span><i class="pu-swatch" style="background:var(--zcode)"></i>ZCode ' + fmt(d.zcode) + '</span>'
+        + '<span>Input ' + fmt(total(d) * 0.12) + '</span><span>Output ' + fmt(total(d) * 0.05) + '</span>'
+        + '<span>Cache R ' + fmt(total(d) * 0.70) + '</span><span>Cache W ' + fmt(total(d) * 0.08) + '</span></div>';
+      tip.style.display = 'block';
+      var tw = tip.offsetWidth, left = Math.max(0, Math.min(x + 10, w - tw)), topPx = y > 80 ? y - tip.offsetHeight - 10 : y + 12;
+      tip.style.left = left + 'px';
+      tip.style.top = Math.max(0, topPx) + 'px';
+    };
+    el.onmouseleave = function () { cursor.setAttribute('opacity', '0'); tip.style.display = 'none'; };
+  }
+
+  // ---------- 装配与交互 ----------
+  function render() {
+    root.dataset.mode = state.mode; root.dataset.appearance = state.appearance;
+    root.dataset.width = state.width; root.dataset.popover = state.popover;
+    root.dataset.palette = state.mode === 'wire' ? 'a' : state.mode;
+    document.getElementById('puPage').innerHTML = pageHTML(false);
+    document.getElementById('puPop').innerHTML = pageHTML(true);
+    document.getElementById('puModeLabel').textContent = MODES.filter(function (m) { return m[0] === state.mode; })[0][1];
+    Array.prototype.forEach.call(document.querySelectorAll('.pu-trend'), drawTrend);
+    history.replaceState(null, '', state.mode === 'wire' ? location.pathname : '?mode=' + state.mode);
+  }
+  function cycle(step) {
+    var i = MODES.findIndex(function (m) { return m[0] === state.mode; });
+    state.mode = MODES[(i + step + MODES.length) % MODES.length][0];
+  }
+  root.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-act]');
+    if (!t) return;
+    var act = t.dataset.act, v = t.dataset.v;
+    if (act === 'range') state.range = +v;
+    else if (act === 'gran') state.gran = v;
+    else if (act === 'toggle') state.open[v] = !state.open[v];
+    else if (act === 'toggleAll') state.all = !state.all;
+    else if (act === 'prev') cycle(-1);
+    else if (act === 'next') cycle(1);
+    else if (act === 'appearance') state.appearance = state.appearance === 'dark' ? 'light' : 'dark';
+    else if (act === 'width') state.width = state.width === '880' ? '1280' : '880';
+    else if (act === 'popover') state.popover = state.popover === '1' ? '0' : '1';
+    else return;
+    render();
+  });
+  document.addEventListener('keydown', function (e) {
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) return;
+    if (e.key === 'ArrowLeft') { cycle(-1); render(); }
+    else if (e.key === 'ArrowRight') { cycle(1); render(); }
+    else if (e.key === 's' || e.key === 'S') { state.appearance = state.appearance === 'dark' ? 'light' : 'dark'; render(); }
+  });
+  render();
+})();
+</script>
+</body>
+</html>

@@ -72,11 +72,14 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// 选中态强调色色源(工单 02 令牌表):总览以系统 CPU 负载为主视角取 cpu,
+    /// tab 在指标族里的归属色源(工单 02 令牌表):总览以系统 CPU 负载为主视角取 cpu,
     /// CPU/内存/磁盘/网络/电池各取自家令牌;历史页默认主视角是系统负载(工单 04
     /// 展示以系统负载为主、CPU 双口径注明),卡内曲线色另随所选指标取。
-    /// 选中胶囊、meter、图表全由令牌派生。
-    public var accent: Metric {
+    /// 智能体页与清理页**不属于指标族**,返回 nil——它们各有页面专属强调色(DESIGN.md
+    /// `{colors.accent-agents}` / `{colors.accent-clean}`)。tab 的显示色只经视图层的
+    /// `MetricTab.tintColor` 取(页面强调色优先,其次是这里);别处不要把这里的值
+    /// 当 tab 的显示色用。
+    public var accent: Metric? {
         switch self {
         case .overview: .cpu
         case .cpu: .cpu
@@ -88,11 +91,8 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .network: .network
         // 服务页强调色沿用 containers 品类令牌(tab-regroup/01):页面前身是容器页,色身份不换。
         case .services: .containers
-        // 智能体页取蓝牙青:清理品类令牌里 ai=蓝牙青(junk-ai),AI 身份色全 app 一致;
-        // 与外设页共用是既有先例(总览/CPU 同取 cpu)。
-        case .agents: .bluetooth
+        case .agents, .cleaner: nil
         case .battery: .battery
-        case .cleaner: .disk
         case .history: .cpu
         }
     }

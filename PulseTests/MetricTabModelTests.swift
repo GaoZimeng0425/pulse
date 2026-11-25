@@ -65,7 +65,8 @@ final class MetricTabModelTests: XCTestCase {
     }
 
     func testTabAccentMapsToMetricTokens() {
-        // 选中态强调色(tint 派生)的色源:总览以系统负载(CPU)为主视角,
+        // 指标族色源(智能体 / 清理两个 tab 不属于指标族,各有页面强调色,显示色见
+        // MetricTab.tintColor):总览以系统负载(CPU)为主视角,
         // CPU/内存/磁盘/电池 tab → 各自令牌;历史页默认主视角同为系统负载
         // (工单 04,页内曲线色另随所选指标取)。
         XCTAssertEqual(MetricTab.overview.accent, .cpu)
@@ -77,6 +78,8 @@ final class MetricTabModelTests: XCTestCase {
         XCTAssertEqual(MetricTab.services.accent, .containers)
         XCTAssertEqual(MetricTab.battery.accent, .battery)
         XCTAssertEqual(MetricTab.history.accent, .cpu)
+        XCTAssertNil(MetricTab.agents.accent, "智能体页不属于指标族")
+        XCTAssertNil(MetricTab.cleaner.accent, "清理页不属于指标族")
     }
 
     // MARK: - MetricTabSelection:键盘 ←/→ 切换

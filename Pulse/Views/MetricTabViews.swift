@@ -223,9 +223,9 @@ struct MetricIconTabBar: View {
                     Image(systemName: tab.symbolName)
                         .font(.system(size: 13, weight: .medium))
                         .frame(maxWidth: .infinity, minHeight: 26)
-                        .foregroundStyle(isSelected ? tab.accent.accentColor : Color.secondary)
+                        .foregroundStyle(isSelected ? tab.tintColor : Color.secondary)
                         .background(
-                            isSelected ? tab.accent.accentColor.opacity(0.15) : Color.clear,
+                            isSelected ? tab.tintColor.opacity(0.15) : Color.clear,
                             in: .capsule
                         )
                         .contentShape(.rect)
@@ -256,13 +256,7 @@ struct MetricPillTabBar: View {
             selection: $selection.current,
             textVisibility: .selectedOnly
         ) { tab in
-            // 清理 tab 取页内专属 Teal(2026-11-06 拍板:顶部 tab 与页内强调一致;
-            // PulseCore 的 Metric 色表是各指标身份色不扩,覆写只在 app 层)。
-            PillTabItem(
-                title: tab.title,
-                symbol: tab.symbolName,
-                tint: tab == .cleaner ? Surface.cleanAccent : tab.accent.accentColor
-            )
+            PillTabItem(title: tab.title, symbol: tab.symbolName, tint: tab.tintColor)
         }
         .metricTabKeyboard($selection)
         // 首尾药丸与系统玻璃底(inner 的胶囊容器)留出内距,不再贴边。

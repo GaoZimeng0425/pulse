@@ -218,7 +218,7 @@ struct AgentProjectCardView: View {
                         (
                             name: AgentUsageWindow.modelDisplayName(model.name),
                             share: model.share,
-                            tint: AgentModelTint.tint(at: index)
+                            tint: AgentPartitionTint.model(at: index)
                         )
                     }
                 )
@@ -226,8 +226,8 @@ struct AgentProjectCardView: View {
             compositionRow(
                 label: "来源",
                 entries: [
-                    (name: "Claude", share: project.claudeShare, tint: AgentModelTint.harness(.claude)),
-                    (name: "ZCode", share: 1 - project.claudeShare, tint: AgentModelTint.harness(.zcode)),
+                    (name: "Claude", share: project.claudeShare, tint: AgentPartitionTint.source(.claude)),
+                    (name: "ZCode", share: 1 - project.claudeShare, tint: AgentPartitionTint.source(.zcode)),
                 ]
             )
         }

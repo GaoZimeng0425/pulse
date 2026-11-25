@@ -53,6 +53,7 @@
 		2E50BD7556CEBBD55531E712 /* CleanerListCommonViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7428ABC51C5AE4C0E54D6475 /* CleanerListCommonViews.swift */; };
 		2F016FF68304A538C3FEF849 /* LiveCleanActivitySource.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD87D6AF9EFA784A9E84C641 /* LiveCleanActivitySource.swift */; };
 		2F681644821F7D9946A73E92 /* MetricTabModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9378B86940EBE30E057F718D /* MetricTabModelTests.swift */; };
+		30E505156AA86E05EFF841A0 /* AgentColorTokenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB255CF308BC1B675F92273F /* AgentColorTokenTests.swift */; };
 		31A4795EB7C03BA0FE9573D2 /* AppIconCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78EC09371E86E7408FA32ADC /* AppIconCacheTests.swift */; };
 		32721AC640E8858D06CDC387 /* CleanerAppSubTabTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD363FC8D26158B2692B1EC8 /* CleanerAppSubTabTests.swift */; };
 		3442790CDC0CC18BF8A6E7B7 /* PreDeleteLiveConsistencyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A9DD984A73F2C57684332F7 /* PreDeleteLiveConsistencyTests.swift */; };
@@ -436,6 +437,7 @@
 		CA3DD124F0650F10B15F255D /* SmcFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmcFeature.swift; sourceTree = "<group>"; };
 		CA9B6FCA72A37F307AF87A30 /* DashboardModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardModel.swift; sourceTree = "<group>"; };
 		CB2143C633E5F922EDA23B55 /* EnergyImpactFeatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyImpactFeatureTests.swift; sourceTree = "<group>"; };
+		CB255CF308BC1B675F92273F /* AgentColorTokenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentColorTokenTests.swift; sourceTree = "<group>"; };
 		CB40B26CEE07BB01EDE3C798 /* CleanerConfirmSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanerConfirmSheet.swift; sourceTree = "<group>"; };
 		CD87D6AF9EFA784A9E84C641 /* LiveCleanActivitySource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCleanActivitySource.swift; sourceTree = "<group>"; };
 		CEF074B1893DFC234824F594 /* CleanerViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanerViews.swift; sourceTree = "<group>"; };
@@ -761,6 +763,7 @@
 			isa = PBXGroup;
 			children = (
 				8C71FCD146BC0C56EF25AEE9 /* AcceptanceAnchorEndToEndTests.swift */,
+				CB255CF308BC1B675F92273F /* AgentColorTokenTests.swift */,
 				3E2C1C579AAC70056E11EABF /* AgentEnergyTableTests.swift */,
 				36BBD49FB118B6B3BD3CF96D /* AgentIncrementalLiveTests.swift */,
 				3E595E40581B77940B03A4D7 /* AgentSessionFeatureGitTests.swift */,
@@ -942,6 +945,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E4A99F8C1ACA71DF7876AF70 /* AcceptanceAnchorEndToEndTests.swift in Sources */,
+				30E505156AA86E05EFF841A0 /* AgentColorTokenTests.swift in Sources */,
 				5EFCC13BB4804E62AFD916B3 /* AgentEnergyTableTests.swift in Sources */,
 				95F11AA60DFD61D22F17DAA0 /* AgentIncrementalLiveTests.swift in Sources */,
 				EE321EF06473B0434FDDC113 /* AgentSessionFeatureGitTests.swift in Sources */,

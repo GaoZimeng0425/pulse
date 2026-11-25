@@ -18,6 +18,7 @@ colors:
   accent-bluetooth: "#0891b2 / #22a8cc"
   accent-containers: "#eb6834 / #d95926"
   accent-clean: "#0d9488 / #35c4b5"
+  accent-agents: "#5a921a / #a6d94a"
   projects-accent: = {accent-containers}
   state-positive: = {accent-battery}
   state-negative: "#e0352b / #ff453a"
@@ -36,9 +37,11 @@ colors:
   junk-ai: = {accent-bluetooth}
   junk-leftover: = {accent-sensors}
   junk-trash: = {accent-disk}
-  agent-model-lead: = {accent-bluetooth}
-  agent-model-second: = {accent-memory}
-  agent-model-rest: = {accent-disk}
+  agent-source-claude: "#c9622f / #e8946a"
+  agent-source-zcode: "#6a4fe0 / #8f7cf5"
+  agent-model-first: "#1a78bd / #58a8e8"
+  agent-model-second: "#bd3a7c / #e070a8"
+  agent-model-third: "#93730f / #cfab4a"
   settings-icon-general-from: "#9e9ea8"
   settings-icon-general-to: "#6b6b78"
   settings-icon-alerts-from: "#f29e33"
@@ -137,6 +140,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 | `{colors.ink-tertiary}` | `Surface.inkTertiary` | 三级墨色:最弱的文字与图形 |
 | `{colors.accent-cpu}` … `{colors.accent-containers}` | `Metric.accentColor` | 每指标一色:tab、图表、徽章、大数字的身份色 |
 | `{colors.accent-clean}` | `Surface.cleanAccent` | 清理页专属强调色:主按钮、选中态、子页药丸 |
+| `{colors.accent-agents}` | `Surface.agentsAccent` | 智能体页专属强调色:tab 图标、选中态、今日数字、日历色阶 |
 | `{colors.projects-accent}` | `Surface.projectsAccent` | 内存构成环里「项目」一段的身份色 |
 | `{colors.state-positive}` | `Surface.positive` | 正常、充电中 |
 | `{colors.state-warning}` | `Surface.warning` | 偏高、优化充电介入、告警提示 |
@@ -145,7 +149,8 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 | `{colors.state-inactive}` | `Surface.inactive` | 「停 / 未连接」的状态点 |
 | `{colors.category-*}` | `GroupCategory.identityColor` | 非 App 分组的图标瓦底色 |
 | `{colors.junk-*}` | `JunkGroup.identityColor` | 清理品类的身份色 |
-| `{colors.agent-model-*}` | `AgentModelTint` | 智能体页按模型、按来源分区异色 |
+| `{colors.agent-source-claude}` / `-zcode` | `AgentPartitionTint.sourceToken(_:)` | 智能体页两家来源的身份色:走势分层、来源构成条与图例 |
+| `{colors.agent-model-first}` / `-second` / `-third` | `AgentPartitionTint.modelTokens` | 智能体页模型分布的分区色(三档,越界收第三档) |
 | `{colors.settings-icon-*-from}` / `-to` | `SettingsIconTint` | 设置侧栏图标砖的渐变起止色(固定色) |
 
 规则:
@@ -153,7 +158,10 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 - 文字层级用系统语义色(`.primary` / `.secondary` / `.tertiary`),不自定义灰。
 - 指标色只从 `Metric` 取。新增指标先入表:浅深互异、指标之间互异,有单测钉死。
 - 指标色是**身份**,不是强调级。分组、品类借用指标色只是为了区分「是谁」;页面
-  自己的强调色另定(清理页用 `{colors.accent-clean}`)。
+  自己的强调色另定(清理页用 `{colors.accent-clean}`,智能体页用 `{colors.accent-agents}`)。
+  页面强调色与全部指标色在浅、深两套内互不相等。tab 条的着色只经一个取色口
+  (`MetricTab.tintColor`):有页面强调色的 tab 取页强调色,其余取指标色;有页面
+  强调色的 tab 不属于指标族。
 - 强调级(正常 / 偏高 / 危险)到颜色的映射只许出现在三处:`StatusBadge.chip`、
   `MetricCardModel` 里的状态芯片构造、菜单栏徽标渲染器。取值一律是语义令牌。
 - 菜单栏位图里的颜色只能靠预绘位图带出去(系统会剥掉 SwiftUI 前景色)。位图里的
