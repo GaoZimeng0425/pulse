@@ -1,7 +1,8 @@
 #!/bin/sh
 # Pulse 合并闸门(源头文件;安装副本由 install.sh 生成,勿直接改安装副本)。
 # 规则:merge 真正落到 develop 分支上时(git merge 或 git pull 都算),
-# Release 构建并安装到 /Applications —— 合入即换新版。
+# 先回收过期构建产物(scripts/gc-build.sh),再 Release 构建并安装到
+# /Applications —— 合入即换新版。回收是附带动作:出错只提示,不挡构建。
 # 与 pre-commit 门禁互补:那边保提交可编译,这边保宿主跑的是 develop 最新版。
 # 应急跳过:PULSE_SKIP_BUILD=1 git merge ...;干跑:PULSE_HOOK_DEBUG=1 只打印
 # 将执行的命令,用于测试触发面;post-merge 失败不影响合并结果。
@@ -14,9 +15,13 @@ branch=$(git rev-parse --abbrev-ref HEAD)
 root=$(git rev-parse --show-toplevel)
 
 if [ "${PULSE_HOOK_DEBUG:-0}" = "1" ]; then
-  echo "[debug] PULSE_HOOK_DEBUG=1 — 干跑,不真构建。将执行: sh \"$root/scripts/build.sh\""
+  echo "[debug] PULSE_HOOK_DEBUG=1 — 干跑,不真构建。将执行: sh \"$root/scripts/gc-build.sh\" 然后 sh \"$root/scripts/build.sh\""
   exit 0
 fi
+
+# 回收过期构建产物(build-artifact-gc):Xcode 给已删 worktree 留下的残留、闲置 worktree
+# 的编译结果。只删能重新编译出来的东西,主目录与依赖下载副本不碰;失败不影响下面的构建。
+sh "$root/scripts/gc-build.sh" || echo "⚠️  构建产物回收出错(不影响构建)— 排查: sh scripts/gc-build.sh --dry-run" >&2
 
 if sh "$root/scripts/build.sh"; then
   echo "✅ 新 build 已安装到 /Applications 并重启"

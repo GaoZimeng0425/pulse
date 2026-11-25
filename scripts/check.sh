@@ -1,14 +1,18 @@
 #!/bin/sh
-# Pulse 完整检查:lint + 构建 + 全量测试。合并进 main / 收口节点 / 大改动之后用;
+# Pulse 完整检查:lint + 脚本自测 + 构建 + 全量测试。合并进 main / 收口节点 / 大改动之后用;
 # 提交级快速闸门见 .githooks/pre-commit(lint 只查 staged,构建不测试,增量)。
 set -e
 root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
 
-echo "🧹  1/3 lint(全仓,只读)"
+echo "🧹  1/4 lint(全仓,只读)"
 sh scripts/lint.sh
 
-echo "🛠  2/3 构建"
+echo "🐚  2/4 脚本自测(合成夹具,秒级)"
+# scripts/gc-build.sh 会 rm -rf:「删什么 / 绝不删什么」由它的自测钉住,规则被改坏在这里红。
+sh scripts/test-gc-build.sh
+
+echo "🛠  3/4 构建"
 # 显式关签名与 build.sh 同款(本地部署签名归 build.sh 统一处理,构建门禁
 # 只关心编译)。另:Xcode 27.1 偶发 "exit code 0 but produced no further
 # output" 构建 flake(干净仓库也复现,重跑即绿,2026-10-26 观察记档)——
@@ -32,5 +36,5 @@ swift build --package-path Packages/PulseMCP -q
 # 特权助手独立 SPM 包(p3-root-mcp/03)同上。
 swift build --package-path Packages/PulseHelper -q
 
-echo "🧪  3/3 测试"
+echo "🧪  4/4 测试"
 sh scripts/test.sh
