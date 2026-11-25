@@ -63,74 +63,49 @@ final class HistoryCurveEdgeHoverTests: XCTestCase {
         XCTAssertEqual(HistoryCurveHover.edgeIndex(atX: 50, width: 0, count: 56), 0)
         XCTAssertEqual(HistoryCurveHover.edgeIndex(atX: 50, width: 110, count: 1), 0)
     }
-
-    func testWindowIndexExcludesPaddingSlots() {
-        // 满窗(56/56)无垫底:槽即窗序号。
-        XCTAssertEqual(HistoryCurveHover.windowIndex(forSlot: 0, paddingCount: 0), 0)
-        // 半窗(30/56):左 26 槽是垫底假点,悬停不出读数。
-        XCTAssertNil(HistoryCurveHover.windowIndex(forSlot: 25, paddingCount: 26))
-        XCTAssertEqual(HistoryCurveHover.windowIndex(forSlot: 26, paddingCount: 26), 0)
-        XCTAssertEqual(HistoryCurveHover.windowIndex(forSlot: 55, paddingCount: 26), 29)
-    }
 }
 
-// MARK: - 主卡悬停取值(history-hover/02 回归:切片下标错位)
+// MARK: - 主卡定长窗口(chart-hover-partial:不足补 0,第 i 格 = list[i])
 
-final class HistoryCurveEdgeSampleTests: XCTestCase {
+final class HistoryCurveEdgeWindowTests: XCTestCase {
     private let base = Date(timeIntervalSince1970: 1_800_000_000)
-    private let pointCount = 56
+    private let count = 56
 
-    /// 满环 60 点:值 = 序号,时刻 = 基准 + 序号秒;窗 = 最近 56 点(序号 4…59)。
-    private var fullRing: (values: [Double], times: [Date]) {
-        let values = (0 ..< 60).map { Double($0) }
-        let times = (0 ..< 60).map { base.addingTimeInterval(Double($0)) }
-        return (values, times)
+    private func ring(_ n: Int) -> (values: [Double], times: [Date]) {
+        ((0 ..< n).map { Double($0) }, (0 ..< n).map { base.addingTimeInterval(Double($0)) })
     }
 
-    /// 实犯回归(2026-11-24 用户截图:GPU 折线 57% 而浮层报 0%):suffix 的
-    /// ArraySlice 下标从 4 起,拿 0 起的槽序号去取会往前错 4 点、前 4 槽取不到。
-    func testFullRingReadsTheHoveredSlotItself() {
-        let ring = fullRing
-        let slot3 = HistoryCurveHover.edgeHoverSample(
-            values: ring.values, times: ring.times, slot: 3, pointCount: pointCount
-        )
-        XCTAssertEqual(slot3?.value, 7)
-        XCTAssertEqual(slot3?.time, base.addingTimeInterval(7))
-        let slot10 = HistoryCurveHover.edgeHoverSample(
-            values: ring.values, times: ring.times, slot: 10, pointCount: pointCount
-        )
-        XCTAssertEqual(slot10?.value, 14)
-        XCTAssertEqual(slot10?.time, base.addingTimeInterval(14))
-        let last = HistoryCurveHover.edgeHoverSample(
-            values: ring.values, times: ring.times, slot: 55, pointCount: pointCount
-        )
-        XCTAssertEqual(last?.value, 59)
+    /// 满环 60 点取最近 56(序号 4…59);第 i 格就是 list[i]——2026-11-24 回归
+    /// (切片下标错位,GPU 折线 57% 浮层报 0%)在此仍守住。
+    func testFullRingKeepsMostRecentAndIndexesDirectly() {
+        let r = ring(60)
+        let window = HistoryCurveHover.edgeWindow(values: r.values, times: r.times, count: count)
+        XCTAssertEqual(window.count, count)
+        XCTAssertEqual(window[0], .init(value: 4, time: base.addingTimeInterval(4)))
+        XCTAssertEqual(window[3].value, 7)
+        XCTAssertEqual(window[55], .init(value: 59, time: base.addingTimeInterval(59)))
     }
 
-    func testUnfilledRingSkipsPaddingSlots() {
-        let values = (0 ..< 10).map { Double($0) }
-        let times = (0 ..< 10).map { base.addingTimeInterval(Double($0)) }
-        // 左端 46 槽是 2% 垫底假点,不出读数。
-        XCTAssertNil(
-            HistoryCurveHover.edgeHoverSample(values: values, times: times, slot: 45, pointCount: pointCount)
-        )
-        let first = HistoryCurveHover.edgeHoverSample(
-            values: values, times: times, slot: 46, pointCount: pointCount
-        )
-        XCTAssertEqual(first?.value, 0)
-        XCTAssertEqual(first?.time, base)
+    /// 实犯(2026-11-25 用户报 GPU / 磁盘图无悬停线):未满窗时前面补 0、无时刻,
+    /// 真实点紧随其后——右半段悬停必须拿得到真读数。
+    func testPartialRingPadsFrontWithZero() {
+        let r = ring(10)
+        let window = HistoryCurveHover.edgeWindow(values: r.values, times: r.times, count: count)
+        XCTAssertEqual(window.count, count)
+        XCTAssertEqual(window[0], .init(value: 0, time: nil))
+        XCTAssertEqual(window[45], .init(value: 0, time: nil))
+        XCTAssertEqual(window[46], .init(value: 0, time: base))
+        XCTAssertEqual(window[55], .init(value: 9, time: base.addingTimeInterval(9)))
     }
 
-    func testMismatchedOrEmptyAxesYieldNil() {
-        let values = (0 ..< 60).map { Double($0) }
-        XCTAssertNil(
-            HistoryCurveHover.edgeHoverSample(values: values, times: [], slot: 10, pointCount: pointCount)
-        )
-        XCTAssertNil(
-            HistoryCurveHover.edgeHoverSample(values: values, times: [base], slot: 10, pointCount: pointCount)
-        )
-        XCTAssertNil(
-            HistoryCurveHover.edgeHoverSample(values: [], times: [], slot: 10, pointCount: pointCount)
-        )
+    func testMisalignedTimesDropAllTimesButKeepValues() {
+        let window = HistoryCurveHover.edgeWindow(values: [1, 2, 3], times: [base], count: count)
+        XCTAssertEqual(window.count, count)
+        XCTAssertEqual(window[55], .init(value: 3, time: nil))
+        XCTAssertTrue(window.allSatisfy { $0.time == nil })
+    }
+
+    func testEmptyValuesYieldEmptyWindow() {
+        XCTAssertTrue(HistoryCurveHover.edgeWindow(values: [], times: [], count: count).isEmpty)
     }
 }

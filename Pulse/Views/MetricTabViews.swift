@@ -9,8 +9,9 @@ import SwiftUI
 
 /// 面积折线图(参考文档 §3-2,详情 tab 主卡):56 点、线 tint 2px、线下
 /// 梯度 tint 32%→0、4 条水平网格线(--line 口径)——无轴、无刻度、无标签。
-/// 数据不足 56 点时左侧以 2% 垫底(与 strip 同口径),空序列只剩网格线,
-/// 不出坏图。自绘 Canvas:与 StripChartView 同理由(省 Charts 轴开销,形态精确)。
+/// 定长 list:数据经 `HistoryCurveHover.edgeWindow` 取最近 56 点,不足前面补 0
+/// (0 值画在 2% 底线,与 strip 同口径);第 i 格 = list[i],悬停到哪格显示哪格,
+/// 无任何序号换算(chart-hover-partial,2026-11-25 用户拍板)。空序列只剩网格线。自绘 Canvas:与 StripChartView 同理由(省 Charts 轴开销,形态精确)。
 struct AreaTrendChartView: View {
     /// 点数 = 参考文档 §3-2 的 56 点形态(缓冲窗口 ~60 点,取最近 56 个)。
     static let pointCount = 56
@@ -45,21 +46,14 @@ struct AreaTrendChartView: View {
         self.domainMax = max(domainMax, 1)
     }
 
-    /// 悬停读数(history-hover/02,与历史页同款行为):吸附槽序号;nil = 未
-    /// 悬停 / 垫底槽(2% 假点不是读数)/ 时刻轴缺失——都安静收起不编数。
-    @State private var hoverSlot: Int?
+    /// 悬停所在格(= window 下标);nil = 未悬停。
+    @State private var hoverIndex: Int?
     @State private var plotSize: CGSize = .zero
     @State private var tooltipSize: CGSize = .zero
 
-    /// 悬停可用:时刻轴与值等长且非空(诚实降级面)。
-    private var hoverEnabled: Bool {
-        times.count == values.count && !times.isEmpty
-    }
-
-    /// 值窗点数(与绘制同一 suffix 口径:最近 pointCount 个点)。悬停取值一律走
-    /// `HistoryCurveHover.edgeHoverSample`,这里不留切片下标口。
-    private var windowCount: Int {
-        min(values.count, Self.pointCount)
+    /// 定长窗口:恰好 pointCount 个点(空输入 = 空)。绘制与悬停读同一份。
+    private var window: [HistoryCurveHover.EdgePoint] {
+        HistoryCurveHover.edgeWindow(values: values, times: times, count: Self.pointCount)
     }
 
     var body: some View {
@@ -74,29 +68,22 @@ struct AreaTrendChartView: View {
             }
         }
         .onContinuousHover(coordinateSpace: .local) { phase in
-            guard hoverEnabled else { return }
             switch phase {
             case let .active(location):
-                let slot = HistoryCurveHover.edgeIndex(
+                let index = HistoryCurveHover.edgeIndex(
                     atX: location.x, width: plotSize.width, count: Self.pointCount
                 )
-                let next = HistoryCurveHover.windowIndex(
-                    forSlot: slot, paddingCount: Self.pointCount - windowCount
-                )
-                if next != hoverSlot {
-                    hoverSlot = next
+                if index != hoverIndex {
+                    hoverIndex = index
                 }
             case .ended:
-                hoverSlot = nil
+                hoverIndex = nil
             }
         }
         .overlay(alignment: .topLeading) {
-            // 取值唯一出口:越界 / 垫底槽 / 时刻轴不齐由它返回 nil 安静收起。
-            if let hoverSlot,
-               let sample = HistoryCurveHover.edgeHoverSample(
-                   values: values, times: times, slot: hoverSlot, pointCount: Self.pointCount
-               ) {
-                hoverOverlay(hoverSlot, sample: sample)
+            let window = window
+            if let hoverIndex, window.indices.contains(hoverIndex) {
+                hoverOverlay(hoverIndex, point: window[hoverIndex])
             }
         }
         .accessibilityHidden(true) // 数值信息由主卡统计文字承载
@@ -104,23 +91,18 @@ struct AreaTrendChartView: View {
 
     // MARK: - 悬停读数
 
-    /// 槽点坐标(与绘制同一 x 式:i/(count-1)·width;y 同归一)。
-    private func slotPoint(_ slot: Int, value: Double, in size: CGSize) -> CGPoint {
+    /// 第 index 格的坐标(绘制与悬停同一式:x = i/(count-1)·width;0 值落 2% 底线)。
+    private func point(at index: Int, value: Double, in size: CGSize) -> CGPoint {
         let normalized = min(max(value / domainMax, 0), 1)
         let fraction = max(Self.floorFraction, CGFloat(normalized))
         return CGPoint(
-            x: size.width * CGFloat(slot) / CGFloat(Self.pointCount - 1),
+            x: size.width * CGFloat(index) / CGFloat(Self.pointCount - 1),
             y: size.height * (1 - fraction)
         )
     }
 
-    private func hoverOverlay(
-        _ windowIndex: Int,
-        sample: HistoryCurveHover.EdgeHoverSample
-    ) -> some View {
-        let center = slotPoint(
-            windowIndex + (Self.pointCount - windowCount), value: sample.value, in: plotSize
-        )
+    private func hoverOverlay(_ index: Int, point sample: HistoryCurveHover.EdgePoint) -> some View {
+        let center = point(at: index, value: sample.value, in: plotSize)
         let anchor = CGRect(x: center.x - 4, y: center.y - 4, width: 8, height: 8)
         let origin = ChartHoverGeometry.tooltipOrigin(
             anchor: anchor, size: tooltipSize, bounds: plotSize, gap: 6
@@ -131,7 +113,8 @@ struct AreaTrendChartView: View {
                 .frame(width: 1, height: max(plotSize.height, 0))
                 .position(x: center.x, y: plotSize.height / 2)
             AgentChartTooltip(
-                title: Self.timeFormatter.string(from: sample.time),
+                // 补位点没有采样时刻:显示「—」,不编时间。
+                title: sample.time.map { Self.timeFormatter.string(from: $0) } ?? "—",
                 value: valueText(sample.value),
                 swatch: tint
             )
@@ -160,22 +143,10 @@ struct AreaTrendChartView: View {
         // 网格线:primary 的 8% 不透明度——primary 浅色是黑、深色是白,两种外观同一式子。
         context.stroke(grid, with: .color(Color.primary.opacity(0.08)), lineWidth: 1)
 
-        let count = Self.pointCount
-        let window = Array(values.suffix(count))
+        let window = window
         guard !window.isEmpty else { return }
-
-        // 左垫底右对齐:不足 56 点时旧槽位 2% 垫底——刚启动只见网格与底线。
-        var points: [CGPoint] = []
-        points.reserveCapacity(count)
-        for index in 0 ..< count {
-            let dataIndex = index - (count - window.count)
-            let normalized: Double = dataIndex >= 0
-                ? min(max(window[dataIndex] / domainMax, 0), 1)
-                : 0
-            let fraction = max(Self.floorFraction, CGFloat(normalized))
-            let x = size.width * CGFloat(index) / CGFloat(count - 1)
-            points.append(CGPoint(x: x, y: size.height * (1 - fraction)))
-        }
+        let count = window.count
+        let points = window.enumerated().map { point(at: $0.offset, value: $0.element.value, in: size) }
 
         var line = Path()
         line.move(to: points[0])
