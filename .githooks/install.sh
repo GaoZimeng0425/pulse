@@ -26,7 +26,7 @@ git config branch.develop.mergeoptions "--no-ff"
 echo "✅ Pulse git 闸门已安装: $hooks/{pre-commit,pre-merge-commit,post-merge}"
 echo "   pre-commit:副本自检 → Swift lint(SwiftFormat 自动修 + SwiftLint error 拦截)→ 构建 + 核心测试编译门禁;绕过:PULSE_SKIP_BUILD=1 / --no-verify"
 echo "   pre-merge-commit:main/master 与 p1-implementation 禁止 merge 提交;绕过:--no-verify"
-echo "   post-merge:merge 落在 develop → sh scripts/build.sh Release 安装;跳过:PULSE_SKIP_BUILD=1;干跑:PULSE_HOOK_DEBUG=1"
+echo "   post-merge:merge 落在 develop → sh scripts/gc-build.sh 回收过期构建产物 → sh scripts/build.sh Release 安装;跳过:PULSE_SKIP_BUILD=1;干跑:PULSE_HOOK_DEBUG=1"
 echo "   config:pull.ff=only · branch.develop.rebase=true · branch.develop.mergeoptions=--no-ff"
 
 # lint 门禁依赖 swiftlint + swiftformat;缺工具时 pre-commit 会拦截提交(防假绿)。
