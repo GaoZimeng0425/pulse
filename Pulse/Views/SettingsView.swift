@@ -66,7 +66,7 @@ struct SettingsView: View {
     private var detailView: some View {
         switch SettingsPage(rawValue: selectedPageRaw) ?? .general {
         case .general: GeneralSettingsView(monitor: monitor)
-        case .alerts: AlertSettingsView(center: monitor.alerts)
+        case .alerts: AlertSettingsView(center: monitor.features.alerts)
         case .projectRoots: ProjectRootsSettingsView(store: rootsStore)
         case .menuBar: MenuBarBadgeSettingsView()
         case .cleaner: CleanerSettingsView(store: cleanExclusions, scanRoots: cleanScanRoots)

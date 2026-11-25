@@ -245,8 +245,8 @@ final class MenuBarController: NSObject {
         ) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
-                await self.monitor.alerts.syncAuthorizationStatus()
-                self.monitor.bluetooth.refreshAuthorization()
+                await self.monitor.features.alerts.syncAuthorizationStatus()
+                self.monitor.features.bluetooth.refreshAuthorization()
             }
         }
         // 槽位配置(设置页写 UserDefaults)→ 徽标重算。didChange 对任何 defaults

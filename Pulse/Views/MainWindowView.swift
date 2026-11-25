@@ -61,7 +61,7 @@ struct MainWindowView: View {
         // 窗口新建/重建时先取路由落点(点通知时窗口可能还没开)。
         _tabSelection = State(initialValue: MetricTabSelection(
             current: landing?.pendingTab ?? initialTab,
-            axis: MetricTab.displayAxis(hasBattery: monitor.battery.hasBattery)
+            axis: MetricTab.displayAxis(hasBattery: monitor.features.battery.hasBattery)
         ))
     }
 
@@ -91,7 +91,7 @@ struct MainWindowView: View {
         .padding(.top, 12)
         .padding(.bottom, 24)
         // 首次电池读数落地 → 电池页入轴(工单 02);被隐藏的当前 tab 回落总览。
-        .onChange(of: monitor.battery.hasBattery) { _, hasBattery in
+        .onChange(of: monitor.features.battery.hasBattery) { _, hasBattery in
             tabSelection.setAxis(MetricTab.displayAxis(hasBattery: hasBattery))
         }
         // 主窗口采样闸(p2-review/05 收编):切页 = 一次 setMainWindowTab——排行
@@ -237,10 +237,10 @@ struct MainWindowView: View {
     @ViewBuilder
     private var pageHeader: some View {
         if tabSelection.current == .cleaner {
-            CleanerPageHeader(model: cleanerModel, alerts: monitor.alerts)
+            CleanerPageHeader(model: cleanerModel, alerts: monitor.features.alerts)
         } else {
             PageHeader(tab: tabSelection.current, style: .full) {
-                AlertHeaderIndicator(center: monitor.alerts)
+                AlertHeaderIndicator(center: monitor.features.alerts)
             }
         }
     }
