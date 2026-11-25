@@ -9,7 +9,14 @@ extension Metric {
     /// 动态 NSColor provider 让同一 `Color` 随系统外观切换;浅深切换的观感
     /// 属预览 + 手动验收(spec 测试决策:UI 不写单元测试)。
     var accentColor: Color {
-        Color.dynamic(light: accent.light, dark: accent.dark)
+        accent.color
+    }
+}
+
+extension MetricAccentToken {
+    /// 令牌 → 浅深自适应色:指标色与页面强调色共用的唯一解码点。
+    var color: Color {
+        Color.dynamic(light: light, dark: dark)
     }
 }
 
@@ -42,15 +49,47 @@ enum Surface {
     /// 「先检查」档位专用(DESIGN.md state-caution;p4-uninstaller/08):
     /// warning 是磁盘金别名,在清理页与 accent 全页撞色,档位语义需独立琥珀。
     static let caution = Color.dynamic(light: 0xD95926, dark: 0xEB6834)
-    /// 清理页专属强调色(`{colors.accent-clean}`,2026-11-06 用户拍板 Teal):
+    /// 清理页专属强调色令牌(`{colors.accent-clean}`,2026-11-06 用户拍板 Teal):
     /// 此前借磁盘金被评「丑」,且指标色是各 tab 的身份色不宜跨页借——清理页的
     /// 主按钮 / 排序选中段 / 勾选框选中 / 选中卡片底 / 子页药丸统一取此令牌。
     /// 青 = 回收焕新语义;与十指标色拉得开(蓝牙青偏蓝、网络绿偏绿)。
-    static let cleanAccent = Color.dynamic(light: 0x0D9488, dark: 0x35C4B5)
+    static let cleanAccentToken = MetricAccentToken(light: 0x0D9488, dark: 0x35C4B5)
+    static let cleanAccent = cleanAccentToken.color
+    /// 智能体页专属强调色令牌(`{colors.accent-agents}`,agent-usage-redesign/01):
+    /// tab 图标、选中态、今日数字、日历色阶的唯一出处。青柠落在指标色表空着的
+    /// 黄绿段(磁盘金偏黄、电池绿偏绿),tab 条上认得出来;与指标色同形(双值令牌),
+    /// 两族互不相等由单测守护。
+    static let agentsAccentToken = MetricAccentToken(light: 0x5A921A, dark: 0xA6D94A)
+    static let agentsAccent = agentsAccentToken.color
     /// 状态点"停 / 未连接"(`{colors.state-inactive}`,p2-review/03 入表):系统 secondary
     /// 降到 40%——与亮起态的指标色点成对,不是文字层级,所以单立令牌而非用 `.tertiary`。
     /// 容器行(未运行)与蓝牙设备行(未连接)共用。
     static let inactive = Color.secondary.opacity(0.4)
+}
+
+// MARK: - tab 显示色(agent-usage-redesign/01)
+
+extension MetricTab {
+    /// tab 的显示色——图标条与药丸条的唯一取色口。顶部的 tab 要和页内强调一致:
+    /// 有页面专属强调色的 tab 取页强调色,其余取指标族的指标色。页面强调色放在
+    /// app 层,不扩 PulseCore 的指标色表——指标色是各指标的身份色,页面强调色是
+    /// 某一页自己的,两者不同族。
+    var tintColor: Color {
+        if let pageAccent {
+            return pageAccent
+        }
+        // 每个 tab 恰好一种色源(单测钉住);缺省分支只是让它有值。
+        return accent?.accentColor ?? .secondary
+    }
+
+    /// 页面专属强调色;没有的 tab 为 nil。与 `accent`(指标族归属)恰好其一非 nil。
+    var pageAccent: Color? {
+        switch self {
+        case .agents: Surface.agentsAccent
+        case .cleaner: Surface.cleanAccent
+        default: nil
+        }
+    }
 }
 
 // MARK: - 类别身份色(arch-review-2026-10-18/02 中8)
@@ -99,28 +138,35 @@ enum JunkTrashIdentity {
     static let color = Metric.disk.accentColor
 }
 
-// MARK: - 智能体页模型 / harness 分区色(agent-tab/05,DESIGN.md {colors.agent-model-*})
+// MARK: - 智能体页来源 / 模型分区色(agent-usage-redesign/01,DESIGN.md {colors.agent-source-*} / {agent-model-*})
 
-/// 每日消耗卡「模型分段条 / harness 分段条」的分区异色唯一出处。原型示意色
-/// 青/紫/琥珀映射既有令牌(lead 与页 accent 同源蓝牙青,同 junk-* 先例——指标色
-/// 作类别身份借用,不作页面强调);harness claude/zcode = 前两色(原型同款)。
-enum AgentModelTint {
-    static let lead = Metric.bluetooth.accentColor
-    static let second = Metric.memory.accentColor
-    static let rest = Metric.disk.accentColor
-
-    /// harness = source 分段色。
-    static func harness(_ source: AgentUsageSource) -> Color {
-        source == .claude ? lead : second
+/// 智能体页「来源分段条 / 模型分段条」与走势分层的分区色唯一出处。两家来源各有
+/// 身份色、模型三档异色但柔和。不借指标色:分区色要回答「这是谁」,借来的颜色会和
+/// 别处同一个指标色混在一起。模型超出三档收第三档,不出第四种颜色。
+enum AgentPartitionTint {
+    /// 来源色令牌:`{colors.agent-source-claude}` / `{colors.agent-source-zcode}`。
+    static func sourceToken(_ source: AgentUsageSource) -> MetricAccentToken {
+        switch source {
+        case .claude: MetricAccentToken(light: 0xC9622F, dark: 0xE8946A)
+        case .zcode: MetricAccentToken(light: 0x6A4FE0, dark: 0x8F7CF5)
+        }
     }
 
-    /// 分段序号 → 色(0 起;越界收尾档)。
-    static func tint(at index: Int) -> Color {
-        switch index {
-        case 0: lead
-        case 1: second
-        default: rest
-        }
+    /// 模型三档令牌:`{colors.agent-model-first / second / third}`。
+    static let modelTokens: [MetricAccentToken] = [
+        MetricAccentToken(light: 0x1A78BD, dark: 0x58A8E8),
+        MetricAccentToken(light: 0xBD3A7C, dark: 0xE070A8),
+        MetricAccentToken(light: 0x93730F, dark: 0xCFAB4A),
+    ]
+
+    /// 来源 → 色。
+    static func source(_ source: AgentUsageSource) -> Color {
+        sourceToken(source).color
+    }
+
+    /// 模型分段序号 → 色(0 起;越界收第三档)。
+    static func model(at index: Int) -> Color {
+        modelTokens[min(max(index, 0), modelTokens.count - 1)].color
     }
 }
 

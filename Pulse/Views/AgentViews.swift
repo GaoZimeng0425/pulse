@@ -9,11 +9,11 @@ import SwiftUI
 // · 消耗(`AgentUsagePaneView`):数字卡排 → 日历图 + 走势 → 项目大卡;
 // · 会话(`ClaudeSessionsCardView` / `ZCodeSessionsCardView`):Claude Code 与 ZCode
 //   各一张卡,卡身每个会话一块。
-// 本文件只放页级零件:页指标色、token 读数转发、日期小工具、子页枚举、子药丸条。
+// 本文件只放页级零件:页强调色、token 读数转发、日期小工具、子页枚举、子药丸条。
 
-/// 智能体页指标色:蓝牙青(DESIGN.md junk-ai 先例;tab accent 同源)。
+/// 智能体页强调色(DESIGN.md `{colors.accent-agents}`;tab 条的着色同出这个令牌)。
 /// 智能体页各卡(AgentViews / AgentUsageViews)共用。
-let agentsAccent = Metric.bluetooth.accentColor
+let agentsAccent = Surface.agentsAccent
 
 /// token 读数短型(556k / 6.9M / 1.9B;唯一出处 PulseCore `AgentTokenFormat`)。
 /// 智能体页会话行、消耗子页、图表轴与浮层共用。
@@ -71,7 +71,7 @@ enum AgentSubTab: Hashable {
     static let all: [AgentSubTab] = [.usage, .sessions]
 }
 
-/// 智能体页子药丸条:清理页子页条同款(`PillTabBar` comfortable 档 + 页指标色 +
+/// 智能体页子药丸条:清理页子页条同款(`PillTabBar` comfortable 档 + 页强调色 +
 /// 玻璃外裹)。`isGlassContainer` 默认 false,漏传就没有玻璃外裹,和清理页子页条两个样。
 struct AgentSubTabBar: View {
     @Binding var selection: AgentSubTab

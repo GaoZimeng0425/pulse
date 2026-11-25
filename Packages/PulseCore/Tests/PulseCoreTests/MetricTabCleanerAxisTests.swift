@@ -20,7 +20,7 @@ final class MetricTabCleanerAxisTests: XCTestCase {
     func testCleanerMetadataAndGating() {
         XCTAssertEqual(MetricTab.cleaner.title, "清理")
         XCTAssertEqual(MetricTab.cleaner.symbolName, "sparkles")
-        XCTAssertEqual(MetricTab.cleaner.accent, .disk, "磁盘色族(spec 实现决定)")
+        XCTAssertNil(MetricTab.cleaner.accent, "清理页不属于指标族:着色走页面强调色 accent-clean")
         XCTAssertFalse(MetricTab.cleaner.hostsModuleRanking, "无排行采样闸")
         XCTAssertTrue(MetricTab.cleaner.displayedFamilies.isEmpty, "无常驻传感器家族——可见性闸不沾")
     }
