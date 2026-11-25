@@ -1,6 +1,6 @@
 # arch-clean/04 纯核心测试挪回包内
 
-Status: ready-for-agent
+Status: done
 Type: task
 
 ## 背景
@@ -22,9 +22,10 @@ ADR-0003 补记承诺「核心测试用 `swift test` 跑,不起 app 宿主」,�
 
 ## 验收
 
-- [ ] 四组测试在 `swift test` 下全绿,app 侧对应减少,总数不变
-- [ ] `sh scripts/check.sh` 全绿
+- [x] 四组测试在 `swift test` 下全绿,app 侧对应减少,总数不变
+- [x] `sh scripts/check.sh` 全绿
 
 ## Comments
 
 - 2026-11-24 立票,取代 arch-review-2026-11-24/08(去掉 lint 一步)。
+- 2026-11-25 完成:四文件 git mv 进 PulseCoreTests,只删 `@testable import Pulse` 一行,零辅助符号依赖、零代码改动。68 个用例挪入;核心包 906→974,app 547→479,check.sh 总数 1457 不变。
