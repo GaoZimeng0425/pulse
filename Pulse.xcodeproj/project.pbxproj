@@ -13,6 +13,7 @@
 		02E97C4C404FDFB2C8B24988 /* AlertCenterToastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12FBE262C111877A74B7F58 /* AlertCenterToastTests.swift */; };
 		040A86C6285D90BF16F5B5AA /* PulseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 679FABC27E634B3FA90955FE /* PulseCore */; };
 		04BFB76AC65777ABAFFF1897 /* LiveDiskSourceSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F27F7F4AB085BB21BC93D75 /* LiveDiskSourceSmokeTests.swift */; };
+		05200DF47F34F53EBE9F6B40 /* MainWindowPlacement.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA69B619892E3CBBC7A2E0C6 /* MainWindowPlacement.swift */; };
 		060D9322386EBB423055F963 /* MetricTabViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9434FBDCD0EABA01ACDC0639 /* MetricTabViews.swift */; };
 		060E22E8B6190A3495594D89 /* KillService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD227C96857D63ACF7B5E480 /* KillService.swift */; };
 		098D0D33569F3786FB5D75F6 /* ProjectRootsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAD5923604EC0076DBCA7F94 /* ProjectRootsSettingsView.swift */; };
@@ -483,6 +484,7 @@
 		F852219B5F9D1F164FD759CD /* CleanFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanFixture.swift; sourceTree = "<group>"; };
 		F873321FB00A9164A02DBFE9 /* McpCleanBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = McpCleanBridge.swift; sourceTree = "<group>"; };
 		F9BA4BFB5CC3D0A7FBB10504 /* CleanerJunkRowViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanerJunkRowViews.swift; sourceTree = "<group>"; };
+		FA69B619892E3CBBC7A2E0C6 /* MainWindowPlacement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowPlacement.swift; sourceTree = "<group>"; };
 		FA7E96070C180E8A9D018C6C /* AppVolumeCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppVolumeCardView.swift; sourceTree = "<group>"; };
 		FA89F0F6BF4AD6BD4BC8C012 /* AgentUsageReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentUsageReaderTests.swift; sourceTree = "<group>"; };
 		FA9D963B1DE0ED63855A6AAF /* RankingCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingCard.swift; sourceTree = "<group>"; };
@@ -541,6 +543,7 @@
 				E353A0118896B05E3761D72A /* DockPresence.swift */,
 				2395D7D9D7A918F62EDFADD8 /* InertSources.swift */,
 				09C5195738D18D24F08D8281 /* LogService.swift */,
+				FA69B619892E3CBBC7A2E0C6 /* MainWindowPlacement.swift */,
 				BD3B00277D6CF515AEA81E6C /* MenuBarController.swift */,
 				16E122CDE8CB7A49B14C617E /* MonitorAssembly.swift */,
 				0AEE9CD05DD0A6FAA15E6014 /* PulseApp.swift */,
@@ -1113,6 +1116,7 @@
 				4A70488CB7607A767B604693 /* LogService.swift in Sources */,
 				498BC0DC7F05FF35BF31B569 /* MainWindowGate.swift in Sources */,
 				8DEEFD6F69C6B29CA02994EF /* MainWindowLanding.swift in Sources */,
+				05200DF47F34F53EBE9F6B40 /* MainWindowPlacement.swift in Sources */,
 				67564384C3B69AC9097524CE /* MainWindowView.swift in Sources */,
 				6FFFBBE1DD4567DBCD7A9884 /* McpCleanBridge.swift in Sources */,
 				294EBD9BB566F85D7B9E80A6 /* MemoryStats.swift in Sources */,

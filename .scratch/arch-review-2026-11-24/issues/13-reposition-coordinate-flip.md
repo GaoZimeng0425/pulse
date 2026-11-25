@@ -1,6 +1,6 @@
 # 13: 主窗口离屏拉回混用两套屏幕坐标
 
-**Status:** ready-for-agent
+**Status:** done
 
 **背景:** 核实 09 时发现(2026-11-24)。`Pulse/Views/MainWindowView.swift` `repositionIfOffscreen()`:
 
@@ -23,3 +23,11 @@ AppKit 里为 > 主屏高),会把在屏上的窗口误判为离屏并搬走,或�
 
 **验收:** 换算单测覆盖四种排布;单屏行为不变;`sh scripts/check.sh` 全绿。实机验证需外接屏上下摆放,
 由用户方便时确认(不擅自动鼠标)。
+
+## Comments
+
+- 2026-11-25 完成。纯几何 `WindowPlacement`(PulseCore):屏与光标先 CG → AppKit 翻转(`y' = 主屏高 − y − h`),
+  判定与钳制只在 AppKit 系做;app 侧取数 + 落位迁到 `Pulse/App/MainWindowPlacement.swift`,5 处调用改指。
+  13 条单测:换算、单屏两例(行为不变)、上方外接屏三例(含旧实现对照探针:窗口在上方屏被误判离屏)、
+  左右并排两例 + 「不在光标屏就搬」既有口径一例、回退链三例。check.sh 1469 全绿。
+  实机(外接屏放上方)待用户方便时确认。

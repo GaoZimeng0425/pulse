@@ -137,11 +137,11 @@ struct PulseApp: App {
                       let window = NSApp.window(withWindowNumber: windowNumber),
                       window.identifier?.rawValue == MainWindowSceneID.value || window.title == "Pulse"
                 else { return }
-                MainWindowView.repositionIfOffscreen()
+                MainWindowPlacement.repositionIfOffscreen()
             }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            MainWindowView.repositionIfOffscreen()
+            MainWindowPlacement.repositionIfOffscreen()
         }
         DockPresence.install()
         LogService.info("Pulse 启动(项目根 \(store.projectRoots.count) 个)", category: "App")
