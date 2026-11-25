@@ -47,8 +47,8 @@ struct AgentProjectOverflowRow: View {
 
 // MARK: - 项目卡响应式网格(agent-tab/06)
 
-/// 项目大卡响应式网格:列数 = 容器实宽容纳得下的最多列,逐行 HStack——**行内
-/// 等高**、末行不满自动满宽;容器再窄也是单列 100% 宽。
+/// 项目大卡响应式网格:列数 = 容器实宽容纳得下的最多列,逐行 `EqualHeightRow`——
+/// **行内等高**、末行不满自动满宽;容器再窄也是单列 100% 宽。
 /// 不要换成 `LazyVGrid`(行内拉不齐高度)或 `GridItem(minimum:)`(minimum 是硬下限,
 /// 容器比它窄时溢出裁剪)。
 struct AgentProjectCardGrid: View {
@@ -71,10 +71,9 @@ struct AgentProjectCardGrid: View {
         let maximumColumns = Self.maximumColumns
         return VStack(alignment: .leading, spacing: spacing) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                HStack(alignment: .top, spacing: spacing) {
+                EqualHeightRow(spacing: spacing) {
                     ForEach(row) { project in
                         AgentProjectCardView(project: project, windowDays: windowDays)
-                            .frame(maxHeight: .infinity, alignment: .top)
                     }
                 }
             }
@@ -89,7 +88,7 @@ struct AgentProjectCardGrid: View {
         }
     }
 
-    /// 按列数分行(不足列的末行自动满宽——HStack 内卡 maxWidth ∞)。
+    /// 按列数分行(不足列的末行自动满宽——行内各卡均分行宽)。
     private var rows: [[AgentProjectSummary]] {
         guard columnCount > 1 else { return projects.map { [$0] } }
         return stride(from: 0, to: projects.count, by: columnCount).map {
@@ -121,6 +120,8 @@ struct AgentProjectCardView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
+        // 弹性框在底色里面:`EqualHeightRow` 提进来的行高才铺得到底,同排卡底边齐平。
+        .frame(maxHeight: .infinity, alignment: .top)
         .background(Surface.cardHigh, in: .rect(cornerRadius: 10))
         .accessibilityElement(children: .combine)
     }

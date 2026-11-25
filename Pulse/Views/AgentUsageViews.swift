@@ -7,7 +7,8 @@ import SwiftUI
 //
 // 子页骨架:四张卡平级、上下排,外面不套统一的大卡(还没有账本数据时整页换成一张
 // 空态卡)——
-// 1. 数字卡排:一张卡,内含四张等宽小卡(今日消耗 / N 天合计 / 日均 / Claude 用量);
+// 1. 数字卡排:一张卡,内含四张等宽小卡(今日消耗 / N 天合计 / 日均 / Claude 用量;
+//    主窗口四张一排,弹窗两列两行,同一行底边齐平);
 // 2. 日历图(热力墙)与 3. 走势:内容宽够才并排两列,否则上下各一张;
 // 4. 项目大卡网格(默认截断,末行展开 / 收起)。
 // 数字与派生全在 PulseCore `AgentUsageWindow`(纯值),本文件只描不算。
@@ -90,77 +91,89 @@ struct AgentUsagePaneView: View {
         }
     }
 
-    // MARK: 卡 1:数字卡排(四张一排)
+    // MARK: 卡 1:数字卡排
 
     private var numberCard: some View {
         let figures = AgentUsageWindow.figures(rows: rows, days: range.days)
+        // 弹窗 360 宽塞不下四张:每张会窄到截数字、折标签,改两列两行。
+        let cellsPerRow = isCompact ? 2 : Self.numberCells.count
+        let cellRows = stride(from: 0, to: Self.numberCells.count, by: cellsPerRow).map { start in
+            Array(Self.numberCells[start ..< min(start + cellsPerRow, Self.numberCells.count)])
+        }
         return VStack(alignment: .leading, spacing: 12) {
             CardHeader(symbolName: nil, title: "消耗总览", tint: agentsAccent) {
                 EmptyView()
             }
-            HStack(alignment: .top, spacing: 8) {
-                numberCell(
-                    label: "今日消耗",
-                    tokens: figures.todayTotal,
-                    valueTint: agentsAccent
-                ) {
-                    AgentDeltaText(label: "较昨日", delta: figures.todayDelta)
+            VStack(spacing: 8) {
+                ForEach(Array(cellRows.enumerated()), id: \.offset) { _, cellRow in
+                    EqualHeightRow(spacing: 8) {
+                        ForEach(cellRow, id: \.rawValue) { cell in
+                            numberCell(cell, figures: figures)
+                        }
+                    }
                 }
-                numberCell(
-                    label: "\(figures.windowDays) 天合计",
-                    tokens: figures.windowTotal
-                ) {
-                    AgentDeltaText(label: range.previousLabel, delta: figures.windowDelta)
-                }
-                numberCell(
-                    label: "日均(\(figures.windowDays) 天)",
-                    tokens: figures.windowAverage
-                ) {
-                    Text("峰 \(agentTokenText(figures.windowPeak))/天")
-                        .font(.system(size: 10.5))
-                        .monospacedDigit()
-                        .foregroundStyle(.tertiary)
-                }
-                usageCell
             }
         }
         .cardShell(compact: isCompact)
     }
 
-    /// 一张 lift 数字小卡:标签 → 大数字(figure-stat 28)→ 副行;等宽分布。
-    private func numberCell(
+    /// 数字卡的排布顺序(两个窗口同一份)。
+    private static let numberCells: [NumberCell] = [.today, .windowTotal, .windowAverage, .usage]
+
+    private enum NumberCell: Int {
+        case today, windowTotal, windowAverage, usage
+    }
+
+    @ViewBuilder
+    private func numberCell(_ cell: NumberCell, figures: AgentUsageFigures) -> some View {
+        switch cell {
+        case .today:
+            statCell(label: "今日消耗", tokens: figures.todayTotal, valueTint: agentsAccent) {
+                AgentDeltaText(label: "较昨日", delta: figures.todayDelta)
+            }
+        case .windowTotal:
+            statCell(label: "\(figures.windowDays) 天合计", tokens: figures.windowTotal) {
+                AgentDeltaText(label: range.previousLabel, delta: figures.windowDelta)
+            }
+        case .windowAverage:
+            statCell(label: "日均(\(figures.windowDays) 天)", tokens: figures.windowAverage) {
+                Text("峰 \(agentTokenText(figures.windowPeak))/天")
+                    .font(.system(size: 10.5))
+                    .monospacedDigit()
+                    .foregroundStyle(.tertiary)
+            }
+        case .usage:
+            usageCell
+        }
+    }
+
+    /// 一张 token 数字小卡:标签 → 大数字(figure-stat 28)→ 副行。
+    private func statCell(
         label: String,
         tokens: Int,
         valueTint: Color? = nil,
         @ViewBuilder sub: () -> some View
     ) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        numberCellShell {
             Text(label)
                 .font(.system(size: 10.5))
                 .foregroundStyle(.secondary)
             let figure = agentTokenFigure(tokens)
             FigureText(value: figure.value, unit: figure.unit, size: FigureSize.stat)
                 .foregroundStyle(valueTint ?? Color.primary)
-                .minimumScaleFactor(0.5) // 弹窗紧凑档四等分,超宽读数兜底
             sub()
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
-        .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
-        .frame(maxHeight: .infinity, alignment: .top) // 同行四卡等高
-        .accessibilityElement(children: .combine)
     }
 
     /// 第 4 张 = Claude 用量(5 小时窗优先,缺失退本周;快照缺失「—」不伪造)。
     private var usageCell: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        numberCellShell {
             Text("Claude 用量")
                 .font(.system(size: 10.5))
                 .foregroundStyle(.secondary)
             if let window = usage?.fiveHour ?? usage?.sevenDay {
                 FigureText(value: "\(window.usedPercentage)", unit: "%", size: FigureSize.stat)
                     .foregroundStyle(Color.primary)
-                    .minimumScaleFactor(0.5)
                 Text(usageSubline)
                     .font(.system(size: 10.5))
                     .monospacedDigit()
@@ -173,10 +186,18 @@ struct AgentUsagePaneView: View {
                     .foregroundStyle(.tertiary)
             }
         }
+    }
+
+    /// 小卡外壳:内容 → 等宽 → 内距 → 弹性框 → 底色。弹性框必须在底色里面,
+    /// `EqualHeightRow` 把行高提进来时,矮卡的底色才铺得到行底(agent-tab/14)。
+    private func numberCellShell(@ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            content()
+        }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
-        .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
         .frame(maxHeight: .infinity, alignment: .top)
+        .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
         .accessibilityElement(children: .combine)
     }
 

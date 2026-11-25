@@ -323,11 +323,10 @@ struct CardEmptyState: View {
 
 /// 自适应列数的卡片网格(数据驱动):列数 = 内容宽容纳的最多列(单卡最小宽 +
 /// 列距),夹在 1…上限——比系统 `.adaptive` 多一个**上限**(ultrawide 不出更多列)。
-/// 逐行 HStack 排布:**行内等高**(每卡 `.frame(maxHeight: .infinity)` 顶对齐,
-/// 短卡背景铺满行高;用户拍板 2026-11-21「多卡一组相同高度」)、末行不满自动
-/// 满宽。不用 LazyVGrid(行内不拉齐高度)也不用 GridItem minimum(硬下限,窄容器
-/// 溢出裁剪——agent 项目卡 min 960 前案)——agent-tab/06 三度修正定稿的
-/// AgentProjectCardGrid 模式泛化而来。
+/// 逐行 HStack 排布,末行不满自动满宽。行内等高**尚未**接入 `EqualHeightRow`:这里的
+/// 弹性框在卡壳外面,底色不跟着拉伸,同排卡只在自然高相同时看着齐。不用 LazyVGrid
+/// (行内不拉齐高度)也不用 GridItem minimum(硬下限,窄容器溢出裁剪——agent 项目卡
+/// min 960 前案)——agent-tab/06 三度修正定稿的 AgentProjectCardGrid 模式泛化而来。
 /// 宽度经 `onGeometryChange` 读取(挂外层普通容器——lazy 容器几何不随窗口缩放
 /// 逐帧上报,挂 LazyVGrid 自身列数会算一次就冻住,2026-11-21 用户实报总览六卡
 /// 恒 3 列),只在跨档时改状态,拖拽缩放不逐帧重排。
@@ -398,5 +397,50 @@ struct AdaptiveCardGrid<Item: Identifiable, Card: View>: View {
         return stride(from: 0, to: items.count, by: columnCount).map {
             Array(items[$0 ..< min($0 + columnCount, items.count)])
         }
+    }
+}
+
+/// 同行等高横排(agent-tab/14):一排卡,列等宽,整行按最高的一张定高,再把
+/// 「列宽 × 行高」明确提给每一张。行内等高只认这一种机制——不要用
+/// `.frame(maxHeight: .infinity)` 靠宿主的高度提案去撑:弹窗原生列表量高时高度
+/// 没有上限,弹性框会把整页量成天文数字;滚动区里框撑开了,底色若画在框里面
+/// 也不跟着变高。所以卡自己要先撑框、后铺底色
+/// (`.frame(maxHeight: .infinity, alignment: .top)` 写在 `.background` 之前)。
+/// `sizeThatFits` 不理会宿主的高度提案,行高只由内容决定;末行卡少时各卡
+/// 自动变宽铺满整行。
+struct EqualHeightRow: Layout {
+    let spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? Self.naturalWidth(of: subviews, spacing: spacing)
+        return CGSize(width: width, height: rowHeight(width: width, subviews: subviews))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let height = rowHeight(width: bounds.width, subviews: subviews)
+        let column = Self.columnWidth(total: bounds.width, count: subviews.count, spacing: spacing)
+        for (index, subview) in subviews.enumerated() {
+            subview.place(
+                at: CGPoint(x: bounds.minX + CGFloat(index) * (column + spacing), y: bounds.minY),
+                anchor: .topLeading,
+                proposal: ProposedViewSize(width: column, height: height)
+            )
+        }
+    }
+
+    /// 行高 = 各卡在自己的列宽下、不限高时量出的最高值。
+    private func rowHeight(width: CGFloat, subviews: Subviews) -> CGFloat {
+        let column = Self.columnWidth(total: width, count: subviews.count, spacing: spacing)
+        return subviews.map { $0.sizeThatFits(ProposedViewSize(width: column, height: nil)).height }.max() ?? 0
+    }
+
+    private static func columnWidth(total: CGFloat, count: Int, spacing: CGFloat) -> CGFloat {
+        (total - spacing * CGFloat(max(count - 1, 0))) / CGFloat(max(count, 1))
+    }
+
+    /// 宿主没给宽(问理想尺寸)时,按各卡自然宽之和。
+    private static func naturalWidth(of subviews: Subviews, spacing: CGFloat) -> CGFloat {
+        subviews.map { $0.sizeThatFits(.unspecified).width }.reduce(0, +)
+            + spacing * CGFloat(max(subviews.count - 1, 0))
     }
 }

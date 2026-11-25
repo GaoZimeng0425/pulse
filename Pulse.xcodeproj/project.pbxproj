@@ -196,6 +196,7 @@
 		CADC6FC231286ABD06F04C67 /* KillServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C53D2D1E33AFAC1704FD224A /* KillServiceTests.swift */; };
 		CD3119D8DB34CB29A184EFC1 /* BatterySensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C592AC26CEC4C7129D0463B /* BatterySensor.swift */; };
 		CF06B9E60C578C995DAF72DC /* AlertNotificationSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02DA72B605936ABAB68101E8 /* AlertNotificationSmokeTests.swift */; };
+		D0260CCBE9828C5963177D73 /* EqualHeightRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A242F21203D4437E359DEAF /* EqualHeightRowTests.swift */; };
 		D13598C5852FE5D54CB29D0B /* CleanerJunkViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E8DC1C1BAEF8918D34C6A90 /* CleanerJunkViews.swift */; };
 		D2016D53E979E77A8BB0FCEC /* RowMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B78FEACA6C9C99BD1865E867 /* RowMetrics.swift */; };
 		D397A1C4ABDB5AE7AB188061 /* MeterBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 726DD15D946CA1C40E9B17F9 /* MeterBar.swift */; };
@@ -354,6 +355,7 @@
 		6394DED2F224C5FC7939D499 /* GpuSensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GpuSensor.swift; sourceTree = "<group>"; };
 		660FB2721DCBDC67C5B3E98A /* LineagePruningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineagePruningTests.swift; sourceTree = "<group>"; };
 		689A729F03DE35CA0C9E3D5D /* MainWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowView.swift; sourceTree = "<group>"; };
+		6A242F21203D4437E359DEAF /* EqualHeightRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EqualHeightRowTests.swift; sourceTree = "<group>"; };
 		6A98A79159A39E317CC43DA0 /* NettopProcessRateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NettopProcessRateTests.swift; sourceTree = "<group>"; };
 		6A9DD984A73F2C57684332F7 /* PreDeleteLiveConsistencyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreDeleteLiveConsistencyTests.swift; sourceTree = "<group>"; };
 		6ABD0F49B382EE3281B6A91B /* CleanerSpaceMapPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanerSpaceMapPalette.swift; sourceTree = "<group>"; };
@@ -790,6 +792,7 @@
 				CB2143C633E5F922EDA23B55 /* EnergyImpactFeatureTests.swift */,
 				E61F388AE87DD149C463A8C4 /* EnergyImpactTableTests.swift */,
 				1C01F3A4AB4BC765537F64DA /* EnergyModelSensorTests.swift */,
+				6A242F21203D4437E359DEAF /* EqualHeightRowTests.swift */,
 				F4498F13FD5B50D5609049E6 /* GlobalPortScannerTests.swift */,
 				997E4A682EAB7F54A6FEB9BE /* GpuSensorTests.swift */,
 				1B7ADC75304AC8AC8EF1CED3 /* GroupCategoryDisplayTests.swift */,
@@ -974,6 +977,7 @@
 				F64753C9B30A91EA24799BB1 /* EnergyImpactFeatureTests.swift in Sources */,
 				9730A85711DA1A95E61C1299 /* EnergyImpactTableTests.swift in Sources */,
 				6164A801BF9C51036BBF73BC /* EnergyModelSensorTests.swift in Sources */,
+				D0260CCBE9828C5963177D73 /* EqualHeightRowTests.swift in Sources */,
 				70B64CE4C7C3D6130ED1021A /* GlobalPortScannerTests.swift in Sources */,
 				21BAA7AE4F5D186DD8EF781F /* GpuSensorTests.swift in Sources */,
 				3891285DCA8188E59A9EC34E /* GroupCategoryDisplayTests.swift in Sources */,
