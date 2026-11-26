@@ -6,7 +6,8 @@ import SwiftUI
 
 //
 // 两张图的骨架相同——图区 → 日期轴带:
-// · `AgentHeatWall`:一年 52 列格子墙,Canvas 自绘,随容器宽等比缩放、不滚动;
+// · `AgentHeatWall`:一年 52 列格子墙,Canvas 自绘;主窗口随容器宽等比缩放、不滚动,
+//   弹窗格子定边长、横向滚动;
 // · `AgentTrendChart`:近 N 天按来源分两层的面积 + 两条线,官方 Swift Charts,x 轴隐藏;
 // · `AgentChartAxis`:两图共用的自绘日期轴带(轴带高与标签位置只在这里定);
 // · `AgentChartTooltip`:多处共用的悬停浮层(通用件,规范在 DESIGN.md;历史页与
@@ -196,10 +197,14 @@ struct AgentLegendSwatch: View {
 
 // MARK: - 热力墙
 
-/// 一年 52 列格子墙:随容器宽**等比缩放、不滚动**,每月一个刻度;四档色阶按峰值
-/// 归一(量化在 PulseCore `AgentHeatScale`)。悬停 = 命中格描边 + 浮层,浮层锚定
-/// 命中格而不是跟随光标(逐格吸附不抖);命中一律坐标反算,不依赖形状
-/// hit test(空间地图同款纪律)。
+/// 一年 52 列格子墙,每月一个刻度;四档色阶按峰值归一(量化在 PulseCore
+/// `AgentHeatScale`)。两种排法:
+/// · 默认(主窗口):随容器宽**等比缩放、不滚动**;
+/// · 定边长(`fixedCellSide`,弹窗):格子按令牌定大小,墙比卡宽 → 横向滚动,
+///   初始停在最右(最近的日子)。
+/// 悬停 = 命中格描边 + 浮层,浮层锚定命中格而不是跟随光标(逐格吸附不抖);命中
+/// 一律坐标反算,不依赖形状 hit test(空间地图同款纪律)。滚动时浮层画在滚动区
+/// 外面(锚点减滚动偏移、按可视宽钳位),不被滚动区裁掉;一滚动就收起浮层。
 struct AgentHeatWall: View {
     static let weeks = 52
     private static let gap: CGFloat = 3
@@ -214,8 +219,14 @@ struct AgentHeatWall: View {
     let totals: [AgentDayTotal]
     /// 按天 / 按周,规则见 `AgentHeatGranularity`。
     var granularity: AgentHeatGranularity = .day
+    /// 定格边长(`{layout.agent-heat-cell-compact}`,弹窗):墙宽由它定、横向滚动;
+    /// nil = 随容器宽等比缩放、不滚动。
+    var fixedCellSide: CGFloat?
 
+    /// 可视宽(容器宽;不滚动时就是墙宽)。
     @State private var width: CGFloat = 640
+    /// 横向滚动偏移(只在定边长时非 0;浮层锚点据此从墙坐标换到可视坐标)。
+    @State private var scrollOffset: CGFloat = 0
     /// 悬停命中:按天 = 天序号;按周 = 列序号。
     @State private var hoverIndex: Int?
     /// 浮层实测尺寸(钳位用;首帧为 0 时隐藏,免一帧跳位)。
@@ -226,18 +237,30 @@ struct AgentHeatWall: View {
     }
 
     private var side: CGFloat {
-        let horizontal = (width - Self.inset * 2 - Self.gap * CGFloat(Self.weeks - 1)) / CGFloat(Self.weeks)
-        return max(horizontal, 1)
+        fixedCellSide ?? Self.cellSide(forWidth: width)
+    }
+
+    /// 墙宽:定边长时由格子数推出(比可视宽大 → 滚动),否则 = 可视宽。
+    private var wallWidth: CGFloat {
+        guard let fixedCellSide else { return width }
+        return Self.inset * 2 + fixedCellSide * CGFloat(Self.weeks) + Self.gap * CGFloat(Self.weeks - 1)
     }
 
     private var gridHeight: CGFloat {
-        Self.gridHeight(forWidth: width)
+        Self.gridHeight(side: side)
+    }
+
+    private static func cellSide(forWidth width: CGFloat) -> CGFloat {
+        max((width - inset * 2 - gap * CGFloat(weeks - 1)) / CGFloat(weeks), 1)
     }
 
     /// 图区高(格墙 + 上下 inset;不含轴带),随容器宽等比:格边长 × 7 行 + 行距。
     static func gridHeight(forWidth width: CGFloat) -> CGFloat {
-        let side = max((width - inset * 2 - gap * CGFloat(weeks - 1)) / CGFloat(weeks), 1)
-        return inset * 2 + side * 7 + gap * 6
+        gridHeight(side: cellSide(forWidth: width))
+    }
+
+    private static func gridHeight(side: CGFloat) -> CGFloat {
+        inset * 2 + side * 7 + gap * 6
     }
 
     private var dates: [Date] {
@@ -246,18 +269,11 @@ struct AgentHeatWall: View {
 
     var body: some View {
         let levels = levels
-        Canvas { context, _ in
+        let wall = Canvas { context, _ in
             draw(in: &context, levels: levels)
         }
-        .frame(height: gridHeight + AgentChartAxis.height)
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { newValue in
-            if abs(newValue - width) > 0.5 {
-                width = newValue
-            }
-        }
+        .frame(width: fixedCellSide == nil ? nil : wallWidth, height: gridHeight + AgentChartAxis.height)
         .contentShape(.rect)
-        // 悬停下标两档含义不同(天序号 / 列序号),切档必须清,否则按旧义错位命中。
-        .onChange(of: granularity) { hoverIndex = nil }
         .onContinuousHover(coordinateSpace: .local) { phase in
             switch phase {
             case let .active(location):
@@ -266,6 +282,29 @@ struct AgentHeatWall: View {
                 hoverIndex = nil
             }
         }
+        Group {
+            if fixedCellSide == nil {
+                wall
+            } else {
+                ScrollView(.horizontal) { wall }
+                    .defaultScrollAnchor(.trailing)
+                    .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.x } action: { _, newValue in
+                        // 滚动时光标下的格子换了,但悬停事件要等下一次移动才来:先收起浮层。
+                        if abs(newValue - scrollOffset) > 0.5 {
+                            scrollOffset = newValue
+                            hoverIndex = nil
+                        }
+                    }
+            }
+        }
+        .frame(height: gridHeight + AgentChartAxis.height)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { newValue in
+            if abs(newValue - width) > 0.5 {
+                width = newValue
+            }
+        }
+        // 悬停下标两档含义不同(天序号 / 列序号),切档必须清,否则按旧义错位命中。
+        .onChange(of: granularity) { hoverIndex = nil }
         .overlay(alignment: .topLeading) {
             if let hoverIndex {
                 tooltip(for: hoverIndex, levels: levels)
@@ -274,11 +313,13 @@ struct AgentHeatWall: View {
     }
 
     private func tooltip(for index: Int, levels: [Int]) -> some View {
+        // 钳位按可视区:锚点从墙坐标减去滚动偏移(不滚动时偏移恒 0)。
         let bounds = CGSize(width: width, height: gridHeight)
+        let anchor = hoverRect(index).offsetBy(dx: -scrollOffset, dy: 0)
         // 按周锚点是整列(上下没空间)→ 侧放;按天锚点是单格 → 格上方。
         let origin = granularity == .week
-            ? ChartHoverGeometry.sideTooltipOrigin(anchor: hoverRect(index), size: tooltipSize, bounds: bounds, gap: 6)
-            : ChartHoverGeometry.tooltipOrigin(anchor: hoverRect(index), size: tooltipSize, bounds: bounds, gap: 6)
+            ? ChartHoverGeometry.sideTooltipOrigin(anchor: anchor, size: tooltipSize, bounds: bounds, gap: 6)
+            : ChartHoverGeometry.tooltipOrigin(anchor: anchor, size: tooltipSize, bounds: bounds, gap: 6)
         let content: TooltipContent = switch granularity {
         case .day:
             TooltipContent(
@@ -374,7 +415,7 @@ struct AgentHeatWall: View {
     private func draw(in context: inout GraphicsContext, levels: [Int]) {
         // 图区底(灰 6%,圆角 8)。
         context.fill(
-            Path(roundedRect: CGRect(x: 0, y: 0, width: width, height: gridHeight), cornerRadius: 8),
+            Path(roundedRect: CGRect(x: 0, y: 0, width: wallWidth, height: gridHeight), cornerRadius: 8),
             with: .color(Color.primary.opacity(0.06))
         )
         let corner = min(3, side / 3)
@@ -405,7 +446,7 @@ struct AgentHeatWall: View {
                 marks.append((Self.inset + CGFloat(column) * step, month))
             }
         }
-        let rightmostStart = width - Self.inset - Self.monthLabelMaxWidth
+        let rightmostStart = wallWidth - Self.inset - Self.monthLabelMaxWidth
         var nextKeptX = CGFloat.infinity
         for mark in marks.reversed() {
             let x = min(mark.x, rightmostStart)

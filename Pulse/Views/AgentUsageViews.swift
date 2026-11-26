@@ -10,7 +10,9 @@ import SwiftUI
 //    主窗口一排四张,弹窗两列两行;
 // 2. 走势 | 日历:子页内容宽 ≥ `{layout.agent-chart-two-column-min-width}` 1512(窗宽 1560)
 //    时左右两列等高,否则上下一列(半宽的图太小);弹窗恒一列。走势卡头的
-//    「7 天 | 30 天」是全页唯一的范围开关;日历卡头是「重新扫描」玻璃按钮 + 天 / 周;
+//    「7 天 | 30 天」是全页唯一的范围开关;日历卡头是「重新扫描」玻璃按钮 + 天 / 周。
+//    日历在主窗口随卡宽等比缩放;弹窗里格子定边长 `{layout.agent-heat-cell-compact}` 10,
+//    一年比卡宽 → 横向滚动,初始停在最右(最近的日子);
 // 3. 项目榜单:一行一个项目,点行看明细;默认前 10 个,末行展开 / 收起;跟着范围走。
 // 卡间距:主窗口 16,弹窗 8(`{spacing.gap}`,与别的页一致)。范围(7 / 30 天)只有一个
 // 状态,重进子页回默认(7 天、项目收起)。数字与派生全在 PulseCore `AgentUsageWindow`
@@ -45,6 +47,9 @@ struct AgentUsagePaneView: View {
     /// 并排时走势高的下限:走势跟日历同高(两卡同构、不留空),但日历在半宽下很矮,
     /// 走势不低于这个高度;多出来的高度让日历在卡里上下居中。
     private static let pairedTrendMinHeight: CGFloat = 140
+    /// 弹窗日历格边长(`{layout.agent-heat-cell-compact}`):弹窗卡宽约 310,一年 52 列
+    /// 按宽缩只剩 3pt 一格;定成 10 后墙宽约 680,横向滚动,初始停最右。
+    private static let compactHeatCellSide: CGFloat = 10
 
     /// 范围:数字卡、走势、项目榜单共用。
     @State private var range: AgentUsageRange = .week
@@ -201,9 +206,13 @@ struct AgentUsagePaneView: View {
                 }
             }
             // 并排时卡高跟着走势;日历比它矮的部分上下均分,不挤在卡头下面。
-            AgentHeatWall(totals: totals, granularity: heatGranularity)
-                .frame(maxHeight: fillsHeight ? .infinity : nil)
-                .zIndex(1)
+            AgentHeatWall(
+                totals: totals,
+                granularity: heatGranularity,
+                fixedCellSide: isCompact ? Self.compactHeatCellSide : nil
+            )
+            .frame(maxHeight: fillsHeight ? .infinity : nil)
+            .zIndex(1)
             chartFooter(leading: "Claude 与 ZCode 合计", trailing: heatPeakText(totals))
         }
         .chartCardShell(compact: isCompact, fillsHeight: fillsHeight)
