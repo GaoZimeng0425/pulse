@@ -57,7 +57,7 @@ struct AgentChartTooltip: View {
             }
         }
         .padding(EdgeInsets(top: 6, leading: 8, bottom: 6, trailing: 8))
-        .background(.regularMaterial, in: .rect(cornerRadius: 8))
+        .background(.thickMaterial, in: .rect(cornerRadius: 8))
         .fixedSize()
         .allowsHitTesting(false)
     }
@@ -481,6 +481,8 @@ struct AgentTrendChart: View {
             VStack(spacing: 0) {
                 chart(points)
                     .frame(height: max(height - AgentChartAxis.height, 0))
+                    // 浮层翻到点下方时会伸出图区:图层抬到日期轴之上,轴标签不压在浮层上面。
+                    .zIndex(1)
                 axisStrip(points)
                     .frame(height: AgentChartAxis.height)
             }

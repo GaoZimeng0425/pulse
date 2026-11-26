@@ -74,7 +74,10 @@ struct AgentUsagePaneView: View {
                     range: range,
                     isCompact: isCompact
                 )
+                // 图表浮层可能伸出卡外(日历在半宽下比浮层还矮):图表行压在后面的榜单之上,
+                // 浮层才盖得住后面的内容(材质底才模糊得到它们),而不是被它们压住。
                 chartRow
+                    .zIndex(1)
                 projectCard
             }
         }
@@ -114,6 +117,7 @@ struct AgentUsagePaneView: View {
             } else {
                 VStack(alignment: .leading, spacing: cardSpacing) {
                     trendCard(fillsHeight: false)
+                        .zIndex(1)
                     calendarCard(fillsHeight: false)
                 }
             }
@@ -159,6 +163,7 @@ struct AgentUsagePaneView: View {
             )
             .accessibilityHidden(true)
             .frame(maxHeight: fillsHeight ? .infinity : nil)
+            .zIndex(1)
             HStack(spacing: 12) {
                 ForEach([("Claude", AgentUsageSource.claude), ("ZCode", .zcode)], id: \.0) { name, source in
                     HStack(spacing: 4) {
@@ -190,6 +195,7 @@ struct AgentUsagePaneView: View {
             // 并排时卡高跟着走势;日历比它矮的部分上下均分,不挤在卡头下面。
             AgentHeatWall(totals: totals, granularity: heatGranularity)
                 .frame(maxHeight: fillsHeight ? .infinity : nil)
+                .zIndex(1)
             chartFooter(leading: "Claude 与 ZCode 合计", trailing: heatPeakText(totals))
         }
         .chartCardShell(compact: isCompact, fillsHeight: fillsHeight)
