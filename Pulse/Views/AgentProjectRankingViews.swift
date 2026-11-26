@@ -9,7 +9,8 @@ import SwiftUI
 // 标准件之上(行尺寸走 RowMetrics 两档、行尾留展开箭头一列、悬停底色、卡内空态、
 // 截断末行);与通用排行行只差两处——占比条是分段的(两段 = 两家来源),数值有三列
 // (占比 / 消耗 / 环比)。紧凑档的行是两行(上行名称 + 消耗,下行小字:在跑 / 占比 /
-// 环比),给名称留出宽度。点一行原地展开明细,展开区把后面的行推下去。
+// 环比),给名称留出宽度。点一行原地展开:展开后行与明细是同一张卡(一块抬升底,
+// 行是卡头、明细在卡里),把后面的行推下去;收起只剩那一行。
 // 排序、占比、环比、五桶、模型与来源份额全在 PulseCore `AgentUsageWindow.projects`。
 
 /// 榜单的列宽(页面专属参数;行尺寸的共享值一律委托 `RowMetrics` / `RankingListMetrics`)。
@@ -164,8 +165,8 @@ struct AgentProjectRankingCard: View {
 }
 
 /// 榜单的一行。全尺寸一行:图标 + 名称与「在跑」芯片 + 分段占比条 + 占比 / 消耗 / 环比
-/// + 箭头;紧凑档两行:上行名称 + 消耗,下行在跑 / 占比 / 环比。整行可点,悬停或展开
-/// 时有底色。
+/// + 箭头;紧凑档两行:上行名称 + 消耗,下行在跑 / 占比 / 环比。整行可点:收起时悬停
+/// 有底色;展开后行与明细合成一张卡(`Surface.cardHigh`、`{rounded.inner}` 10)。
 struct AgentProjectRankingRow: View {
     let project: AgentProjectSummary
     let windowDays: Int
@@ -177,6 +178,10 @@ struct AgentProjectRankingRow: View {
 
     @State private var isHovering = false
 
+    /// 展开卡的圆角(`{rounded.inner}`)与收起行悬停底的圆角(同所有排行行)。
+    private static let expandedRadius: CGFloat = 10
+    private static let hoverRadius: CGFloat = 8
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button(action: onToggle) {
@@ -184,8 +189,8 @@ struct AgentProjectRankingRow: View {
                     .padding(.horizontal, RowMetrics.rowInset(compact: isCompact))
                     .padding(.vertical, RowMetrics.rowVerticalPadding(compact: isCompact))
                     .background(
-                        isHovering || isExpanded ? Color.primary.opacity(0.05) : Color.clear,
-                        in: .rect(cornerRadius: 8)
+                        isHovering && !isExpanded ? Color.primary.opacity(0.05) : Color.clear,
+                        in: .rect(cornerRadius: Self.hoverRadius)
                     )
                     .contentShape(.rect)
             }
@@ -196,7 +201,7 @@ struct AgentProjectRankingRow: View {
             )
             .accessibilityHint(isExpanded ? "收起项目明细" : "展开项目明细")
             if isExpanded {
-                // 明细缩进到名称的起点。
+                // 明细与行同在一张卡里:左缘对齐名称起点,右缘对齐行尾,底边留卡内距。
                 AgentProjectDetail(project: project, windowDays: windowDays, isCompact: isCompact)
                     .padding(
                         .leading,
@@ -204,9 +209,14 @@ struct AgentProjectRankingRow: View {
                             + RowMetrics.spacing(compact: isCompact)
                     )
                     .padding(.trailing, RowMetrics.rowInset(compact: isCompact))
-                    .padding(.bottom, RowMetrics.rowVerticalPadding(compact: isCompact))
+                    .padding(.top, 4)
+                    .padding(.bottom, CardMetrics.padding(compact: isCompact))
             }
         }
+        .background(
+            isExpanded ? Surface.cardHigh : Color.clear,
+            in: .rect(cornerRadius: Self.expandedRadius)
+        )
     }
 
     @ViewBuilder
@@ -350,8 +360,8 @@ struct AgentProjectRankingRow: View {
 
 // MARK: - 明细
 
-/// 展开的明细(卡内抬升底):五格读数 → 模型构成 → 来源构成 → 元信息。
-/// 紧凑档把五格与图例折成多行,不靠截断。
+/// 展开的明细:五格读数 → 模型构成 → 来源构成 → 元信息。自己不带底——底色与圆角在
+/// 行上(行与明细是同一张卡)。紧凑档把五格与图例折成多行,不靠截断。
 struct AgentProjectDetail: View {
     let project: AgentProjectSummary
     let windowDays: Int
@@ -381,9 +391,7 @@ struct AgentProjectDetail: View {
             )
             meta
         }
-        .padding(CardMetrics.padding(compact: isCompact))
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Surface.cardHigh, in: .rect(cornerRadius: 10))
         .accessibilityElement(children: .combine)
     }
 
