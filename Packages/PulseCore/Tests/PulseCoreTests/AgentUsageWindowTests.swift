@@ -13,6 +13,16 @@ final class AgentUsageWindowTests: XCTestCase {
         return AgentUsageWindow.dayKey(date, calendar: calendar)
     }
 
+    /// 固定时钟的「此刻」:`base` 那天的第 hour 小时整。今日环比按全天等效量算,
+    /// 结果随时刻变——这类用例不能拿真实时钟当夹具。
+    private func clock(hour: Int, of base: Date) -> Date {
+        calendar.date(byAdding: .hour, value: hour, to: calendar.startOfDay(for: base))!
+    }
+
+    private func claudeRow(_ ago: Int, _ total: Int, from now: Date) -> AgentDailyUsageRow {
+        AgentDailyUsageRow(day: dayKey(ago, from: now), source: .claude, origin: .jsonl, totalTokens: total)
+    }
+
     // MARK: 逐天合计
 
     func testDayTotalsFillMissingDaysWithZero() {
@@ -28,6 +38,27 @@ final class AgentUsageWindowTests: XCTestCase {
         XCTAssertEqual(totals.last?.total, 40) // 两家同天合计
         XCTAssertEqual(totals[6 - 2].total, 50)
         XCTAssertEqual(totals.filter { $0.total == 0 }.count, 5) // 缺天 0
+    }
+
+    /// 每天除合计外还带两家的分量(走势按来源分层用):各算各的,缺天为 0,
+    /// 合计恒等于两家之和。
+    func testDayTotalsSplitTotalsBySource() {
+        let now = Date()
+        let rows = [
+            AgentDailyUsageRow(day: dayKey(0, from: now), source: .claude, origin: .jsonl, totalTokens: 30),
+            AgentDailyUsageRow(day: dayKey(0, from: now), source: .zcode, origin: .db, totalTokens: 10),
+            AgentDailyUsageRow(day: dayKey(2, from: now), source: .claude, origin: .jsonl, totalTokens: 50),
+        ]
+        let totals = AgentUsageWindow.dayTotals(rows: rows, days: 7, calendar: calendar, now: now)
+        XCTAssertEqual(totals.last?.claudeTotal, 30)
+        XCTAssertEqual(totals.last?.zcodeTotal, 10)
+        XCTAssertEqual(totals[6 - 2].claudeTotal, 50)
+        XCTAssertEqual(totals[6 - 2].zcodeTotal, 0)
+        XCTAssertEqual(totals[6 - 3].claudeTotal, 0) // 缺天
+        XCTAssertEqual(totals[6 - 3].zcodeTotal, 0)
+        for day in totals {
+            XCTAssertEqual(day.total, day.claudeTotal + day.zcodeTotal)
+        }
     }
 
     func testDayTotalsAggregateBucketsAndBackfillDayHasNoBreakdown() {
@@ -54,19 +85,14 @@ final class AgentUsageWindowTests: XCTestCase {
         XCTAssertNil(totals.first?.breakdown) // 缺天(0)无明细
     }
 
-    // MARK: 数字卡排
+    // MARK: 主卡数字
 
     func testFiguresDeltasAndPeak() {
-        let now = Date()
+        let base = Date()
         // 窗口 7 天:300,100,50×5 = 650;前窗 7 天:25×7 = 175。
         var rows: [AgentDailyUsageRow] = []
         func add(_ ago: Int, _ total: Int) {
-            rows.append(AgentDailyUsageRow(
-                day: dayKey(ago, from: now),
-                source: .claude,
-                origin: .jsonl,
-                totalTokens: total
-            ))
+            rows.append(claudeRow(ago, total, from: base))
         }
         add(0, 300)
         add(1, 100)
@@ -77,14 +103,38 @@ final class AgentUsageWindowTests: XCTestCase {
             add(ago, 25)
         }
 
-        let figures = AgentUsageWindow.figures(rows: rows, days: 7, calendar: calendar, now: now)
+        // 今天已过半天:读数仍是实际值,环比拿全天等效量(300 × 2 = 600)去比昨天。
+        let figures = AgentUsageWindow.figures(rows: rows, days: 7, calendar: calendar, now: clock(hour: 12, of: base))
         XCTAssertEqual(figures.todayTotal, 300)
-        XCTAssertEqual(figures.todayDelta, 2.0) // (300-100)/100
+        XCTAssertEqual(figures.todayDelta ?? 0, 5.0, accuracy: 1e-9)
         XCTAssertEqual(figures.windowTotal, 650)
         XCTAssertEqual(figures.windowDelta ?? 0, Double(650 - 175) / 175, accuracy: 1e-9)
         XCTAssertEqual(figures.windowAverage, 92) // 650/7 整除
         XCTAssertEqual(figures.windowPeak, 300)
         XCTAssertEqual(figures.windowDays, 7)
+    }
+
+    /// 今天不足 6 小时:按 6 小时下限折算(最多放大 4 倍),不让凌晨的小量虚高。
+    func testTodayDeltaUsesSixHourFloor() {
+        let oneAM = clock(hour: 1, of: Date())
+        let rows = [claudeRow(0, 100, from: oneAM), claudeRow(1, 300, from: oneAM)]
+        let figures = AgentUsageWindow.figures(rows: rows, days: 7, calendar: calendar, now: oneAM)
+        // 等效量 = 100 × 86400 / 21600 = 400 → (400 - 300) / 300。
+        XCTAssertEqual(figures.todayDelta ?? 0, Double(400 - 300) / 300, accuracy: 1e-9)
+    }
+
+    /// 同一份数据、同一个时刻:今日环比说「持平」,日历里今天和昨天就必须同档——
+    /// 两处是同一个折算规则。
+    func testTodayDeltaAndHeatLevelAgreeOnSameData() {
+        let noon = clock(hour: 12, of: Date())
+        let rows = [claudeRow(1, 200, from: noon), claudeRow(0, 100, from: noon)]
+        let figures = AgentUsageWindow.figures(rows: rows, days: 7, calendar: calendar, now: noon)
+        XCTAssertEqual(figures.todayDelta ?? 1, 0, accuracy: 1e-9)
+        let levels = AgentHeatScale.dayLevels(
+            AgentUsageWindow.dayTotals(rows: rows, days: 7, calendar: calendar, now: noon),
+            todayElapsed: 12 * 3600
+        )
+        XCTAssertEqual(levels.last, levels[levels.count - 2])
     }
 
     /// 昨日 / 前窗无数据:delta nil(无基准,不出 ±∞ 与 0% 假读数)。

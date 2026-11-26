@@ -2,23 +2,38 @@ import Charts
 import PulseCore
 import SwiftUI
 
-// MARK: - 消耗子页两图:热力墙 + 走势(agent-tab/07)
+// MARK: - 消耗页两图:热力墙 + 走势(agent-tab/07)
 
 //
-// 两张图的骨架相同——图区 → 日期轴带,并排时靠这份同构等高、左右缘对齐:
+// 两张图的骨架相同——图区 → 日期轴带:
 // · `AgentHeatWall`:一年 52 列格子墙,Canvas 自绘,随容器宽等比缩放、不滚动;
-// · `AgentTrendChart`:近 N 天折线 + 线下渐变面积,官方 Swift Charts,x 轴隐藏;
-// · `AgentChartAxis`:两图共用的自绘日期轴带;
-// · `AgentChartTooltip`:两图共用的悬停浮层(通用件,规范在 DESIGN.md)。
+// · `AgentTrendChart`:近 N 天按来源分两层的面积 + 两条线,官方 Swift Charts,x 轴隐藏;
+// · `AgentChartAxis`:两图共用的自绘日期轴带(轴带高与标签位置只在这里定);
+// · `AgentChartTooltip`:多处共用的悬停浮层(通用件,规范在 DESIGN.md;历史页与
+//   指标主卡也用)。
 
-/// 两图共用的悬停浮层。形态、材质与定位走 DESIGN.md「图表悬停读数与浮层」组件规范
-/// (定位算法在 PulseCore `ChartHoverGeometry`);本页特有的只有一处——该时段有分项
-/// 时,末尾加一块 2×2 四桶明细(标签层级对齐项目卡 `bucketsRow`)。
+/// 浮层明细格里的一项分区:色块 + 名称 + 读数。
+struct ChartTooltipPartition: Identifiable {
+    let name: String
+    let value: String
+    let tint: Color
+
+    var id: String {
+        name
+    }
+}
+
+/// 多处共用的悬停浮层。形态、材质与定位走 DESIGN.md「图表悬停读数与浮层」组件规范
+/// (定位算法在 PulseCore `ChartHoverGeometry`);读数下可带两列明细格——先按分区列
+/// 各项,再列更细一级的分项,哪一级没有数据就不画哪一行。
 struct AgentChartTooltip: View {
     let title: String
     let value: String
-    let swatch: Color
-    /// 四桶明细;分项缺失(粗粒度回填天)→ nil,浮层照旧两行。
+    /// 读数旁的色块;读数不是单一颜色(多层叠出来的总数)时为 nil。
+    var swatch: Color?
+    /// 按分区列出的各项(如两层面积各占多少);空 = 不画这一行。
+    var partitions: [ChartTooltipPartition] = []
+    /// 更细一级的分项;缺失(粗粒度回填天)→ nil。
     var breakdown: AgentTokenBreakdown?
 
     var body: some View {
@@ -28,16 +43,16 @@ struct AgentChartTooltip: View {
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
             HStack(spacing: 6) {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(swatch)
-                    .frame(width: 8, height: 8)
+                if let swatch {
+                    swatchView(swatch)
+                }
                 Text(value)
                     .font(.system(size: 12, weight: .semibold))
                     .monospacedDigit()
                     .foregroundStyle(.primary)
             }
-            if let breakdown {
-                bucketsGrid(breakdown)
+            if !partitions.isEmpty || breakdown != nil {
+                detailGrid
                     .padding(.top, 3)
             }
         }
@@ -47,17 +62,42 @@ struct AgentChartTooltip: View {
         .allowsHitTesting(false)
     }
 
-    /// 2×2 四桶:Grid 保证两列跨行对齐(数值宽度不一,HStack+Spacer 会错列)。
-    private func bucketsGrid(_ buckets: AgentTokenBreakdown) -> some View {
+    /// 两列明细格:Grid 保证跨行对齐(数值宽度不一,HStack+Spacer 会错列)。
+    private var detailGrid: some View {
         Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 2) {
-            GridRow {
-                bucket("Input", agentTokenText(buckets.input))
-                bucket("Output", agentTokenText(buckets.output))
+            if !partitions.isEmpty {
+                GridRow {
+                    ForEach(partitions) { partition in
+                        partitionItem(partition)
+                    }
+                }
             }
-            GridRow {
-                bucket("Cache R", agentTokenText(buckets.cacheRead))
-                bucket("Cache W", agentTokenText(buckets.cacheWrite))
+            if let breakdown {
+                GridRow {
+                    bucket("Input", agentTokenText(breakdown.input))
+                    bucket("Output", agentTokenText(breakdown.output))
+                }
+                GridRow {
+                    bucket("Cache R", agentTokenText(breakdown.cacheRead))
+                    bucket("Cache W", agentTokenText(breakdown.cacheWrite))
+                }
             }
+        }
+    }
+
+    private func swatchView(_ color: Color) -> some View {
+        RoundedRectangle(cornerRadius: 2)
+            .fill(color)
+            .frame(width: 8, height: 8)
+    }
+
+    private func partitionItem(_ partition: ChartTooltipPartition) -> some View {
+        HStack(spacing: 5) {
+            swatchView(partition.tint)
+            Text("\(partition.name) \(partition.value)")
+                .font(.system(size: 11, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -114,8 +154,8 @@ enum AgentHeatGranularity: Hashable {
 // MARK: - 共享日期轴带
 
 /// 两图共用的日期轴带:热力墙与走势都用这一个函数画标签,轴带高与标签到图区底的
-/// 距离是同一组常量——两图并排时上下缘与日期标签基线对齐由构造保证,不靠两套
-/// 布局碰巧对齐。
+/// 距离是同一组常量——同一个页面里两张图的日期标签在图内的高度一致,由构造保证,
+/// 不靠两套布局碰巧对齐。
 enum AgentChartAxis {
     static let height: CGFloat = 18
     /// 标签垂直中线距图区底边的距离。
@@ -177,8 +217,7 @@ struct AgentHeatWall: View {
         Self.gridHeight(forWidth: width)
     }
 
-    /// 图区高(格墙 + 上下 inset;不含轴带)。走势图按同宽套同式取绘图区高,
-    /// 两图并排 / 上下排时绘图区恒等高(agent-tab/10)。
+    /// 图区高(格墙 + 上下 inset;不含轴带),随容器宽等比:格边长 × 7 行 + 行距。
     static func gridHeight(forWidth width: CGFloat) -> CGFloat {
         let side = max((width - inset * 2 - gap * CGFloat(weeks - 1)) / CGFloat(weeks), 1)
         return inset * 2 + side * 7 + gap * 6
@@ -365,21 +404,29 @@ struct AgentHeatWall: View {
 
 // MARK: - 走势(官方 Swift Charts)
 
-/// 近 N 天合计折线 + 线下渐变面积(与 `AreaTrendChartView` 同配方)。与热力墙
-/// **同构**,并排时才等高、左右缘对齐:绘图区高 = 热力墙同宽图区高
-/// (`AgentHeatWall.gridHeight(forWidth:)`),图区底同式,下接同一条 `AgentChartAxis`。
-/// Charts 自带 x 轴隐藏、y 标签画进图内左上——轴标签一旦占了绘图区以外的宽,
-/// 绘图区就比热力墙窄,左右缘对不齐。悬停 = 吸附日竖线 + 高亮点 + 点上方浮层。
+/// 近 N 天按来源分两层的面积 + 两条线(ZCode 在下、Claude 在上),各取来源色——
+/// 一层是「谁在用」,读得出此消彼长。高度由主卡给(含日期轴带)。Charts 的轴标签
+/// 一旦占了绘图区以外的宽,悬停坐标就得减偏移,所以 x 轴隐藏、y 标签画进图内左上,
+/// 下接与热力墙同一条 `AgentChartAxis`。今天画实际值(不折算),悬停标题标「今天」。
+/// 悬停 = 吸附日竖线 + 高亮点 + 点上方浮层(日期、总数、两家、四桶)。
 struct AgentTrendChart: View {
     let totals: [AgentDayTotal]
-    /// nil = 与热力墙等高(按自身宽套同式);弹窗紧凑档传定高。
-    var plotHeight: CGFloat?
+    /// 整体高(含日期轴带)。
+    let height: CGFloat
+    /// 是否在图内左侧画半值 / 峰值刻度字;图很矮的紧凑档不放(数值由读数承载)。
+    let showsPeakLabels: Bool
 
     private struct Point: Identifiable {
         let date: Date
-        let value: Double
+        let claude: Double
+        let zcode: Double
         /// 四桶明细;分项缺失的回填天 = nil。
         let breakdown: AgentTokenBreakdown?
+        let sources: AgentSourceSplit
+
+        var total: Double {
+            claude + zcode
+        }
 
         var id: Date {
             date
@@ -388,8 +435,6 @@ struct AgentTrendChart: View {
 
     /// 单个 MM-DD 标签至少分到的宽(10.5pt 五字符 ≈ 30 + 两侧呼吸)。
     private static let labelMinSpacing: CGFloat = 44
-    /// 绘图区高下限(窄宽时热力墙很矮,折线不至于压成一条线)。
-    private static let minimumPlotHeight: CGFloat = 60
 
     @State private var hoverIndex: Int?
     @State private var chartWidth: CGFloat = 0
@@ -398,21 +443,31 @@ struct AgentTrendChart: View {
     var body: some View {
         let points: [Point] = totals.compactMap { total in
             agentDate(total.day).map {
-                Point(date: $0, value: Double(total.total), breakdown: total.breakdown)
+                Point(
+                    date: $0,
+                    claude: Double(total.claudeTotal),
+                    zcode: Double(total.zcodeTotal),
+                    breakdown: total.breakdown,
+                    sources: total.sourceSplit
+                )
             }
         }
+        // 没有点也占住高度:主卡左右两列的高度不随数据有无跳。
         if points.isEmpty {
-            EmptyView()
+            Color.clear.frame(height: height)
         } else {
-            let height = plotHeight
-                ?? max(AgentHeatWall.gridHeight(forWidth: chartWidth), Self.minimumPlotHeight)
             VStack(spacing: 0) {
                 chart(points)
-                    .frame(height: height)
+                    .frame(height: max(height - AgentChartAxis.height, 0))
                 axisStrip(points)
                     .frame(height: AgentChartAxis.height)
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { chartWidth = $0 }
+            // 切范围换了点数:悬停着的竖线与浮层不再对应任何点,清掉。只看点数——
+            // 后台刷新今天那行时点数不变,不打断正在看的悬停。
+            .onChange(of: totals.count) { _, _ in
+                hoverIndex = nil
+            }
         }
     }
 
@@ -450,43 +505,77 @@ struct AgentTrendChart: View {
     }
 
     private func chart(_ points: [Point]) -> some View {
-        let rawMax = max(points.map(\.value).max() ?? 0, 1)
+        let rawMax = max(points.map(\.total).max() ?? 0, 1)
         let first = points[0].date
         let last = points[points.count - 1].date
         // 域 = 首…末日零点,线贴绘图区左右缘;单点兜底各让半天防零宽域。
         let domain = first < last
             ? first ... last
             : first.addingTimeInterval(-43200) ... last.addingTimeInterval(43200)
-        let fill = LinearGradient(
-            colors: [agentsAccent.opacity(0.32), agentsAccent.opacity(0)],
+        let claude = AgentPartitionTint.source(.claude)
+        let zcode = AgentPartitionTint.source(.zcode)
+        let claudeFill = LinearGradient(
+            colors: [claude.opacity(0.5), claude.opacity(0.08)],
             startPoint: .top,
             endPoint: .bottom
         )
-        let focus = hoverIndex.map { points[$0] } ?? points[points.count - 1]
+        let focus = hoverIndex.flatMap { points.indices.contains($0) ? points[$0] : nil }
+            ?? points[points.count - 1]
 
         // x 值一律不带 `unit:`——带 `.day` 时 Charts 把点画在当天区间中点(+12h),
         // 刻度与悬停吸附却按零点算,点、刻度、吸附三者差半天:线看着漂、吸附不贴点。
         // 遇到竖线不贴点先查这里,不要去挪竖线。
+        // 两层面积各画成一条带,起点 / 终点由数据显式给出(下:0 → ZCode,上:ZCode → 合计),
+        // 不靠堆叠规则;每一层都带自己的 series——同一点上画两笔同类型的标记,不带
+        // series 时 Charts 把它们并成一笔,几何与样式都会串(实测只剩一层、颜色还错)。
         return Chart {
             ForEach(points) { point in
-                AreaMark(x: .value("日期", point.date), y: .value("Token", point.value))
-                    .foregroundStyle(fill)
-                    .interpolationMethod(.monotone)
-                LineMark(x: .value("日期", point.date), y: .value("Token", point.value))
-                    .foregroundStyle(agentsAccent)
-                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                    .interpolationMethod(.monotone)
+                AreaMark(
+                    x: .value("日期", point.date),
+                    yStart: .value("Token", 0.0),
+                    yEnd: .value("Token", point.zcode),
+                    series: .value("来源", "ZCode")
+                )
+                .foregroundStyle(zcode.opacity(0.42))
+                .interpolationMethod(.monotone)
+                AreaMark(
+                    x: .value("日期", point.date),
+                    yStart: .value("Token", point.zcode),
+                    yEnd: .value("Token", point.total),
+                    series: .value("来源", "Claude")
+                )
+                .foregroundStyle(claudeFill)
+                .interpolationMethod(.monotone)
             }
-            if let hoverIndex {
-                RuleMark(x: .value("日期", points[hoverIndex].date))
+            ForEach(points) { point in
+                LineMark(
+                    x: .value("日期", point.date),
+                    y: .value("Token", point.zcode),
+                    series: .value("来源", "ZCode")
+                )
+                .foregroundStyle(zcode)
+                .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                .interpolationMethod(.monotone)
+                LineMark(
+                    x: .value("日期", point.date),
+                    y: .value("Token", point.total),
+                    series: .value("来源", "Claude")
+                )
+                .foregroundStyle(claude)
+                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                .interpolationMethod(.monotone)
+            }
+            if let hoverIndex, points.indices.contains(hoverIndex) {
+                let point = points[hoverIndex]
+                RuleMark(x: .value("日期", point.date))
                     .foregroundStyle(agentsAccent.opacity(0.35))
                     .lineStyle(StrokeStyle(lineWidth: 1))
-                PointMark(x: .value("日期", points[hoverIndex].date), y: .value("Token", points[hoverIndex].value))
-                    .foregroundStyle(agentsAccent.opacity(0.25))
+                PointMark(x: .value("日期", point.date), y: .value("Token", point.total))
+                    .foregroundStyle(claude.opacity(0.25))
                     .symbolSize(120)
             }
-            PointMark(x: .value("日期", focus.date), y: .value("Token", focus.value))
-                .foregroundStyle(agentsAccent)
+            PointMark(x: .value("日期", focus.date), y: .value("Token", focus.total))
+                .foregroundStyle(claude)
                 .symbolSize(36)
         }
         .chartXScale(domain: domain)
@@ -506,7 +595,9 @@ struct AgentTrendChart: View {
             GeometryReader { geo in
                 let plot = proxy.plotFrame.map { geo[$0] } ?? .zero
                 ZStack(alignment: .topLeading) {
-                    yLabels(rawMax: rawMax, proxy: proxy, plot: plot)
+                    if showsPeakLabels {
+                        yLabels(rawMax: rawMax, proxy: proxy, plot: plot)
+                    }
                     Color.clear
                         .contentShape(.rect)
                         .onContinuousHover(coordinateSpace: .local) { phase in
@@ -523,9 +614,9 @@ struct AgentTrendChart: View {
                                 hoverIndex = nil
                             }
                         }
-                    if let hoverIndex,
+                    if let hoverIndex, points.indices.contains(hoverIndex),
                        let x = proxy.position(forX: points[hoverIndex].date),
-                       let y = proxy.position(forY: points[hoverIndex].value) {
+                       let y = proxy.position(forY: points[hoverIndex].total) {
                         tooltip(
                             for: points[hoverIndex],
                             anchor: CGRect(x: plot.minX + x - 6, y: plot.minY + y - 6, width: 12, height: 12),
@@ -556,10 +647,21 @@ struct AgentTrendChart: View {
 
     private func tooltip(for point: Point, anchor: CGRect, bounds: CGSize) -> some View {
         let origin = ChartHoverGeometry.tooltipOrigin(anchor: anchor, size: tooltipSize, bounds: bounds, gap: 6)
+        // 总数不是单一颜色(两层叠出来的),读数旁不画色块;两层的量各带来源色块列在明细里。
         return AgentChartTooltip(
             title: agentTooltipDate(point.date),
-            value: "\(agentTokenText(Int(point.value))) tokens",
-            swatch: agentsAccent,
+            value: "\(agentTokenText(Int(point.total))) tokens",
+            swatch: nil,
+            partitions: [
+                ChartTooltipPartition(
+                    name: "Claude", value: agentTokenText(point.sources.claude),
+                    tint: AgentPartitionTint.source(.claude)
+                ),
+                ChartTooltipPartition(
+                    name: "ZCode", value: agentTokenText(point.sources.zcode),
+                    tint: AgentPartitionTint.source(.zcode)
+                ),
+            ],
             breakdown: point.breakdown
         )
         .onGeometryChange(for: CGSize.self) { $0.size } action: { tooltipSize = $0 }

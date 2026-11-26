@@ -6,7 +6,7 @@ import SwiftUI
 //
 // 页面骨架:子药丸条 + 当前子页,两块在 `MetricTabStack` 组装(主窗口与弹窗同一份,
 // 弹窗走紧凑档)。两个子页——
-// · 消耗(`AgentUsagePaneView`):数字卡排 → 日历图 + 走势 → 项目大卡;
+// · 消耗(`AgentUsagePaneView`):主卡 → 日历 → 项目;
 // · 会话(`ClaudeSessionsCardView` / `ZCodeSessionsCardView`):Claude Code 与 ZCode
 //   各一张卡,卡身每个会话一块。
 // 本文件只放页级零件:页强调色、token 读数转发、日期小工具、子页枚举、子药丸条。
@@ -56,7 +56,7 @@ func agentShortDate(_ date: Date) -> String {
 /// 智能体页的两个子页;选中态存在 `DashboardModel.agentSubTab`(切 tab 不丢),
 /// 默认落消耗。
 enum AgentSubTab: Hashable {
-    /// 消耗(token 账:数字卡排 / 日历图 + 走势 / 项目大卡)。
+    /// 消耗(token 账:主卡 / 日历 / 项目)。
     case usage
     /// 会话(现在在跑什么:两家会话卡)。
     case sessions

@@ -98,11 +98,19 @@ public enum AgentHeatScale {
         return levels(sums)
     }
 
-    /// 逐天值;末天按时刻折算成全天等效量(下限 6h)。
+    /// 全天等效量:进行中的今天按已过时间折算成的等效全天用量——只用于和完整天
+    /// 比较(日历色阶、今日环比),任何读数都不显示它。不足 `minimumTodayElapsed`
+    /// 按下限算(凌晨数据少,防折算虚高);`todayElapsed` 为 nil = 不折算。
+    public static func dayEquivalent(ofToday total: Double, todayElapsed: TimeInterval?) -> Double {
+        guard let todayElapsed else { return total }
+        return total * 86400 / max(todayElapsed, minimumTodayElapsed)
+    }
+
+    /// 逐天值;末天(今天)换成全天等效量。
     private static func projectedValues(_ days: [AgentDayTotal], todayElapsed: TimeInterval?) -> [Double] {
         var values = days.map { Double($0.total) }
-        if let elapsed = todayElapsed, !values.isEmpty {
-            values[values.count - 1] *= 86400 / max(elapsed, minimumTodayElapsed)
+        if let last = values.indices.last {
+            values[last] = dayEquivalent(ofToday: values[last], todayElapsed: todayElapsed)
         }
         return values
     }
