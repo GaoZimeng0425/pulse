@@ -17,16 +17,16 @@ CardEmptyState 标准件:一句说明 + 按钮 → 直达设置页开关;待批�
 root Energy Impact 是可行真值(macOS 不给普通 app 每进程瓦特;苹果自家也用
 指数)。AI 卡用户必用 → 助手必装 → 不做双口径保底(B 不 C)。
 
-**Status:** ready-for-agent(2026-11-22 用户拍板「B, 开」)
+**Status:** done(2026-11-22,4283641/c8dd7d9 装机;装机验收即装助手两步)
 
-- [ ] EnergyImpactFeature 增 helper 三态暴露(notRegistered/requiresApproval/
+- [x] EnergyImpactFeature 增 helper 三态暴露(notRegistered/requiresApproval/
       enabled)+ 占比折算(top ÷ 合计;纯函数,进 PulseCore 配单测)
-- [ ] 电池页两卡换口径+标题成对+注脚;ModuleRankingCard 通用卡型不动,
+- [x] 电池页两卡换口径+标题成对+注脚;ModuleRankingCard 通用卡型不动,
       spec 换数据源与 label
-- [ ] 两卡授权型引导空态(按钮路由到设置页特权助手开关;待批准态给
+- [x] 两卡授权型引导空态(按钮路由到设置页特权助手开关;待批准态给
       「去系统设置」深链——TCC 授权用户自点原则)
-- [ ] 删 A 链:RankingBoard 能耗段 + energyRows 及其测试同步
-- [ ] check 全绿 → 合并装机
+- [x] 删 A 链:RankingBoard 能耗段 + energyRows 及其测试同步
+- [x] check 全绿 → 合并装机(核心 844 例绿,check exit=0 一次过)
 
 **Out of scope:** AI 助手卡行内容(照旧);能耗历史曲线(已走 root 口径);
 弹窗 compact 专属形态(跟随主卡自动)。

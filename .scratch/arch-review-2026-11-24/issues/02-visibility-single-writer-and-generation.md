@@ -2,7 +2,7 @@
 
 **What to build:** 修复 REPORT 高4:排行闸已有 generation 防乱序(`Sampler.swift:262-274`),同一次可见性变化触发的节奏闸(`setPopoverVisible`)却无代号;弹窗 tab 双主(AppKit 控制器 + SwiftUI 门控),主窗口关窗无 AppKit 兜底。
 
-**Status:** ready-for-agent
+**Status:** wontfix
 
 证据见 `../REPORT.md` §高4。关键锚点:`SystemMonitor.swift:275-281`(有代号)/`:329-336`(无代号);`MenuBarController.swift:44,124-126,156-159` vs `MenuBarPopoverGate.swift:21-23,36-53`;`MainWindowGate.swift:53-54` 是 `setMainWindowTab(nil)` 全仓唯一写者。
 
@@ -17,3 +17,5 @@
 ## 核实(2026-11-24)
 
 真但被夸大,降为中。节奏消息确无代号、弹窗 tab 两处写,但:MainActor 同优先级 Task 实际按序、0.3s 防抖,乱序后下次开关即自纠(非「不会自纠」);「弹窗空白」无证据;主窗口 onDisappear 实测会触发。**Brief 收窄**:只给 setPopoverVisible 加代号;弹窗 tab 收为控制器单写者(先实测门控 onAppear);主窗口复用 DockPresence.swift:41 已有的 willClose 监听加一行兜底。
+
+2026-11-25 **由 unified-cadence 取代**(用户拍板采样统一 5 秒):第 1 项不需要——节奏固定后这条消息整个删除,无代号可言;第 2、3 项保留,归 unified-cadence/02。
