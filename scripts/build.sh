@@ -40,10 +40,18 @@ if [ "$SIGNING_IDENTITY" != "-" ]; then
   # 过期预警:证书链里找 Apple Development 的剩余天数(<30 天警告)。
   expiry=$(security find-certificate -a -c "Apple Development" -p login.keychain-db 2>/dev/null \
     | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
+  # openssl 的到期日是英文月份(「Nov 19 06:02:40 2027 GMT」):解析必须钉 C locale——
+  # 中文系统下 %b 只认「11月」,解析失败曾被当成 0(1970 年)算出「剩 -20783 天」。
+  # 读不出就如实说,不拿假数字报警。
   if [ -n "$expiry" ]; then
-    days=$(( ( $(date -j -f "%b %d %H:%M:%S %Y GMT" "$expiry" "+%s" 2>/dev/null || echo 0) - $(date +%s) ) / 86400 ))
-    if [ "$days" -lt 30 ]; then
-      echo "⚠️  Apple Development 证书仅剩 ${days} 天有效——过期后签名失效,需重铸(release-dev-signing 记档)"
+    end_epoch=$(LC_ALL=C date -j -u -f "%b %d %H:%M:%S %Y GMT" "$expiry" "+%s" 2>/dev/null || true)
+    if [ -n "$end_epoch" ]; then
+      days=$(( (end_epoch - $(date +%s)) / 86400 ))
+      if [ "$days" -lt 30 ]; then
+        echo "⚠️  Apple Development 证书仅剩 ${days} 天有效——过期后签名失效,需重铸(release-dev-signing 记档)"
+      fi
+    else
+      echo "⚠️  读不出 Apple Development 证书到期日(「${expiry}」),跳过有效期检查"
     fi
   fi
 fi
