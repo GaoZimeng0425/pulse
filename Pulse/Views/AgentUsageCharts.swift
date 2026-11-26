@@ -538,11 +538,10 @@ struct AgentTrendChart: View {
             : first.addingTimeInterval(-43200) ... last.addingTimeInterval(43200)
         let claude = AgentPartitionTint.source(.claude)
         let zcode = AgentPartitionTint.source(.zcode)
-        let claudeFill = LinearGradient(
-            colors: [claude.opacity(0.5), claude.opacity(0.08)],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+        // 线下填充同 DESIGN.md「面积走势图」:各自来源色 32% → 0 的竖向渐变,不平涂。
+        func fill(_ tint: Color) -> LinearGradient {
+            LinearGradient(colors: [tint.opacity(0.32), tint.opacity(0)], startPoint: .top, endPoint: .bottom)
+        }
         let focus = hoverIndex.flatMap { points.indices.contains($0) ? points[$0] : nil }
             ?? points[points.count - 1]
 
@@ -560,7 +559,7 @@ struct AgentTrendChart: View {
                     yEnd: .value("Token", point.zcode),
                     series: .value("来源", "ZCode")
                 )
-                .foregroundStyle(zcode.opacity(0.42))
+                .foregroundStyle(fill(zcode))
                 .interpolationMethod(.monotone)
                 AreaMark(
                     x: .value("日期", point.date),
@@ -568,7 +567,7 @@ struct AgentTrendChart: View {
                     yEnd: .value("Token", point.total),
                     series: .value("来源", "Claude")
                 )
-                .foregroundStyle(claudeFill)
+                .foregroundStyle(fill(claude))
                 .interpolationMethod(.monotone)
             }
             ForEach(points) { point in
@@ -611,9 +610,6 @@ struct AgentTrendChart: View {
                 AxisGridLine()
                     .foregroundStyle(Color.primary.opacity(0.08))
             }
-        }
-        .chartPlotStyle { plot in
-            plot.background(Color.primary.opacity(0.06), in: .rect(cornerRadius: 8))
         }
         .chartOverlay { proxy in
             GeometryReader { geo in
