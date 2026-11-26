@@ -243,7 +243,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 | `{layout.overview-card-min-width}` | 340pt | 自适应卡片网格的单卡最小宽(主窗口列数 1–3 由它派生) |
 | `{layout.module-card-min-width}` | 340pt | 清理总览模块大卡的单卡最小宽(列数上限 2) |
 | `{layout.card-pair-two-column-min-width}` | 696pt | 两卡并排的断点:内容宽达到就并排等高,否则上下排 |
-| `{layout.agent-chart-two-column-min-width}` | 1024pt | 智能体页走势与日历并排的断点(半宽下日历格约 6pt);不足就上下排 |
+| `{layout.agent-chart-two-column-min-width}` | 1512pt | 智能体页走势与日历并排的断点(子页内容宽;= 窗宽 1560);不足就上下排 |
 | `{layout.agent-project-limit}` | 10 个 | 智能体页项目榜单的默认展示上限 |
 | `{layout.port-row-limit}` | 20 行 | 监听端口卡的默认展示行上限 |
 | `{layout.ranking-limit}` | 20 行 | 各排行默认展示的上限 |
@@ -644,9 +644,11 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 
 **用途**:卡头右侧作用于整卡的主动作,要一眼找得到,比卡头文字按钮醒目。
 
-**形态与数值**:系统 Liquid Glass 按钮样式(`.buttonStyle(.glass)`、`controlSize(.small)`),
-不自绘底、不加描边、不套卡片底;标签 = `{icons.inline}` semibold 符号 + `{typography.body}`
-12 semibold 文字。与同一配件槽里的药丸页签条间距 8。
+**形态与数值**:**胶囊形**系统 Liquid Glass(`HeaderGlassButtonStyle`:`glassEffect` 胶囊,
+与内容页玻璃药丸条同一种材质),不自绘底、不加描边、不套卡片底;与玻璃药丸条**同高**——
+内距 13×9(= 外裹 4 + 药丸 9 / 外裹 4 + 药丸 5),文字起点与旁边药丸里的文字对齐;
+标签 = `{icons.inline}` semibold 符号 + `{typography.body}` 12 semibold 文字(primary)。
+与同一配件槽里的药丸页签条间距 8,药丸条照第 7 条在内容页里带玻璃外裹。
 
 **状态与变体**:进行中换成小号转圈 + 状态文案并禁用,防重复触发。
 

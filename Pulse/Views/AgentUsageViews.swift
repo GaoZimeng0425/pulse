@@ -8,8 +8,8 @@ import SwiftUI
 // 空态卡)——
 // 1. 数字卡排(`AgentUsageStatCards`):今日消耗 / N 天合计 / 日均 / Claude 用量四张小卡;
 //    主窗口一排四张,弹窗两列两行;
-// 2. 走势 | 日历:子页内容宽 ≥ `{layout.agent-chart-two-column-min-width}` 1024 时左右两列
-//    等高(日历在半宽下格子不至于过大),否则上下一列;弹窗恒一列。走势卡头的
+// 2. 走势 | 日历:子页内容宽 ≥ `{layout.agent-chart-two-column-min-width}` 1512(窗宽 1560)
+//    时左右两列等高,否则上下一列(半宽的图太小);弹窗恒一列。走势卡头的
 //    「7 天 | 30 天」是全页唯一的范围开关;日历卡头是「重新扫描」玻璃按钮 + 天 / 周;
 // 3. 项目榜单:一行一个项目,点行看明细;默认前 10 个,末行展开 / 收起;跟着范围走。
 // 卡间距:主窗口 16,弹窗 8(`{spacing.gap}`,与别的页一致)。范围(7 / 30 天)只有一个
@@ -36,8 +36,9 @@ struct AgentUsagePaneView: View {
     var onRescan: () -> Void
 
     /// 走势与日历并排的断点(`{layout.agent-chart-two-column-min-width}`):量的是子页
-    /// 内容宽,不是窗宽。半宽下日历格约 6pt;不足就上下排,日历独占一行。
-    static let chartTwoColumnMinWidth: CGFloat = 1024
+    /// 内容宽,不是窗宽——1512 = 窗宽 1560 减两侧 `{spacing.window-padding}` 24。
+    /// 不足就上下排,两张图各占整行。
+    static let chartTwoColumnMinWidth: CGFloat = 1512
     /// 走势整体高(含日期轴带):主窗口同大卡正文高,弹窗同旧走势卡的紧凑档。
     private static let trendHeight: CGFloat = 184
     private static let compactTrendHeight: CGFloat = 100
@@ -147,7 +148,7 @@ struct AgentUsagePaneView: View {
     private func trendCard(fillsHeight: Bool) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             CardHeader(symbolName: nil, title: "走势 · 近 \(range.days) 天", tint: agentsAccent) {
-                PillTabBar([AgentUsageRange.week, .month], selection: $range) { item in
+                PillTabBar([AgentUsageRange.week, .month], selection: $range, isGlassContainer: true) { item in
                     PillTabItem(title: item.title, symbol: nil, tint: agentsAccent)
                 }
             }
@@ -179,7 +180,9 @@ struct AgentUsagePaneView: View {
             CardHeader(symbolName: nil, title: "日历", tint: agentsAccent) {
                 HStack(spacing: 8) {
                     rescanButton
-                    PillTabBar([AgentHeatGranularity.day, .week], selection: $heatGranularity) { item in
+                    PillTabBar(
+                        [AgentHeatGranularity.day, .week], selection: $heatGranularity, isGlassContainer: true
+                    ) { item in
                         PillTabItem(title: item.title, symbol: nil, tint: agentsAccent)
                     }
                 }
@@ -218,7 +221,7 @@ struct AgentUsagePaneView: View {
     }
 
     /// 重新扫描:全量重扫 Claude 与 ZCode 的本地记录,补齐漏记的日子。样式走 DESIGN.md
-    /// 「卡头玻璃按钮」(系统 Liquid Glass,不自绘底);这里只定本页的状态——扫描中换成
+    /// 「卡头玻璃按钮」(`HeaderGlassButtonStyle`);这里只定本页的状态——扫描中换成
     /// 转圈 + 「扫描中」并禁用,防重入。
     private var rescanButton: some View {
         Button {
@@ -234,10 +237,8 @@ struct AgentUsagePaneView: View {
                 }
                 Text(isScanning ? "扫描中" : "重新扫描")
             }
-            .font(.system(size: 12, weight: .semibold))
         }
-        .buttonStyle(.glass)
-        .controlSize(.small)
+        .buttonStyle(HeaderGlassButtonStyle())
         .disabled(isScanning)
         .help("全量重扫 Claude 与 ZCode 的本地记录,补齐漏记的日子")
     }
