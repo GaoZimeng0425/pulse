@@ -10,12 +10,13 @@ import SwiftUI
 //    主窗口一排四张,弹窗两列两行;
 // 2. 走势 | 日历:子页内容宽 ≥ `{layout.agent-chart-two-column-min-width}` 1512(窗宽 1560)
 //    时左右两列等高,否则上下一列(半宽的图太小);弹窗恒一列。走势卡头的
-//    「7 天 | 30 天」是全页唯一的范围开关;日历卡头是「重新扫描」玻璃按钮 + 天 / 周。
+//    「7 天 | 30 天」管数字卡与走势;日历卡头是「重新扫描」玻璃按钮 + 天 / 周。
 //    日历在主窗口随卡宽等比缩放;弹窗里格子定边长 `{layout.agent-heat-cell-compact}` 10,
 //    一年比卡宽 → 横向滚动,初始停在最右(最近的日子);
-// 3. 项目榜单:一行一个项目,点行看明细;默认前 10 个,末行展开 / 收起;跟着范围走。
-// 卡间距:主窗口 16,弹窗 8(`{spacing.gap}`,与别的页一致)。范围(7 / 30 天)只有一个
-// 状态,重进子页回默认(7 天、项目收起)。数字与派生全在 PulseCore `AgentUsageWindow`
+// 3. 项目榜单:一行一个项目,点行看明细;默认前 10 个,末行展开 / 收起。卡头有自己的
+//    「7 天 | 30 天」(与走势卡头的互不牵连——两者中间隔着日历,一个开关管两头够不着)。
+// 卡间距:主窗口 16,弹窗 8(`{spacing.gap}`,与别的页一致)。两个范围各自一个状态,
+// 重进子页都回默认(7 天、项目收起)。数字与派生全在 PulseCore `AgentUsageWindow`
 // (纯值),本文件只描不算。
 
 /// 消耗子页(骨架见文件头)。
@@ -51,8 +52,10 @@ struct AgentUsagePaneView: View {
     /// 按宽缩只剩 3pt 一格;定成 10 后墙宽约 680,横向滚动,初始停最右。
     private static let compactHeatCellSide: CGFloat = 10
 
-    /// 范围:数字卡、走势、项目榜单共用。
+    /// 范围:数字卡与走势共用(走势卡头的开关)。
     @State private var range: AgentUsageRange = .week
+    /// 项目榜单自己的范围(榜单卡头的开关;与 `range` 互相独立)。
+    @State private var projectRange: AgentUsageRange = .week
     /// 日历图粒度(天 / 周)。
     @State private var heatGranularity: AgentHeatGranularity = .day
     /// 榜单里展开着明细的项目(切 7/30 保持;重进子页回默认全部收起)。
@@ -158,7 +161,7 @@ struct AgentUsagePaneView: View {
         return max(calendarHeight, Self.pairedTrendMinHeight)
     }
 
-    /// 走势卡:卡头(标题 + 全页唯一的范围开关)→ 按来源分层的走势 → 图例。
+    /// 走势卡:卡头(标题 + 数字卡与走势共用的范围开关)→ 按来源分层的走势 → 图例。
     private func trendCard(fillsHeight: Bool) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             CardHeader(symbolName: nil, title: "走势 · 近 \(range.days) 天", tint: agentsAccent) {
@@ -269,17 +272,16 @@ struct AgentUsagePaneView: View {
     // MARK: 卡 3:项目榜单
 
     private var projectCard: some View {
-        // 范围开关在走势卡头;榜单标题写明当前窗口,读数跟着同一个范围走。
-        // 截断、展开明细与卡内空态都在榜单卡里。
+        // 榜单有自己的范围开关(卡头);截断、展开明细与卡内空态都在榜单卡里。
         AgentProjectRankingCard(
             projects: AgentUsageWindow.projects(
                 projectRows: projectRows,
                 modelRows: modelRows,
-                days: range.days,
+                days: projectRange.days,
                 liveCounts: liveProjectCounts,
                 sessionCounts: sessionCounts
             ),
-            windowDays: range.days,
+            range: $projectRange,
             isCompact: isCompact,
             expandedProjects: $expandedProjects,
             showsAll: $projectsExpanded

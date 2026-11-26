@@ -8,9 +8,9 @@ import SwiftUI
 // 四张、弹窗两列两行;同一行等高(`EqualHeightRow`,卡底铺到行底)。
 // 每张卡:说明(11 secondary)→ 大数字(figure-card 24 / 弹窗 figure-overview-compact 22)
 // → 副行(10.5)。大数字恒为实际值、主色;今日环比拿全天等效量去比昨天
-// (`AgentUsageFigures.todayDelta`)。范围开关在走势卡头(全页唯一),这里只读 range。
+// (`AgentUsageFigures.todayDelta`)。范围开关在走势卡头(与项目榜单的各自独立),这里只读 range。
 
-/// 范围(7 / 30 天):数字卡、走势、项目榜单共用同一个状态。
+/// 范围(7 / 30 天):数字卡与走势共用一个状态,项目榜单另有一个。
 enum AgentUsageRange: Hashable {
     case week
     case month
