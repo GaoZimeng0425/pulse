@@ -1,0 +1,80 @@
+[
+  {
+    "id": 1,
+    "prompt": "我想做一个SaaS产品的登录页面，给我3个风格方向对比看看",
+    "expected": "先跑开工三件事（learn / ledger / capabilities）；只问一轮问题并索要参考；三套逻辑各出两个候选共六张方向卡（现实参照用 ref_board.py 截图、轮盘先看样张图）；写成六张方向卡后挑三张做完整 HTML＋截图（不画缩略图页）（不挤同一家族、不撞外观账本、最多一张用力过头），design_lint compare 不撞；三张完整版加缩略图备选一起摆出来就停",
+    "tests": "三方向门 + 六候选挑三 + 参考板与样张 + compare 与外观账本自检"
+  },
+  {
+    "id": 2,
+    "prompt": "帮我做一份10页的产品pitch deck，讲一个AI工具的创业项目",
+    "expected": "三方向各出 2 页代表页（封面＋差异最大的一页），deck 外壳用 assets/deck_index.html 多文件概览墙；摆出来就停；选定后先定 2 页 showcase grammar 再批量；正文 ≥24px、标签 ≥16px；单页不自带页码；完成后自动出 PDF",
+    "tests": "三方向门 + deck 模块交付链 + 多文件架构 + 字号底线"
+  },
+  {
+    "id": 3,
+    "prompt": "做个30秒的HTML动画，讲神经网络怎么工作",
+    "expected": "用animations.jsx的Stage+Sprite；先写时间轴再写组件；入场easeOut出场easeIn；分phase讲故事而不是堆动画；文字停留≥3秒",
+    "tests": "animations工作流 + easing正确 + 节奏设计 + 时长控制"
+  },
+  {
+    "id": 4,
+    "prompt": "做一个 Habit Tracker App 原型",
+    "expected": "问用户要 overview 平铺 or flow demo（默认走 overview）；用 assets/ios_frame.jsx，不手写 Dynamic Island；Tracker 属高密度型，每屏 ≥ 3 处信息密度元素（习惯完成率、连续天数、趋势曲线、成就badge等，非装饰）；至少 5-7 屏并排（首页/新建习惯/详情/统计/设置）",
+    "tests": "overview/flow 形态路由 + ios_frame 硬绑定 + 信息密度分型（高密度型）+ 多屏并排"
+  },
+  {
+    "id": 5,
+    "prompt": "做一个读书笔记 App 原型",
+    "expected": "overview 平铺为主；ios_frame.jsx；读书笔记偏内容展示类，信息密度要求不如 Tracker 极端，但笔记列表页仍需 ≥ 3 层信息（书籍、引文、标签、进度）；至少 4-6 屏（首页书架/笔记详情/标注高亮/搜索/笔记本管理）；字体优先 serif display",
+    "tests": "overview 默认 + ios_frame + 信息层次 + 内容为主的视觉节奏"
+  },
+  {
+    "id": 6,
+    "prompt": "做一个跑步记录 App 原型",
+    "expected": "overview 平铺；ios_frame.jsx；跑步 App 属高密度型（地图、配速曲线、心率区间、每公里分段数据），每屏 ≥ 3 处产品差异化信息；至少 5 屏（今日总览/跑步中实时数据/路线地图/历史记录/月度统计）；避免撞 AI slop（不用紫渐变、不堆装饰 icon，但数据可视化 icon 允许保留）",
+    "tests": "overview + ios_frame + 高密度型数据可视化 + 地图/图表混排 + slop 边界条件"
+  },
+  {
+    "id": 7,
+    "prompt": "把这篇读书笔记做成一组小红书图文，6 张左右",
+    "expected": "路由到 modules/xiaohongshu.md；三方向 = 三个不同范式各出封面＋一张内页并排；1242×1660；正文 ≥42px、标签 ≥32px；从 assets/style-specimens/xhs/ 模板起步但换掉示例贴纸与示例配色；xhs_render.py 出图且无 ✗；图里无外链、二维码、极限词",
+    "tests": "新路由 + 范式池 + 模板复用 + 字号底线 + 出图脚本 + 平台限制"
+  },
+  {
+    "id": 8,
+    "prompt": "给我的咖啡店探店笔记做个小红书封面和三张连续滑动的长卷",
+    "expected": "封面单独一张；长卷用 .xhs-strip --n:3，主角跨缝，每张单看成立；xhs_render.py 切成 3 张且没有字跨缝；颜色从咖啡店照片或品牌推导，不沿用鸣迹黄",
+    "tests": "长卷范式 + 跨缝检查 + 色彩推导而非照抄示例"
+  },
+  {
+    "id": 9,
+    "prompt": "给我的记账 App 做一套 App Store 宣传图",
+    "expected": "路由到 modules/appstore.md；先问或取到真实界面，没有界面先走 app-prototype；appstore_shots.py 按 id 取同类目参考并写出借的规则；先写分镜表（一张一句，前三张自己成立）；三方向各出前三张＋search-preview 并排后停；1320×2868、无透明通道、不超过 10 张，appstore_render.py 无 ✗；不编奖项月桂、评分、用户评价、媒体字标",
+    "tests": "新路由 + 规格窄桥 + 诚实窄桥 + 分镜先行 + 三方向门形态"
+  },
+  {
+    "id": 10,
+    "prompt": "做一个记录潮汐、给赶海的人用的 App 原型",
+    "expected": "方向卡写清主屏形态、签名处、数据的形状、颜色回答什么、嗓音五件事，三个方向至少三件不同；主屏不是默认的导航栏＋卡片列表＋五个 tab；现实参照用 appstore_shots.py 取真实 App 截图再拆；不照搬 paradigm 样张的题材与配色；ios_frame.jsx；展示板有主次；方向卡有「不借的、自己长的」一栏；有现实参照的方向做完跑 ref_card.py compare 并在 polish-log 写认得出测试的结论；没有哪个方向像参照 App 的新版本",
+    "tests": "app-paradigms 作为候选来源而非配额 + 形态先行 + 不抄样张"
+  },
+  {
+    "id": 11,
+    "prompt": "做一个家常菜谱 App 原型",
+    "expected": "capabilities.py 列出图片来源顺序；菜品、食材、头像这些该是图的地方放的是真的图：环境能生图就生成（同一处出两三张挑一张），不能就借本机 Codex（gen_image.py）或取开放许可真图；全程没有用 emoji、手画 SVG、灰色占位块顶替图片；取不到的地方在交付说明里写明；三个方向的主角素材在初稿阶段就到位",
+    "tests": "图片来源顺序 + 不用 emoji/SVG/占位顶替 + 三方向初稿素材到位"
+  },
+  {
+    "id": 12,
+    "prompt": "给一家社区咖啡店做一个点单小程序",
+    "expected": "路由到 modules/miniprogram.md；方向卡写主入口（扫桌贴码/群聊卡片/最近使用）与转发卡片；每屏包在 wechat_frame.jsx 的 WechatFrame 里，不手写胶囊状态栏、不用 ios_frame；字和按钮不压胶囊；tab 2–5 个或不要 tab；先用后登录；本地图用 img 不用 background-image；三方向各 4–5 屏＋一张 5:4 转发卡片摆出来就停；不默认微信绿、白底灰卡、顶部轮播、金刚区",
+    "tests": "新路由 + 规格窄桥 + 能落地窄桥 + 入口思维 + 转发卡片 + 三方向门形态"
+  },
+  {
+    "id": 13,
+    "prompt": "这个方向定了，导出给 WorkBuddy 做成真的小程序",
+    "expected": "不重开三方向门（同项目已选定方向后的迭代）；正式版至少两轮打磨后跑 mp_handoff.py；✗ 修完再交；逐张看 screens/；在 WorkBuddy 里则问一句后在新空目录建工程、拷入 _design/、照给WorkBuddy的话.md 开工、做完逐屏对照；在别的 agent 里给出三步交接；不替用户发布、不说已上线",
+    "tests": "交付包 + 体检 + WorkBuddy 交接两种环境 + 诚实交付"
+  }
+]
