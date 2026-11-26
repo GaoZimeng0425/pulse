@@ -179,6 +179,21 @@ enum AgentChartAxis {
     }
 }
 
+// MARK: - 图例色点
+
+/// 图例色点(`{layout.legend-swatch}` 6pt,圆角 2):走势卡图例、项目明细的构成图例共用。
+struct AgentLegendSwatch: View {
+    let tint: Color
+
+    static let side: CGFloat = 6
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 2)
+            .fill(tint)
+            .frame(width: Self.side, height: Self.side)
+    }
+}
+
 // MARK: - 热力墙
 
 /// 一年 52 列格子墙:随容器宽**等比缩放、不滚动**,每月一个刻度;四档色阶按峰值
@@ -192,6 +207,8 @@ struct AgentHeatWall: View {
     private static let inset: CGFloat = 3
     /// 相邻月签最小间距(「12月」10.5pt ≈ 24 + 呼吸)。
     private static let monthLabelMinGap: CGFloat = 32
+    /// 月签最宽读数(「12月」10.5pt)的估宽:最右一签起点往回收,不出墙右缘被裁。
+    private static let monthLabelMaxWidth: CGFloat = 24
 
     /// 旧 → 新的逐天合计(weeks × 7 条;天数固定,缺天 0)。
     let totals: [AgentDayTotal]
@@ -374,8 +391,9 @@ struct AgentHeatWall: View {
         }
 
         // 月刻度:某列首日的月份与前列不同 → 该列是新月起点,标「N月」。
-        // 相邻两签不足 `monthLabelMinGap` 时丢前一个——首列常是残月,只占一两列,
-        // 不丢会和下月签挤成「11月12月」。
+        // 从最新的月往回排:与已留下的后一签不足 `monthLabelMinGap` 时丢前一个——首列常是
+        // 残月,只占一两列,不丢会和下月签挤成「11月12月」;墙很窄(弹窗)时隔月留签。
+        // 最右一签的起点收到墙内,不被右缘裁成「11,」。
         var marks: [(x: CGFloat, month: Int)] = []
         var lastMonth = -1
         for column in 0 ..< Self.weeks {
@@ -387,13 +405,17 @@ struct AgentHeatWall: View {
                 marks.append((Self.inset + CGFloat(column) * step, month))
             }
         }
-        for (index, mark) in marks.enumerated() {
-            if index + 1 < marks.count, marks[index + 1].x - mark.x < Self.monthLabelMinGap {
+        let rightmostStart = width - Self.inset - Self.monthLabelMaxWidth
+        var nextKeptX = CGFloat.infinity
+        for mark in marks.reversed() {
+            let x = min(mark.x, rightmostStart)
+            guard nextKeptX - x >= Self.monthLabelMinGap else {
                 continue
             }
+            nextKeptX = x
             AgentChartAxis.drawLabel(
                 "\(mark.month)月",
-                x: mark.x,
+                x: x,
                 plotBottom: gridHeight,
                 anchor: .leading,
                 in: &context
@@ -405,7 +427,7 @@ struct AgentHeatWall: View {
 // MARK: - 走势(官方 Swift Charts)
 
 /// 近 N 天按来源分两层的面积 + 两条线(ZCode 在下、Claude 在上),各取来源色——
-/// 一层是「谁在用」,读得出此消彼长。高度由主卡给(含日期轴带)。Charts 的轴标签
+/// 一层是「谁在用」,读得出此消彼长。高度由走势卡给(含日期轴带)。Charts 的轴标签
 /// 一旦占了绘图区以外的宽,悬停坐标就得减偏移,所以 x 轴隐藏、y 标签画进图内左上,
 /// 下接与热力墙同一条 `AgentChartAxis`。今天画实际值(不折算),悬停标题标「今天」。
 /// 悬停 = 吸附日竖线 + 高亮点 + 点上方浮层(日期、总数、两家、四桶)。
@@ -452,7 +474,7 @@ struct AgentTrendChart: View {
                 )
             }
         }
-        // 没有点也占住高度:主卡左右两列的高度不随数据有无跳。
+        // 没有点也占住高度:卡高不随数据有无跳。
         if points.isEmpty {
             Color.clear.frame(height: height)
         } else {

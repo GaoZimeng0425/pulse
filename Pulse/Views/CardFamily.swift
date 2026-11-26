@@ -72,6 +72,7 @@ struct CardHeader<Accessory: View>: View {
             }
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
+                .monospacedDigit()
                 .foregroundStyle(tint)
             Spacer(minLength: 8)
             accessory()
@@ -146,6 +147,14 @@ enum CardRowWidth {
     static func scaled(_ width: CGFloat, fontSize: CGFloat) -> CGFloat {
         ceil(width * fontSize / 12)
     }
+}
+
+/// 数值列定宽的量法(DESIGN.md「数值列定宽」):一组现实读数以实际绘制字体(等宽数字)
+/// 量宽,取最宽、向上取整,再留 2 余量。各处的列宽常量都从这里量,不各写一份。
+func measuredReadingsWidth(_ readings: [String], fontSize: CGFloat, weight: NSFont.Weight) -> CGFloat {
+    let font = NSFont.monospacedDigitSystemFont(ofSize: fontSize, weight: weight)
+    let widest = readings.map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+    return ceil(widest) + 2
 }
 
 /// 卡内实体行(DESIGN.md §Components「卡片家族零件」):
@@ -325,8 +334,7 @@ struct CardEmptyState: View {
 /// 列距),夹在 1…上限——比系统 `.adaptive` 多一个**上限**(ultrawide 不出更多列)。
 /// 逐行 HStack 排布,末行不满自动满宽。行内等高**尚未**接入 `EqualHeightRow`:这里的
 /// 弹性框在卡壳外面,底色不跟着拉伸,同排卡只在自然高相同时看着齐。不用 LazyVGrid
-/// (行内不拉齐高度)也不用 GridItem minimum(硬下限,窄容器溢出裁剪——agent 项目卡
-/// min 960 前案)——agent-tab/06 三度修正定稿的 AgentProjectCardGrid 模式泛化而来。
+/// (行内不拉齐高度)也不用 GridItem minimum(硬下限,窄容器溢出裁剪)。
 /// 宽度经 `onGeometryChange` 读取(挂外层普通容器——lazy 容器几何不随窗口缩放
 /// 逐帧上报,挂 LazyVGrid 自身列数会算一次就冻住,2026-11-21 用户实报总览六卡
 /// 恒 3 列),只在跨档时改状态,拖拽缩放不逐帧重排。
@@ -336,8 +344,7 @@ struct AdaptiveCardGrid<Item: Identifiable, Card: View>: View {
     let minimumCardWidth: CGFloat
     let spacing: CGFloat
     let maximumColumns: Int
-    /// 单卡最大宽(nil = 不封顶;agent-tab/05 项目大卡 340 的封顶语义,现无
-    /// 调用方,参数保留)。
+    /// 单卡最大宽(nil = 不封顶;现无调用方,参数保留)。
     var maximumCardWidth: CGFloat?
     @ViewBuilder let card: (Item) -> Card
 

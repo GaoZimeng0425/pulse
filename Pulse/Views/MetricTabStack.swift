@@ -76,7 +76,7 @@ struct MetricTabStack<Ranking: View>: View {
             )
             switch model.agentSubTab {
             case .usage:
-                // 消耗子页:主卡 → 日历 → 项目三张平级卡;在跑数从会话快照
+                // 消耗子页:数字卡排 → 走势 | 日历 → 项目榜单;在跑数从会话快照
                 // 按项目名匹配,组装时传入。
                 builder.card(
                     "agent-usage-pane",

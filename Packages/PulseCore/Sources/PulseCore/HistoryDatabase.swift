@@ -393,7 +393,7 @@ public enum HistoryDatabase {
         }
 
         // 每日账本模型轨(agent-tab/05):一天 × 来源 × 项目 × 模型一行,主键
-        // (day, source, project, model) 覆盖式 upsert——项目卡模型分段条的数据源。
+        // (day, source, project, model) 覆盖式 upsert——项目榜单明细里模型分段条的数据源。
         // 模型标识缺失的老行不进此表,五桶对称留排查。读写在 AgentUsageStore。
         migrator.registerMigration(agentModelUsageMigrationID) { db in
             try db.execute(sql: """

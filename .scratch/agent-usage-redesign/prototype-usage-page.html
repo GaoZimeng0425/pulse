@@ -31,6 +31,32 @@
 .pu-root[data-appearance="light"][data-palette="a"] { --accent: #6a4fe0; --claude: #c9622f; --zcode: #1a78bd; --m1: #bd3a7c; --m2: #258a57; --m3: #93730f; }
 .pu-root[data-appearance="light"][data-palette="b"] { --accent: #7a3ff2; --claude: #d4551f; --zcode: #0680d8; --m1: #d41f7c; --m2: #0a9a5f; --m3: #aa7f08; }
 .pu-root[data-appearance="light"][data-palette="c"] { --accent: #5a921a; --claude: #c9622f; --zcode: #6a4fe0; --m1: #1a78bd; --m2: #bd3a7c; --m3: #93730f; }
+/* 第二轮(2026-11-26):三套配色全部取自 DESIGN.md 已有的指标色(总览同一套),不另造色。
+   D 靛紫主色 = 内存色;E 蓝主色 = CPU 色;F 绿主色 = 网络色。Claude 一律取传感器赤陶。 */
+.pu-root[data-palette="d"] { --accent: #9085e9; --claude: #e07b5f; --zcode: #3987e5; --m1: #199e70; --m2: #d55181; --m3: #c98500; }
+.pu-root[data-palette="e"] { --accent: #3987e5; --claude: #e07b5f; --zcode: #9085e9; --m1: #199e70; --m2: #d55181; --m3: #c98500; }
+.pu-root[data-palette="f"] { --accent: #199e70; --claude: #e07b5f; --zcode: #9085e9; --m1: #3987e5; --m2: #d55181; --m3: #c98500; }
+.pu-root[data-appearance="light"][data-palette="d"] { --accent: #4a3aa7; --claude: #d96a4e; --zcode: #2a78d6; --m1: #1baf7a; --m2: #e87ba4; --m3: #eda100; }
+.pu-root[data-appearance="light"][data-palette="e"] { --accent: #2a78d6; --claude: #d96a4e; --zcode: #4a3aa7; --m1: #1baf7a; --m2: #e87ba4; --m3: #eda100; }
+.pu-root[data-appearance="light"][data-palette="f"] { --accent: #1baf7a; --claude: #d96a4e; --zcode: #4a3aa7; --m1: #2a78d6; --m2: #e87ba4; --m3: #eda100; }
+/* 第二轮版式:数字卡一排 → 走势 | 日历(宽两列、窄一列)→ 项目榜单 */
+.pu-root .pu-statrow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+.pu-root .pu-statrow .pu-card { margin-top: 0; }
+.pu-root .pu-statcard .pu-figure { font-size: 24px; letter-spacing: -0.4px; margin-top: 6px; }
+.pu-root .pu-statcard .pu-figure i { font-size: 13px; }
+.pu-root .pu-statcard .pu-sub { margin-top: 4px; font-size: 11px; }
+.pu-root .pu-statcard .pu-today-delta { margin-top: 4px; font-size: 11px; }
+.pu-root .pu-charts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; margin-top: 16px; }
+.pu-root .pu-charts .pu-card { margin-top: 0; display: flex; flex-direction: column; }
+.pu-root[data-width="1280"] .pu-window .pu-charts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pu-root .pu-charts .pu-trend { height: auto; min-height: 180px; flex: 1; margin-top: 12px; }
+.pu-root .pu-charts .pu-foot { margin-top: auto; padding-top: 8px; }
+.pu-root .pu-legend-row { display: flex; gap: 12px; margin-top: 8px; }
+.pu-root .pu-popover .pu-statrow { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.pu-root .pu-popover .pu-charts { gap: 8px; margin-top: 8px; }
+.pu-root .pu-popover .pu-charts .pu-trend { min-height: 96px; }
+.pu-root .pu-popover .pu-card + .pu-card, .pu-root .pu-popover .pu-charts + .pu-card { margin-top: 8px; }
+.pu-root .pu-popover .pu-statcard .pu-figure { font-size: 22px; }
 /* 线稿:整页去色 + 卡片描边,只看结构 */
 .pu-root[data-mode="wire"] .pu-stage { filter: grayscale(1); }
 .pu-root[data-mode="wire"] .pu-card { background: transparent; border: 1.5px solid #8a8a8a; }
@@ -155,12 +181,12 @@
 .pu-root #puModeLabel { min-width: 132px; text-align: center; font-weight: 600; }
 </style>
 </head>
-<body class="pu-root" data-mode="wire" data-appearance="dark" data-palette="a" data-width="880" data-popover="1">
+<body class="pu-root" data-mode="wire" data-appearance="dark" data-palette="a" data-width="1280" data-popover="1">
 <div class="pu-hint">
   <b>骨架原型 · 智能体「消耗」页</b>(一次性原型,不是产品代码;数据是按种子生成的假数据)<br>
   ① 先看 <b>线稿</b> 定结构(主卡 → 日历 → 项目榜单);② 按 <kbd>←</kbd> <kbd>→</kbd> 或底栏切到 <b>配色 A / B / C</b> 看颜色方向;<kbd>S</kbd> 切深浅。<br>
   可点:主卡卡头的「7 天 | 30 天」(标准药丸页签条,同时管走势、小读数、项目榜单)、日历的「天 | 周」、「重新扫描」(Liquid Glass 按钮)、项目行点开明细、「显示全部」。右边是同一套卡片的弹窗紧凑档。<br>
-  <b>定稿方向:</b>配色 C(青柠主色)· 结构照本原型。
+  <b>第二轮(2026-11-26):</b>版式改成「数字卡一排 → 走势 | 日历(窗宽 1280 两列,880 一列)→ 项目榜单」;配色 D / E / F 全部取自 DESIGN.md 已有的指标色(和总览同一套),「现状 · 青柠」留作对照。
 </div>
 <div class="pu-stage">
   <main class="pu-window" id="puPage"></main>
@@ -179,7 +205,7 @@
   'use strict';
   var root = document.body;
   var params = new URLSearchParams(location.search);
-  var MODES = [['wire', '线稿(只看结构)'], ['a', '配色 A · 靛紫'], ['b', '配色 B · 靛紫 · 明快'], ['c', '配色 C · 青柠']];
+  var MODES = [['wire', '线稿(只看结构)'], ['c', '现状 · 青柠'], ['d', 'D · 靛紫主色(内存色)'], ['e', 'E · 蓝主色(CPU 色)'], ['f', 'F · 绿主色(网络色)']];
   var DAY = 86400000;
   // 演示用的「此刻」钉在 19:11:不管什么时候打开,看到的都是白天进行中的典型状态。
   var now = new Date();
@@ -256,7 +282,7 @@
   }
 
   var state = {
-    mode: 'wire', appearance: 'dark', width: '880', popover: '1',
+    mode: 'wire', appearance: 'dark', width: '1280', popover: '1',
     range: 7, gran: 'day', open: {}, all: false
   };
   MODES.forEach(function (m) { if (m[0] === params.get('mode')) state.mode = m[0]; });
@@ -281,6 +307,33 @@
       + '<div class="pu-stat wide"><span class="pu-micro">Claude 用量</span><b>17%</b>'
       + '<span class="pu-sub">本周 17% · 重置 3 小时后</span></div>'
       + '</div></div><div class="pu-trend"></div></div></section>';
+  }
+
+  // 第二轮:主卡拆回「数字卡一排 + 独立走势卡」;7 / 30 开关挪到走势卡头(全页唯一)。
+  function statCard(label, fig, sub) {
+    var f = figure(fig);
+    return '<section class="pu-card pu-statcard"><span class="pu-caption">' + label + '</span>'
+      + '<div class="pu-figure">' + f.v + '<i>' + f.u + '</i></div>' + sub + '</section>';
+  }
+  function statRow() {
+    var n = state.range, s = windowStats(n), today = total(days[days.length - 1]);
+    var prorated = elapsed >= 0.25 ? today / elapsed : today / 0.25;
+    return '<div class="pu-statrow">'
+      + statCard('今日消耗', today, '<div class="pu-today-delta" title="今天还没过完:按已过时间折算后与昨天比">'
+        + deltaHTML(ratio(prorated, yesterdayTotal), '较昨日') + '</div>')
+      + statCard(n + ' 天合计', s.cur, '<span class="pu-sub">' + deltaHTML(ratio(s.cur, s.prev), n === 7 ? '较上周' : '较上月') + '</span>')
+      + statCard('日均(' + n + ' 天)', s.avg, '<span class="pu-sub">峰值 ' + fmt(s.peak) + '/天</span>')
+      + '<section class="pu-card pu-statcard"><span class="pu-caption">Claude 用量</span>'
+      + '<div class="pu-figure">17<i>%</i></div><span class="pu-sub">本周 17% · 重置 3 小时后</span></section>'
+      + '</div>';
+  }
+  function trendCard() {
+    var n = state.range;
+    return '<section class="pu-card"><header class="pu-card-head"><span class="pu-card-title">走势 · 近 ' + n + ' 天</span>'
+      + '<span class="pu-spacer"></span>' + pills([[7, '7 天'], [30, '30 天']], n, 'range') + '</header>'
+      + '<div class="pu-trend"></div>'
+      + '<div class="pu-legend-row"><span class="pu-micro"><i class="pu-swatch" style="background:var(--claude)"></i>Claude</span>'
+      + '<span class="pu-micro"><i class="pu-swatch" style="background:var(--zcode)"></i>ZCode</span></div></section>';
   }
 
   function levelOf(v, peak) { var f = v / peak; return f <= 0 || f < 0.08 ? 0 : f < 0.25 ? 1 : f < 0.5 ? 2 : f < 0.8 ? 3 : 4; }
@@ -383,7 +436,7 @@
     return icons
       + '<div class="pu-pagehead"><span class="pu-page-title">智能体</span></div>'
       + '<div class="pu-subtabs"><div class="pu-glass"><span class="pu-pill on">消耗</span><span class="pu-pill">会话</span></div></div>'
-      + hero() + calendar(compact) + ranking();
+      + statRow() + '<div class="pu-charts">' + trendCard() + calendar(compact) + '</div>' + ranking();
   }
 
   // ---------- 走势:Claude / ZCode 两层面积 ----------

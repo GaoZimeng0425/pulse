@@ -18,7 +18,7 @@ colors:
   accent-bluetooth: "#0891b2 / #22a8cc"
   accent-containers: "#eb6834 / #d95926"
   accent-clean: "#0d9488 / #35c4b5"
-  accent-agents: "#5a921a / #a6d94a"
+  accent-agents: = {accent-memory}
   projects-accent: = {accent-containers}
   state-positive: = {accent-battery}
   state-negative: "#e0352b / #ff453a"
@@ -37,11 +37,11 @@ colors:
   junk-ai: = {accent-bluetooth}
   junk-leftover: = {accent-sensors}
   junk-trash: = {accent-disk}
-  agent-source-claude: "#c9622f / #e8946a"
-  agent-source-zcode: "#6a4fe0 / #8f7cf5"
-  agent-model-first: "#1a78bd / #58a8e8"
-  agent-model-second: "#bd3a7c / #e070a8"
-  agent-model-third: "#93730f / #cfab4a"
+  agent-source-claude: = {accent-sensors}
+  agent-source-zcode: = {accent-cpu}
+  agent-model-first: = {accent-network}
+  agent-model-second: = {accent-gpu}
+  agent-model-third: = {accent-disk}
   settings-icon-general-from: "#9e9ea8"
   settings-icon-general-to: "#6b6b78"
   settings-icon-alerts-from: "#f29e33"
@@ -109,6 +109,7 @@ components:
   check-box: "勾选框,见 §Components"
   chart-hover: "图表悬停读数与浮层,见 §Components"
   header-text-button: "卡头文字按钮,见 §Components"
+  header-glass-button: "卡头玻璃按钮,见 §Components"
   settings-icon-tile: "设置侧栏图标砖,见 §Components"
 ---
 
@@ -139,7 +140,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 | `{colors.ink-tertiary}` | `Surface.inkTertiary` | 三级墨色:最弱的文字与图形 |
 | `{colors.accent-cpu}` … `{colors.accent-containers}` | `Metric.accentColor` | 每指标一色:tab、图表、徽章、大数字的身份色 |
 | `{colors.accent-clean}` | `Surface.cleanAccent` | 清理页专属强调色:主按钮、选中态、子页药丸 |
-| `{colors.accent-agents}` | `Surface.agentsAccent` | 智能体页专属强调色:tab 图标、选中态、日历色阶 |
+| `{colors.accent-agents}` | `Surface.agentsAccent` | 智能体页强调色(借内存色):tab 图标、选中态、日历色阶 |
 | `{colors.projects-accent}` | `Surface.projectsAccent` | 内存构成环里「项目」一段的身份色 |
 | `{colors.state-positive}` | `Surface.positive` | 正常、充电中 |
 | `{colors.state-warning}` | `Surface.warning` | 偏高、优化充电介入、告警提示 |
@@ -148,8 +149,8 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 | `{colors.state-inactive}` | `Surface.inactive` | 「停 / 未连接」的状态点 |
 | `{colors.category-*}` | `GroupCategory.identityColor` | 非 App 分组的图标瓦底色 |
 | `{colors.junk-*}` | `JunkGroup.identityColor` | 清理品类的身份色 |
-| `{colors.agent-source-claude}` / `-zcode` | `AgentPartitionTint.sourceToken(_:)` | 智能体页两家来源的身份色:走势分层、来源构成条与图例 |
-| `{colors.agent-model-first}` / `-second` / `-third` | `AgentPartitionTint.modelTokens` | 智能体页模型分布的分区色(三档,越界收第三档) |
+| `{colors.agent-source-claude}` / `-zcode` | `AgentPartitionTint.sourceToken(_:)` | 智能体页两家来源的身份色(借传感器色 / CPU 色):走势分层、来源构成条与图例、项目榜单的行首图标 |
+| `{colors.agent-model-first}` / `-second` / `-third` | `AgentPartitionTint.modelTokens` | 智能体页模型分布的分区色(借网络 / GPU / 磁盘色,三档,越界收第三档) |
 | `{colors.settings-icon-*-from}` / `-to` | `SettingsIconTint` | 设置侧栏图标砖的渐变起止色(固定色) |
 
 规则:
@@ -158,7 +159,9 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 - 指标色只从 `Metric` 取。新增指标先入表:浅深互异、指标之间互异,有单测钉死。
 - 指标色是**身份**,不是强调级。分组、品类借用指标色只是为了区分「是谁」;页面
   自己的强调色另定(清理页用 `{colors.accent-clean}`,智能体页用 `{colors.accent-agents}`)。
-  页面强调色与全部指标色在浅、深两套内互不相等。tab 条的着色只经一个取色口
+  页面强调色原则上与全部指标色在浅、深两套内互不相等;例外是智能体页——它的强调色与
+  分区色全部借指标色,整页和总览同一套颜色才协调,代价是 tab 条上与内存 tab 同色。
+  同屏的分区色之间、分区色与页强调色之间仍互不相等。tab 条的着色只经一个取色口
   (`MetricTab.tintColor`):有页面强调色的 tab 取页强调色,其余取指标色;有页面
   强调色的 tab 不属于指标族。
 - 强调级(正常 / 偏高 / 危险)到颜色的映射只许出现在三处:`StatusBadge.chip`、
@@ -173,7 +176,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 | `{typography.figure-main}` | 44pt bold 圆体,等宽数字 | 指标页主卡的大数字 |
 | `{typography.figure-overview}` | 34pt bold 圆体,等宽数字 | 总览卡的大数字(单位约半号) |
 | `{typography.figure-main-compact}` | 30pt bold 圆体,等宽数字 | 弹窗主卡的大数字 |
-| `{typography.figure-card}` | 24pt bold 圆体,等宽数字 | 清理总览模块大卡的大数字 |
+| `{typography.figure-card}` | 24pt bold 圆体,等宽数字 | 清理总览模块大卡、智能体页数字卡的大数字 |
 | `{typography.figure-overview-compact}` | 22pt bold 圆体,等宽数字 | 弹窗总览卡的大数字 |
 | `{typography.figure-ring}` / `-compact` | 19 / 16pt bold 圆体,等宽数字 | 环形图中心的数字(主窗口 / 弹窗) |
 | `{typography.page-title}` | 26pt bold | 页头标题(主窗口) |
@@ -229,17 +232,19 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 | `{spacing.card-padding-compact}` | 12pt | 紧凑卡片内距 |
 | `{spacing.card-gap}` | 16pt | 卡片网格的卡间距 |
 | `{spacing.window-padding}` | 24pt | 主窗口内容区的左右与底部边距 |
-| `{layout.row-label-short}` | 36pt | 项目大卡「模型 / 来源」行的标签列 |
+| `{layout.row-label-short}` | 36pt | 项目榜单明细「模型 / 来源」行的标签列 |
 | `{layout.row-value-percent}` | 36pt | 卡内读数行数值列的最小宽:整数百分比 |
 | `{layout.row-value-decimal-percent}` | 48pt | 同上:一位小数的百分比 |
 | `{layout.row-value-temperature}` | 52pt | 同上:带摄氏度 |
 | `{layout.row-value-quantity}` | 56pt | 同上:带单位的量 |
 | `{layout.row-value-rpm}` | 64pt | 同上:风扇转速 |
 | `{layout.row-host-icon}` | 14pt | 下钻进程行里宿主 App 徽标的边长 |
+| `{layout.legend-swatch}` | 6pt | 图例色点的边长(圆角 2);悬停浮层读数旁的色块是 8pt |
 | `{layout.overview-card-min-width}` | 340pt | 自适应卡片网格的单卡最小宽(主窗口列数 1–3 由它派生) |
 | `{layout.module-card-min-width}` | 340pt | 清理总览模块大卡的单卡最小宽(列数上限 2) |
 | `{layout.card-pair-two-column-min-width}` | 696pt | 两卡并排的断点:内容宽达到就并排等高,否则上下排 |
-| `{layout.agent-project-limit}` | 10 个 | 智能体页项目大卡的默认展示上限 |
+| `{layout.agent-chart-two-column-min-width}` | 1024pt | 智能体页走势与日历并排的断点(半宽下日历格约 6pt);不足就上下排 |
+| `{layout.agent-project-limit}` | 10 个 | 智能体页项目榜单的默认展示上限 |
 | `{layout.port-row-limit}` | 20 行 | 监听端口卡的默认展示行上限 |
 | `{layout.ranking-limit}` | 20 行 | 各排行默认展示的上限 |
 | `{layout.sheet-width}` | 460pt | 确认清单弹层的宽度 |
@@ -409,11 +414,8 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
   36pt 高的条形走势;段间 12,内距 16。紧凑档换副卡头,大数字 22,说明退到大数字右侧,
   内距 12。各指标同形态,不为某个指标特殊化。
 - **大卡**(放在页头):左列 200pt(11pt 说明、`{typography.figure-main}` 44 的大数字、状态
-  芯片、2×2 的统计值)+ 右侧撑满的面积走势;左列与走势之间 24;正文高 176(读数格带
-  副行时 184),内距 16。
+  芯片、2×2 的统计值)+ 右侧撑满的面积走势;左列与走势之间 24;正文高 176,内距 16。
   紧凑档竖排:说明与大数字一行、64pt 高的走势、统计值一行;行距 10,内距 12。
-- 大卡可在正文上方加一行卡头(卡头标题 + 右侧配件槽),槽里放作用于整卡的开关;卡头
-  与正文之间 `{spacing.group-gap}` 12。紧凑档的卡头照留。
 - 大数字只有 `FigureText` 一个实现:圆体加粗、等宽数字、负字距;单位约半号、次级色。
 
 **状态与变体**:全尺寸 / 紧凑两档;同一指标在主窗口与弹窗的读数同一观感。小卡整卡
@@ -448,18 +450,24 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 - 行:行首图标、名称(可挂 `.inline` 芯片)、副文、meter 条、数值、行尾列。尺寸全取自
   第 2 条;行尾恒留一列(舒适 30 / 紧凑 24),放结束按钮与展开箭头,所以所有排行的
   meter 与数值在同一条竖线上。
+- 数值可以不止一列:每列按自己的最宽现实读数定宽、右对齐,同卡各行同一竖线;没有上限的
+  读数(涨跌幅)更宽时缩字号放进列里,不撑列、不折行。表头逐列命名。占比条可以是分段的:
+  高度与圆角同 meter 条,轨道用 `{colors.ink-tertiary}` 14%,各段按分区取色。紧凑档
+  放不下时,次要读数退到名称下的副文行,不截名称。
 - meter 条:高 6、胶囊;轨道 = 强调色 14%,填充 = 强调色;对无障碍隐藏。
 - 截断末行:`{typography.caption}` 11 medium secondary,居中,带上下小箭头;悬停有底。
 
 **状态与变体**
 
-- 两种用法:**组排行**(行可展开,悬停显出结束按钮)与**只读的模块排行**。
+- 两种用法:**组排行**(行可展开,悬停显出结束按钮)与**只读的模块排行**。行可以原地
+  展开:展开区在行下,把后面的行推下去。
 - 默认只列前 `{layout.ranking-limit}` 20 名,末行是「显示全部(另 N 项)」;主窗口原地
   展开、可收起,弹窗点了跳主窗口并展开该卡;展开状态按卡记住;搜索命中时不截。
 - 空态在卡内。同一前置条件挡住多张排行卡时,收成一条紧凑的引导行(一行高:页强调色
   符号 + 一句说明 + 文字动作),数据到来才展开——展开与否由数据决定,不猜。
 - 高负载只标 CPU 口径的行:数值染负面色 + 名称后最忙进程芯片。
-- 行容器与主窗口的滚动区一律惰性堆叠(排行常上百行)。
+- 行容器与主窗口的滚动区一律惰性堆叠(排行常上百行);按内容量高的宿主里(弹窗原生
+  列表的整卡)用普通堆叠——惰性容器在「高度无上限」的量法下报不准,行一多就把行高报大。
 
 **什么时候用**:按某个口径给对象排序并展示前若干名。表头、数值列、截断末行都复用,
 不各写一套。
@@ -631,7 +639,20 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 动作。页里的主行动作用带底色的强调按钮;浮在图表上的胶囊按钮、行尾的图标按钮各是
 别的件,不用它。
 
-### 16. 设置侧栏图标砖
+### 16. 卡头玻璃按钮
+
+**用途**:卡头右侧作用于整卡的主动作,要一眼找得到,比卡头文字按钮醒目。
+
+**形态与数值**:系统 Liquid Glass 按钮样式(`.buttonStyle(.glass)`、`controlSize(.small)`),
+不自绘底、不加描边、不套卡片底;标签 = `{icons.inline}` semibold 符号 + `{typography.body}`
+12 semibold 文字。与同一配件槽里的药丸页签条间距 8。
+
+**状态与变体**:进行中换成小号转圈 + 状态文案并禁用,防重复触发。
+
+**什么时候用**:一张卡上最主要、用户会主动找的动作(如日历卡的「重新扫描」)。一张卡
+最多一枚;次要动作仍用卡头文字按钮。
+
+### 17. 设置侧栏图标砖
 
 **用途**:设置窗侧栏每个设置页前面的彩色图标。
 

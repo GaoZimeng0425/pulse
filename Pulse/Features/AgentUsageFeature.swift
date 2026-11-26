@@ -20,7 +20,7 @@ final class AgentUsageFeature: MonitorFeature {
     private(set) var rows: [AgentDailyUsageRow] = []
     /// 项目轨全表(agent-tab/04):UI 按窗口聚合出项目排行。
     private(set) var projectRows: [AgentProjectUsageRow] = []
-    /// 模型轨全表(agent-tab/05):项目卡模型分段条按窗口聚合。
+    /// 模型轨全表(agent-tab/05):项目榜单明细里模型分段条按窗口聚合。
     private(set) var modelRows: [AgentModelUsageRow] = []
     /// 项目现存会话数(agent-tab/06;全量档/引导时现数,不落库)。
     private(set) var sessionCounts: [String: Int] = [:]

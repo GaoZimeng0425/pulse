@@ -63,9 +63,9 @@ public enum MetricTab: String, CaseIterable, Identifiable, Sendable {
         case .network: "network"
         // 服务页沿用容器页图标(tab-regroup/01):页的主体仍是容器盘点,dev server 并入不换身份符号。
         case .services: "cube.box.fill"
-        // 智能体换 brain(2026-11-16 用户点名换掉 person.2.fill——双人像像「共享/多人」,
-        // 不达 AI 语义;sparkles 已被清理页占用)。
-        case .agents: "brain"
+        // 智能体 = 终端:Claude Code / ZCode 都是跑在终端里的
+        // 编码助手;brain 在 14pt 下糊成一团,sparkles 已被清理页占用。
+        case .agents: "apple.terminal.fill"
         case .battery: "battery.100percent"
         case .cleaner: "sparkles"
         case .history: "clock.arrow.circlepath"
