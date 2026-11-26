@@ -115,7 +115,7 @@ final class EqualHeightRowTests: XCTestCase {
         }
     }
 
-    /// 两个项目 × 近 30 天:项目卡网格里有不止一张卡。
+    /// 两个项目 × 近 30 天:项目榜单里有不止一行。
     private static func projectRows() -> [AgentProjectUsageRow] {
         ["pulse", "octok-client"].flatMap { project in
             (0 ..< 30).map { offset in

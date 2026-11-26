@@ -229,7 +229,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 | `{spacing.card-padding-compact}` | 12pt | 紧凑卡片内距 |
 | `{spacing.card-gap}` | 16pt | 卡片网格的卡间距 |
 | `{spacing.window-padding}` | 24pt | 主窗口内容区的左右与底部边距 |
-| `{layout.row-label-short}` | 36pt | 项目大卡「模型 / 来源」行的标签列 |
+| `{layout.row-label-short}` | 36pt | 项目榜单明细「模型 / 来源」行的标签列 |
 | `{layout.row-value-percent}` | 36pt | 卡内读数行数值列的最小宽:整数百分比 |
 | `{layout.row-value-decimal-percent}` | 48pt | 同上:一位小数的百分比 |
 | `{layout.row-value-temperature}` | 52pt | 同上:带摄氏度 |
@@ -239,7 +239,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 | `{layout.overview-card-min-width}` | 340pt | 自适应卡片网格的单卡最小宽(主窗口列数 1–3 由它派生) |
 | `{layout.module-card-min-width}` | 340pt | 清理总览模块大卡的单卡最小宽(列数上限 2) |
 | `{layout.card-pair-two-column-min-width}` | 696pt | 两卡并排的断点:内容宽达到就并排等高,否则上下排 |
-| `{layout.agent-project-limit}` | 10 个 | 智能体页项目大卡的默认展示上限 |
+| `{layout.agent-project-limit}` | 10 个 | 智能体页项目榜单的默认展示上限 |
 | `{layout.port-row-limit}` | 20 行 | 监听端口卡的默认展示行上限 |
 | `{layout.ranking-limit}` | 20 行 | 各排行默认展示的上限 |
 | `{layout.sheet-width}` | 460pt | 确认清单弹层的宽度 |
@@ -448,12 +448,16 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 - 行:行首图标、名称(可挂 `.inline` 芯片)、副文、meter 条、数值、行尾列。尺寸全取自
   第 2 条;行尾恒留一列(舒适 30 / 紧凑 24),放结束按钮与展开箭头,所以所有排行的
   meter 与数值在同一条竖线上。
+- 数值可以不止一列:每列按自己的最宽现实读数定宽、右对齐,表头逐列命名。占比条可以
+  是分段的:高度与轨道同 meter 条,各段按分区取色。紧凑档放不下时,次要读数退到
+  名称下的副文行,不截名称。
 - meter 条:高 6、胶囊;轨道 = 强调色 14%,填充 = 强调色;对无障碍隐藏。
 - 截断末行:`{typography.caption}` 11 medium secondary,居中,带上下小箭头;悬停有底。
 
 **状态与变体**
 
-- 两种用法:**组排行**(行可展开,悬停显出结束按钮)与**只读的模块排行**。
+- 两种用法:**组排行**(行可展开,悬停显出结束按钮)与**只读的模块排行**;只读排行的行
+  也可以展开——展开区在行下原地展开,把后面的行推下去。
 - 默认只列前 `{layout.ranking-limit}` 20 名,末行是「显示全部(另 N 项)」;主窗口原地
   展开、可收起,弹窗点了跳主窗口并展开该卡;展开状态按卡记住;搜索命中时不截。
 - 空态在卡内。同一前置条件挡住多张排行卡时,收成一条紧凑的引导行(一行高:页强调色

@@ -299,7 +299,7 @@ public struct AgentProjectUsageRow: Codable, Equatable, Sendable, FetchableRecor
 }
 
 /// 每日账本的**模型轨**行:一天 × 来源 × 项目 × 模型一行,主键
-/// `(day, source, project, model)`(agent-tab/05)。挂在项目轨之下(项目卡内的
+/// `(day, source, project, model)`(agent-tab/05)。挂在项目轨之下(项目榜单明细里的
 /// 模型分段条数据源);模型标识缺失(Claude 老行无 message.model / ZCode 老
 /// schema 无 model_id)不进本表,五桶留作对称排查同前两表。
 public struct AgentModelUsageRow: Codable, Equatable, Sendable, FetchableRecord, PersistableRecord {

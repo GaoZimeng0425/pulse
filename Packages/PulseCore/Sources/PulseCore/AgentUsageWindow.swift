@@ -36,7 +36,7 @@ public struct AgentModelShare: Equatable, Sendable {
     }
 }
 
-/// 项目大卡一条(原型四层数据全派生)。
+/// 项目榜单一条(全部字段派生)。
 public struct AgentProjectSummary: Equatable, Sendable, Identifiable {
     public let project: String
     public let total: Int
@@ -50,7 +50,7 @@ public struct AgentProjectSummary: Equatable, Sendable, Identifiable {
     public let requests: Int
     /// 模型占比(降序,≤3 项,剩余并「其他」)。
     public let models: [AgentModelShare]
-    /// harness = source:claude 份额(0…1;zcode = 1 - claudeShare)。
+    /// 来源里 Claude 的份额(0…1;zcode = 1 - claudeShare)。
     public let claudeShare: Double
     /// 会话快照里的在跑数(实时传入,非账本)。
     public let liveSessions: Int
@@ -73,7 +73,7 @@ public struct AgentProjectSummary: Equatable, Sendable, Identifiable {
     }
 }
 
-/// 四桶明细(输入 / 输出 / 缓存读 / 缓存写;悬停浮层展示,对齐项目卡四格)。
+/// 四桶明细(输入 / 输出 / 缓存读 / 缓存写;悬停浮层展示,对齐项目明细的五格)。
 public struct AgentTokenBreakdown: Equatable, Sendable {
     public let input: Int
     public let output: Int
@@ -269,9 +269,9 @@ public enum AgentUsageWindow {
         return Double(current - previous) / Double(previous)
     }
 
-    // MARK: 项目大卡
+    // MARK: 项目榜单
 
-    /// 近 `days` 天项目大卡数据(按窗口总量降序)。
+    /// 近 `days` 天项目榜单数据(按窗口总量降序)。
     public static func projects(
         projectRows: [AgentProjectUsageRow],
         modelRows: [AgentModelUsageRow],

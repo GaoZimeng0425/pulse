@@ -325,8 +325,7 @@ struct CardEmptyState: View {
 /// 列距),夹在 1…上限——比系统 `.adaptive` 多一个**上限**(ultrawide 不出更多列)。
 /// 逐行 HStack 排布,末行不满自动满宽。行内等高**尚未**接入 `EqualHeightRow`:这里的
 /// 弹性框在卡壳外面,底色不跟着拉伸,同排卡只在自然高相同时看着齐。不用 LazyVGrid
-/// (行内不拉齐高度)也不用 GridItem minimum(硬下限,窄容器溢出裁剪——agent 项目卡
-/// min 960 前案)——agent-tab/06 三度修正定稿的 AgentProjectCardGrid 模式泛化而来。
+/// (行内不拉齐高度)也不用 GridItem minimum(硬下限,窄容器溢出裁剪)。
 /// 宽度经 `onGeometryChange` 读取(挂外层普通容器——lazy 容器几何不随窗口缩放
 /// 逐帧上报,挂 LazyVGrid 自身列数会算一次就冻住,2026-11-21 用户实报总览六卡
 /// 恒 3 列),只在跨档时改状态,拖拽缩放不逐帧重排。

@@ -9,7 +9,8 @@ import SwiftUI
 // 1. 主卡(`AgentUsageHeroCard`):今日实际用量 + 环比 + 三格读数,右侧按来源分层的
 //    走势;卡头的「7 天 | 30 天」是全页唯一的范围开关;
 // 2. 日历(热力墙):近一年每日用量,天 / 周两档;「重新扫描」在卡头;
-// 3. 项目:窗口内的项目卡,默认前 N 张,末行展开 / 收起;跟着主卡的范围走。
+// 3. 项目榜单:一行一个项目,点行看明细;默认前 10 个,末行展开 / 收起;跟着
+//    主卡的范围走。
 // 范围(7 / 30 天)只有一个状态,重进子页回默认(7 天、项目收起)。
 // 数字与派生全在 PulseCore `AgentUsageWindow`(纯值),本文件只描不算。
 
@@ -32,14 +33,13 @@ struct AgentUsagePaneView: View {
     /// 「重新扫描」动作(日历卡头按钮的唯一触发源)。
     var onRescan: () -> Void
 
-    /// 项目默认展示上限(超出走末行展开 / 收起)。
-    private static let projectLimit = 10
-
-    /// 范围:主卡的走势与读数、项目卡共用。
+    /// 范围:主卡的走势与读数、项目榜单共用。
     @State private var range: AgentUsageRange = .week
     /// 日历图粒度(天 / 周)。
     @State private var heatGranularity: AgentHeatGranularity = .day
-    /// 项目超过上限时的展开态(切 7/30 保持;重进子页回默认收起)。
+    /// 榜单里展开着明细的项目(切 7/30 保持;重进子页回默认全部收起)。
+    @State private var expandedProjects: Set<String> = []
+    /// 项目超过上限时是否列出全部(切 7/30 保持;重进子页回默认收起)。
     @State private var projectsExpanded = false
 
     var body: some View {
@@ -152,46 +152,28 @@ struct AgentUsagePaneView: View {
         .help("全量重扫 Claude 与 ZCode 的本地记录,补齐漏记的日子")
     }
 
-    // MARK: 卡 3:项目
+    // MARK: 卡 3:项目榜单
 
     private var projectCard: some View {
-        let projects = AgentUsageWindow.projects(
-            projectRows: projectRows,
-            modelRows: modelRows,
-            days: range.days,
-            liveCounts: liveProjectCounts,
-            sessionCounts: sessionCounts
+        // 范围开关在主卡卡头;榜单标题写明当前窗口,读数跟着同一个范围走。
+        // 截断、展开明细与卡内空态都在榜单卡里。
+        AgentProjectRankingCard(
+            projects: AgentUsageWindow.projects(
+                projectRows: projectRows,
+                modelRows: modelRows,
+                days: range.days,
+                liveCounts: liveProjectCounts,
+                sessionCounts: sessionCounts
+            ),
+            windowDays: range.days,
+            isCompact: isCompact,
+            expandedProjects: $expandedProjects,
+            showsAll: $projectsExpanded
         )
-        return VStack(alignment: .leading, spacing: 12) {
-            // 范围开关在主卡卡头;标题写明当前窗口,读数跟着同一个范围走。
-            CardHeader(symbolName: nil, title: "项目 · 近 \(range.days) 天", tint: agentsAccent) {
-                EmptyView()
-            }
-            if projects.isEmpty {
-                CardEmptyState(title: "窗口内没有项目数据", detail: "只有粗粒度回填的日子没有项目维度")
-            } else {
-                // 列数、行内等高、末行满宽的规则都在 `AgentProjectCardGrid`。
-                // 这里只管截断:默认前 `projectLimit` 张,超出走末行展开 / 收起
-                // (排行截断同款交互)。
-                AgentProjectCardGrid(
-                    projects: projectsExpanded ? projects : Array(projects.prefix(Self.projectLimit)),
-                    windowDays: range.days
-                )
-                if projects.count > Self.projectLimit {
-                    AgentProjectOverflowRow(
-                        isExpanded: projectsExpanded,
-                        hiddenCount: projects.count - Self.projectLimit
-                    ) {
-                        projectsExpanded.toggle()
-                    }
-                }
-            }
-        }
-        .cardShell(compact: isCompact)
     }
 }
 
-// MARK: - 环比文字(主卡与项目卡共用)
+// MARK: - 环比文字(主卡与项目榜单共用)
 
 /// ▲ +12% / ▼ -8% / 持平 / —(无基准):▲ 绿 ▼ 红,零与无基准灰。
 struct AgentDeltaText: View {

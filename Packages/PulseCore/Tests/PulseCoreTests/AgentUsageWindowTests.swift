@@ -149,7 +149,7 @@ final class AgentUsageWindowTests: XCTestCase {
         XCTAssertEqual(figures.windowPeak, 300)
     }
 
-    // MARK: 项目大卡
+    // MARK: 项目榜单
 
     func testProjectsDeriveAllFields() {
         let now = Date()
