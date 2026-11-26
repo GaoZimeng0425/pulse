@@ -132,6 +132,24 @@ struct PillTabBar<Item: Hashable>: View {
     }
 }
 
+// MARK: - 卡头玻璃按钮(DESIGN.md §Components「卡头玻璃按钮」)
+
+/// 卡头上的主动作按钮:胶囊形系统 Liquid Glass,与内容页里的玻璃药丸条同材质、同高——
+/// 药丸条高 = 文字 + 药丸内距 5×2 + 外裹 4×2,按钮把两层合成一层内距 9;水平内距 13 =
+/// 外裹 4 + 药丸 9,文字起点与旁边药丸条里的文字对齐。不自绘底、不加描边。
+struct HeaderGlassButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 9)
+            .contentShape(.capsule)
+            .glassEffect(.regular.interactive(), in: .capsule)
+            .opacity(configuration.isPressed ? 0.8 : 1)
+    }
+}
+
 #Preview("药丸 tab 条:历史页两种用法") {
     @Previewable @State var metric: HistoryMetricKey = .systemLoad
     @Previewable @State var range: HistoryRange = .hour1
