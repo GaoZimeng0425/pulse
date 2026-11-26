@@ -72,13 +72,19 @@ enum AgentSubTab: Hashable {
 }
 
 /// 智能体页子药丸条:清理页子页条同款(`PillTabBar` comfortable 档 + 页强调色 +
-/// 玻璃外裹)。`isGlassContainer` 默认 false,漏传就没有玻璃外裹,和清理页子页条两个样。
+/// 玻璃外裹),弹窗降到常规档。`isGlassContainer` 默认 false,漏传就没有玻璃外裹。
+/// 恒靠左上——弹窗原生列表的行会把比行窄的内容居中,所以自己撑满行宽、内容靠左。
 struct AgentSubTabBar: View {
     @Binding var selection: AgentSubTab
+    var isCompact = false
 
     var body: some View {
-        PillTabBar(AgentSubTab.all, selection: $selection, isGlassContainer: true, size: .comfortable) { tab in
+        PillTabBar(
+            AgentSubTab.all, selection: $selection, isGlassContainer: true,
+            size: isCompact ? .regular : .comfortable
+        ) { tab in
             PillTabItem(title: tab.title, symbol: nil, tint: agentsAccent)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
