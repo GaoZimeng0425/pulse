@@ -148,7 +148,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 | `{colors.state-inactive}` | `Surface.inactive` | 「停 / 未连接」的状态点 |
 | `{colors.category-*}` | `GroupCategory.identityColor` | 非 App 分组的图标瓦底色 |
 | `{colors.junk-*}` | `JunkGroup.identityColor` | 清理品类的身份色 |
-| `{colors.agent-source-claude}` / `-zcode` | `AgentPartitionTint.sourceToken(_:)` | 智能体页两家来源的身份色:走势分层、来源构成条与图例 |
+| `{colors.agent-source-claude}` / `-zcode` | `AgentPartitionTint.sourceToken(_:)` | 智能体页两家来源的身份色:走势分层、来源构成条与图例、项目榜单的行首图标 |
 | `{colors.agent-model-first}` / `-second` / `-third` | `AgentPartitionTint.modelTokens` | 智能体页模型分布的分区色(三档,越界收第三档) |
 | `{colors.settings-icon-*-from}` / `-to` | `SettingsIconTint` | 设置侧栏图标砖的渐变起止色(固定色) |
 
@@ -236,6 +236,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 | `{layout.row-value-quantity}` | 56pt | 同上:带单位的量 |
 | `{layout.row-value-rpm}` | 64pt | 同上:风扇转速 |
 | `{layout.row-host-icon}` | 14pt | 下钻进程行里宿主 App 徽标的边长 |
+| `{layout.legend-swatch}` | 6pt | 图例色点的边长(圆角 2);悬停浮层读数旁的色块是 8pt |
 | `{layout.overview-card-min-width}` | 340pt | 自适应卡片网格的单卡最小宽(主窗口列数 1–3 由它派生) |
 | `{layout.module-card-min-width}` | 340pt | 清理总览模块大卡的单卡最小宽(列数上限 2) |
 | `{layout.card-pair-two-column-min-width}` | 696pt | 两卡并排的断点:内容宽达到就并排等高,否则上下排 |
@@ -448,22 +449,24 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 - 行:行首图标、名称(可挂 `.inline` 芯片)、副文、meter 条、数值、行尾列。尺寸全取自
   第 2 条;行尾恒留一列(舒适 30 / 紧凑 24),放结束按钮与展开箭头,所以所有排行的
   meter 与数值在同一条竖线上。
-- 数值可以不止一列:每列按自己的最宽现实读数定宽、右对齐,表头逐列命名。占比条可以
-  是分段的:高度与轨道同 meter 条,各段按分区取色。紧凑档放不下时,次要读数退到
-  名称下的副文行,不截名称。
+- 数值可以不止一列:每列按自己的最宽现实读数定宽、右对齐,同卡各行同一竖线;没有上限的
+  读数(涨跌幅)更宽时缩字号放进列里,不撑列、不折行。表头逐列命名。占比条可以是分段的:
+  高度与圆角同 meter 条,轨道用 `{colors.ink-tertiary}` 14%,各段按分区取色。紧凑档
+  放不下时,次要读数退到名称下的副文行,不截名称。
 - meter 条:高 6、胶囊;轨道 = 强调色 14%,填充 = 强调色;对无障碍隐藏。
 - 截断末行:`{typography.caption}` 11 medium secondary,居中,带上下小箭头;悬停有底。
 
 **状态与变体**
 
-- 两种用法:**组排行**(行可展开,悬停显出结束按钮)与**只读的模块排行**;只读排行的行
-  也可以展开——展开区在行下原地展开,把后面的行推下去。
+- 两种用法:**组排行**(行可展开,悬停显出结束按钮)与**只读的模块排行**。行可以原地
+  展开:展开区在行下,把后面的行推下去。
 - 默认只列前 `{layout.ranking-limit}` 20 名,末行是「显示全部(另 N 项)」;主窗口原地
   展开、可收起,弹窗点了跳主窗口并展开该卡;展开状态按卡记住;搜索命中时不截。
 - 空态在卡内。同一前置条件挡住多张排行卡时,收成一条紧凑的引导行(一行高:页强调色
   符号 + 一句说明 + 文字动作),数据到来才展开——展开与否由数据决定,不猜。
 - 高负载只标 CPU 口径的行:数值染负面色 + 名称后最忙进程芯片。
-- 行容器与主窗口的滚动区一律惰性堆叠(排行常上百行)。
+- 行容器与主窗口的滚动区一律惰性堆叠(排行常上百行);按内容量高的宿主里(弹窗原生
+  列表的整卡)用普通堆叠——惰性容器在「高度无上限」的量法下报不准,行一多就把行高报大。
 
 **什么时候用**:按某个口径给对象排序并展示前若干名。表头、数值列、截断末行都复用,
 不各写一套。

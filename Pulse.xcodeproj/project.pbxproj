@@ -121,6 +121,7 @@
 		7700D89C75AA6D6D0EB794B6 /* DevServerFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41196C89D2456B23F701DF21 /* DevServerFeature.swift */; };
 		793FED693BFB62064DA0DE63 /* PageHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 784169E55AFE6F109F41B427 /* PageHeader.swift */; };
 		7A42BF5BE1ECD8D87989902C /* SoundSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A93981AEA461948386E597BB /* SoundSensor.swift */; };
+		7A9AE30C046860228AA830E4 /* ZZSnapshotProbeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E589DA061405CE0579C7C05 /* ZZSnapshotProbeTests.swift */; };
 		7B78DA9310927EF3FB5CB0F3 /* UninstallModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 607B205CBD1C5DFC1F58E246 /* UninstallModelTests.swift */; };
 		7BF12994E21D701AED3C426D /* AppVolumeSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D92D289F11A76D17A3BC65D3 /* AppVolumeSettingsStore.swift */; };
 		7DA585A2786F7FEDFED5D08E /* EnergyHelperClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CDD19BA97EC142A19A465AE /* EnergyHelperClient.swift */; };
@@ -378,6 +379,7 @@
 		78EC09371E86E7408FA32ADC /* AppIconCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconCacheTests.swift; sourceTree = "<group>"; };
 		793E152BCFF6DC45BB501438 /* CardFamily.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardFamily.swift; sourceTree = "<group>"; };
 		797393589A818A7C3C18F34F /* CleanExclusionsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanExclusionsStoreTests.swift; sourceTree = "<group>"; };
+		7E589DA061405CE0579C7C05 /* ZZSnapshotProbeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZZSnapshotProbeTests.swift; sourceTree = "<group>"; };
 		7FFE17F679EFFD8CCA29B0DC /* LiveCleanDirectoryEnumerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCleanDirectoryEnumerator.swift; sourceTree = "<group>"; };
 		84AFAFC8D33B01908457ADE1 /* BluetoothCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothCardViews.swift; sourceTree = "<group>"; };
 		8576B450296CE59084093EDC /* ContainerSensorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerSensorTests.swift; sourceTree = "<group>"; };
@@ -844,6 +846,7 @@
 				BE86A48D24949B3D225394BD /* TestHostIsolationTests.swift */,
 				EC87A93839D6CA24CF501E16 /* UiUnifyRowMetricsTests.swift */,
 				607B205CBD1C5DFC1F58E246 /* UninstallModelTests.swift */,
+				7E589DA061405CE0579C7C05 /* ZZSnapshotProbeTests.swift */,
 			);
 			path = PulseTests;
 			sourceTree = "<group>";
@@ -1032,6 +1035,7 @@
 				73B3EC560B0C6A5339B55928 /* TestHostIsolationTests.swift in Sources */,
 				DC5C75FC243BB1F7EC9DE426 /* UiUnifyRowMetricsTests.swift in Sources */,
 				7B78DA9310927EF3FB5CB0F3 /* UninstallModelTests.swift in Sources */,
+				7A9AE30C046860228AA830E4 /* ZZSnapshotProbeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -213,6 +213,10 @@
    现有的量高用例,它钉住了子页的入参形状)。
    先例:`EqualHeightRowTests`。
 
+实施中超出三处的一项(2026-11-26 记;已向用户报备,留不留待用户定):项目榜单的列宽
+与委托关系、以及「弹窗量法报的高 = 实排高」的用例(`AgentProjectRankingMetricsTests`,
+先例 `RankingListMetricsTests`)。
+
 ## Out of Scope
 
 - 「会话」子页的重排(只跟随主色)。

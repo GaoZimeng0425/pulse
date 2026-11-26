@@ -67,10 +67,16 @@ enum RankingOverflowPolicy {
     }
 }
 
-/// 截断末行的数据面:隐藏数 + 行为。
+/// 截断末行的数据面:隐藏数 + 行为;上限与量词默认取通用排行(`{layout.ranking-limit}`
+/// 与「项 / 名」),上限不同的榜单自己传。
 struct RankingOverflowRowModel {
     let hiddenCount: Int
     let action: RankingOverflow.Action
+    var limit: Int = RankingOverflow.limit
+    /// 「另 N __」里的量词。
+    var noun: String = "项"
+    /// 「只看前 N __」里的量词。
+    var rankNoun: String = "名"
 }
 
 /// 排行截断后的末行:弹窗「查看全部(另 N 项)›」跳主窗口;主窗口「显示全部(另 N 项)⌄」
@@ -104,9 +110,11 @@ struct RankingOverflowRow: View {
     private var label: String {
         switch model.action {
         case .jump:
-            "查看全部(另 \(model.hiddenCount) 项)"
+            "查看全部(另 \(model.hiddenCount) \(model.noun))"
         case let .expand(isExpanded, _):
-            isExpanded ? "收起,只看前 \(RankingOverflow.limit) 名" : "显示全部(另 \(model.hiddenCount) 项)"
+            isExpanded
+                ? "收起,只看前 \(model.limit) \(model.rankNoun)"
+                : "显示全部(另 \(model.hiddenCount) \(model.noun))"
         }
     }
 
@@ -120,7 +128,8 @@ struct RankingOverflowRow: View {
     private var help: String {
         switch model.action {
         case .jump: "在主窗口查看完整排行"
-        case let .expand(isExpanded, _): isExpanded ? "收起到前 \(RankingOverflow.limit) 名" : "在本卡内展开完整排行"
+        case let .expand(isExpanded, _):
+            isExpanded ? "收起到前 \(model.limit) \(model.rankNoun)" : "在本卡内展开完整排行"
         }
     }
 

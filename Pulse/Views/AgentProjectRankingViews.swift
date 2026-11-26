@@ -15,14 +15,13 @@ import SwiftUI
 /// 榜单的列宽(页面专属参数;行尺寸的共享值一律委托 `RowMetrics` / `RankingListMetrics`)。
 enum AgentProjectRankingMetrics {
     /// 占比列:整数百分比,取 `{layout.row-value-percent}`(令牌按 12pt 量,随行档放大)。
-    static func shareWidth(compact: Bool) -> CGFloat {
-        CardRowWidth.scaled(CardRowWidth.percentValue, fontSize: RowMetrics.valueFontSize(compact: compact))
-    }
+    /// 只有全尺寸行有这一列——紧凑档的占比在副文行里,不定宽。
+    static let shareWidth = CardRowWidth.scaled(
+        CardRowWidth.percentValue, fontSize: RowMetrics.valueFontSize(compact: false)
+    )
 
-    /// 占比条宽,同 meter 条;紧凑档不画条。
-    static func barWidth(compact: Bool) -> CGFloat {
-        RowMetrics.meterWidth(compact: compact)
-    }
+    /// 占比条宽,同 meter 条;只有全尺寸行画条。
+    static let barWidth = RowMetrics.meterWidth(compact: false)
 
     /// 行尾的展开箭头列,同所有排行。
     static func trailingWidth(compact: Bool) -> CGFloat {
@@ -34,23 +33,23 @@ enum AgentProjectRankingMetrics {
         compact ? compactTokensWidth : regularTokensWidth
     }
 
-    /// 环比列(▲ +N% / ▼ -N% / 持平):两档同为 10.5 常规。
-    static let deltaWidth = measured(
+    /// 环比列(▲ +N% / ▼ -N% / 持平):两档同为 10.5 常规;只有全尺寸行有这一列。
+    /// 量到三位数为止——涨跌没有上限,过千的读数缩字号放进这一列,不撑列、不折行。
+    static let deltaWidth = measuredReadingsWidth(
         ["▲ +999%", "▼ -999%", "持平"], fontSize: 10.5, weight: .regular
     )
 
-    private static let regularTokensWidth = measured(
+    private static let regularTokensWidth = measuredReadingsWidth(
         ["999.9B", "999.9M", "999k", "999"], fontSize: RowMetrics.valueFontSize(compact: false), weight: .semibold
     )
-    private static let compactTokensWidth = measured(
+    private static let compactTokensWidth = measuredReadingsWidth(
         ["999.9B", "999.9M", "999k", "999"], fontSize: RowMetrics.valueFontSize(compact: true), weight: .semibold
     )
+}
 
-    private static func measured(_ readings: [String], fontSize: CGFloat, weight: NSFont.Weight) -> CGFloat {
-        let font = NSFont.monospacedDigitSystemFont(ofSize: fontSize, weight: weight)
-        let widest = readings.map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
-        return ceil(widest) + 2
-    }
+/// 份额 → 整数百分比文字(0…1 → "42%")。
+private func percentText(_ fraction: Double) -> String {
+    "\(Int((fraction * 100).rounded()))%"
 }
 
 /// 项目榜单卡:标题带当前窗口天数;默认列前 N 个,末行展开 / 收起;点行看明细。
@@ -78,7 +77,9 @@ struct AgentProjectRankingCard: View {
                 CardEmptyState(title: "窗口内没有项目数据", detail: "只有粗粒度回填的日子没有项目维度")
             } else {
                 columnHeader
-                // 行距 2,同所有排行卡。
+                // 行距 2,同所有排行卡。行容器用普通堆叠、不用惰性的:弹窗把整页按内容
+                // 量高(高无上限),惰性容器在这种量法下报不准——实测展开一行明细时
+                // 报 1545、实排 759,弹窗底部会空出一大截;本榜默认 10 行,也不需要惰性。
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(shown) { project in
                         AgentProjectRankingRow(
@@ -92,17 +93,23 @@ struct AgentProjectRankingCard: View {
                         }
                     }
                     if projects.count > Self.limit {
-                        AgentProjectOverflowRow(
-                            isExpanded: showsAll,
-                            hiddenCount: projects.count - Self.limit
-                        ) {
-                            showsAll.toggle()
-                        }
+                        RankingOverflowRow(model: overflowModel, isCompact: isCompact)
                     }
                 }
             }
         }
         .cardShell(compact: isCompact)
+    }
+
+    /// 截断末行的数据面:上限是本榜的 10(不是通用排行的 20),量词按项目口径。
+    private var overflowModel: RankingOverflowRowModel {
+        RankingOverflowRowModel(
+            hiddenCount: showsAll ? 0 : projects.count - Self.limit,
+            action: .expand(isExpanded: showsAll) { showsAll.toggle() },
+            limit: Self.limit,
+            noun: "个项目",
+            rankNoun: "个"
+        )
     }
 
     private var shown: [AgentProjectSummary] {
@@ -117,21 +124,22 @@ struct AgentProjectRankingCard: View {
         }
     }
 
-    /// 表头逐列命名,列宽与行逐列相同;首列留出行首图标的宽,和名称对齐。紧凑档的行是
-    /// 两行,占比与环比在第二行的小字里自带口径,表头只剩「项目 | 消耗」。
+    /// 表头逐列命名,列宽与行逐列相同;首列留出行首图标的宽和图标到名称的间距,
+    /// 「项目」与各行的名称起点对齐。紧凑档的行是两行,占比与环比在第二行的小字里
+    /// 自带口径,表头只剩「项目 | 消耗」。
     private var columnHeader: some View {
         HStack(spacing: RowMetrics.spacing(compact: isCompact)) {
-            HStack(spacing: 0) {
+            HStack(spacing: RowMetrics.spacing(compact: isCompact)) {
                 placeholder(width: RowMetrics.iconSize(compact: isCompact))
                 Text("项目")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if !isCompact {
-                placeholder(width: AgentProjectRankingMetrics.barWidth(compact: false))
+                placeholder(width: AgentProjectRankingMetrics.barWidth)
             }
             if !isCompact {
                 Text("占比").frame(
-                    width: AgentProjectRankingMetrics.shareWidth(compact: isCompact), alignment: .trailing
+                    width: AgentProjectRankingMetrics.shareWidth, alignment: .trailing
                 )
             }
             Text("消耗").frame(
@@ -184,7 +192,7 @@ struct AgentProjectRankingRow: View {
             .buttonStyle(.plain)
             .onHover { isHovering = $0 }
             .accessibilityLabel(
-                "\(project.project),占 \(shareText),近 \(windowDays) 天 \(agentTokenText(project.total))"
+                "\(project.project),占 \(percentText(project.share)),近 \(windowDays) 天 \(agentTokenText(project.total))"
             )
             .accessibilityHint(isExpanded ? "收起项目明细" : "展开项目明细")
             if isExpanded {
@@ -220,16 +228,22 @@ struct AgentProjectRankingRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             AgentSegmentedBar(segments: barSegments)
-                .frame(width: AgentProjectRankingMetrics.barWidth(compact: false))
-            value(shareText, width: AgentProjectRankingMetrics.shareWidth(compact: false))
+                .frame(width: AgentProjectRankingMetrics.barWidth)
+            value(percentText(project.share), width: AgentProjectRankingMetrics.shareWidth)
             value(
                 agentTokenText(project.total),
                 width: AgentProjectRankingMetrics.tokensWidth(compact: false)
             )
-            AgentDeltaText(label: nil, delta: project.delta)
-                .frame(width: AgentProjectRankingMetrics.deltaWidth, alignment: .trailing)
+            delta.frame(width: AgentProjectRankingMetrics.deltaWidth, alignment: .trailing)
             chevron
         }
+    }
+
+    /// 环比读数。全尺寸行里定宽:过千的涨跌缩字号放进列里(同排行数值列),不折行。
+    private var delta: some View {
+        AgentDeltaText(label: nil, delta: project.delta)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
     }
 
     /// 紧凑档两行:上行 = 图标 + 名称 + 消耗 + 箭头,下行(缩进到名称起点)= 在跑芯片、
@@ -249,8 +263,8 @@ struct AgentProjectRankingRow: View {
             }
             HStack(spacing: 6) {
                 liveChip
-                subline("占 \(shareText)")
-                AgentDeltaText(label: nil, delta: project.delta)
+                subline("占 \(percentText(project.share))")
+                delta
                 Spacer(minLength: 0)
             }
             .padding(.leading, iconColumn)
@@ -270,11 +284,12 @@ struct AgentProjectRankingRow: View {
             .frame(width: RowMetrics.iconSize(compact: isCompact))
     }
 
+    /// 名称吃剩余宽度、尾部省略(开头是项目名,最该留;同通用排行行)。
     private var name: some View {
         Text(project.project)
             .font(.system(size: RowMetrics.nameFontSize(compact: isCompact), weight: .medium))
             .lineLimit(1)
-            .truncationMode(.middle)
+            .truncationMode(.tail)
     }
 
     @ViewBuilder
@@ -315,10 +330,6 @@ struct AgentProjectRankingRow: View {
             .frame(width: width, alignment: .trailing)
     }
 
-    private var shareText: String {
-        "\(Int((project.share * 100).rounded()))%"
-    }
-
     /// 占比条:长度 = 本项目 ÷ 榜首,两段按来源分——一眼看出主要来自哪家。
     private var barSegments: [(fraction: Double, tint: Color)] {
         let length = peakTotal > 0 ? Double(project.total) / Double(peakTotal) : 0
@@ -346,8 +357,8 @@ struct AgentProjectDetail: View {
     let windowDays: Int
     let isCompact: Bool
 
-    /// 构成行标签列宽 = `{layout.row-label-short}` 36(两汉字「模型 / 来源」)。
-    private static let compositionLabelWidth: CGFloat = 36
+    /// 图例色点边长(圆角 2),取 `{layout.legend-swatch}`。
+    private static let legendSwatch: CGFloat = 6
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -373,7 +384,7 @@ struct AgentProjectDetail: View {
             )
             meta
         }
-        .padding(isCompact ? 12 : 16)
+        .padding(CardMetrics.padding(compact: isCompact))
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Surface.cardHigh, in: .rect(cornerRadius: 10))
         .accessibilityElement(children: .combine)
@@ -447,10 +458,12 @@ struct AgentProjectDetail: View {
             Text(label)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
-                .frame(width: Self.compositionLabelWidth, alignment: .leading)
+                // 标签列定宽取 `{layout.row-label-short}`(两汉字「模型 / 来源」)。
+                .frame(width: CardRowWidth.shortLabel, alignment: .leading)
             VStack(alignment: .leading, spacing: 6) {
                 AgentSegmentedBar(segments: entries.map { (fraction: $0.share, tint: $0.tint) })
-                    .padding(.top, 5) // 条中线对齐标签 11pt 文字中线
+                    // 条顶留一格 `{spacing.unit}`,条中线贴标签 11pt 文字的中线。
+                    .padding(.top, 4)
                 legend(entries)
             }
         }
@@ -478,11 +491,11 @@ struct AgentProjectDetail: View {
         HStack(spacing: 4) {
             RoundedRectangle(cornerRadius: 2)
                 .fill(tint)
-                .frame(width: 6, height: 6)
+                .frame(width: Self.legendSwatch, height: Self.legendSwatch)
             Text(name)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-            Text("\(Int((share * 100).rounded()))%")
+            Text(percentText(share))
                 .monospacedDigit()
                 .foregroundStyle(.tertiary)
         }
@@ -494,32 +507,39 @@ struct AgentProjectDetail: View {
     /// 活跃天数 · 现存会话数 · 请求数,符号引导;全尺寸右侧是日粒度活跃态,紧凑档折成 2×2。
     @ViewBuilder
     private var meta: some View {
-        let items = [
-            metaItem("calendar", "活跃 \(min(project.activeDays, windowDays))/\(windowDays) 天"),
-            metaItem("bubble.left.and.bubble.right", "\(project.sessions) 个会话"),
-            metaItem("arrow.up.arrow.down", "\(agentCountText(project.requests)) 次请求"),
-        ]
         if isCompact {
             // 窄处一行放不下三项:折成 2×2,每格都放得下,不靠截断。
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
                 GridRow {
-                    items[0]
-                    items[1]
+                    activeDaysItem
+                    sessionsItem
                 }
                 GridRow {
-                    items[2]
+                    requestsItem
                     idleText
                 }
             }
         } else {
             HStack(spacing: 16) {
-                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                    item
-                }
+                activeDaysItem
+                sessionsItem
+                requestsItem
                 Spacer(minLength: 8)
                 idleText
             }
         }
+    }
+
+    private var activeDaysItem: some View {
+        metaItem("calendar", "活跃 \(min(project.activeDays, windowDays))/\(windowDays) 天")
+    }
+
+    private var sessionsItem: some View {
+        metaItem("bubble.left.and.bubble.right", "\(project.sessions) 个会话")
+    }
+
+    private var requestsItem: some View {
+        metaItem("arrow.up.arrow.down", "\(agentCountText(project.requests)) 次请求")
     }
 
     private func metaItem(_ symbol: String, _ text: String) -> some View {
@@ -568,41 +588,5 @@ struct AgentSegmentedBar: View {
         .background(Surface.inkTertiary.opacity(0.14), in: .rect(cornerRadius: 3))
         .clipShape(RoundedRectangle(cornerRadius: 3))
         .accessibilityHidden(true)
-    }
-}
-
-// MARK: - 截断末行
-
-/// 项目展开 / 收起末行:排行截断末行(`RankingOverflowRow`)同款视觉配方
-/// (11 medium secondary + chevron + 悬停 primary 5% 圆角 8),文案按项目口径
-/// (「另 N 个项目」/「只看前 10 个」)。
-struct AgentProjectOverflowRow: View {
-    let isExpanded: Bool
-    let hiddenCount: Int
-    let action: () -> Void
-
-    @State private var isHovering = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                Text(label)
-                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                    .font(.system(size: IconSize.chevron, weight: .semibold))
-            }
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 9)
-            .background(isHovering ? Color.primary.opacity(0.05) : Color.clear, in: .rect(cornerRadius: 8))
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
-        .help(isExpanded ? "收起,只看前 10 个项目" : "展开全部项目")
-    }
-
-    private var label: String {
-        isExpanded ? "收起,只看前 10 个" : "显示全部(另 \(hiddenCount) 个项目)"
     }
 }

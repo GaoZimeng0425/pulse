@@ -112,11 +112,7 @@ enum RankingListMetrics {
     private static let compactRateWidth = measuredValueWidth(compact: true, column: .rate)
 
     private static func measuredValueWidth(compact: Bool, column: RankingValueColumn) -> CGFloat {
-        let font = NSFont.monospacedDigitSystemFont(ofSize: valueFontSize(compact: compact), weight: .semibold)
-        let widest = column.widestReadings
-            .map { ($0 as NSString).size(withAttributes: [.font: font]).width }
-            .max() ?? 0
-        return ceil(widest) + 2
+        measuredReadingsWidth(column.widestReadings, fontSize: valueFontSize(compact: compact), weight: .semibold)
     }
 }
 

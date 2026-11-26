@@ -116,8 +116,8 @@ struct PortsCardView: View {
     }
 }
 
-/// 端口卡截断末行:与项目榜单截断末行(`AgentProjectOverflowRow`)同款交互与视觉,
-/// 文案按端口口径改写(不复用排行的「前 20 名」字样)。
+/// 端口卡截断末行:与排行截断末行(`RankingOverflowRow`)同一族交互与视觉,文案按
+/// 端口口径另写一份(写它时标准件还不支持自定义量词)。
 private struct PortOverflowRow: View {
     let isExpanded: Bool
     let hiddenCount: Int
