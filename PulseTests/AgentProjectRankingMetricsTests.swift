@@ -140,7 +140,7 @@ final class AgentProjectRankingMetricsTests: XCTestCase {
     ) -> some View {
         AgentProjectRankingCard(
             projects: projects,
-            windowDays: 7,
+            range: .constant(.week),
             isCompact: width < 700,
             expandedProjects: .constant(expanded),
             showsAll: .constant(false)

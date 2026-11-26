@@ -53,11 +53,13 @@ private func percentText(_ fraction: Double) -> String {
     "\(Int((fraction * 100).rounded()))%"
 }
 
-/// 项目榜单卡:标题带当前窗口天数;默认列前 N 个,末行展开 / 收起;点行看明细。
+/// 项目榜单卡:卡头 = 标题(带当前窗口天数)+ 本卡自己的「7 天 | 30 天」;默认列前
+/// N 个,末行展开 / 收起;点行看明细。
 struct AgentProjectRankingCard: View {
-    /// 窗口内全部项目(已按消耗降序)。
+    /// 窗口内全部项目(已按消耗降序;由子页按 `range` 算好传入)。
     let projects: [AgentProjectSummary]
-    let windowDays: Int
+    /// 榜单自己的范围(与走势卡头的范围互相独立;状态由子页持有)。
+    @Binding var range: AgentUsageRange
     let isCompact: Bool
     /// 展开明细的项目(按项目名);由子页持有,切范围保持。
     @Binding var expandedProjects: Set<String>
@@ -67,12 +69,21 @@ struct AgentProjectRankingCard: View {
     /// 默认展示上限(DESIGN.md `{layout.agent-project-limit}`)。
     private static let limit = 10
 
+    private var windowDays: Int {
+        range.days
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             CardHeader(
                 symbolName: nil, title: "项目 · 近 \(windowDays) 天", tint: agentsAccent
             ) {
-                EmptyView()
+                PillTabBar(
+                    [AgentUsageRange.week, .month], selection: $range,
+                    isGlassContainer: true, size: isCompact ? .compact : .regular
+                ) { item in
+                    PillTabItem(title: item.title, symbol: nil, tint: agentsAccent)
+                }
             }
             if projects.isEmpty {
                 CardEmptyState(title: "窗口内没有项目数据", detail: "只有粗粒度回填的日子没有项目维度")
