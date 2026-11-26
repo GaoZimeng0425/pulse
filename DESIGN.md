@@ -57,7 +57,6 @@ typography:
   figure-overview: "34pt bold rounded, tabular"
   figure-main: "44pt bold rounded, tabular"
   figure-main-compact: "30pt bold rounded, tabular"
-  figure-stat: "28pt bold rounded, tabular"
   figure-card: "24pt bold rounded, tabular"
   figure-overview-compact: "22pt bold rounded, tabular"
   figure-ring: "19pt bold rounded, tabular"
@@ -140,7 +139,7 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 | `{colors.ink-tertiary}` | `Surface.inkTertiary` | 三级墨色:最弱的文字与图形 |
 | `{colors.accent-cpu}` … `{colors.accent-containers}` | `Metric.accentColor` | 每指标一色:tab、图表、徽章、大数字的身份色 |
 | `{colors.accent-clean}` | `Surface.cleanAccent` | 清理页专属强调色:主按钮、选中态、子页药丸 |
-| `{colors.accent-agents}` | `Surface.agentsAccent` | 智能体页专属强调色:tab 图标、选中态、今日数字、日历色阶 |
+| `{colors.accent-agents}` | `Surface.agentsAccent` | 智能体页专属强调色:tab 图标、选中态、日历色阶 |
 | `{colors.projects-accent}` | `Surface.projectsAccent` | 内存构成环里「项目」一段的身份色 |
 | `{colors.state-positive}` | `Surface.positive` | 正常、充电中 |
 | `{colors.state-warning}` | `Surface.warning` | 偏高、优化充电介入、告警提示 |
@@ -174,7 +173,6 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 | `{typography.figure-main}` | 44pt bold 圆体,等宽数字 | 指标页主卡的大数字 |
 | `{typography.figure-overview}` | 34pt bold 圆体,等宽数字 | 总览卡的大数字(单位约半号) |
 | `{typography.figure-main-compact}` | 30pt bold 圆体,等宽数字 | 弹窗主卡的大数字 |
-| `{typography.figure-stat}` | 28pt bold 圆体,等宽数字 | 智能体页数字卡的大数字 |
 | `{typography.figure-card}` | 24pt bold 圆体,等宽数字 | 清理总览模块大卡的大数字 |
 | `{typography.figure-overview-compact}` | 22pt bold 圆体,等宽数字 | 弹窗总览卡的大数字 |
 | `{typography.figure-ring}` / `-compact` | 19 / 16pt bold 圆体,等宽数字 | 环形图中心的数字(主窗口 / 弹窗) |
@@ -243,7 +241,6 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 | `{layout.card-pair-two-column-min-width}` | 696pt | 两卡并排的断点:内容宽达到就并排等高,否则上下排 |
 | `{layout.agent-project-limit}` | 10 个 | 智能体页项目大卡的默认展示上限 |
 | `{layout.port-row-limit}` | 20 行 | 监听端口卡的默认展示行上限 |
-| `{layout.agent-chart-two-column-min-width}` | 1872pt | 智能体页日历图与走势图并排的断点 |
 | `{layout.ranking-limit}` | 20 行 | 各排行默认展示的上限 |
 | `{layout.sheet-width}` | 460pt | 确认清单弹层的宽度 |
 | `{layout.sheet-list-max-height}` | 220pt | 确认清单弹层内列表的最大高 |
@@ -412,8 +409,11 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
   36pt 高的条形走势;段间 12,内距 16。紧凑档换副卡头,大数字 22,说明退到大数字右侧,
   内距 12。各指标同形态,不为某个指标特殊化。
 - **大卡**(放在页头):左列 200pt(11pt 说明、`{typography.figure-main}` 44 的大数字、状态
-  芯片、2×2 的统计值)+ 右侧撑满的面积走势;卡高 176,内距 16。紧凑档竖排:说明与
-  大数字一行、64pt 高的走势、统计值一行;内距 12。
+  芯片、2×2 的统计值)+ 右侧撑满的面积走势;左列与走势之间 24;正文高 176(读数格带
+  副行时 184),内距 16。
+  紧凑档竖排:说明与大数字一行、64pt 高的走势、统计值一行;行距 10,内距 12。
+- 大卡可在正文上方加一行卡头(卡头标题 + 右侧配件槽),槽里放作用于整卡的开关;卡头
+  与正文之间 `{spacing.group-gap}` 12。紧凑档的卡头照留。
 - 大数字只有 `FigureText` 一个实现:圆体加粗、等宽数字、负字距;单位约半号、次级色。
 
 **状态与变体**:全尺寸 / 紧凑两档;同一指标在主窗口与弹窗的读数同一观感。小卡整卡
@@ -598,15 +598,17 @@ Pulse 是 macOS 26+ 菜单栏系统监控 app,三个展示面:
 **形态与数值**:悬停位置一律用坐标反算,不依赖形状的点击测试。竖线贴**吸附到的数据点**
 而不是光标:空桶吸最近的有效点,等距取更早的;竖线 1pt、图表色 70%。
 浮层(`AgentChartTooltip`):第一行微字号的时刻或名称(secondary,等宽数字),第二行
-8×8 圆角 2 的色块 + `{typography.body}` 12 semibold 的读数(等宽数字);系统材质底、
+8×8 圆角 2 的色块 + `{typography.body}` 12 semibold 的读数(等宽数字)——读数不是单一
+颜色(多层叠出来的总数)时不出色块;系统材质底、
 `{rounded.chip}` 8 圆角、内距 6×8;不接鼠标。
 
 **状态与变体**
 
 - 定位:锚在被命中数据点的正上方居中、间距 6;上方放不下翻到下方;上下都没空间时
   侧放(整列命中的周视图)。水平方向钳在图内;首帧还没量到浮层尺寸时不显示。
-- 浮层可在读数下追加一块 2×2 的四格明细(有分项数据时才有):标签 10.5 tertiary、
-  值 11 semibold、等宽数字。
+- 浮层可在读数下追加两列的明细格(有分项数据时才有):先按分区列各项(该分区的色块 +
+  名称 + 读数,11 semibold secondary),再列更细一级的分项(标签 10.5 tertiary、值
+  11 semibold、等宽数字)。哪一级没有数据就不画哪一行。
 - 读数自带口径与单位,不出裸数字。时刻取吸附点自己的时刻,不取鼠标的瞬时位置。
 - 切换粒度或数据范围时清掉悬停态。
 

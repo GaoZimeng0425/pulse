@@ -87,4 +87,13 @@ final class AgentHeatScaleTests: XCTestCase {
         let values = Array(repeating: 100, count: 7) + Array(repeating: 10, count: 7)
         XCTAssertEqual(AgentHeatScale.weekLevels(days(values), todayElapsed: nil), [4, 1])
     }
+
+    /// 全天等效量(agent-usage-redesign/02):日历色阶与今日环比共用的那一个折算——
+    /// 按已过时间放大,不足 6 小时按 6 小时下限(最多 4 倍),nil = 不折算。
+    func testDayEquivalentProjectsTodayWithSixHourFloor() {
+        XCTAssertEqual(AgentHeatScale.dayEquivalent(ofToday: 100, todayElapsed: 12 * 3600), 200)
+        XCTAssertEqual(AgentHeatScale.dayEquivalent(ofToday: 100, todayElapsed: 6 * 3600), 400)
+        XCTAssertEqual(AgentHeatScale.dayEquivalent(ofToday: 100, todayElapsed: 3600), 400)
+        XCTAssertEqual(AgentHeatScale.dayEquivalent(ofToday: 100, todayElapsed: nil), 100)
+    }
 }

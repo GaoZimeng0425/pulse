@@ -1,16 +1,16 @@
-import Charts
 import PulseCore
 import SwiftUI
 
 // MARK: - 消耗子页(agent-tab/06)
 
 //
-// 子页骨架:四张卡平级、上下排,外面不套统一的大卡(还没有账本数据时整页换成一张
+// 子页骨架:三张卡平级、上下排,外面不套统一的大卡(还没有账本数据时整页换成一张
 // 空态卡)——
-// 1. 数字卡排:一张卡,内含四张等宽小卡(今日消耗 / N 天合计 / 日均 / Claude 用量;
-//    主窗口四张一排,弹窗两列两行,同一行底边齐平);
-// 2. 日历图(热力墙)与 3. 走势:内容宽够才并排两列,否则上下各一张;
-// 4. 项目大卡网格(默认截断,末行展开 / 收起)。
+// 1. 主卡(`AgentUsageHeroCard`):今日实际用量 + 环比 + 三格读数,右侧按来源分层的
+//    走势;卡头的「7 天 | 30 天」是全页唯一的范围开关;
+// 2. 日历(热力墙):近一年每日用量,天 / 周两档;「重新扫描」在卡头;
+// 3. 项目:窗口内的项目卡,默认前 N 张,末行展开 / 收起;跟着主卡的范围走。
+// 范围(7 / 30 天)只有一个状态,重进子页回默认(7 天、项目收起)。
 // 数字与派生全在 PulseCore `AgentUsageWindow`(纯值),本文件只描不算。
 
 /// 消耗子页(骨架见文件头)。
@@ -21,7 +21,7 @@ struct AgentUsagePaneView: View {
     var modelRows: [AgentModelUsageRow] = []
     /// 项目现存会话数(agent-tab/06,扫描现数)。
     var sessionCounts: [String: Int] = [:]
-    /// Claude 用量快照(数字卡排第 4 张;两窗全缺如实「—」)。
+    /// Claude 用量快照(主卡第 3 格读数;两窗全缺如实「—」)。
     var usage: ClaudeUsageSnapshot?
     /// 会话快照的项目在跑数(组装时传入)。
     var liveProjectCounts: [String: Int] = [:]
@@ -29,46 +29,26 @@ struct AgentUsagePaneView: View {
     var isCompact = false
     /// 全量扫描进行中(按钮转圈与禁用重入)。
     var isScanning = false
-    /// 「重新扫描」动作(日历图卡头按钮的唯一触发源)。
+    /// 「重新扫描」动作(日历卡头按钮的唯一触发源)。
     var onRescan: () -> Void
 
     /// 项目默认展示上限(超出走末行展开 / 收起)。
     private static let projectLimit = 10
 
-    /// 走势 / 项目的范围切换(数字卡排随档位联动)。
-    enum Range: Hashable {
-        case week
-        case month
-
-        var days: Int {
-            self == .week ? 7 : 30
-        }
-
-        var title: String {
-            self == .week ? "7 天" : "30 天"
-        }
-
-        /// 合计卡环比基准的称谓(7 天比上周、30 天比上月)。
-        var previousLabel: String {
-            self == .week ? "较上周" : "较上月"
-        }
-    }
-
-    @State private var range: Range = .week
+    /// 范围:主卡的走势与读数、项目卡共用。
+    @State private var range: AgentUsageRange = .week
     /// 日历图粒度(天 / 周)。
     @State private var heatGranularity: AgentHeatGranularity = .day
     /// 项目超过上限时的展开态(切 7/30 保持;重进子页回默认收起)。
     @State private var projectsExpanded = false
-    /// 日历图 + 走势列数(按子页内容宽 ≥ `chartTwoColumnMinWidth` 判定)。
-    @State private var chartColumns = 1
 
     var body: some View {
         if rows.isEmpty {
             emptyState
         } else {
             VStack(alignment: .leading, spacing: 16) {
-                numberCard
-                chartRow
+                heroCard
+                calendarCard
                 projectCard
             }
         }
@@ -91,174 +71,21 @@ struct AgentUsagePaneView: View {
         }
     }
 
-    // MARK: 卡 1:数字卡排
+    // MARK: 卡 1:主卡
 
-    private var numberCard: some View {
-        let figures = AgentUsageWindow.figures(rows: rows, days: range.days)
-        // 弹窗 360 宽塞不下四张:每张会窄到截数字、折标签,改两列两行。
-        let cellsPerRow = isCompact ? 2 : Self.numberCells.count
-        let cellRows = stride(from: 0, to: Self.numberCells.count, by: cellsPerRow).map { start in
-            Array(Self.numberCells[start ..< min(start + cellsPerRow, Self.numberCells.count)])
-        }
-        return VStack(alignment: .leading, spacing: 12) {
-            CardHeader(symbolName: nil, title: "消耗总览", tint: agentsAccent) {
-                EmptyView()
-            }
-            VStack(spacing: 8) {
-                ForEach(Array(cellRows.enumerated()), id: \.offset) { _, cellRow in
-                    EqualHeightRow(spacing: 8) {
-                        ForEach(cellRow, id: \.rawValue) { cell in
-                            numberCell(cell, figures: figures)
-                        }
-                    }
-                }
-            }
-        }
-        .cardShell(compact: isCompact)
+    private var heroCard: some View {
+        AgentUsageHeroCard(
+            figures: AgentUsageWindow.figures(rows: rows, days: range.days),
+            totals: AgentUsageWindow.dayTotals(rows: rows, days: range.days),
+            usage: usage,
+            isCompact: isCompact,
+            range: $range
+        )
     }
 
-    /// 数字卡的排布顺序(两个窗口同一份)。
-    private static let numberCells: [NumberCell] = [.today, .windowTotal, .windowAverage, .usage]
+    // MARK: 卡 2:日历(热力墙)
 
-    private enum NumberCell: Int {
-        case today, windowTotal, windowAverage, usage
-    }
-
-    @ViewBuilder
-    private func numberCell(_ cell: NumberCell, figures: AgentUsageFigures) -> some View {
-        switch cell {
-        case .today:
-            statCell(label: "今日消耗", tokens: figures.todayTotal, valueTint: agentsAccent) {
-                AgentDeltaText(label: "较昨日", delta: figures.todayDelta)
-            }
-        case .windowTotal:
-            statCell(label: "\(figures.windowDays) 天合计", tokens: figures.windowTotal) {
-                AgentDeltaText(label: range.previousLabel, delta: figures.windowDelta)
-            }
-        case .windowAverage:
-            statCell(label: "日均(\(figures.windowDays) 天)", tokens: figures.windowAverage) {
-                Text("峰 \(agentTokenText(figures.windowPeak))/天")
-                    .font(.system(size: 10.5))
-                    .monospacedDigit()
-                    .foregroundStyle(.tertiary)
-            }
-        case .usage:
-            usageCell
-        }
-    }
-
-    /// 一张 token 数字小卡:标签 → 大数字(figure-stat 28)→ 副行。
-    private func statCell(
-        label: String,
-        tokens: Int,
-        valueTint: Color? = nil,
-        @ViewBuilder sub: () -> some View
-    ) -> some View {
-        numberCellShell {
-            Text(label)
-                .font(.system(size: 10.5))
-                .foregroundStyle(.secondary)
-            let figure = agentTokenFigure(tokens)
-            FigureText(value: figure.value, unit: figure.unit, size: FigureSize.stat)
-                .foregroundStyle(valueTint ?? Color.primary)
-            sub()
-        }
-    }
-
-    /// 第 4 张 = Claude 用量(5 小时窗优先,缺失退本周;快照缺失「—」不伪造)。
-    private var usageCell: some View {
-        numberCellShell {
-            Text("Claude 用量")
-                .font(.system(size: 10.5))
-                .foregroundStyle(.secondary)
-            if let window = usage?.fiveHour ?? usage?.sevenDay {
-                FigureText(value: "\(window.usedPercentage)", unit: "%", size: FigureSize.stat)
-                    .foregroundStyle(Color.primary)
-                Text(usageSubline)
-                    .font(.system(size: 10.5))
-                    .monospacedDigit()
-                    .foregroundStyle(.tertiary)
-            } else {
-                FigureText(value: "—", unit: "", size: FigureSize.stat)
-                    .foregroundStyle(Color.primary)
-                Text("未读到快照")
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.tertiary)
-            }
-        }
-    }
-
-    /// 小卡外壳:内容 → 等宽 → 内距 → 弹性框 → 底色。弹性框必须在底色里面,
-    /// `EqualHeightRow` 把行高提进来时,矮卡的底色才铺得到行底(agent-tab/14)。
-    private func numberCellShell(@ViewBuilder content: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            content()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
-        .frame(maxHeight: .infinity, alignment: .top)
-        .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
-    }
-
-    /// 用量副行:本周占用 + 窗口重置(读得到的才写)。
-    private var usageSubline: String {
-        var parts: [String] = []
-        if let week = usage?.sevenDay {
-            parts.append("本周 \(week.usedPercentage)%")
-        }
-        if let resetsIn = usage?.fiveHour?.resetsAt.map(\.timeIntervalSinceNow),
-           resetsIn > 0 {
-            parts.append("重置 \(PulseFormat.duration(seconds: resetsIn))后")
-        }
-        return parts.joined(separator: " · ")
-    }
-
-    // MARK: 卡 2/3:日历图 + 走势(≥1920 窗宽一排两列,否则一列)
-
-    /// 日历图 + 走势并排的断点:量的是子页内容宽(窗宽减两侧窗口内距),不是窗宽。
-    /// 不要改回 `ViewThatFits`——热力墙与 Charts 都是弹性宽、理想宽不可预期,按它
-    /// 判定何时切换不可控。弹窗恒一列。
-    static let chartTwoColumnMinWidth: CGFloat = 1872
-    /// 弹窗紧凑档走势绘图区定高(热力墙在 330 宽下只有 ~45 高,不跟随)。
-    private static let compactTrendPlotHeight: CGFloat = 100
-
-    private var chartRow: some View {
-        // 断点常量先取局部(非隔离 transform 闭包不得直引 actor 隔离 static)。
-        let chartTwoColumnMinWidth = Self.chartTwoColumnMinWidth
-        return Group {
-            if chartColumns == 2 {
-                // 并排时两卡靠**结构同构**等高(卡头 → 图区 → 日期轴带 → 页脚逐段同高),
-                // 不靠 fixedSize / frame 拉伸。同构落在哪几处,见 `AgentChartAxis` 与
-                // `AgentTrendChart`。
-                HStack(alignment: .top, spacing: 16) {
-                    heatCard
-                    trendCard
-                }
-            } else {
-                VStack(alignment: .leading, spacing: 16) {
-                    heatCard
-                    trendCard
-                }
-            }
-        }
-        .onGeometryChange(for: Int.self) { proxy in
-            !isCompact && proxy.size.width >= chartTwoColumnMinWidth ? 2 : 1
-        } action: { newValue in
-            if newValue != chartColumns {
-                chartColumns = newValue
-            }
-        }
-    }
-
-    /// 7/30 时间筛选药丸(走势与项目各一份,同一 state 视觉同步)。
-    private var rangePills: some View {
-        PillTabBar([Range.week, .month], selection: $range) { item in
-            PillTabItem(title: item.title, symbol: nil, tint: agentsAccent)
-        }
-    }
-
-    private var heatCard: some View {
+    private var calendarCard: some View {
         let totals = AgentUsageWindow.dayTotals(rows: rows, days: AgentHeatWall.weeks * 7)
         return VStack(alignment: .leading, spacing: 12) {
             CardHeader(symbolName: nil, title: "Token 消耗", tint: agentsAccent) {
@@ -285,7 +112,7 @@ struct AgentUsagePaneView: View {
         }
     }
 
-    /// 两图卡共用页脚(micro tertiary,左说明右峰值;两卡同构等高的一部分)。
+    /// 页脚(micro tertiary,左说明右峰值)。
     private func chartFooter(leading: String, trailing: String) -> some View {
         HStack {
             Text(leading)
@@ -325,27 +152,7 @@ struct AgentUsagePaneView: View {
         .help("全量重扫 Claude 与 ZCode 的本地记录,补齐漏记的日子")
     }
 
-    private var trendCard: some View {
-        let totals = AgentUsageWindow.dayTotals(rows: rows, days: range.days)
-        let values = totals.map(\.total)
-        let average = values.isEmpty ? 0 : values.reduce(0, +) / values.count
-        return VStack(alignment: .leading, spacing: 12) {
-            CardHeader(symbolName: nil, title: "走势", tint: agentsAccent) {
-                rangePills
-            }
-            AgentTrendChart(
-                totals: totals,
-                plotHeight: isCompact ? Self.compactTrendPlotHeight : nil
-            )
-            chartFooter(
-                leading: "近 \(range.days) 天 · 日均 \(agentTokenText(average))",
-                trailing: "最多一天 \(agentTokenText(values.max() ?? 0))"
-            )
-        }
-        .cardShell(compact: isCompact)
-    }
-
-    // MARK: 卡 4:项目大卡网格
+    // MARK: 卡 3:项目
 
     private var projectCard: some View {
         let projects = AgentUsageWindow.projects(
@@ -356,8 +163,9 @@ struct AgentUsagePaneView: View {
             sessionCounts: sessionCounts
         )
         return VStack(alignment: .leading, spacing: 12) {
-            CardHeader(symbolName: nil, title: "项目", tint: agentsAccent) {
-                rangePills
+            // 范围开关在主卡卡头;标题写明当前窗口,读数跟着同一个范围走。
+            CardHeader(symbolName: nil, title: "项目 · 近 \(range.days) 天", tint: agentsAccent) {
+                EmptyView()
             }
             if projects.isEmpty {
                 CardEmptyState(title: "窗口内没有项目数据", detail: "只有粗粒度回填的日子没有项目维度")
@@ -383,12 +191,26 @@ struct AgentUsagePaneView: View {
     }
 }
 
-// MARK: - 环比文字(数字卡副行与项目卡共用)
+// MARK: - 环比文字(主卡与项目卡共用)
 
 /// ▲ +12% / ▼ -8% / 持平 / —(无基准):▲ 绿 ▼ 红,零与无基准灰。
 struct AgentDeltaText: View {
     var label: String?
     let delta: Double?
+    /// 字号档:行内的 10.5,或大数字旁的统计值 12 semibold。
+    var size: Size = .micro
+
+    enum Size {
+        case micro
+        case stat
+
+        var font: Font {
+            switch self {
+            case .micro: .system(size: 10.5)
+            case .stat: .system(size: 12, weight: .semibold)
+            }
+        }
+    }
 
     var body: some View {
         let text: String
@@ -411,7 +233,7 @@ struct AgentDeltaText: View {
             style = AnyShapeStyle(.tertiary)
         }
         return Text(text)
-            .font(.system(size: 10.5))
+            .font(size.font)
             .monospacedDigit()
             .foregroundStyle(style)
     }
@@ -426,7 +248,7 @@ struct AgentDeltaText: View {
 }
 
 #Preview("消耗子页") {
-    func row(_ day: String, source: AgentUsageSource, total: Int) -> AgentDailyUsageRow {
+    func row(_ day: String, _ source: AgentUsageSource, _ total: Int) -> AgentDailyUsageRow {
         AgentDailyUsageRow(day: day, source: source, origin: .jsonl, totalTokens: total)
     }
 
@@ -447,11 +269,11 @@ struct AgentDeltaText: View {
         let base = Double(364 - offset) / 364
         let wave = 0.4 + 0.6 * abs(sin(Double(offset) / 5))
         let total = Int(base * wave * 800_000_000)
-        rows.append(row(back(offset), source: .claude, total: total))
-        rows.append(row(back(offset), source: .zcode, total: total / 3))
+        rows.append(row(back(offset), .claude, total))
+        rows.append(row(back(offset), .zcode, total / 3))
     }
-    rows.append(row(back(0), source: .claude, total: 320_000_000))
-    rows.append(row(back(0), source: .zcode, total: 64_000_000))
+    rows.append(row(back(0), .claude, 320_000_000))
+    rows.append(row(back(0), .zcode, 64_000_000))
 
     var projectRows: [AgentProjectUsageRow] = []
     var modelRows: [AgentModelUsageRow] = []

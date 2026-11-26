@@ -1,17 +1,19 @@
 import Foundation
 
-// MARK: - 每日消耗卡窗口派生(agent-tab/05)
+// MARK: - 消耗页窗口派生(agent-tab/05)
 
 //
-// 账本行 → 定稿原型的卡数据(纯值,UI 只描不算):数字卡排三卡的
-// 今日/窗口合计/日均 + 环比,项目大卡一条的全派生字段。全部只吃现有
+// 账本行 → 消耗页的卡数据(纯值,UI 只描不算):主卡的
+// 今日/窗口合计/日均 + 环比,项目一条的全派生字段。全部只吃现有
 // 数据(环比 = 窗口对比、活跃天数 / 请求数 = 项目轨、在跑 = 会话快照)。
 
-/// 数字卡排数据(三卡同规格;随 7/30 档位联动)。
+/// 主卡数字(今日两项不随档位,窗口几项随 7/30 联动)。
 public struct AgentUsageFigures: Equatable, Sendable {
-    /// 今天合计。
+    /// 今天合计(实际值,不折算)。
     public let todayTotal: Int
-    /// (今 - 昨) / 昨;昨为 0 → nil(无基准,UI 显「—」)。
+    /// (今日全天等效量 - 昨日) / 昨日。今天还没过完,直接拿半天比整天白天几乎
+    /// 永远为负,所以先经 `AgentHeatScale.dayEquivalent` 折算(与日历色阶同一个
+    /// 规则)。昨为 0 → nil(无基准,UI 显「—」)。
     public let todayDelta: Double?
     /// 窗口(N 天,含今天)合计。
     public let windowTotal: Int
@@ -90,6 +92,9 @@ public struct AgentTokenBreakdown: Equatable, Sendable {
 public struct AgentDayTotal: Equatable, Sendable {
     public let day: String
     public let total: Int
+    /// 两家各自的分量(走势按来源分层用);合计恒等于两者之和。
+    public let claudeTotal: Int
+    public let zcodeTotal: Int
     /// 四桶合计;粗粒度回填(origin=.cache)的天只有 total,四桶全 0。
     public let inputTokens: Int
     public let outputTokens: Int
@@ -99,6 +104,8 @@ public struct AgentDayTotal: Equatable, Sendable {
     public init(
         day: String,
         total: Int,
+        claudeTotal: Int = 0,
+        zcodeTotal: Int = 0,
         inputTokens: Int = 0,
         outputTokens: Int = 0,
         cacheReadTokens: Int = 0,
@@ -106,10 +113,17 @@ public struct AgentDayTotal: Equatable, Sendable {
     ) {
         self.day = day
         self.total = total
+        self.claudeTotal = claudeTotal
+        self.zcodeTotal = zcodeTotal
         self.inputTokens = inputTokens
         self.outputTokens = outputTokens
         self.cacheReadTokens = cacheReadTokens
         self.cacheWriteTokens = cacheWriteTokens
+    }
+
+    /// 两家分量;合计 = `total`。
+    public var sourceSplit: AgentSourceSplit {
+        AgentSourceSplit(claude: claudeTotal, zcode: zcodeTotal)
     }
 
     /// 四桶明细;分项缺失(只有总数的回填天)→ nil,浮层照旧单行。
@@ -123,10 +137,35 @@ public struct AgentDayTotal: Equatable, Sendable {
     }
 }
 
+/// 两家各自的用量(走势分层与浮层用)。
+public struct AgentSourceSplit: Equatable, Sendable {
+    public let claude: Int
+    public let zcode: Int
+
+    public init(claude: Int, zcode: Int) {
+        self.claude = claude
+        self.zcode = zcode
+    }
+}
+
 /// 账本行 → 卡数据(全部纯函数)。
 public enum AgentUsageWindow {
-    /// dayTotals 的按天累计(总额 + 四桶)。
+    /// 按来源累计两家各自的用量(逐天合计与项目累计共用)。
+    private struct SourceSum {
+        var claude = 0
+        var zcode = 0
+
+        mutating func add(_ tokens: Int, from source: AgentUsageSource) {
+            switch source {
+            case .claude: claude += tokens
+            case .zcode: zcode += tokens
+            }
+        }
+    }
+
+    /// dayTotals 的按天累计(两家分量 + 总额 + 四桶)。
     private struct DaySum {
+        var sources = SourceSum()
         var total = 0
         var input = 0
         var output = 0
@@ -135,6 +174,7 @@ public enum AgentUsageWindow {
 
         mutating func add(_ row: AgentDailyUsageRow) {
             total += row.totalTokens
+            sources.add(row.totalTokens, from: row.source)
             input += row.inputTokens
             output += row.outputTokens
             cacheRead += row.cacheReadTokens
@@ -162,6 +202,7 @@ public enum AgentUsageWindow {
                 let sum = byDay[key] ?? DaySum()
                 return AgentDayTotal(
                     day: key, total: sum.total,
+                    claudeTotal: sum.sources.claude, zcodeTotal: sum.sources.zcode,
                     inputTokens: sum.input, outputTokens: sum.output,
                     cacheReadTokens: sum.cacheRead, cacheWriteTokens: sum.cacheWrite
                 )
@@ -169,9 +210,9 @@ public enum AgentUsageWindow {
         }
     }
 
-    // MARK: 数字卡排
+    // MARK: 主卡数字
 
-    /// 近 `days` 天(含今天)数字卡数据。
+    /// 近 `days` 天(含今天)主卡数字。
     public static func figures(
         rows: [AgentDailyUsageRow],
         days: Int,
@@ -204,9 +245,16 @@ public enum AgentUsageWindow {
             peak = max(peak, key(daysAgo: ago).flatMap { byDay[$0] } ?? 0)
         }
 
+        // 今天还没过完:环比拿全天等效量去比昨天(与日历色阶同一个折算规则),不然
+        // 白天几乎永远是负的;读数 todayTotal 仍是实际值。
+        let todayEquivalent = AgentHeatScale.dayEquivalent(
+            ofToday: Double(todayTotal),
+            todayElapsed: now.timeIntervalSince(today)
+        )
+
         return AgentUsageFigures(
             todayTotal: todayTotal,
-            todayDelta: changeRatio(current: todayTotal, previous: yesterdayTotal),
+            todayDelta: changeRatio(current: Int(todayEquivalent.rounded()), previous: yesterdayTotal),
             windowTotal: windowSum,
             windowDelta: changeRatio(current: windowSum, previous: previousSum),
             windowAverage: days > 0 ? windowSum / days : 0,
@@ -248,8 +296,7 @@ public enum AgentUsageWindow {
         struct ProjectAggregate {
             var total = 0
             var requests = 0
-            var claudeTotal = 0
-            var zcodeTotal = 0
+            var sources = SourceSum()
             var activeDays: Set<String> = []
             var lastActiveDaysAgo = Int.max
             // 四桶窗口合计(agent-tab/06,tokscale 对齐行)。
@@ -268,10 +315,7 @@ public enum AgentUsageWindow {
             aggregate.output += row.outputTokens
             aggregate.cacheRead += row.cacheReadTokens
             aggregate.cacheWrite += row.cacheWriteTokens
-            switch row.source {
-            case .claude: aggregate.claudeTotal += row.totalTokens
-            case .zcode: aggregate.zcodeTotal += row.totalTokens
-            }
+            aggregate.sources.add(row.totalTokens, from: row.source)
             aggregate.activeDays.insert(row.day)
             aggregate.lastActiveDaysAgo = min(
                 aggregate.lastActiveDaysAgo,
@@ -314,7 +358,7 @@ public enum AgentUsageWindow {
                     requests: aggregate.requests,
                     models: topModels(shares),
                     claudeShare: aggregate.total > 0
-                        ? Double(aggregate.claudeTotal) / Double(aggregate.total)
+                        ? Double(aggregate.sources.claude) / Double(aggregate.total)
                         : 0,
                     liveSessions: liveCounts[project] ?? 0,
                     idleDays: aggregate.lastActiveDaysAgo == .max
