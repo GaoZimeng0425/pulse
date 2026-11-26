@@ -55,11 +55,10 @@ enum Surface {
     /// 青 = 回收焕新语义;与十指标色拉得开(蓝牙青偏蓝、网络绿偏绿)。
     static let cleanAccentToken = MetricAccentToken(light: 0x0D9488, dark: 0x35C4B5)
     static let cleanAccent = cleanAccentToken.color
-    /// 智能体页专属强调色令牌(`{colors.accent-agents}`,agent-usage-redesign/01):
-    /// tab 图标、选中态、今日数字、日历色阶的唯一出处。青柠落在指标色表空着的
-    /// 黄绿段(磁盘金偏黄、电池绿偏绿),tab 条上认得出来;与指标色同形(双值令牌),
-    /// 两族互不相等由单测守护。
-    static let agentsAccentToken = MetricAccentToken(light: 0x5A921A, dark: 0xA6D94A)
+    /// 智能体页强调色令牌(`{colors.accent-agents}` = `{colors.accent-memory}`):
+    /// tab 图标、选中态、日历色阶的唯一出处。借内存靛紫,不另造色——整页颜色与总览
+    /// 同一套指标色才协调(代价:tab 条上与内存 tab 同色)。
+    static let agentsAccentToken = Metric.memory.accent
     static let agentsAccent = agentsAccentToken.color
     /// 状态点"停 / 未连接"(`{colors.state-inactive}`,p2-review/03 入表):系统 secondary
     /// 降到 40%——与亮起态的指标色点成对,不是文字层级,所以单立令牌而非用 `.tertiary`。
@@ -140,24 +139,21 @@ enum JunkTrashIdentity {
 
 // MARK: - 智能体页来源 / 模型分区色(agent-usage-redesign/01,DESIGN.md {colors.agent-source-*} / {agent-model-*})
 
-/// 智能体页「来源分段条 / 模型分段条」与走势分层的分区色唯一出处。两家来源各有
-/// 身份色、模型三档异色但柔和。不借指标色:分区色要回答「这是谁」,借来的颜色会和
-/// 别处同一个指标色混在一起。模型超出三档收第三档,不出第四种颜色。
+/// 智能体页「来源分段条 / 模型分段条」与走势分层的分区色唯一出处。全部借指标色
+/// (与总览同一套):Claude = 传感器赤陶、ZCode = CPU 蓝,
+/// 模型三档 = 网络绿 / GPU 粉 / 磁盘琥珀——都避开页面强调色(内存靛紫)。
+/// 模型超出三档收第三档,不出第四种颜色。
 enum AgentPartitionTint {
     /// 来源色令牌:`{colors.agent-source-claude}` / `{colors.agent-source-zcode}`。
     static func sourceToken(_ source: AgentUsageSource) -> MetricAccentToken {
         switch source {
-        case .claude: MetricAccentToken(light: 0xC9622F, dark: 0xE8946A)
-        case .zcode: MetricAccentToken(light: 0x6A4FE0, dark: 0x8F7CF5)
+        case .claude: Metric.sensors.accent
+        case .zcode: Metric.cpu.accent
         }
     }
 
     /// 模型三档令牌:`{colors.agent-model-first / second / third}`。
-    static let modelTokens: [MetricAccentToken] = [
-        MetricAccentToken(light: 0x1A78BD, dark: 0x58A8E8),
-        MetricAccentToken(light: 0xBD3A7C, dark: 0xE070A8),
-        MetricAccentToken(light: 0x93730F, dark: 0xCFAB4A),
-    ]
+    static let modelTokens: [MetricAccentToken] = [Metric.network.accent, Metric.gpu.accent, Metric.disk.accent]
 
     /// 来源 → 色。
     static func source(_ source: AgentUsageSource) -> Color {

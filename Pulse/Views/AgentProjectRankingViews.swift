@@ -357,9 +357,6 @@ struct AgentProjectDetail: View {
     let windowDays: Int
     let isCompact: Bool
 
-    /// 图例色点边长(圆角 2),取 `{layout.legend-swatch}`。
-    private static let legendSwatch: CGFloat = 6
-
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             buckets
@@ -489,9 +486,7 @@ struct AgentProjectDetail: View {
 
     private func legendItem(_ name: String, _ share: Double, _ tint: Color) -> some View {
         HStack(spacing: 4) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(tint)
-                .frame(width: Self.legendSwatch, height: Self.legendSwatch)
+            AgentLegendSwatch(tint: tint)
             Text(name)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)

@@ -2,7 +2,7 @@
 
 **Status:** ready-for-agent(2026-11-26;测试缝与拆票经用户确认)
 **原型(定稿方向的来源):** `prototype-usage-page.html`,`?mode=c`
-**拆票:** `issues/01`–`issues/04`
+**拆票:** `issues/01`–`issues/05`(05 = 用户二轮反馈:数字卡排回归、走势与日历宽屏并排、配色改借总览指标色、tab 图标换终端;与下文「主卡」「颜色」两节冲突处以 05 为准)
 
 ## Problem Statement
 
