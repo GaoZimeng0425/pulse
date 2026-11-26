@@ -63,6 +63,11 @@ struct AgentUsagePaneView: View {
         isCompact ? 8 : 16
     }
 
+    /// 卡头配件槽(药丸条与玻璃按钮)的尺寸档:弹窗用紧凑档。
+    private var headerPillSize: PillTabSize {
+        isCompact ? .compact : .regular
+    }
+
     var body: some View {
         if rows.isEmpty {
             emptyState
@@ -152,7 +157,9 @@ struct AgentUsagePaneView: View {
     private func trendCard(fillsHeight: Bool) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             CardHeader(symbolName: nil, title: "走势 · 近 \(range.days) 天", tint: agentsAccent) {
-                PillTabBar([AgentUsageRange.week, .month], selection: $range, isGlassContainer: true) { item in
+                PillTabBar(
+                    [AgentUsageRange.week, .month], selection: $range, isGlassContainer: true, size: headerPillSize
+                ) { item in
                     PillTabItem(title: item.title, symbol: nil, tint: agentsAccent)
                 }
             }
@@ -186,7 +193,8 @@ struct AgentUsagePaneView: View {
                 HStack(spacing: 8) {
                     rescanButton
                     PillTabBar(
-                        [AgentHeatGranularity.day, .week], selection: $heatGranularity, isGlassContainer: true
+                        [AgentHeatGranularity.day, .week], selection: $heatGranularity,
+                        isGlassContainer: true, size: headerPillSize
                     ) { item in
                         PillTabItem(title: item.title, symbol: nil, tint: agentsAccent)
                     }
@@ -244,7 +252,7 @@ struct AgentUsagePaneView: View {
                 Text(isScanning ? "扫描中" : "重新扫描")
             }
         }
-        .buttonStyle(HeaderGlassButtonStyle())
+        .buttonStyle(HeaderGlassButtonStyle(size: headerPillSize))
         .disabled(isScanning)
         .help("全量重扫 Claude 与 ZCode 的本地记录,补齐漏记的日子")
     }

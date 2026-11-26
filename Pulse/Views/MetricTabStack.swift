@@ -72,7 +72,7 @@ struct MetricTabStack<Ranking: View>: View {
                 AgentSubTabBar(selection: Binding(
                     get: { model.agentSubTab },
                     set: { model.agentSubTab = $0 }
-                ))
+                ), isCompact: isCompact)
             )
             switch model.agentSubTab {
             case .usage:

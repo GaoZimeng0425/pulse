@@ -14,6 +14,38 @@ struct PillTabItem {
     let tint: Color
 }
 
+/// 三档尺寸(DESIGN.md §Components「药丸页签条」):`.regular` = 显式 12 medium +
+/// 内距 9×5(工具栏/历史页);`.comfortable` = 清理页舒适密度档(14.5 medium +
+/// 内距 14×8,高≈34)——工具栏与弹窗的宽度预算不许被这档波及;`.compact` = 弹窗卡头
+/// 上的小切换(11 medium + 内距 7×3,玻璃外裹 3)。
+enum PillTabSize {
+    case regular
+    case comfortable
+    case compact
+
+    var fontSize: CGFloat {
+        switch self {
+        case .regular: 12
+        case .comfortable: 14.5
+        case .compact: 11
+        }
+    }
+
+    /// 药丸内距(水平 × 垂直)。
+    var pillPadding: (horizontal: CGFloat, vertical: CGFloat) {
+        switch self {
+        case .regular: (9, 5)
+        case .comfortable: (14, 8)
+        case .compact: (7, 3)
+        }
+    }
+
+    /// 玻璃外裹与药丸之间的内距。
+    var glassPadding: CGFloat {
+        self == .compact ? 3 : 4
+    }
+}
+
 /// 通用药丸 tab 条:主窗口工具栏 tab(经 `MetricPillTabBar` 薄封装)与历史页
 /// 指标 / 范围切换共用的同一视觉配方——选中 = 该项强调色 15% 胶囊底 + 同色
 /// 前景,未选中 = secondary 前景无底;内距 9(水平)×5(垂直)、药丸间距 4;
@@ -39,13 +71,7 @@ struct PillTabBar<Item: Hashable>: View {
         case always
     }
 
-    /// 两档尺寸(DESIGN.md §Components「药丸页签条」):`.regular` = 显式 12 medium +
-    /// 内距 9×5(工具栏/历史页);`.comfortable` = 清理页舒适密度档(14.5 medium +
-    /// 内距 14×8,高≈34)——工具栏与弹窗的宽度预算不许被这档波及。
-    enum Size {
-        case regular
-        case comfortable
-    }
+    typealias Size = PillTabSize
 
     let items: [Item]
     @Binding var selection: Item
@@ -75,7 +101,7 @@ struct PillTabBar<Item: Hashable>: View {
         if isGlassContainer {
             // 与工具栏同配方:首尾(及上下)药丸离玻璃胶囊边 4pt,不贴边。
             bar
-                .padding(4)
+                .padding(size.glassPadding)
                 .glassEffect()
         } else {
             bar
@@ -111,9 +137,9 @@ struct PillTabBar<Item: Hashable>: View {
                         )
                 }
             }
-            .font(.system(size: size == .comfortable ? 14.5 : 12, weight: .medium))
-            .padding(.horizontal, size == .comfortable ? 14 : 9)
-            .padding(.vertical, size == .comfortable ? 8 : 5)
+            .font(.system(size: size.fontSize, weight: .medium))
+            .padding(.horizontal, size.pillPadding.horizontal)
+            .padding(.vertical, size.pillPadding.vertical)
             .foregroundStyle(isSelected ? spec.tint : Color.secondary)
             .background(
                 isSelected ? spec.tint.opacity(0.15) : Color.clear,
@@ -135,15 +161,20 @@ struct PillTabBar<Item: Hashable>: View {
 // MARK: - 卡头玻璃按钮(DESIGN.md §Components「卡头玻璃按钮」)
 
 /// 卡头上的主动作按钮:胶囊形系统 Liquid Glass,与内容页里的玻璃药丸条同材质、同高——
-/// 药丸条高 = 文字 + 药丸内距 5×2 + 外裹 4×2,按钮把两层合成一层内距 9;水平内距 13 =
-/// 外裹 4 + 药丸 9,文字起点与旁边药丸条里的文字对齐。不自绘底、不加描边。
+/// 药丸条高 = 文字 + 药丸内距 ×2 + 外裹 ×2,按钮把两层合成一层;水平内距 = 外裹 + 药丸
+/// 水平内距,文字起点与旁边药丸条里的文字对齐。尺寸档跟旁边的药丸条走(常规 / 紧凑)。
+/// 不自绘底、不加描边。
 struct HeaderGlassButtonStyle: ButtonStyle {
+    /// 与同一配件槽里药丸条的尺寸档一致。
+    var size: PillTabSize = .regular
+
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 12, weight: .semibold))
+        let pill = size.pillPadding
+        return configuration.label
+            .font(.system(size: size.fontSize, weight: .semibold))
             .foregroundStyle(.primary)
-            .padding(.horizontal, 13)
-            .padding(.vertical, 9)
+            .padding(.horizontal, size.glassPadding + pill.horizontal)
+            .padding(.vertical, size.glassPadding + pill.vertical)
             .contentShape(.capsule)
             .glassEffect(.regular.interactive(), in: .capsule)
             .opacity(configuration.isPressed ? 0.8 : 1)
