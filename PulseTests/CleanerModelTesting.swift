@@ -2,9 +2,9 @@ import Foundation
 @testable import Pulse
 import PulseCore
 
-/// 测试用工厂(arch-clean/01):参数与 `CleanerModel.init` 同名同序;原先默认走 Live 的
-/// 三个参数(目录枚举 / 已装清点 / 废纸篓清点)默认给惰性替身——测试不再碰本机真
-/// /Applications、真废纸篓、真目录树。其余默认与 init 一致。
+/// 测试用工厂(arch-clean/01):参数与 `CleanerModel.init` 同名同序;生产走 Live 采集的
+/// 四个参数(目录枚举 / 已装清点 / 运行中应用 / 废纸篓清点)在这里默认给替身——测试
+/// 不碰本机真 /Applications、系统的工作区应用列表、真废纸篓、真目录树。其余默认与 init 一致。
 @MainActor
 extension CleanerModel {
     static func testing(
@@ -21,9 +21,11 @@ extension CleanerModel {
         installedAppInventory: @escaping @Sendable ([SpaceNode], Bool, String) -> InstalledAppInventory = { _, _, _ in
             .complete([])
         },
+        runningApps: @escaping @Sendable () -> [RunningAppIdentity] = { [] },
         trashInventory: @escaping @Sendable () async -> TrashInventory? = { nil },
         aiManifestReader: @escaping (String) -> String? = { try? String(contentsOfFile: $0, encoding: .utf8) },
-        scanCancelForceTimeout: TimeInterval = 5
+        scanCancelForceTimeout: TimeInterval = 5,
+        runningAppsFreshness: TimeInterval = 1
     ) -> CleanerModel {
         CleanerModel(
             exclusions: exclusions,
@@ -37,9 +39,11 @@ extension CleanerModel {
             homeDirectory: homeDirectory,
             markerExists: markerExists,
             installedAppInventory: installedAppInventory,
+            runningApps: runningApps,
             trashInventory: trashInventory,
             aiManifestReader: aiManifestReader,
-            scanCancelForceTimeout: scanCancelForceTimeout
+            scanCancelForceTimeout: scanCancelForceTimeout,
+            runningAppsFreshness: runningAppsFreshness
         )
     }
 }

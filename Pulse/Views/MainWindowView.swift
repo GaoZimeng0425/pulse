@@ -143,6 +143,18 @@ struct MainWindowView: View {
         )) { _ in
             MainWindowPlacement.repositionIfOffscreen()
         }
+        // 谁在运行变了(应用启动 / 退出)→ 清理清单重读。清单里「所属应用在运行就不出现」
+        // 的条目是读清单时现查的,这里不查,只让清理页重读;窗口关着时本视图不在,零动作。
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(
+            for: NSWorkspace.didLaunchApplicationNotification
+        )) { _ in
+            cleanerModel.noteRunningAppsMayHaveChanged()
+        }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(
+            for: NSWorkspace.didTerminateApplicationNotification
+        )) { _ in
+            cleanerModel.noteRunningAppsMayHaveChanged()
+        }
         // spec 最小尺寸 ~720×560;弹窗的宽度约束是 MenuBarExtra 专用,此处不适用。
         .frame(minWidth: 720, minHeight: 560)
         .containerBackground(Surface.window, for: .window)

@@ -143,19 +143,21 @@ public enum OrphanLeftoverDetector {
         }
     }
 
-    /// 与另两个规则域的候选去重(p5-cleaner/02 真案:规则表 `Library/Caches/org.swift.swiftpm`
-    /// 是 CLI 工具缓存,没有 .app,孤儿检测会再报一遍——同路径两张卡、勾一联动二、
-    /// 确认清单重复)。路径相等或互为祖孙 = 重叠,孤儿让位:规则表的说明与档位是逐条
-    /// 担保过的,比「不在已装清单」的推断更准。
+    /// 候选去重让位:与已认领的候选路径相等或互为祖孙 = 重叠,让位的一方不产出。
+    /// 出处(p5-cleaner/02):规则表 `Library/Caches/org.swift.swiftpm` 是 CLI 工具缓存,
+    /// 没有 .app,孤儿检测会再报一遍——同路径两张卡、勾一联动二、确认清单重复。孤儿让位:
+    /// 规则表的说明与档位是逐条担保过的,比「不在已装清单」的推断更准。通用发现
+    /// (p7-cleaner/02)让位走同一个函数,理由同上。
     public static func excludingOverlaps(
-        _ orphans: [JunkCandidate],
+        _ yielding: [JunkCandidate],
         claimedBy claimed: [JunkCandidate]
     ) -> [JunkCandidate] {
-        guard !claimed.isEmpty else { return orphans }
+        guard !claimed.isEmpty else { return yielding }
         let claimedPaths = claimed.map(\.path)
-        return orphans.filter { orphan in
+        return yielding.filter { candidate in
             !claimedPaths.contains { other in
-                other == orphan.path || orphan.path.hasPrefix(other + "/") || other.hasPrefix(orphan.path + "/")
+                other == candidate.path || candidate.path.hasPrefix(other + "/") || other
+                    .hasPrefix(candidate.path + "/")
             }
         }
     }

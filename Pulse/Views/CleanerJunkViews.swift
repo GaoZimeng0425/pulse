@@ -52,8 +52,10 @@ struct JunkListCard: View {
                     Spacer(minLength: 0)
                 } else {
                     CardEmptyState(
-                        title: "白名单没有识别出可回收项",
-                        detail: "只显示担保过的目录(ADR-0008);这台机器的开发工具与应用缓存已经干净"
+                        title: CleanerEmptyStateCopy.nothingFoundTitle,
+                        detail: CleanerEmptyStateCopy.nothingFoundDetail(
+                            hiddenRunningAppEntries: model.hiddenRunningAppEntryCount
+                        )
                     )
                     Spacer(minLength: 0)
                 }
