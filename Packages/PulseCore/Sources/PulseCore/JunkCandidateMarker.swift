@@ -36,16 +36,11 @@ public enum JunkCandidateMarker: String, Sendable, Equatable, CaseIterable {
     }
 }
 
-public extension JunkCandidate {
-    /// 候选的标记清单。固定序:需授权在前——它决定「点了会发生什么」,比认不认识更要紧。
-    var markers: [JunkCandidateMarker] {
-        var out: [JunkCandidateMarker] = []
-        if requiresAuthorization {
-            out.append(.requiresAuthorization)
-        }
-        if unidentified {
-            out.append(.unidentified)
-        }
-        return out
+public extension JunkCandidateMarker {
+    /// 标记清单的规范形:按 `allCases` 的固定序排列并去重——需授权在前,它决定「点了会
+    /// 发生什么」,比认不认识更要紧。候选只存规范形,比较与显示都不必再各自排序。
+    static func normalized(_ markers: [JunkCandidateMarker]) -> [JunkCandidateMarker] {
+        let present = Set(markers)
+        return allCases.filter { present.contains($0) }
     }
 }

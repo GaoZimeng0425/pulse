@@ -197,8 +197,7 @@ final class CleanPlanTests: XCTestCase {
             rationale: "",
             symbolName: "folder",
             modifiedAtScan: CleanFixture.directoryModified,
-            requiresAuthorization: true,
-            unidentified: true
+            markers: [.requiresAuthorization, .unidentified]
         )
         let plain = candidate("/Users/t/Library/Caches/Homebrew", bytes: 3100)
         let spy = FakeCleanTrashExecutor(nextRecycleOutcome: TrashRecycleOutcome(recycled: [
