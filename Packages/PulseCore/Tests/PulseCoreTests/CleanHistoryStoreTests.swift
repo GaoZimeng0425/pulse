@@ -111,6 +111,28 @@ final class CleanHistoryStoreTests: XCTestCase {
         XCTAssertEqual(items.map(\.markers), [[.requiresAuthorization], [.unidentified], []])
     }
 
+    /// 登记面:每个已登记的标记都能经「落库 → 读回」原样回来。历史库的列映射在落库与读库
+    /// 两处各手写一份——新增标记若忘了接,不报错、只是静默不进历史;这里按全 case 遍历兜底。
+    func testEveryMarkerSurvivesHistoryRoundTrip() async throws {
+        let store = try CleanHistoryStore(database: HistoryDatabase.openInMemory())
+        let items = JunkCandidateMarker.allCases.enumerated().map { index, marker in
+            CleanRunItem(
+                path: "/fixture/\(marker.rawValue)",
+                title: marker.rawValue,
+                bytes: Int64(index + 1),
+                tier: .checkFirst,
+                ruleID: "fixture.\(marker.rawValue)",
+                outcome: .recycled(destination: "/Users/t/.Trash/\(marker.rawValue)"),
+                markers: [marker]
+            )
+        }
+
+        let runID = try await store.record(makeReport(items: items))
+
+        let readBack = try await store.items(runID: XCTUnwrap(runID))
+        XCTAssertEqual(readBack.map(\.markers), items.map(\.markers), "有标记没接进历史库的列映射")
+    }
+
     /// 迁移幂等:p7-cleaner/01 之前的库(有清理表、没有标记列)补跑迁移即得两列,旧行读回无标记。
     func testMigrationAddsMarkerColumnsToExistingDatabase() async throws {
         let queue = try DatabaseQueue()

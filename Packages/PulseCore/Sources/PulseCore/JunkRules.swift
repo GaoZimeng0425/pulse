@@ -638,11 +638,10 @@ public struct JunkCandidate: Sendable, Identifiable, Equatable {
     /// 计入口径标注(p6-cleaner/02):Ollama 内容寻址在清单不可用时按整目录兜底,
     /// 行副标如实说明(nil = 无标注;沿用「部分扫描」附标惯例,不造新行形态)。
     public let accountingNote: String?
-    /// 客观标记(p7-cleaner/01):系统目录里的条目,移走前要运行时授权。默认否;
-    /// 由系统级条目给出,规则表匹配产出的候选恒为否。
-    public let requiresAuthorization: Bool
-    /// 客观标记(p7-cleaner/01):通用发现列出的名单外条目。默认否。
-    public let unidentified: Bool
+    /// 客观标记清单(p7-cleaner/01;GLOSSARY「运行时授权」「通用发现」):系统级条目带
+    /// 「需要管理员权限」,通用发现的条目带「未识别」。标记在候选上只有这一份(唯一出处),
+    /// 存进去的已是规范形(固定序、去重);规则表匹配产出的候选恒为空。
+    public let markers: [JunkCandidateMarker]
 
     public init(
         ruleID: String,
@@ -660,8 +659,7 @@ public struct JunkCandidate: Sendable, Identifiable, Equatable {
         newestChangeEpoch: Double? = nil,
         modifiedAtScan: Double? = nil,
         accountingNote: String? = nil,
-        requiresAuthorization: Bool = false,
-        unidentified: Bool = false
+        markers: [JunkCandidateMarker] = []
     ) {
         self.ruleID = ruleID
         self.group = group
@@ -678,8 +676,7 @@ public struct JunkCandidate: Sendable, Identifiable, Equatable {
         self.newestChangeEpoch = newestChangeEpoch
         self.modifiedAtScan = modifiedAtScan
         self.accountingNote = accountingNote
-        self.requiresAuthorization = requiresAuthorization
-        self.unidentified = unidentified
+        self.markers = JunkCandidateMarker.normalized(markers)
     }
 
     init(rule: JunkRule, node: SpaceNode, pattern: JunkPathPattern) {
