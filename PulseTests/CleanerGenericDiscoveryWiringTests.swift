@@ -25,7 +25,9 @@ final class CleanerGenericDiscoveryWiringTests: XCTestCase {
     }
 
     /// 运行中应用(测试中途切换 = 应用启动 / 退出)与采集次数。class 是刻意的:模型捕获
-    /// 同一个实例。锁是给并发检查看的——实际只在主线程调。
+    /// 同一个实例。
+    /// `@unchecked Sendable` 的前提:`apps` 与 `collections` 的全部访问都经 `lock`——采集
+    /// 闭包是 `@Sendable`(模型在主线程调它),测试在主线程改 `apps`、读计数,彼此隔锁。
     private final class RunningAppsBox: @unchecked Sendable {
         private let lock = NSLock()
         private var apps: [RunningAppIdentity]
@@ -58,6 +60,8 @@ final class CleanerGenericDiscoveryWiringTests: XCTestCase {
     }
 
     /// 落盘缓存的替身(缓存装载用例)。
+    /// `@unchecked Sendable` 的前提:`stored` 的读写全部经 `lock`——模型把 load / save 两个
+    /// `@Sendable` 闭包交给扫描与缓存装载的后台任务调,与测试主线程的读写隔锁。
     private final class PayloadBox: @unchecked Sendable {
         private let lock = NSLock()
         private var stored: SpaceScanCachePayload?
@@ -248,6 +252,24 @@ final class CleanerGenericDiscoveryWiringTests: XCTestCase {
     }
 
     // MARK: 自动勾选 / 总览 / 地图
+
+    /// 空态说明要把「查了没有」与「有但此刻没显示」分开:有因应用在运行而不显示的条目时
+    /// 报出有几项,没有时不提。
+    func testHiddenRunningAppEntryCountFeedsEmptyStateCopy() async {
+        let running = RunningAppsBox([])
+        let model = await scannedModel(running: running)
+        XCTAssertEqual(model.hiddenRunningAppEntryCount, 0)
+        let plainCopy = CleanerEmptyStateCopy.nothingFoundDetail(hiddenRunningAppEntries: 0)
+        XCTAssertTrue(plainCopy.contains("没有可回收项"))
+        XCTAssertFalse(plainCopy.contains("正在运行"), "没有隐藏条目就不提这件事")
+
+        running.setRunning([RunningAppIdentity(bundleID: "com.running.app", names: [])])
+        model.noteRunningAppsMayHaveChanged()
+        XCTAssertEqual(model.hiddenRunningAppEntryCount, 1, "所属目录是 com.running.app 的那一条;别的条目不算")
+        XCTAssertTrue(
+            CleanerEmptyStateCopy.nothingFoundDetail(hiddenRunningAppEntries: 1).contains("另有 1 项属于正在运行的应用")
+        )
+    }
 
     /// 「一键清理安全项」永远不勾通用发现的条目——它们不在安全档;规则表的安全项照常。
     func testSelectAllSafeNeverPicksGenericEntries() async {

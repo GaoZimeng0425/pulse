@@ -81,7 +81,7 @@ struct CleanerOverviewSection: View {
                     title: model.isRestoringCache ? "正在恢复上次扫描结果…" : "先扫一遍,看看能回收多少",
                     detail: model.isRestoringCache
                         ? "从缓存读回上次结果(约一秒;机器满载时稍等)"
-                        : "点右上「扫描整台 Mac」——白名单识别,未识别的目录不会出现",
+                        : CleanerEmptyStateCopy.beforeScanDetail,
                     actionTitle: model.isRestoringCache ? nil : "开始扫描",
                     action: model.isRestoringCache ? nil : { model.startScan() }
                 )
@@ -108,10 +108,11 @@ struct CleanerOverviewSection: View {
         return ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if overview.isEmpty {
-                    // 清单不再只有担保过的目录(通用发现兜名单外的缓存),说明照实说。
                     CardEmptyState(
-                        title: "没有识别出可回收项",
-                        detail: "名单上的目录和名单外的缓存都查过了;这台机器的开发工具与应用缓存已经干净"
+                        title: CleanerEmptyStateCopy.nothingFoundTitle,
+                        detail: CleanerEmptyStateCopy.nothingFoundDetail(
+                            hiddenRunningAppEntries: model.hiddenRunningAppEntryCount
+                        )
                     )
                     .cardShell(compact: false)
                     // 空清单时废纸篓卡独占一行(网格里孤卡半宽反而失衡)。

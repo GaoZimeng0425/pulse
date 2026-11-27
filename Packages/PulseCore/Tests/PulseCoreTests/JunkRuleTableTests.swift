@@ -4,7 +4,8 @@ import XCTest
 
 /// 安全白名单规则表与匹配器(p4-cleaner/04;ADR-0008)。
 /// 核心命题:①每条内置规则至少被一个正例命中——**登记完整性**,新增规则不补正例必红;
-/// ②似是而非的目录绝不出现(未命中不显示 = 不可删);③排除只收窄;④空目录不列、部分扫描照列。
+/// ②似是而非的目录绝不因本表出现(未命中 = 本表不出它;名单外的目录另由通用发现以
+/// 「先检查」列出,不在本表);③排除只收窄;④空目录不列、部分扫描照列。
 /// 全部打在假家目录上(CleanFixture.homeListings),零真盘。
 final class JunkRuleTableTests: XCTestCase {
     private let home = "/Users/test"
@@ -96,8 +97,8 @@ final class JunkRuleTableTests: XCTestCase {
         "Library/Containers/com.docker.docker/Settings",
         "Library/Caches",
         "Library/pnpm",
-        // p6-cleaner/01:知识库外的 Caches 目录不列(认不出 = 不碰,ADR-0008 / spec 定案 10);
-        // 字面匹配大小写敏感,"arc" ≠ "Arc"。
+        // p6-cleaner/01:知识库外的 Caches 目录不经本表(本表不出它;名单外的由通用发现
+        // 另列,ADR-0013);字面匹配大小写敏感,"arc" ≠ "Arc"。
         "Library/Caches/arc",
         "Library/Caches/MyGo Music",
         "Library/Caches/Citro Labs",
@@ -162,7 +163,7 @@ final class JunkRuleTableTests: XCTestCase {
         XCTAssertEqual(rulesWithoutHit(JunkRuleTable.builtin + [bogus], candidates: candidates), ["bogus.noExample"])
     }
 
-    // MARK: 未命中不显示
+    // MARK: 未命中本表不出
 
     func testLookalikeDirectoriesNeverAppear() async {
         var dirs = allExamples()

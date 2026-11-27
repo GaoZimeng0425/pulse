@@ -51,10 +51,11 @@ struct JunkListCard: View {
                     )
                     Spacer(minLength: 0)
                 } else {
-                    // 清单不再只有担保过的目录(通用发现兜名单外的缓存),说明照实说。
                     CardEmptyState(
-                        title: "没有识别出可回收项",
-                        detail: "名单上的目录和名单外的缓存都查过了;这台机器的开发工具与应用缓存已经干净"
+                        title: CleanerEmptyStateCopy.nothingFoundTitle,
+                        detail: CleanerEmptyStateCopy.nothingFoundDetail(
+                            hiddenRunningAppEntries: model.hiddenRunningAppEntryCount
+                        )
                     )
                     Spacer(minLength: 0)
                 }

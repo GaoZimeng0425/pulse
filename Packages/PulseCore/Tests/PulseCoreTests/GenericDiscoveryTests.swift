@@ -1,9 +1,10 @@
 @testable import PulseCore
+import PulseCoreTestSupport
 import XCTest
 
 /// 通用发现 + 保护名单(p7-cleaner/02;ADR-0013;GLOSSARY「通用发现」「保护名单」)。
 /// 接缝 = 扫描树 → 候选清单:手搭家目录下的三处(缓存 / 日志 / 应用数据),已认领路径、
-/// 排除目录、运行中应用作为输入注入,零真盘。
+/// 排除目录、运行中应用作为输入注入,零真盘;废纸篓执行用 spy,绝不真删。
 final class GenericDiscoveryTests: XCTestCase {
     // MARK: 夹具(手搭 ~/Library 域树)
 
@@ -96,7 +97,9 @@ final class GenericDiscoveryTests: XCTestCase {
         XCTAssertEqual(item.group, .appCache, "并入现有分组,不新开")
         XCTAssertEqual(item.bytes, 700)
         XCTAssertEqual(item.title, "SomeTool")
-        XCTAssertFalse(item.rationale.isEmpty, "行悬停要有一句说明")
+        // 行悬停要说清两件事:清了会怎样、为什么它不会被自动勾。
+        XCTAssertTrue(item.rationale.contains("先检查"), "悬停说明要交代它为什么不进自动勾选:\(item.rationale)")
+        XCTAssertTrue(item.rationale.contains("重新生成"), "悬停说明要交代清了会怎样:\(item.rationale)")
     }
 
     /// 「按新旧」排序用子树内任何文件的最新变动(与卸载残留同口径),不是目录自己那一层;
@@ -159,9 +162,11 @@ final class GenericDiscoveryTests: XCTestCase {
         XCTAssertEqual(out.map(\.path), [cachesPath + "/KeptTool"])
     }
 
-    /// 只管三处:家目录下其它位置(文稿、偏好设置、应用容器、临时目录)里有东西也不列。
+    /// 只管三处:家目录下其它位置(文稿、偏好设置、应用容器)里有东西也不列;系统临时目录
+    /// (`/private/tmp` 下放着进行中的工作)与用户临时目录(`/private/var/folders/…/T`)
+    /// 哪怕和扫描树一起传进来也不列。
     func testLocationsOutsideTheThreeRootsAreNeverListed() {
-        let tree = dir("Users", under: "/", children: [
+        let homeTree = dir("Users", under: "/", children: [
             dir("me", under: "/Users", children: [
                 dir("Documents", under: home, children: [
                     dir("SomeTool", under: home + "/Documents", bytes: 900),
@@ -176,8 +181,30 @@ final class GenericDiscoveryTests: XCTestCase {
                 ]),
             ]),
         ])
+        let folders = "/private/var/folders/ab"
+        let systemTree = dir("private", under: "/", children: [
+            dir("tmp", under: "/private", children: [
+                dir("claude-501", under: "/private/tmp", bytes: 500),
+            ]),
+            dir("var", under: "/private", children: [
+                dir("folders", under: "/private/var", children: [
+                    dir("ab", under: "/private/var/folders", children: [
+                        dir("T", under: folders, children: [
+                            dir("SomeTool", under: folders + "/T", bytes: 300),
+                        ]),
+                    ]),
+                ]),
+            ]),
+        ])
 
-        XCTAssertTrue(detect(in: tree).isEmpty)
+        let out = GenericDiscovery.detect(
+            in: [homeTree, systemTree],
+            home: home,
+            claimedBy: [],
+            excludedPathPrefixes: []
+        )
+
+        XCTAssertTrue(out.isEmpty)
     }
 
     // MARK: 去重让位
@@ -232,16 +259,16 @@ final class GenericDiscoveryTests: XCTestCase {
     // MARK: 保护名单
 
     /// 保护名单按名字命中就不列。每类给一个现实里的真名;名字旁边的编号是对齐对象
-    /// 踩同一个坑的事故记录,只借事实。
+    /// 的 issue,只借事实。
     func testProtectedNamesAreNeverListed() {
         let protected = [
             // 密码与密钥类(沿用孤儿检测的敏感名单)
             "com.1password.1password", "com.agilebits.onepassword4", "Bitwarden",
-            // 日历缓存(#1508:日历代理常驻,清了崩到重新登录)
+            // 日历缓存(#1508:缺陷报告,清理后日历启动即崩)
             "Calendar Cache",
-            // 壁纸缩略图(#1118:清了系统设置里的壁纸封面变成占位图)
+            // 壁纸缩略图(#1118:用户报告清理后壁纸封面不见)
             "wallpaper-thumbnails",
-            // 接力 / 通用剪贴板的中转缓存(#1178)
+            // 接力 / 通用剪贴板的中转缓存:同步到一半的条目不能断
             "shared-pasteboard",
             // 编译模型缓存(守护进程在跑时清了,识别功能坏到它重启)
             "E5RT.e5bundlecache",
@@ -261,6 +288,22 @@ final class GenericDiscoveryTests: XCTestCase {
         XCTAssertEqual(detect(in: tree).map(\.path), [cachesPath + "/PlainTool"])
     }
 
+    /// 厂商名里短的那些不许撞上长得像的词:ESET 只认反域名里的那一段(`com.eset.*`)与
+    /// 词首(`ESET Endpoint Security`);preset、reset 不算它,照列。
+    func testShortVendorNameDoesNotMatchLookalikeWords() {
+        let tree = tree(caches: [
+            dir("com.eset.endpoint", under: cachesPath, bytes: 100),
+            dir("ESET Endpoint Security", under: cachesPath, bytes: 100),
+            dir("PresetCache", under: cachesPath, bytes: 100),
+            dir("com.example.reset", under: cachesPath, bytes: 100),
+        ])
+
+        XCTAssertEqual(
+            detect(in: tree).map(\.path),
+            [cachesPath + "/PresetCache", cachesPath + "/com.example.reset"]
+        )
+    }
+
     /// 系统所有的条目不进通用发现:带 `com.apple.` 前缀的、名为「Apple」的,以及不带
     /// 前缀的那批守护进程缓存(只认前缀会漏掉它们)。它们的守护进程常年常驻,「在运行就
     /// 跳过」对它们没有可靠信号;认得的苹果缓存走知识库逐条担保。别家的反域名条目照列。
@@ -278,7 +321,7 @@ final class GenericDiscoveryTests: XCTestCase {
         XCTAssertEqual(detect(in: tree).map(\.path), [cachesPath + "/com.microsoft.something"])
     }
 
-    // MARK: 正在运行的应用(现查过滤,不在扫描时判)
+    // MARK: 正在运行的应用(读清单时现查,不在扫描时判)
 
     /// 正在运行的应用的条目此刻不出现,对应方式各一例:目录名就是 bundle id(不分大小写);
     /// 是 bundle id 的子组件;是应用名;是知识库给这个应用登记的别名——知识库条目
@@ -303,7 +346,7 @@ final class GenericDiscoveryTests: XCTestCase {
         XCTAssertEqual(Set(out.map(\.path)), [cachesPath + "/Stopped App", cachesPath + "/com.running.applicate"])
     }
 
-    /// 缓存目录只取了应用名的前半截也对得上(本机实案:应用「MyGo Music」,目录叫「MyGo」):
+    /// 缓存目录只取了应用名的前半截也对得上(应用叫「MyGo Music」,缓存目录起名叫「MyGo」):
     /// 目录名是运行中应用某段标识的开头一段就算。只认到词边界——连写的「MyGoMusic」不算。
     func testLeadingWordsOfRunningAppNameAreSkipped() {
         let tree = tree(caches: [
@@ -336,7 +379,8 @@ final class GenericDiscoveryTests: XCTestCase {
         )
     }
 
-    /// 运行中应用的读数:版本号没变且没过期,重复读只采一次;过期、版本号变了都重采。
+    /// 运行中应用的读数:版本号没变且没过期,重复读只采一次;过期、版本号变了都重采;
+    /// 时钟往回拨(离采集的时间差变成负的)也重采——不知道它要多久才追得上。
     func testRunningAppsReadingReusesOneCollectionWithinFreshness() {
         var reading = RunningAppsReading(freshness: 1)
         var collections = 0
@@ -355,20 +399,38 @@ final class GenericDiscoveryTests: XCTestCase {
 
         _ = reading.value(at: start.addingTimeInterval(1.2), revision: 1, collect: collect)
         XCTAssertEqual(collections, 3, "版本号变了(应用启动 / 退出)即刻重采,不等过期")
+
+        _ = reading.value(at: start.addingTimeInterval(0.5), revision: 1, collect: collect)
+        XCTAssertEqual(collections, 4, "时钟回拨:时间差为负,不算新鲜")
     }
 
-    /// 进了确认清单的通用发现条目带着规则 id 与「未识别」:清理历史按它查得出是哪一轮、哪个来源。
-    func testPlannedEntryCarriesRuleIDAndFlag() throws {
+    /// 清过的通用发现条目在清理历史里查得出是哪个来源、带「未识别」:规则 id 与条目标志
+    /// 从候选一路带进计划、战报、落库读回。
+    func testCleanedEntryIsTraceableInHistory() async throws {
+        let path = cachesPath + "/SomeTool"
         let item = try XCTUnwrap(detect(in: tree(caches: [
-            dir("SomeTool", under: cachesPath, bytes: 700, ownModified: now),
+            // 与假废纸篓的删前复核快照同一个时刻,条目才放行。
+            dir("SomeTool", under: cachesPath, bytes: 700, ownModified: CleanFixture.directoryModified),
         ])).only)
         var selection = JunkSelection()
         selection.set(item, selected: true)
-
         let plan = CleanPlan.make(selection: selection, candidates: [item], excludedPathPrefixes: [])
-
-        XCTAssertEqual(plan.items.map(\.ruleID), [GenericDiscovery.ruleID])
         XCTAssertEqual(plan.items.map(\.flags), [[.unidentified]])
+
+        let report = await CleanRunner.run(
+            plan,
+            using: FakeCleanTrashExecutor(
+                nextRecycleOutcome: TrashRecycleOutcome(recycled: [path: "/Users/me/.Trash/SomeTool"])
+            )
+        )
+        let store = try CleanHistoryStore(database: HistoryDatabase.openInMemory())
+        let runID = try await store.record(report)
+
+        XCTAssertTrue(report.failed.isEmpty, "删前复核放行,战报里是成功项")
+        let items = try await store.items(runID: XCTUnwrap(runID))
+        XCTAssertEqual(items.map(\.ruleID), [GenericDiscovery.ruleID])
+        XCTAssertEqual(items.map(\.flags), [[.unidentified]])
+        XCTAssertEqual(items.map(\.tier), [.checkFirst])
     }
 
     // MARK: 日志目录 / 应用数据目录
@@ -411,6 +473,24 @@ final class GenericDiscoveryTests: XCTestCase {
         XCTAssertEqual(out.map(\.bytes), [400, 300, 50])
     }
 
+    /// 应用数据目录下右键排除与零字节两道闸照常生效:排除的缓存子目录不列;零字节且不是
+    /// 部分扫描的不列,部分扫描的照列。
+    func testAppSupportHonorsExclusionAndZeroByteGates() {
+        let app = appSupportPath + "/SomeEditor"
+        let tree = tree(appSupport: [
+            dir("SomeEditor", under: appSupportPath, children: [
+                dir("Cache", under: app, bytes: 400),
+                dir("Code Cache", under: app, bytes: 300),
+                dir("GPUCache", under: app, bytes: 0),
+                dir("DawnCache", under: app, bytes: 0, partial: true),
+            ]),
+        ])
+
+        let out = detect(in: tree, excluded: [app + "/Code Cache"])
+
+        XCTAssertEqual(out.map(\.path), [app + "/Cache", app + "/DawnCache"])
+    }
+
     /// 浏览器用户资料目录靠结构进不来:应用目录本身就是资料根(登录态与 Cookie 在这),
     /// 缓存在它下面第二层——通用发现只看应用目录的直接子目录,里面叫 Cache 的也轮不到;
     /// 「User Data」「Profiles」不是缓存名,同样不收。资料根的直接子目录里真叫缓存的照列。
@@ -437,9 +517,9 @@ final class GenericDiscoveryTests: XCTestCase {
         XCTAssertEqual(detect(in: tree).map(\.path), [profile + "/GPUCache"])
     }
 
-    /// 应用数据目录下三道闸照常生效:受保护的应用目录整个跳过(含它下面的缓存子目录——
-    /// 邮件数据、端点防护类软件、系统所有);正在运行的应用的目录跳过,按 bundle id 或按
-    /// 应用名都对得上;没在跑的照列。
+    /// 应用数据目录下保护名单照常生效:受保护的应用目录整个跳过,含它下面的缓存子目录
+    /// (邮件数据、设备备份、端点防护类软件、系统所有)。「所属应用在运行」的目录也跳过,
+    /// 按 bundle id、按应用名都对得上;没在跑的照列。
     func testAppSupportHonorsProtectionAndRunningApps() {
         func appDir(_ name: String, children: [SpaceNode] = []) -> SpaceNode {
             // 每个应用目录下都放一个名字明确的缓存子目录:受保护 / 在运行的,它不该被列。

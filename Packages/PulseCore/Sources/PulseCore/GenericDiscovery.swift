@@ -8,13 +8,15 @@ import Foundation
 // 永不进自动勾选(GLOSSARY「通用发现」)。
 // 只管三处:缓存目录一级条目、日志目录一级条目、应用数据目录各应用目录里名字明确的
 // 缓存子目录。放着进行中工作的临时目录等不进通用发现,只在规则表里按工具点名。
-// 扫描树 → 候选是纯值、零 IO,与卸载残留检测同形:跑在已扫出的扫描树上。
-// 「所属应用此刻在运行」不在扫描快照里判:扫描之后才启动的应用,它的缓存不该还列着。
-// 它是另一个纯函数(`excludingRunningApps`),由调用方每次读清单时现查现传,与在用保护
-// 同一个「判定不缓存」的纪律。
-// 对齐对象在这条路上的事故教训只借事实(路径、条件),零搬码。
+// 分两步,都是纯值、零 IO、跑在已扫出的扫描树上:
+//   ① detect:扫描树 → 候选。只判「名单外、不受保护、没被认领」——结果是扫描快照的
+//      函数,调用方随扫描结果记忆;
+//   ② excludingRunningApps:按「谁在运行」筛。它随时间变,所以不进①的结果:每次读
+//      清单时现查现传(采集的成本由 `RunningAppsReading` 摊薄)。被筛掉的条目不显示、
+//      不计数——在用保护是另一回事(在用项照列,只是不许删)。
+// 对齐对象在这条路上的用户报告只借事实(哪个路径、什么条件下出的问题),零搬码。
 
-/// 运行中的应用的身份(「在运行应用」判定的输入;Live 从系统的工作区应用列表采集)。
+/// 运行中的应用的身份(「在运行」判定的输入;Live 从系统的工作区应用列表采集)。
 /// 纯值:采集在 app 侧,判定在这里。
 public struct RunningAppIdentity: Sendable, Equatable {
     /// bundle id;没有 bundle id 的应用为 nil。
@@ -33,7 +35,7 @@ public enum GenericDiscovery {
     public static let ruleID = "app-generic"
 
     /// 行悬停说明:说不出它属于谁,只说清「清了会怎样、为什么不会自动勾」。
-    static let rationale = "名单外的目录:名字看起来是缓存,但说不出属于哪个工具。清了通常会自动重建;不确定里面有没有还要用的东西,所以只列在「先检查」,不会被自动勾选。"
+    static let rationale = "名单外的目录:看起来是缓存或日志,但说不出属于哪个工具。清了通常会自动重新生成;不确定里面有没有还要用的东西,所以只列在「先检查」,不会被自动勾选。"
 
     /// 应用数据目录下算得上「名字明确的缓存」的子目录名(小写比较——磁盘默认不分大小写)。
     /// 只收定义上就是可重建缓存的:Chromium / Electron 系的渲染进程缓存一族,加通用的
@@ -44,7 +46,7 @@ public enum GenericDiscovery {
         "cacheddata", "graphitedawncache", "dawngraphitecache", "dawnwebgpucache",
     ]
 
-    /// 扫描树 → 通用发现的候选。不判「在运行」(那是现查的事,见文件头)。
+    /// 扫描树 → 通用发现的候选。不判「在运行」(那是读清单时的事,见文件头②)。
     /// - Parameters:
     ///   - trees: 扫描产出(`SpaceScanResult.trees`)。
     ///   - home: 用户家目录(定位 ~/Library 三处)。
@@ -75,7 +77,7 @@ public enum GenericDiscovery {
         }
 
         var out: [JunkCandidate] = []
-        // 缓存目录、日志目录:一级条目,一个目录一条。
+        // 缓存目录、日志目录:一级条目,一个目录一条;所属目录就是条目自己。
         for rootName in ["Caches", "Logs"] {
             guard let root = domain(rootName) else { continue }
             for child in root.children where child.kind == .directory {
@@ -85,7 +87,7 @@ public enum GenericDiscovery {
         }
         // 应用数据目录:这里装着登录态、本地数据库、离线资源,只收各应用目录下**名字明确
         // 是缓存**的子目录,一个子目录一条——资料目录、数据库、工作区状态一律轮不到。
-        // 应用目录本身过不了闸的,下面一律不进。
+        // 应用目录本身过不了闸的,下面一律不进。所属目录 = 上面那层应用目录。
         if let appSupport = domain("Application Support") {
             for appDirectory in appSupport.children where appDirectory.kind == .directory {
                 guard passesGates(appDirectory) else { continue }
@@ -102,13 +104,14 @@ public enum GenericDiscovery {
         // 去重让位:与规则表 / 项目产物 / 卸载残留路径相等或互为祖孙就让位——那一侧
         // 的说明与档位是逐条担保过的,比「名单外」的推断更准。规则与孤儿让位同一个函数。
         return OrphanLeftoverDetector.excludingOverlaps(
-            out.sorted { $0.bytes != $1.bytes ? $0.bytes > $1.bytes : $0.path < $1.path },
+            out.sortedForDisplay(by: .size),
             claimedBy: claimed
         )
     }
 
-    /// 现查过滤:通用发现的条目里,所属应用此刻在运行的,此刻不出现(它的缓存此刻在用,
-    /// 视同在用)。每次读清单时调用——答案随时间变,不进扫描结果。非通用发现的条目原样通过。
+    /// 按「谁在运行」筛:通用发现的条目里,所属目录属于正在运行的应用的,此刻不出现
+    /// (它的缓存此刻多半在用)。每次读清单时调用,结果不进扫描结果。
+    /// 非通用发现的条目原样通过——它们在不在用由在用保护现查。
     public static func excludingRunningApps(
         _ candidates: [JunkCandidate],
         runningApps: [RunningAppIdentity]
@@ -120,8 +123,9 @@ public enum GenericDiscovery {
         }
     }
 
-    /// 通用发现条目的「所属目录名」:缓存 / 日志条目就是它自己;应用数据目录的缓存子目录
-    /// 是它上面那层应用目录(`…/Application Support/<应用>/Cache`)。
+    /// 通用发现条目的「所属目录名」,与 `detect` 的两处形状一一对应:缓存 / 日志条目是
+    /// 路径最后一段自己;应用数据目录的缓存子目录是它上面那层应用目录
+    /// (`…/Application Support/<应用>/Cache`,倒数第三段恒为 Application Support)。
     static func ownerDirectoryName(of candidate: JunkCandidate) -> String {
         let parts = candidate.path.split(separator: "/").map(String.init)
         if parts.count >= 3, parts[parts.count - 3] == "Application Support" {
@@ -156,7 +160,8 @@ public enum GenericDiscovery {
 /// 运行中应用的读数:一小段时间内的重复读共用一次采集。
 /// 采集有成本(逐应用读属性,本机两百来个应用约 2 毫秒),而一次渲染会把清单读好几遍。
 /// 新鲜 = 距采集不满 `freshness`,且「谁在运行」的版本号没变(`revision` 由调用方在
-/// 应用启动 / 退出、生成确认清单前递增)。时间由调用方传:纯值,零时钟。
+/// 应用启动 / 退出、生成确认清单前递增)。时钟往回拨(距采集的时间差为负)不算新鲜:
+/// 等它自己追上要多久不知道,重采最省事。时间由调用方传:纯值,零时钟。
 public struct RunningAppsReading {
     private let freshness: TimeInterval
     private var snapshot: (value: [RunningAppIdentity], collectedAt: Date, revision: Int)?
@@ -170,9 +175,11 @@ public struct RunningAppsReading {
         revision: Int,
         collect: () -> [RunningAppIdentity]
     ) -> [RunningAppIdentity] {
-        if let snapshot, snapshot.revision == revision,
-           now.timeIntervalSince(snapshot.collectedAt) < freshness {
-            return snapshot.value
+        if let snapshot, snapshot.revision == revision {
+            let age = now.timeIntervalSince(snapshot.collectedAt)
+            if age >= 0, age < freshness {
+                return snapshot.value
+            }
         }
         let value = collect()
         snapshot = (value, now, revision)
@@ -183,8 +190,8 @@ public struct RunningAppsReading {
 /// 「哪些目录名属于正在运行的应用」。运行中应用的每段标识(bundle id、应用名、知识库
 /// 登记的别名)都登记进来,一个目录名算它的有三种对应,**都认到段边界为止**:
 ///   · 整段相等:目录名就是它的 bundle id 或应用名(不分大小写);
-///   · 目录名是某段标识的开头一段:目录「MyGo」之于应用名「MyGo Music」(本机实案:
-///     缓存目录只取了应用名的前半截,整名相等对不上);
+///   · 目录名是某段标识的开头一段:目录「MyGo」之于应用名「MyGo Music」(缓存目录
+///     只取应用名前半截的起名方式,整名相等对不上);
 ///   · 某段标识是目录名的开头一段:目录 `com.running.app.helper` 之于 bundle id
 ///     `com.running.app`(子组件 / 助手的缓存)。
 /// 段边界 = 点或空格:`com.running.applicate` 与 `com.running.app` 只是前几个字符相同,不算。

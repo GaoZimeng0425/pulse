@@ -621,13 +621,31 @@ final class CleanerModel {
 
     // MARK: 清单(04 全局缓存 + 05 项目产物)
 
-    /// 可删单元:全局缓存(04)+ 项目产物(05)+ 卸载残留 + 通用发现(p7-cleaner/02)都跑在
-    /// 同一棵扫描树上,排除目录与本会话已回收的项不列。仍是计算属性——读 `phase` /
-    /// `exclusions.paths` / `scanRoots.paths` / `recycledPaths` 照常登记观察,设置页改动
-    /// 即时反映、不必重扫;但按这四样输入记忆化(cleaner-hardening/05):一次渲染读好几
-    /// 次、点勾选整卡重绘,输入不变就不重跑匹配器(项目产物要整棵 DFS + 查标记文件)。
-    /// 唯一不进备忘的是「所属应用此刻在运行」:备忘跟扫描结果走,而谁在运行随时间变。
+    /// 可删单元:全局缓存(04)+ 项目产物(05)+ 卸载残留 + 通用发现(p7-cleaner/02),排除
+    /// 目录与本会话已回收的项不列。其中通用发现的条目若所属应用此刻在运行,不出现——
+    /// 每次读都现查现滤,不进备忘(备忘跟扫描结果走,而谁在运行随时间变;见
+    /// `listedCandidates`)。读 `runningAppsRevision` 即登记观察:应用启动 / 退出时视图
+    /// 一戳(`noteRunningAppsMayHaveChanged`),读着清单的视图重读。
     var candidates: [JunkCandidate] {
+        GenericDiscovery.excludingRunningApps(
+            listedCandidates,
+            runningApps: runningAppsReading.value(
+                at: Date(), revision: runningAppsRevision, collect: runningAppsSource
+            )
+        )
+    }
+
+    /// 此刻因「所属应用在运行」而不显示的条目数。空态说明据此把「查了没有」与
+    /// 「有但没显示」分开说(DESIGN.md「未知与未查分开」)。
+    var hiddenRunningAppEntryCount: Int {
+        listedCandidates.count - candidates.count
+    }
+
+    /// 不含「在运行」过滤的清单。计算属性——读 `phase` / `exclusions.paths` /
+    /// `scanRoots.paths` / `recycledPaths` 照常登记观察,设置页改动即时反映、不必重扫;
+    /// 但按这四样输入记忆化(cleaner-hardening/05):一次渲染读好几遍、点勾选整卡重绘,
+    /// 输入不变就不重跑匹配器(项目产物要整棵 DFS + 查标记文件)。
+    private var listedCandidates: [JunkCandidate] {
         let key = CandidatesKey(
             phaseGeneration: phaseGeneration,
             excluded: exclusions.paths,
@@ -636,22 +654,12 @@ final class CleanerModel {
         )
         // 先读 phase 再判缓存:保证观察登记与未命中时一致。
         guard let result else { return [] }
-        let listed: [JunkCandidate]
         if let candidatesMemo, candidatesMemo.key == key {
-            listed = candidatesMemo.value
-        } else {
-            listed = computeCandidates(in: result, key: key)
-            candidatesMemo = (key, listed)
+            return candidatesMemo.value
         }
-        // 通用发现里所属应用在运行的条目此刻不出现:每次读都现查现滤。读
-        // `runningAppsRevision` 即登记观察——应用启动 / 退出时视图一戳
-        // (`noteRunningAppsMayHaveChanged`),读着清单的视图重读。
-        return GenericDiscovery.excludingRunningApps(
-            listed,
-            runningApps: runningAppsReading.value(
-                at: Date(), revision: runningAppsRevision, collect: runningAppsSource
-            )
-        )
+        let value = computeCandidates(in: result, key: key)
+        candidatesMemo = (key, value)
+        return value
     }
 
     private struct CandidatesKey: Equatable {

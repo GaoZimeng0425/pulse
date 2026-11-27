@@ -47,6 +47,25 @@ enum CleanerListMetrics {
     static let checkBoxSize: CGFloat = 20
 }
 
+/// 清理页空态说明里跟着清单内容走的那几句:总览与全部清单两处同文,单出处。
+enum CleanerEmptyStateCopy {
+    /// 扫描前:说清扫完会看到什么。
+    static let beforeScanDetail = "点右上「扫描整台 Mac」——能安全清的和拿不准的缓存、日志目录都会列出来,拿不准的标「先检查」"
+
+    /// 扫描后清单为空:标题。
+    static let nothingFoundTitle = "没有识别出可回收项"
+
+    /// 扫描后清单为空:说明。「查了没有」与「有但此刻没显示」分开说——属于正在运行的
+    /// 应用的条目不显示,数出来才说,没有就不提。
+    static func nothingFoundDetail(hiddenRunningAppEntries: Int) -> String {
+        guard hiddenRunningAppEntries > 0 else {
+            return "缓存、日志、应用数据里的缓存目录都查过了,没有可回收项"
+        }
+        return "缓存、日志、应用数据里的缓存目录都查过了,目前没有列出可回收项;"
+            + "另有 \(hiddenRunningAppEntries) 项属于正在运行的应用,退出该应用后才会显示"
+    }
+}
+
 /// 清理页统一勾选框,自绘:off 空心、on 实心带勾、mixed 实心带横线、disabled 压暗。
 /// 纯显示件——点击语义在宿主(整行可点,不逼用户点小方块)。
 struct CleanerCheckBox: View {
@@ -107,7 +126,7 @@ struct JunkListSection: View {
                     title: model.isRestoringCache ? "正在恢复上次扫描结果…" : "先扫一遍,看看能回收多少",
                     detail: model.isRestoringCache
                         ? "从缓存读回上次结果(约一秒;机器满载时稍等)"
-                        : "点右上「扫描整台 Mac」——白名单识别,未识别的目录不会出现",
+                        : CleanerEmptyStateCopy.beforeScanDetail,
                     actionTitle: model.isRestoringCache ? nil : "开始扫描",
                     action: model.isRestoringCache ? nil : { model.startScan() }
                 )

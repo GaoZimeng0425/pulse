@@ -3,8 +3,9 @@ import Foundation
 // MARK: - 应用缓存知识库(p6-cleaner/01)
 
 //
-// ~/Library/Caches 一级目录名 → 定档表:**认得出的目录才进清单,认不出不列不碰**
-// (ADR-0008;spec 定案 10——"按大小发现、未识别也列"的阈值式留待二期单拍)。
+// ~/Library/Caches 一级目录名 → 定档表。本表只决定「认得出的目录」的档位——命中才有
+// 资格进「可安全清理」;认不出的目录不经本表,由通用发现(`GenericDiscovery`)兜住,
+// 一律「先检查」(ADR-0013 改写 ADR-0008 的「认不出不列不碰」)。
 // 名字与档位移植自 purge-app(jithin-sabu/purge-app,MIT License)
 // `purge/Resources/explanations.json`(目录名匹配 key / aliases / bundle_ids 的
 // 上游语义收编为"规范大小写目录名,字面精确匹配");文案按 Pulse 两档口径中文

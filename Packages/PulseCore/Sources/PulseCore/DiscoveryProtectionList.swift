@@ -10,32 +10,35 @@ import Foundation
 // 浏览器用户资料目录不在这里:通用发现在应用数据目录下只收名字明确的缓存子目录,
 // 资料目录本身与它下面几层都轮不到,靠结构就进不来。
 // 「正在运行的应用」也受保护,但它随时间变:由通用发现的调用方每回现传,不写在这里。
-// 对齐对象的事故编号只借事实(哪个路径、什么条件下出的事),零搬码。
+// 对齐对象的 issue 编号只借事实(哪个路径、什么条件下出的问题),零搬码。
 
 public enum DiscoveryProtectionList {
     /// 条目名(小写)包含即保护。密码与密钥类沿用孤儿检测的敏感名单(同一份常量,
     /// 不另抄——两处各写一份迟早漂移)。
     public static let nameTokens: [String] = OrphanRedlines.sensitiveNameSubstrings + [
-        // 日历缓存:日历代理常驻,清了崩到重新登录(对齐对象事故 #1508)。
+        // 日历缓存:日历代理常驻,清了日历启动即崩,要重新登录(对齐对象缺陷报告 #1508)。
         "calendar",
-        // 壁纸缩略图:清了系统设置里的壁纸封面变成云下载占位图(对齐对象事故 #1118)。
+        // 壁纸缩略图:用户报告每次清理后系统设置里的壁纸封面不见了(对齐对象 #1118)。
         "wallpaper",
-        // 接力 / 通用剪贴板的中转缓存:同步进行到一半的条目不能断(对齐对象事故 #1178)。
+        // 接力 / 通用剪贴板的中转缓存:同步进行到一半的条目不能断。对齐对象有人提希望
+        // 清它(#1178,功能请求);我们反过来保护——它住在系统管理的容器里,不在通用发现
+        // 的三处,这里把名字一并登记,挪了位置也不漏。
         "pasteboard", "useractivityd", "handoff",
         // 编译模型缓存:守护进程在跑时清了,识别功能坏到它重启。
         "e5bundlecache",
-        // 以下两个是对齐对象在通用扫描上的硬跳过:前者的目录名下是 Chrome 运行时的
-        // 网络缓存(它自己的记录是「清了连着七次失败」);后者是 Rust 构建缓存的垫片与
-        // 调度租约,正在用的检出链接进来,清了断构建。
+        // 对齐对象在通用扫描上的两个硬跳过:`Google` 目录名下是 Chrome 运行时的网络缓存,
+        // 整个扫走时 Chrome 还在跑,它的记录是连着七次清理都失败;`mbx` 是 Rust 构建缓存的
+        // 垫片与调度租约,正在用的检出链接进来,整个扫走断了构建。
         "google", "mbx",
     ]
 
     /// 软件类别:端点防护、设备管理、企业组网。本机在场的四家(SentinelOne / Santa /
     /// CorpLink / Tailscale)必须在内。按条目名包含匹配,宁可多藏不可漏。
+    /// ESET 的名字短,裸写会撞上 preset / reset 这类词:只认反域名里的那一段与词首。
     public static let vendorTokens: [String] = [
         // 端点防护
         "sentinel", "northpolesec", "santa", "corplink",
-        "crowdstrike", "carbonblack", "cylance", "sophos", "eset", "kaspersky", "symantec",
+        "crowdstrike", "carbonblack", "cylance", "sophos", ".eset", "eset ", "kaspersky", "symantec",
         "norton", "mcafee", "trellix", "defender", "tanium", "trendmicro",
         "qianxin", "tianqing", "huorong", "sangfor",
         // 设备管理
