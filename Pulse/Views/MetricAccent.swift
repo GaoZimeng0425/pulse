@@ -120,6 +120,8 @@ extension JunkGroup {
     /// 丙案 v2 原型拍板:dev=CPU 蓝 / browser=GPU 粉 / app=App 棕 / proj=内存紫 /
     /// ai=蓝牙青 / leftover=传感器橙红。同空间地图按序循环 accent-* 的先例——
     /// 指标色在此作**类别身份**借用,不作页面强调(清理页强调仍只有 accent-clean)。
+    /// 系统级 / 安装包(p7-cleaner/01):系统级取「系统」类别灰(它说的就是系统目录),
+    /// 安装包取网络绿;两者都不与既有六组撞色。
     var identityColor: Color {
         switch self {
         case .globalToolCache: Metric.cpu.accentColor
@@ -128,6 +130,8 @@ extension JunkGroup {
         case .projectArtifacts: Metric.memory.accentColor
         case .aiModels: Metric.bluetooth.accentColor
         case .uninstallLeftovers: Metric.sensors.accentColor
+        case .systemLevel: GroupCategory.system.identityColor
+        case .installers: Metric.network.accentColor
         }
     }
 }

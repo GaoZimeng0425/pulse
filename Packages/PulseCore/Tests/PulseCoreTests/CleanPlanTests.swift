@@ -182,6 +182,36 @@ final class CleanPlanTests: XCTestCase {
         XCTAssertEqual(report.items[2].tier, .checkFirst)
     }
 
+    /// p7-cleaner/01:战报每一项带上候选的标记(清理历史据此出小标);无标记的候选对应空清单。
+    func testRunnerCarriesCandidateMarkersIntoReport() async {
+        let marked = JunkCandidate(
+            ruleID: "fixture",
+            group: .systemLevel,
+            title: "x.ips",
+            path: "/Library/Logs/DiagnosticReports/x.ips",
+            tier: .checkFirst,
+            bytes: 1,
+            fileCount: 1,
+            isPartial: false,
+            allReclaimableAccounting: true,
+            rationale: "",
+            symbolName: "folder",
+            modifiedAtScan: CleanFixture.directoryModified,
+            requiresAuthorization: true,
+            unidentified: true
+        )
+        let plain = candidate("/Users/t/Library/Caches/Homebrew", bytes: 3100)
+        let spy = FakeCleanTrashExecutor(nextRecycleOutcome: TrashRecycleOutcome(recycled: [
+            marked.path: "/Users/t/.Trash/x.ips",
+            plain.path: "/Users/t/.Trash/Homebrew",
+        ]))
+
+        let report = await CleanRunner.run(CleanPlan(items: [marked, plain]), using: spy)
+
+        XCTAssertEqual(report.items.map(\.markers), [[.requiresAuthorization, .unidentified], []])
+        XCTAssertEqual(report.items.allSatisfy(\.isRecycled), true)
+    }
+
     /// 执行器漏报的项不默认成功。
     func testUnreportedItemsCountAsFailed() async {
         let plan = CleanPlan(items: [candidates[0]])

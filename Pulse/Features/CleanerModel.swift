@@ -133,6 +133,9 @@ final class CleanerModel {
     var browserSort: JunkSortOrder = .size
     var appCacheSort: JunkSortOrder = .size
     var aiModelsSort: JunkSortOrder = .size
+    /// 系统级 / 安装包(p7-cleaner/01;规则由 04 / 06 票落地,状态先备好)。
+    var systemLevelSort: JunkSortOrder = .size
+    var installersSort: JunkSortOrder = .size
 
     /// 组排序读写(穷举 switch:新增分组必须在这里表态,不会静默蹭别组的排序)。
     func sortOrder(for group: JunkGroup) -> JunkSortOrder {
@@ -143,6 +146,8 @@ final class CleanerModel {
         case .projectArtifacts: artifactSort
         case .aiModels: aiModelsSort
         case .uninstallLeftovers: orphanSort
+        case .systemLevel: systemLevelSort
+        case .installers: installersSort
         }
     }
 
@@ -154,6 +159,8 @@ final class CleanerModel {
         case .projectArtifacts: artifactSort = order
         case .aiModels: aiModelsSort = order
         case .uninstallLeftovers: orphanSort = order
+        case .systemLevel: systemLevelSort = order
+        case .installers: installersSort = order
         }
     }
 

@@ -21,6 +21,9 @@ extension JunkGroup {
         case .projectArtifacts: "构建中间产物,删了重新构建"
         case .aiModels: "本地大模型,删了要重新下载"
         case .uninstallLeftovers: "已卸载应用留下的数据"
+        // p7-cleaner/01:两组的规则与界面由 04 / 06 票落地;空组不出卡,文案先登记。
+        case .systemLevel: "系统目录里的日志、缓存与残留"
+        case .installers: "下载与桌面里的安装文件"
         }
     }
 
@@ -33,6 +36,8 @@ extension JunkGroup {
         case .projectArtifacts: "hammer"
         case .aiModels: "brain"
         case .uninstallLeftovers: "app.dashed"
+        case .systemLevel: "folder.badge.gearshape"
+        case .installers: "shippingbox"
         }
     }
 }
