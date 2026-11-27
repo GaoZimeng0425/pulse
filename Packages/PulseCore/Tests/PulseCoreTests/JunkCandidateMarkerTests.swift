@@ -41,12 +41,14 @@ final class JunkCandidateMarkerTests: XCTestCase {
         XCTAssertFalse(JunkCandidateMarker.unidentified.help.isEmpty, "标记自带悬停说明")
     }
 
-    /// 固定序:需授权在前——它决定「点了会发生什么」,比「认不认识」更要紧。倒着给也一样。
+    /// 固定序:需授权在前——它决定「点了会发生什么」,比「认不认识」更要紧。倒着给也一样,
+    /// 所以乱序给出来的两个候选相等(注释里的承诺在这里落成断言)。
     func testMarkersStoredInFixedOrder() {
-        XCTAssertEqual(
-            candidate([.unidentified, .requiresAuthorization]).markers,
-            [.requiresAuthorization, .unidentified]
-        )
+        let forward = candidate([.requiresAuthorization, .unidentified])
+        let reversed = candidate([.unidentified, .requiresAuthorization])
+
+        XCTAssertEqual(reversed.markers, [.requiresAuthorization, .unidentified])
+        XCTAssertEqual(forward, reversed)
     }
 
     /// 重复给出同一个标记,存下来只有一份(小标不重复出)。

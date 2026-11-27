@@ -36,9 +36,10 @@ public enum JunkCandidateMarker: String, Sendable, Equatable, CaseIterable {
     }
 }
 
-public extension JunkCandidateMarker {
+extension JunkCandidateMarker {
     /// 标记清单的规范形:按 `allCases` 的固定序排列并去重——需授权在前,它决定「点了会
     /// 发生什么」,比认不认识更要紧。候选只存规范形,比较与显示都不必再各自排序。
+    /// 模块内使用:候选的构造入口是唯一调用方,不对外暴露。
     static func normalized(_ markers: [JunkCandidateMarker]) -> [JunkCandidateMarker] {
         let present = Set(markers)
         return allCases.filter { present.contains($0) }
