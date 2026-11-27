@@ -29,6 +29,7 @@ struct CleanAssembly {
             installedAppInventory: {
                 LiveInstalledAppInventory.collect(trees: $0, scanCancelled: $1, home: $2)
             },
+            runningApps: { LiveRunningApps.collect() },
             trashInventory: { await LiveCleanTrashExecutor().inventory() }
         )
     }

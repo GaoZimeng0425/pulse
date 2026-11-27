@@ -21,9 +21,11 @@ extension CleanerModel {
         installedAppInventory: @escaping @Sendable ([SpaceNode], Bool, String) -> InstalledAppInventory = { _, _, _ in
             .complete([])
         },
+        runningApps: @escaping @Sendable () -> [RunningAppIdentity] = { [] },
         trashInventory: @escaping @Sendable () async -> TrashInventory? = { nil },
         aiManifestReader: @escaping (String) -> String? = { try? String(contentsOfFile: $0, encoding: .utf8) },
-        scanCancelForceTimeout: TimeInterval = 5
+        scanCancelForceTimeout: TimeInterval = 5,
+        runningAppsFreshness: TimeInterval = 1
     ) -> CleanerModel {
         CleanerModel(
             exclusions: exclusions,
@@ -37,9 +39,11 @@ extension CleanerModel {
             homeDirectory: homeDirectory,
             markerExists: markerExists,
             installedAppInventory: installedAppInventory,
+            runningApps: runningApps,
             trashInventory: trashInventory,
             aiManifestReader: aiManifestReader,
-            scanCancelForceTimeout: scanCancelForceTimeout
+            scanCancelForceTimeout: scanCancelForceTimeout,
+            runningAppsFreshness: runningAppsFreshness
         )
     }
 }

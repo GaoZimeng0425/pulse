@@ -13,7 +13,8 @@ import PulseCore
 // 文件级节点全量驻留 ≈900 MB,目录粒度 ≈90 MB,清单与地图都只认目录。
 //
 // 删除管线(04)全部由 PulseCore 纯值驱动,本类只做粘合与发布:
-//   清单 = JunkMatcher 跑在扫描树上(白名单命中才有;ADR-0008);
+//   清单 = JunkMatcher 跑在扫描树上(白名单命中才有;ADR-0008)+ 项目产物 / 卸载残留
+//     + 通用发现(名单外的缓存与日志,一律「先检查」;ADR-0013);
 //   勾选 = JunkSelection(默认全不勾);计划 = CleanPlan(删前排除二次判定);
 //   执行 = CleanRunner → CleanTrashExecutor(唯一删除出口;生产 Live、测试 spy);
 //   历史 = CleanHistoryStore(历史库缺席照常删,只是不记,界面如实说)。
@@ -176,14 +177,16 @@ final class CleanerModel {
     ///   - markerExists: 项目产物标记探测(cleaner-hardening/02;生产查盘,测试注入假集合)。
     ///   - directoryEnumerator: 生产扫描用的目录枚举器(arch-clean/01:必传,组装点在
     ///     `CleanAssembly`);测试可另经 `startScan(using:)` 单次覆盖。
-    ///   - installedAppInventory / trashInventory: **必传**(arch-clean/01)——无默认值比
-    ///     「默认 Live」更强:装配点漏传直接编译失败(票 11 scanCache 实案的病)。
+    ///   - installedAppInventory / runningApps / trashInventory: **必传**(arch-clean/01)——
+    ///     无默认值比「默认 Live」更强:装配点漏传直接编译失败(票 11 scanCache 实案的病)。
+    ///     runningApps = 运行中应用采集(p7-cleaner/02,通用发现「在运行就跳过」的输入)。
     ///   - aiManifestReader: 读一个 Ollama manifest 文件的 UTF-8 内容
     ///     (p6-cleaner/02 内容寻址记账;生产 FileManager,测试注入字典)。
     ///   - trash: **必传,无默认值**(2026-11-21 收账:曾有默认 Live 真执行器,
     ///     新测试漏传又调清空 = 清空用户真废纸篓——编译期挡住;生产传
     ///     LiveCleanTrashExecutor,测试传 FakeCleanTrashExecutor;同
     ///     AlertCenter 发送器必传纪律)。
+    ///   - runningAppsFreshness: 运行中应用读数多久内算新鲜(生产 1s;测试注入)。
     init(
         exclusions: CleanExclusionsStore = CleanExclusionsStore(load: { [] }, persist: { _ in }),
         scanRoots: CleanScanRootsStore = CleanScanRootsStore(load: { [] }, persist: { _ in }),
@@ -196,11 +199,13 @@ final class CleanerModel {
         homeDirectory: String = NSHomeDirectory(),
         markerExists: @escaping (String) -> Bool = { FileManager.default.fileExists(atPath: $0) },
         installedAppInventory: @escaping @Sendable ([SpaceNode], Bool, String) -> InstalledAppInventory,
+        runningApps: @escaping @Sendable () -> [RunningAppIdentity],
         trashInventory: @escaping @Sendable () async -> TrashInventory?,
         aiManifestReader: @escaping (String) -> String? = { path in
             try? String(contentsOfFile: path, encoding: .utf8)
         },
-        scanCancelForceTimeout: TimeInterval = 5
+        scanCancelForceTimeout: TimeInterval = 5,
+        runningAppsFreshness: TimeInterval = 1
     ) {
         self.scanCancelForceTimeout = scanCancelForceTimeout
         self.exclusions = exclusions
@@ -212,6 +217,8 @@ final class CleanerModel {
         self.volumeSummaries = volumeSummaries
         self.scanCache = scanCache
         self.installedAppInventory = installedAppInventory
+        runningAppsSource = runningApps
+        runningAppsReading = RunningAppsReading(freshness: runningAppsFreshness)
         self.homeDirectory = PathNormalization.normalize(homeDirectory)
         self.markerExists = markerExists
         self.aiManifestReader = aiManifestReader
@@ -222,6 +229,14 @@ final class CleanerModel {
     @ObservationIgnored private let directoryEnumerator: any CleanDirectoryEnumerator
     @ObservationIgnored private let markerExists: (String) -> Bool
     @ObservationIgnored private let trashInventorySource: @Sendable () async -> TrashInventory?
+    /// 运行中应用采集(p7-cleaner/02):生产 Live(系统工作区的应用列表);测试注入固定结果。
+    /// 只读、同步,读清单时在主线程调;采集一次约两毫秒,所以新鲜期内、版本号没变的
+    /// 重复读共用一份(`RunningAppsReading`)。
+    @ObservationIgnored private let runningAppsSource: @Sendable () -> [RunningAppIdentity]
+    @ObservationIgnored private var runningAppsReading: RunningAppsReading
+    /// 「谁在运行」的版本号:应用启动 / 退出、生成确认清单前 +1。清单 getter 读它——读即
+    /// 登记,版本一变,读着清单的视图重读。
+    private(set) var runningAppsRevision = 0
     /// 总览废纸篓清点子状态机(solid-split/02 步骤 2 抽出;对外经下方转发面,零调用点变化)。
     let overviewTrashCounter: OverviewTrashCounter
     /// Ollama manifest 读取器(p6-cleaner/02 内容寻址记账的 IO 接缝,注入以便测试)。
@@ -606,11 +621,12 @@ final class CleanerModel {
 
     // MARK: 清单(04 全局缓存 + 05 项目产物)
 
-    /// 白名单命中的可删单元:全局缓存(04)+ 项目产物(05)都跑在同一棵扫描树上,
-    /// 排除目录与本会话已回收的项不列。仍是计算属性——读 `phase` / `exclusions.paths` /
-    /// `scanRoots.paths` / `recycledPaths` 照常登记观察,设置页改动即时反映、不必重扫;
-    /// 但按这四样输入记忆化(cleaner-hardening/05):一次渲染读好几次、点勾选整卡重绘,
-    /// 输入不变就不重跑匹配器(项目产物要整棵 DFS + 查标记文件)。
+    /// 可删单元:全局缓存(04)+ 项目产物(05)+ 卸载残留 + 通用发现(p7-cleaner/02)都跑在
+    /// 同一棵扫描树上,排除目录与本会话已回收的项不列。仍是计算属性——读 `phase` /
+    /// `exclusions.paths` / `scanRoots.paths` / `recycledPaths` 照常登记观察,设置页改动
+    /// 即时反映、不必重扫;但按这四样输入记忆化(cleaner-hardening/05):一次渲染读好几
+    /// 次、点勾选整卡重绘,输入不变就不重跑匹配器(项目产物要整棵 DFS + 查标记文件)。
+    /// 唯一不进备忘的是「所属应用此刻在运行」:备忘跟扫描结果走,而谁在运行随时间变。
     var candidates: [JunkCandidate] {
         let key = CandidatesKey(
             phaseGeneration: phaseGeneration,
@@ -620,12 +636,22 @@ final class CleanerModel {
         )
         // 先读 phase 再判缓存:保证观察登记与未命中时一致。
         guard let result else { return [] }
+        let listed: [JunkCandidate]
         if let candidatesMemo, candidatesMemo.key == key {
-            return candidatesMemo.value
+            listed = candidatesMemo.value
+        } else {
+            listed = computeCandidates(in: result, key: key)
+            candidatesMemo = (key, listed)
         }
-        let value = computeCandidates(in: result, key: key)
-        candidatesMemo = (key, value)
-        return value
+        // 通用发现里所属应用在运行的条目此刻不出现:每次读都现查现滤。读
+        // `runningAppsRevision` 即登记观察——应用启动 / 退出时视图一戳
+        // (`noteRunningAppsMayHaveChanged`),读着清单的视图重读。
+        return GenericDiscovery.excludingRunningApps(
+            listed,
+            runningApps: runningAppsReading.value(
+                at: Date(), revision: runningAppsRevision, collect: runningAppsSource
+            )
+        )
     }
 
     private struct CandidatesKey: Equatable {
@@ -672,11 +698,28 @@ final class CleanerModel {
         // 与规则表 / 项目产物重叠的孤儿让位(org.swift.swiftpm 真案:CLI 缓存无 .app)。
         let claimed = global + artifacts
         let leftovers = OrphanLeftoverDetector.excludingOverlaps(orphans, claimedBy: claimed)
+        // 通用发现(p7-cleaner/02):三处里前面三个域都没认领的目录,一律「先检查」。
+        // 这一层只判「名单外、不受保护、没被认领」——随扫描结果记忆;「所属应用在运行」
+        // 不在这层,见 `candidates`。
+        let generic = GenericDiscovery.detect(
+            in: result.trees,
+            home: homeDirectory,
+            claimedBy: claimed + leftovers,
+            excludedPathPrefixes: excluded
+        )
 
         // 不过滤亚兆条目(2026-11-06 用户拍板:0 KB 产物也是该清的东西,照列;
         // 显示层由 memory() 的 KB 档给出真实读数)。
-        return (claimed + leftovers)
+        return (claimed + leftovers + generic)
             .filter { !key.recycled.contains($0.path) }
+    }
+
+    // MARK: 运行中应用(p7-cleaner/02;判定不进扫描结果)
+
+    /// 「谁在运行」可能变了:应用启动 / 退出(主窗口视图收到系统通知时调),或即将
+    /// 生成确认清单。下一次读清单时重采运行中应用,读着清单的视图随之重读。
+    func noteRunningAppsMayHaveChanged() {
+        runningAppsRevision &+= 1
     }
 
     /// 配置了项目扫描根没有(设置页引导文案与项目产物空态的判据)。
@@ -822,6 +865,8 @@ final class CleanerModel {
     // MARK: 清理流程(04)
 
     func requestClean() {
+        // 确认清单按此刻谁在运行来:刚启动的应用,它的缓存不进清单。
+        noteRunningAppsMayHaveChanged()
         guard !plan.isEmpty, cleanPhase == .idle || isFinishedPhase else { return }
         cleanPhase = .confirming
     }
@@ -835,6 +880,8 @@ final class CleanerModel {
     /// 记历史、清单收敛。执行期间清单不可再动(UI 按 running 禁用)。
     func confirmClean() {
         guard cleanPhase == .confirming else { return }
+        // 点「移入废纸篓」这一刻重采:确认单挂着的时候启动的应用,它的缓存不跟着走。
+        noteRunningAppsMayHaveChanged()
         let plan = plan
         guard !plan.isEmpty else {
             cleanPhase = .idle

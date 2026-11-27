@@ -108,9 +108,10 @@ struct CleanerOverviewSection: View {
         return ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if overview.isEmpty {
+                    // 清单不再只有担保过的目录(通用发现兜名单外的缓存),说明照实说。
                     CardEmptyState(
-                        title: "白名单没有识别出可回收项",
-                        detail: "只显示担保过的目录(ADR-0008);这台机器的开发工具与应用缓存已经干净"
+                        title: "没有识别出可回收项",
+                        detail: "名单上的目录和名单外的缓存都查过了;这台机器的开发工具与应用缓存已经干净"
                     )
                     .cardShell(compact: false)
                     // 空清单时废纸篓卡独占一行(网格里孤卡半宽反而失衡)。
