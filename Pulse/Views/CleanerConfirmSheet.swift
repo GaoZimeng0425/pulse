@@ -85,7 +85,7 @@ struct CleanConfirmSheet: View {
             VStack(alignment: .leading, spacing: 1) {
                 JunkTitleLine(
                     title: item.title,
-                    markers: item.markers,
+                    flags: item.flags,
                     fontSize: CleanerListMetrics.titleFontSize
                 )
                 Text(item.path)

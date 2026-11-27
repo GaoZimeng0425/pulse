@@ -175,9 +175,9 @@ extension JunkCandidate {
             newestChangeEpoch: newestChangeEpoch,
             modifiedAtScan: modifiedAtScan,
             accountingNote: note,
-            // 逐字段重建容易漏掉后加的字段:标记跟着过去,不静默回落成「无标记」
-            // (p7-cleaner/01;JunkCandidateMarkerTests.testAccountingRebuildKeepsMarkers 钉住)。
-            markers: markers
+            // 逐字段重建容易漏掉后加的字段:条目标志跟着过去,不静默回落成「无标志」
+            // (p7-cleaner/01;JunkCandidateFlagTests.testAccountingRebuildKeepsFlags 钉住)。
+            flags: flags
         )
     }
 }

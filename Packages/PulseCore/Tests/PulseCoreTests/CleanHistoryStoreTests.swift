@@ -83,9 +83,9 @@ final class CleanHistoryStoreTests: XCTestCase {
         XCTAssertEqual(limited.count, 1)
     }
 
-    /// p7-cleaner/01:标记随明细行落库、读回不丢;没带标记的行读回是空清单。两个标记各给
+    /// p7-cleaner/01:条目标志随明细行落库、读回不丢;没带标志的行读回是空清单。两个标志各给
     /// 一行——只验一个的话,另一列写错或读漏照样全绿。
-    func testMarkersRoundTrip() async throws {
+    func testFlagsRoundTrip() async throws {
         let store = try CleanHistoryStore(database: HistoryDatabase.openInMemory())
         let authorized = CleanRunItem(
             path: "/Library/Logs/DiagnosticReports/x.ips",
@@ -94,7 +94,7 @@ final class CleanHistoryStoreTests: XCTestCase {
             tier: .checkFirst,
             ruleID: "fixture.system",
             outcome: .recycled(destination: "/Users/t/.Trash/x.ips"),
-            markers: [.requiresAuthorization]
+            flags: [.requiresAuthorization]
         )
         let unidentified = CleanRunItem(
             path: "/Users/t/Library/Caches/SomeTool",
@@ -103,38 +103,39 @@ final class CleanHistoryStoreTests: XCTestCase {
             tier: .checkFirst,
             ruleID: "fixture.generic",
             outcome: .recycled(destination: "/Users/t/.Trash/SomeTool"),
-            markers: [.unidentified]
+            flags: [.unidentified]
         )
         let runID = try await store.record(makeReport(items: [authorized, unidentified, recycledItem]))
 
         let items = try await store.items(runID: XCTUnwrap(runID))
-        XCTAssertEqual(items.map(\.markers), [[.requiresAuthorization], [.unidentified], []])
+        XCTAssertEqual(items.map(\.flags), [[.requiresAuthorization], [.unidentified], []])
     }
 
-    /// 登记面:每个已登记的标记都能经「落库 → 读回」原样回来。历史库的列映射在落库与读库
-    /// 两处各手写一份——新增标记若忘了接,不报错、只是静默不进历史;这里按全 case 遍历兜底。
-    func testEveryMarkerSurvivesHistoryRoundTrip() async throws {
+    /// 登记面:每个已登记的条目标志都能经「落库 → 读回」原样回来。历史库的列映射在落库与
+    /// 读库两处各手写一份——新增标志若忘了接,不报错、只是静默不进历史;这里按全 case 遍历兜底。
+    func testEveryFlagSurvivesHistoryRoundTrip() async throws {
         let store = try CleanHistoryStore(database: HistoryDatabase.openInMemory())
-        let items = JunkCandidateMarker.allCases.enumerated().map { index, marker in
+        let items = JunkCandidateFlag.allCases.enumerated().map { index, flag in
             CleanRunItem(
-                path: "/fixture/\(marker.rawValue)",
-                title: marker.rawValue,
+                path: "/fixture/\(flag.rawValue)",
+                title: flag.rawValue,
                 bytes: Int64(index + 1),
                 tier: .checkFirst,
-                ruleID: "fixture.\(marker.rawValue)",
-                outcome: .recycled(destination: "/Users/t/.Trash/\(marker.rawValue)"),
-                markers: [marker]
+                ruleID: "fixture.\(flag.rawValue)",
+                outcome: .recycled(destination: "/Users/t/.Trash/\(flag.rawValue)"),
+                flags: [flag]
             )
         }
 
         let runID = try await store.record(makeReport(items: items))
 
         let readBack = try await store.items(runID: XCTUnwrap(runID))
-        XCTAssertEqual(readBack.map(\.markers), items.map(\.markers), "有标记没接进历史库的列映射")
+        XCTAssertEqual(readBack.map(\.flags), items.map(\.flags), "有条目标志没接进历史库的列映射")
     }
 
-    /// 迁移幂等:p7-cleaner/01 之前的库(有清理表、没有标记列)补跑迁移即得两列,旧行读回无标记。
-    func testMigrationAddsMarkerColumnsToExistingDatabase() async throws {
+    /// 迁移幂等:p7-cleaner/01 之前的库(有清理表、没有条目标志列)补跑迁移即得两列,
+    /// 旧行读回无标志。
+    func testMigrationAddsFlagColumnsToExistingDatabase() async throws {
         let queue = try DatabaseQueue()
         try HistoryDatabase.migrator().migrate(queue, upTo: "p4-uninstaller-03-uninstall-history")
         try await queue.write { db in
@@ -151,7 +152,7 @@ final class CleanHistoryStoreTests: XCTestCase {
         try HistoryDatabase.migrator().migrate(queue)
 
         let items = try await CleanHistoryStore(database: queue).items(runID: 1)
-        XCTAssertEqual(items.map(\.markers), [[]])
+        XCTAssertEqual(items.map(\.flags), [[]])
     }
 
     /// 迁移幂等:老库(窄表之后、清理表之前)补跑迁移即得两张表,旧数据不动。

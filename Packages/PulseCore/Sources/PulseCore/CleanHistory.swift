@@ -55,8 +55,8 @@ public struct CleanItemRecord: Sendable, Equatable, Identifiable {
     public let tier: CleanSafetyTier
     public let ruleID: String
     public let outcome: CleanItemOutcome
-    /// 候选的客观标记(p7-cleaner/01);本票之前落库的旧行读回为空。
-    public let markers: [JunkCandidateMarker]
+    /// 候选的条目标志(p7-cleaner/01;GLOSSARY「条目标志」);本票之前落库的旧行读回为空。
+    public let flags: [JunkCandidateFlag]
 
     public init(
         runID: Int64,
@@ -66,7 +66,7 @@ public struct CleanItemRecord: Sendable, Equatable, Identifiable {
         tier: CleanSafetyTier,
         ruleID: String,
         outcome: CleanItemOutcome,
-        markers: [JunkCandidateMarker] = []
+        flags: [JunkCandidateFlag] = []
     ) {
         self.runID = runID
         self.path = path
@@ -75,7 +75,7 @@ public struct CleanItemRecord: Sendable, Equatable, Identifiable {
         self.tier = tier
         self.ruleID = ruleID
         self.outcome = outcome
-        self.markers = markers
+        self.flags = flags
     }
 }
 
@@ -139,8 +139,8 @@ public actor CleanHistoryStore {
                         destination,
                         failure,
                         permanentRoute,
-                        item.markers.contains(.requiresAuthorization),
-                        item.markers.contains(.unidentified),
+                        item.flags.contains(.requiresAuthorization),
+                        item.flags.contains(.unidentified),
                     ]
                 )
             }
@@ -191,14 +191,15 @@ public actor CleanHistoryStore {
                 let destination: String? = row["destination"]
                 let failure: String? = row["failure"]
                 let permanentRoute: String? = row["permanent_route"]
-                // 标记两列 NOT NULL DEFAULT 0:迁移前的旧行读回即 0 = 无标记。判「等于 1」
-                // 而不是「不等于 0」——取不到值时前者落无标记,后者会把读失败说成有标记。
-                var markers: [JunkCandidateMarker] = []
+                // 条目标志两列 NOT NULL DEFAULT 0:迁移前的旧行读回即 0 = 无标志。判「等于 1」
+                // 而不是「不等于 0」——取不到值时前者落无标志,后者会把读失败说成有标志。
+                // 固定序与候选侧一致(需授权在前)。
+                var flags: [JunkCandidateFlag] = []
                 if (row["requires_authorization"] as Int?) == 1 {
-                    markers.append(.requiresAuthorization)
+                    flags.append(.requiresAuthorization)
                 }
                 if (row["unidentified"] as Int?) == 1 {
-                    markers.append(.unidentified)
+                    flags.append(.unidentified)
                 }
                 let outcome: CleanItemOutcome = if let destination {
                     .recycled(destination: destination)
@@ -216,7 +217,7 @@ public actor CleanHistoryStore {
                     tier: CleanSafetyTier(rawValue: row["tier"]) ?? .checkFirst,
                     ruleID: row["rule_id"],
                     outcome: outcome,
-                    markers: markers
+                    flags: flags
                 )
             }
         }

@@ -139,9 +139,9 @@ final class JunkRuleTableTests: XCTestCase {
         let stale = Set(positiveExamples.keys).subtracting(JunkRuleTable.builtin.map(\.id))
         XCTAssertEqual(stale, [], "正例表里有规则表不存在的 id(改名 / 删规则后忘了同步)")
         XCTAssertEqual(Set(JunkRuleTable.builtin.map(\.id)).count, JunkRuleTable.builtin.count, "规则 id 必须唯一")
-        // p7-cleaner/01:规则表产出的候选不带任何标记——「需要管理员权限」「未识别」
+        // p7-cleaner/01:规则表产出的候选不带任何条目标志——「需要管理员权限」「未识别」
         // 只由后续票的系统级规则与通用发现给出,本票不改变扫描结果。
-        XCTAssertTrue(candidates.allSatisfy(\.markers.isEmpty), "规则表候选默认无标记")
+        XCTAssertTrue(candidates.allSatisfy(\.flags.isEmpty), "规则表候选默认无标志")
     }
 
     /// 票面验收:故意加一条无正例的规则,完整性检查必须把它揪出来(红)。
