@@ -191,12 +191,13 @@ public actor CleanHistoryStore {
                 let destination: String? = row["destination"]
                 let failure: String? = row["failure"]
                 let permanentRoute: String? = row["permanent_route"]
-                // 标记两列 NOT NULL DEFAULT 0:迁移前的旧行读回即 0 = 无标记。
+                // 标记两列 NOT NULL DEFAULT 0:迁移前的旧行读回即 0 = 无标记。判「等于 1」
+                // 而不是「不等于 0」——取不到值时前者落无标记,后者会把读失败说成有标记。
                 var markers: [JunkCandidateMarker] = []
-                if (row["requires_authorization"] as Int) != 0 {
+                if (row["requires_authorization"] as Int?) == 1 {
                     markers.append(.requiresAuthorization)
                 }
-                if (row["unidentified"] as Int) != 0 {
+                if (row["unidentified"] as Int?) == 1 {
                     markers.append(.unidentified)
                 }
                 let outcome: CleanItemOutcome = if let destination {

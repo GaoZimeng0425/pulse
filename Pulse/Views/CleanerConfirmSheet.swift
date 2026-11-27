@@ -83,12 +83,11 @@ struct CleanConfirmSheet: View {
                 size: CleanerListMetrics.iconSize
             )
             VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 6) {
-                    Text(item.title)
-                        .font(.system(size: CleanerListMetrics.titleFontSize, weight: .medium))
-                        .lineLimit(1)
-                    JunkMarkerChips(markers: item.markers)
-                }
+                JunkTitleLine(
+                    title: item.title,
+                    markers: item.markers,
+                    fontSize: CleanerListMetrics.titleFontSize
+                )
                 Text(item.path)
                     .font(.system(size: CleanerListMetrics.subFontSize))
                     .foregroundStyle(.secondary)

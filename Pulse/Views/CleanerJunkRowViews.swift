@@ -84,12 +84,11 @@ struct JunkRow: View {
                 size: CleanerListMetrics.iconSize
             )
             VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 6) {
-                    Text(candidate.title)
-                        .font(.system(size: CleanerListMetrics.titleFontSize, weight: .medium))
-                        .lineLimit(1)
-                    JunkMarkerChips(markers: candidate.markers)
-                }
+                JunkTitleLine(
+                    title: candidate.title,
+                    markers: candidate.markers,
+                    fontSize: CleanerListMetrics.titleFontSize
+                )
                 // 副标一律显示路径:同名的 node_modules / build 只靠路径区分。档位说明
                 // (rationale)每行同文案、零信息量,不上副标,降为行悬停;档位本身由
                 // TierChip 的悬停自解释。
@@ -186,6 +185,23 @@ struct JunkMarkerChips: View {
     var body: some View {
         ForEach(markers, id: \.rawValue) { marker in
             ChipView(text: marker.title, tint: Surface.inkTertiary, profile: .inline, help: marker.help)
+        }
+    }
+}
+
+/// 「标题 + 标记小标」一行(清单行、确认清单、清理历史三处同一实现):标题单行,
+/// 小标不被压缩——放不下时截标题,不截标记。名称与小签的间距 6 同智能体页名称后的行内小签。
+struct JunkTitleLine: View {
+    let title: String
+    let markers: [JunkCandidateMarker]
+    let fontSize: CGFloat
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .font(.system(size: fontSize, weight: .medium))
+                .lineLimit(1)
+            JunkMarkerChips(markers: markers)
         }
     }
 }

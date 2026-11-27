@@ -83,10 +83,11 @@ final class CleanHistoryStoreTests: XCTestCase {
         XCTAssertEqual(limited.count, 1)
     }
 
-    /// p7-cleaner/01:标记随明细行落库、读回不丢;没带标记的行读回是空清单。
+    /// p7-cleaner/01:标记随明细行落库、读回不丢;没带标记的行读回是空清单。两个标记各给
+    /// 一行——只验一个的话,另一列写错或读漏照样全绿。
     func testMarkersRoundTrip() async throws {
         let store = try CleanHistoryStore(database: HistoryDatabase.openInMemory())
-        let marked = CleanRunItem(
+        let authorized = CleanRunItem(
             path: "/Library/Logs/DiagnosticReports/x.ips",
             title: "x.ips",
             bytes: 1,
@@ -95,10 +96,19 @@ final class CleanHistoryStoreTests: XCTestCase {
             outcome: .recycled(destination: "/Users/t/.Trash/x.ips"),
             markers: [.requiresAuthorization]
         )
-        let runID = try await store.record(makeReport(items: [marked, recycledItem]))
+        let unidentified = CleanRunItem(
+            path: "/Users/t/Library/Caches/SomeTool",
+            title: "SomeTool",
+            bytes: 2,
+            tier: .checkFirst,
+            ruleID: "fixture.generic",
+            outcome: .recycled(destination: "/Users/t/.Trash/SomeTool"),
+            markers: [.unidentified]
+        )
+        let runID = try await store.record(makeReport(items: [authorized, unidentified, recycledItem]))
 
         let items = try await store.items(runID: XCTUnwrap(runID))
-        XCTAssertEqual(items.map(\.markers), [[.requiresAuthorization], []])
+        XCTAssertEqual(items.map(\.markers), [[.requiresAuthorization], [.unidentified], []])
     }
 
     /// 迁移幂等:p7-cleaner/01 之前的库(有清理表、没有标记列)补跑迁移即得两列,旧行读回无标记。

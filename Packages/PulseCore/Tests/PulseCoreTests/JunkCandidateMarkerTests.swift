@@ -52,9 +52,15 @@ final class JunkCandidateMarkerTests: XCTestCase {
         )
     }
 
-    /// 标记不改变档位:带标记的候选仍按自己的档位走,自动勾选资格不被标记单独否决。
-    func testMarkersDoNotChangeTier() {
-        let marked = candidate(requiresAuthorization: true)
-        XCTAssertEqual(marked.tier, .checkFirst)
+    /// 登记面(全 case 遍历):每个标记都有小标文案与悬停说明,文案互不相同——新增标记
+    /// 漏写文案在这里兜底。
+    func testEveryMarkerHasDistinctTitleAndHelp() {
+        let all = JunkCandidateMarker.allCases
+        XCTAssertEqual(all, [.requiresAuthorization, .unidentified])
+        for marker in all {
+            XCTAssertFalse(marker.title.isEmpty, "\(marker) 缺小标文案")
+            XCTAssertFalse(marker.help.isEmpty, "\(marker) 缺悬停说明")
+        }
+        XCTAssertEqual(Set(all.map(\.title)).count, all.count, "标记文案互不相同")
     }
 }
