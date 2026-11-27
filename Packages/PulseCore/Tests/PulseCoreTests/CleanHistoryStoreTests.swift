@@ -84,7 +84,8 @@ final class CleanHistoryStoreTests: XCTestCase {
     }
 
     /// p7-cleaner/01:条目标志随明细行落库、读回不丢;没带标志的行读回是空清单。两个标志各给
-    /// 一行——只验一个的话,另一列写错或读漏照样全绿。
+    /// 一行——只验一个的话,另一列写错或读漏照样全绿;再加一行双标志,钉住读回的固定序
+    /// (需授权在前,与候选侧一致)。
     func testFlagsRoundTrip() async throws {
         let store = try CleanHistoryStore(database: HistoryDatabase.openInMemory())
         let authorized = CleanRunItem(
@@ -105,10 +106,22 @@ final class CleanHistoryStoreTests: XCTestCase {
             outcome: .recycled(destination: "/Users/t/.Trash/SomeTool"),
             flags: [.unidentified]
         )
-        let runID = try await store.record(makeReport(items: [authorized, unidentified, recycledItem]))
+        let both = CleanRunItem(
+            path: "/Library/Logs/DiagnosticReports/y.ips",
+            title: "y.ips",
+            bytes: 3,
+            tier: .checkFirst,
+            ruleID: "fixture.system",
+            outcome: .recycled(destination: "/Users/t/.Trash/y.ips"),
+            flags: [.requiresAuthorization, .unidentified]
+        )
+        let runID = try await store.record(makeReport(items: [authorized, unidentified, both, recycledItem]))
 
         let items = try await store.items(runID: XCTUnwrap(runID))
-        XCTAssertEqual(items.map(\.flags), [[.requiresAuthorization], [.unidentified], []])
+        XCTAssertEqual(
+            items.map(\.flags),
+            [[.requiresAuthorization], [.unidentified], [.requiresAuthorization, .unidentified], []]
+        )
     }
 
     /// 登记面:每个已登记的条目标志都能经「落库 → 读回」原样回来。历史库的列映射在落库与
