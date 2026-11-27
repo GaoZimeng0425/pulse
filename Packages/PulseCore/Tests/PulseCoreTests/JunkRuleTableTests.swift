@@ -139,6 +139,9 @@ final class JunkRuleTableTests: XCTestCase {
         let stale = Set(positiveExamples.keys).subtracting(JunkRuleTable.builtin.map(\.id))
         XCTAssertEqual(stale, [], "正例表里有规则表不存在的 id(改名 / 删规则后忘了同步)")
         XCTAssertEqual(Set(JunkRuleTable.builtin.map(\.id)).count, JunkRuleTable.builtin.count, "规则 id 必须唯一")
+        // p7-cleaner/01:规则表产出的候选不带任何标记——「需要管理员权限」「未识别」
+        // 只由后续票的系统级规则与通用发现给出,本票不改变扫描结果。
+        XCTAssertTrue(candidates.allSatisfy(\.markers.isEmpty), "规则表候选默认无标记")
     }
 
     /// 票面验收:故意加一条无正例的规则,完整性检查必须把它揪出来(红)。
@@ -234,10 +237,11 @@ final class JunkRuleTableTests: XCTestCase {
     }
 
     /// p6-cleaner/01 组序与归属(spec 定案 8):CaseIterable 序即 UI / 总览品类序。
+    /// p7-cleaner/01 在卸载残留之后追加「系统级」「安装包」两组(空组不出段)。
     func testGroupOrderAndOwnership() {
         XCTAssertEqual(
             JunkGroup.allCases.map(\.title),
-            ["开发工具", "浏览器", "应用缓存", "项目产物", "AI 模型", "卸载残留"]
+            ["开发工具", "浏览器", "应用缓存", "项目产物", "AI 模型", "卸载残留", "系统级", "安装包"]
         )
         XCTAssertEqual(JunkGroup.allCases.filter(\.groupsByOwner), [.projectArtifacts, .uninstallLeftovers])
         // p6-cleaner/02:AI 组四条存储位规则落地,恒「先检查」,组不按所有者聚卡。

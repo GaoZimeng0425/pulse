@@ -37,8 +37,9 @@ public enum CleanSafetyTier: String, Sendable, Codable, CaseIterable, Equatable 
 
 /// 规则域分组(清单按组分段)。开发工具 + 项目产物(p4)→ 浏览器 / 应用缓存 /
 /// AI 模型三组(p6-cleaner/01,spec 定案 8;AI 组规则在 02 票落地,空组不出段)。
-/// CaseIterable 顺序即 UI 组序(卸载残留 p5-cleaner/01,grill 2026-11-08:殿后;
-/// p6 总览品类序 = 开发工具 → 浏览器 → 应用缓存 → 项目产物 → AI 模型 → 卸载残留)。
+/// CaseIterable 顺序即 UI 组序(卸载残留 p5-cleaner/01,grill 2026-11-08)。
+/// p7-cleaner/01 在其后登记「系统级」「安装包」:规则与界面由后续票落地,登记本身
+/// 不改变扫描结果——空组不出段、空卡不出卡。
 public enum JunkGroup: String, Sendable, CaseIterable, Equatable {
     case globalToolCache
     case browserCache
@@ -46,6 +47,10 @@ public enum JunkGroup: String, Sendable, CaseIterable, Equatable {
     case projectArtifacts
     case aiModels
     case uninstallLeftovers
+    /// 系统目录里的条目,移走前要运行时授权(GLOSSARY「系统级残留」)。
+    case systemLevel
+    /// 下载、桌面里的安装文件(GLOSSARY「安装包」)。
+    case installers
 
     public var title: String {
         switch self {
@@ -55,6 +60,8 @@ public enum JunkGroup: String, Sendable, CaseIterable, Equatable {
         case .projectArtifacts: "项目产物"
         case .aiModels: "AI 模型"
         case .uninstallLeftovers: "卸载残留"
+        case .systemLevel: "系统级"
+        case .installers: "安装包"
         }
     }
 
@@ -62,7 +69,7 @@ public enum JunkGroup: String, Sendable, CaseIterable, Equatable {
     /// `projectName` 即分组键)。穷举 switch:新增分组必须表态。
     public var groupsByOwner: Bool {
         switch self {
-        case .globalToolCache, .browserCache, .appCache, .aiModels: false
+        case .globalToolCache, .browserCache, .appCache, .aiModels, .systemLevel, .installers: false
         case .projectArtifacts, .uninstallLeftovers: true
         }
     }
@@ -631,6 +638,11 @@ public struct JunkCandidate: Sendable, Identifiable, Equatable {
     /// 计入口径标注(p6-cleaner/02):Ollama 内容寻址在清单不可用时按整目录兜底,
     /// 行副标如实说明(nil = 无标注;沿用「部分扫描」附标惯例,不造新行形态)。
     public let accountingNote: String?
+    /// 客观标记(p7-cleaner/01):系统目录里的条目,移走前要运行时授权。默认否;
+    /// 由系统级条目给出,规则表匹配产出的候选恒为否。
+    public let requiresAuthorization: Bool
+    /// 客观标记(p7-cleaner/01):通用发现列出的名单外条目。默认否。
+    public let unidentified: Bool
 
     public init(
         ruleID: String,
@@ -647,7 +659,9 @@ public struct JunkCandidate: Sendable, Identifiable, Equatable {
         projectName: String? = nil,
         newestChangeEpoch: Double? = nil,
         modifiedAtScan: Double? = nil,
-        accountingNote: String? = nil
+        accountingNote: String? = nil,
+        requiresAuthorization: Bool = false,
+        unidentified: Bool = false
     ) {
         self.ruleID = ruleID
         self.group = group
@@ -664,6 +678,8 @@ public struct JunkCandidate: Sendable, Identifiable, Equatable {
         self.newestChangeEpoch = newestChangeEpoch
         self.modifiedAtScan = modifiedAtScan
         self.accountingNote = accountingNote
+        self.requiresAuthorization = requiresAuthorization
+        self.unidentified = unidentified
     }
 
     init(rule: JunkRule, node: SpaceNode, pattern: JunkPathPattern) {

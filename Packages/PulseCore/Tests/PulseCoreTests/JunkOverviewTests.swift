@@ -153,7 +153,13 @@ final class JunkOverviewTests: XCTestCase {
             activityEntries: fixtureActivity()
         )
         XCTAssertEqual(overview.rows.count, 6)
-        XCTAssertEqual(overview.rows.map(\.group), JunkGroup.allCases, "行序 = JunkGroup.allCases(UI 组序)")
+        // 夹具覆盖的六组按 JunkGroup.allCases 序出六行;系统级 / 安装包夹具里没有候选,
+        // 空组不出行(p7-cleaner/01)。
+        XCTAssertEqual(
+            overview.rows.map(\.group),
+            [.globalToolCache, .browserCache, .appCache, .projectArtifacts, .aiModels, .uninstallLeftovers],
+            "行序 = JunkGroup.allCases(UI 组序)"
+        )
 
         let dev = overview.row(for: .globalToolCache)
         XCTAssertEqual(dev?.itemCount, 8)
@@ -232,6 +238,20 @@ final class JunkOverviewTests: XCTestCase {
         XCTAssertEqual(empty.totalBytes, 0)
     }
 
+    /// p7-cleaner/01:系统级、安装包有候选时出卡,排在卸载残留之后(总览卡序 = 组序),
+    /// 三段构成照常按档位归段。
+    func testSystemLevelAndInstallersRowsFollowLeftovers() {
+        let candidates = [
+            cand("\(home)/Downloads/Tool.dmg", group: .installers, tier: .checkFirst, bytes: 0.3),
+            cand("\(home)/Library/Caches/Orphan", group: .uninstallLeftovers, tier: .safe, bytes: 0.1),
+            cand("/Library/Logs/DiagnosticReports/x.ips", group: .systemLevel, tier: .checkFirst, bytes: 0.2),
+        ]
+        let overview = JunkOverviewAggregator.overview(candidates: candidates, activityEntries: [])
+        XCTAssertEqual(overview.rows.map(\.group), [.uninstallLeftovers, .systemLevel, .installers])
+        XCTAssertEqual(overview.row(for: .installers)?.checkBytes, gb(0.3))
+        XCTAssertEqual(overview.row(for: .systemLevel)?.largestTitle, "x.ips")
+    }
+
     // MARK: 一键清理安全项
 
     /// 一键 = 全部 safe 且非在用:先检查档与在用项(safe 的 p3、checkFirst 的 m1)绝不入选,
@@ -279,9 +299,10 @@ final class JunkOverviewTests: XCTestCase {
         XCTAssertEqual(ai?.checkBytes, 0)
         XCTAssertEqual(ai?.safeBytes, 0)
 
-        // 不越组:其余五组零在用(夹具里没有别的活动)。
-        for group in JunkGroup.allCases where group != .aiModels {
-            XCTAssertEqual(overview.row(for: group)?.inUseBytes, 0, "home 锚 .aiService 不得越组:\(group.title)")
+        // 不越组:其余各组零在用(夹具里没有别的活动)。按实际出的行遍历——夹具没覆盖的
+        // 分组(系统级 / 安装包)无行,不在断言范围内。
+        for row in overview.rows where row.group != .aiModels {
+            XCTAssertEqual(row.inUseBytes, 0, "home 锚 .aiService 不得越组:\(row.group.title)")
         }
 
         // 一键:AI 恒先检查本就不入;home 锚不得把任何 safe 项挡在一键外(18 个全选)。

@@ -36,6 +36,8 @@ colors:
   junk-project: = {accent-memory}
   junk-ai: = {accent-bluetooth}
   junk-leftover: = {accent-sensors}
+  junk-system: = {category-system}
+  junk-installer: = {accent-network}
   junk-trash: = {accent-disk}
   agent-source-claude: = {accent-sensors}
   agent-source-zcode: = {accent-cpu}

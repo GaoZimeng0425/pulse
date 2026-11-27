@@ -298,8 +298,9 @@ final class OrphanLeftoversTests: XCTestCase {
     func testGroupRegisteredAfterProjectArtifacts() {
         // 防漂移(票 02):CaseIterable 顺序即 UI 组序;组名与「按所有者分大卡」登记面全量入册。
         // p6-cleaner/01 扩六组;全量组序 / 组名的唯一权威断言在 JunkRuleTableTests
-        // (testGroupOrderAndOwnership),这里只钉孤儿组自己的位置与归属。
-        XCTAssertEqual(JunkGroup.allCases.last, .uninstallLeftovers, "卸载残留殿后")
+        // (testGroupOrderAndOwnership),这里只钉孤儿组自己的位置与归属。p7-cleaner/01 起
+        // 卸载残留之后排系统级、安装包(空组不出段),它不再是最后一组。
+        XCTAssertEqual(Array(JunkGroup.allCases.suffix(3)), [.uninstallLeftovers, .systemLevel, .installers])
         XCTAssertTrue(JunkGroup.uninstallLeftovers.groupsByOwner, "按 app 分大卡")
         XCTAssertEqual(JunkGroup.allCases.first { $0.groupsByOwner }, .projectArtifacts)
     }

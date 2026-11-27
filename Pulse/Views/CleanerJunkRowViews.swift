@@ -2,7 +2,8 @@ import AppKit
 import PulseCore
 import SwiftUI
 
-// 清单行家族:行(JunkRow)、档位 chip(TierChip)、在用 chip(InUseChip)、年龄文案(JunkAgeText)。
+// 清单行家族:行(JunkRow)、档位 chip(TierChip)、在用 chip(InUseChip)、年龄文案(JunkAgeText)、
+// 标记小标(JunkMarkerChips)。
 
 // MARK: 行
 
@@ -83,9 +84,11 @@ struct JunkRow: View {
                 size: CleanerListMetrics.iconSize
             )
             VStack(alignment: .leading, spacing: 1) {
-                Text(candidate.title)
-                    .font(.system(size: CleanerListMetrics.titleFontSize, weight: .medium))
-                    .lineLimit(1)
+                JunkTitleLine(
+                    title: candidate.title,
+                    markers: candidate.markers,
+                    fontSize: CleanerListMetrics.titleFontSize
+                )
                 // 副标一律显示路径:同名的 node_modules / build 只靠路径区分。档位说明
                 // (rationale)每行同文案、零信息量,不上副标,降为行悬停;档位本身由
                 // TierChip 的悬停自解释。
@@ -170,6 +173,36 @@ struct InUseChip: View {
 
     var body: some View {
         ChipView(text: "在用保护 · \(reasons.title)正在此项目", tint: Surface.inkTertiary, profile: .regular)
+    }
+}
+
+/// 候选的标记小标(GLOSSARY「运行时授权」「通用发现」):「需要管理员权限」「未识别」,
+/// 挤在名称后。清单行、确认清单、清理历史三处同一实现——文案与悬停说明取自标记本身,
+/// 这里只管形。三级墨色灰:客观状态,不是警示(同在用保护 chip);没有标记时不出。
+struct JunkMarkerChips: View {
+    let markers: [JunkCandidateMarker]
+
+    var body: some View {
+        ForEach(markers, id: \.rawValue) { marker in
+            ChipView(text: marker.title, tint: Surface.inkTertiary, profile: .inline, help: marker.help)
+        }
+    }
+}
+
+/// 「标题 + 标记小标」一行(清单行、确认清单、清理历史三处同一实现):标题单行,
+/// 小标不被压缩——放不下时截标题,不截标记。名称与小签的间距 6 同智能体页名称后的行内小签。
+struct JunkTitleLine: View {
+    let title: String
+    let markers: [JunkCandidateMarker]
+    let fontSize: CGFloat
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .font(.system(size: fontSize, weight: .medium))
+                .lineLimit(1)
+            JunkMarkerChips(markers: markers)
+        }
     }
 }
 

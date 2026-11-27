@@ -62,8 +62,8 @@ final class CleanerAppSubTabTests: XCTestCase {
         XCTAssertEqual(CleanerSubTab.junk.title, "全部清单")
     }
 
-    /// 总览模块大卡的文案登记完整性(p6-cleaner/03):六个品类 + 废纸篓一个不缺——
-    /// 漏写 switch 会编译失败,漏整组(文案表换出处)在这里兜底。
+    /// 总览模块大卡的文案登记完整性(p6-cleaner/03):全部分组 + 废纸篓一个不缺(按枚举遍历,
+    /// 加分组自动覆盖)——漏写 switch 会编译失败,漏整组(文案表换出处)在这里兜底。
     func testOverviewCardCopyCoversAllGroupsAndTrash() {
         for group in JunkGroup.allCases {
             XCTAssertFalse(

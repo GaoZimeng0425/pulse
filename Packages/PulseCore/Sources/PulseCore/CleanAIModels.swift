@@ -174,7 +174,11 @@ extension JunkCandidate {
             projectName: projectName,
             newestChangeEpoch: newestChangeEpoch,
             modifiedAtScan: modifiedAtScan,
-            accountingNote: note
+            accountingNote: note,
+            // 逐字段重建容易漏掉后加的字段:标记跟着过去,不静默回落成「无标记」
+            // (p7-cleaner/01;JunkCandidateMarkerTests.testAccountingRebuildKeepsMarkers 钉住)。
+            requiresAuthorization: requiresAuthorization,
+            unidentified: unidentified
         )
     }
 }

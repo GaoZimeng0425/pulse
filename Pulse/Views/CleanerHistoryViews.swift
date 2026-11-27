@@ -151,9 +151,7 @@ private struct CleanHistoryItemRow: View {
         HStack(spacing: 8) {
             TierChip(tier: record.tier)
             VStack(alignment: .leading, spacing: 1) {
-                Text(record.title)
-                    .font(.system(size: 14.5, weight: .medium))
-                    .lineLimit(1)
+                JunkTitleLine(title: record.title, markers: record.markers, fontSize: 14.5)
                 Text(record.path)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)

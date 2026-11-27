@@ -159,6 +159,8 @@ public struct CleanRunItem: Sendable, Equatable {
     public let tier: CleanSafetyTier
     public let ruleID: String
     public let outcome: CleanItemOutcome
+    /// 候选的客观标记(p7-cleaner/01):随计划项带进战报与清理历史,默认空。
+    public let markers: [JunkCandidateMarker]
 
     public init(
         path: String,
@@ -166,7 +168,8 @@ public struct CleanRunItem: Sendable, Equatable {
         bytes: Int64,
         tier: CleanSafetyTier,
         ruleID: String,
-        outcome: CleanItemOutcome
+        outcome: CleanItemOutcome,
+        markers: [JunkCandidateMarker] = []
     ) {
         self.path = path
         self.title = title
@@ -174,6 +177,7 @@ public struct CleanRunItem: Sendable, Equatable {
         self.tier = tier
         self.ruleID = ruleID
         self.outcome = outcome
+        self.markers = markers
     }
 
     public var isRecycled: Bool {
@@ -272,7 +276,8 @@ public enum CleanRunner {
                 bytes: candidate.bytes,
                 tier: candidate.tier,
                 ruleID: candidate.ruleID,
-                outcome: result
+                outcome: result,
+                markers: candidate.markers
             )
         }
         return CleanRunReport(startedAt: startedAt, finishedAt: now(), items: items)

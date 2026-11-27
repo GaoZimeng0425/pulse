@@ -471,11 +471,21 @@ public enum HistoryDatabase {
             try db.execute(sql: "CREATE INDEX agent_seen_messages_file ON agent_seen_messages(file_id)")
         }
 
+        // 清理明细的客观标记两列(p7-cleaner/01):需授权 / 未识别。只加列不改旧列;
+        // 旧行默认 0 = 无标记,读取侧解码成空标记清单。
+        migrator.registerMigration(cleanItemMarkerMigrationID) { db in
+            try db.execute(sql: "ALTER TABLE clean_item ADD COLUMN requires_authorization INTEGER NOT NULL DEFAULT 0")
+            try db.execute(sql: "ALTER TABLE clean_item ADD COLUMN unidentified INTEGER NOT NULL DEFAULT 0")
+        }
+
         return migrator
     }
 
     /// 消息去重表瘦身迁移标识(agent-tab/13;打开时据此决定是否 VACUUM)。
     static let agentSeenSlimMigrationID = "agent-tab-13-seen-slim"
+
+    /// 清理明细标记列迁移标识(p7-cleaner/01)。
+    static let cleanItemMarkerMigrationID = "p7-cleaner-01-item-markers"
 
     /// 每日账本迁移标识(agent-tab/02)。
     static let agentUsageMigrationID = "agent-tab-02-usage"

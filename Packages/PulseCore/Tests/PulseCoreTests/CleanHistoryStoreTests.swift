@@ -83,6 +83,55 @@ final class CleanHistoryStoreTests: XCTestCase {
         XCTAssertEqual(limited.count, 1)
     }
 
+    /// p7-cleaner/01:标记随明细行落库、读回不丢;没带标记的行读回是空清单。两个标记各给
+    /// 一行——只验一个的话,另一列写错或读漏照样全绿。
+    func testMarkersRoundTrip() async throws {
+        let store = try CleanHistoryStore(database: HistoryDatabase.openInMemory())
+        let authorized = CleanRunItem(
+            path: "/Library/Logs/DiagnosticReports/x.ips",
+            title: "x.ips",
+            bytes: 1,
+            tier: .checkFirst,
+            ruleID: "fixture.system",
+            outcome: .recycled(destination: "/Users/t/.Trash/x.ips"),
+            markers: [.requiresAuthorization]
+        )
+        let unidentified = CleanRunItem(
+            path: "/Users/t/Library/Caches/SomeTool",
+            title: "SomeTool",
+            bytes: 2,
+            tier: .checkFirst,
+            ruleID: "fixture.generic",
+            outcome: .recycled(destination: "/Users/t/.Trash/SomeTool"),
+            markers: [.unidentified]
+        )
+        let runID = try await store.record(makeReport(items: [authorized, unidentified, recycledItem]))
+
+        let items = try await store.items(runID: XCTUnwrap(runID))
+        XCTAssertEqual(items.map(\.markers), [[.requiresAuthorization], [.unidentified], []])
+    }
+
+    /// 迁移幂等:p7-cleaner/01 之前的库(有清理表、没有标记列)补跑迁移即得两列,旧行读回无标记。
+    func testMigrationAddsMarkerColumnsToExistingDatabase() async throws {
+        let queue = try DatabaseQueue()
+        try HistoryDatabase.migrator().migrate(queue, upTo: "p4-uninstaller-03-uninstall-history")
+        try await queue.write { db in
+            try db
+                .execute(
+                    sql: "INSERT INTO clean_run (started_at, finished_at, item_count, freed_bytes, failed_count) VALUES (1, 2, 1, 3, 0)"
+                )
+            try db.execute(sql: """
+            INSERT INTO clean_item (run_id, path, title, bytes, tier, rule_id, destination)
+            VALUES (1, '/Users/t/.npm/_cacache', 'npm 缓存', 3, 'safe', 'npm.cache', '/Users/t/.Trash/_cacache')
+            """)
+        }
+
+        try HistoryDatabase.migrator().migrate(queue)
+
+        let items = try await CleanHistoryStore(database: queue).items(runID: 1)
+        XCTAssertEqual(items.map(\.markers), [[]])
+    }
+
     /// 迁移幂等:老库(窄表之后、清理表之前)补跑迁移即得两张表,旧数据不动。
     func testMigrationAddsTablesToExistingDatabase() throws {
         let queue = try DatabaseQueue()

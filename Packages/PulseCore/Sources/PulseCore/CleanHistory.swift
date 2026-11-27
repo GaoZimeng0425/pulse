@@ -55,6 +55,8 @@ public struct CleanItemRecord: Sendable, Equatable, Identifiable {
     public let tier: CleanSafetyTier
     public let ruleID: String
     public let outcome: CleanItemOutcome
+    /// 候选的客观标记(p7-cleaner/01);本票之前落库的旧行读回为空。
+    public let markers: [JunkCandidateMarker]
 
     public init(
         runID: Int64,
@@ -63,7 +65,8 @@ public struct CleanItemRecord: Sendable, Equatable, Identifiable {
         bytes: Int64,
         tier: CleanSafetyTier,
         ruleID: String,
-        outcome: CleanItemOutcome
+        outcome: CleanItemOutcome,
+        markers: [JunkCandidateMarker] = []
     ) {
         self.runID = runID
         self.path = path
@@ -72,6 +75,7 @@ public struct CleanItemRecord: Sendable, Equatable, Identifiable {
         self.tier = tier
         self.ruleID = ruleID
         self.outcome = outcome
+        self.markers = markers
     }
 }
 
@@ -122,8 +126,8 @@ public actor CleanHistoryStore {
                 }
                 try db.execute(
                     sql: """
-                    INSERT INTO clean_item (run_id, path, title, bytes, tier, rule_id, destination, failure, permanent_route)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO clean_item (run_id, path, title, bytes, tier, rule_id, destination, failure, permanent_route, requires_authorization, unidentified)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     arguments: [
                         runID,
@@ -135,6 +139,8 @@ public actor CleanHistoryStore {
                         destination,
                         failure,
                         permanentRoute,
+                        item.markers.contains(.requiresAuthorization),
+                        item.markers.contains(.unidentified),
                     ]
                 )
             }
@@ -176,7 +182,8 @@ public actor CleanHistoryStore {
             try Row.fetchAll(
                 db,
                 sql: """
-                SELECT run_id, path, title, bytes, tier, rule_id, destination, failure, permanent_route
+                SELECT run_id, path, title, bytes, tier, rule_id, destination, failure, permanent_route,
+                    requires_authorization, unidentified
                 FROM clean_item WHERE run_id = ? ORDER BY rowid
                 """,
                 arguments: [runID]
@@ -184,6 +191,15 @@ public actor CleanHistoryStore {
                 let destination: String? = row["destination"]
                 let failure: String? = row["failure"]
                 let permanentRoute: String? = row["permanent_route"]
+                // 标记两列 NOT NULL DEFAULT 0:迁移前的旧行读回即 0 = 无标记。判「等于 1」
+                // 而不是「不等于 0」——取不到值时前者落无标记,后者会把读失败说成有标记。
+                var markers: [JunkCandidateMarker] = []
+                if (row["requires_authorization"] as Int?) == 1 {
+                    markers.append(.requiresAuthorization)
+                }
+                if (row["unidentified"] as Int?) == 1 {
+                    markers.append(.unidentified)
+                }
                 let outcome: CleanItemOutcome = if let destination {
                     .recycled(destination: destination)
                 } else if let route = permanentRoute.flatMap(PermanentDeleteRoute.init(rawValue:)) {
@@ -199,7 +215,8 @@ public actor CleanHistoryStore {
                     bytes: row["bytes"],
                     tier: CleanSafetyTier(rawValue: row["tier"]) ?? .checkFirst,
                     ruleID: row["rule_id"],
-                    outcome: outcome
+                    outcome: outcome,
+                    markers: markers
                 )
             }
         }
