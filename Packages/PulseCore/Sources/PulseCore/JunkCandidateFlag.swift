@@ -1,16 +1,18 @@
 import Foundation
 
-// MARK: - 候选的客观标记(p7-cleaner/01)
+// MARK: - 条目标志(p7-cleaner/01;GLOSSARY「条目标志」)
 
 //
-// 清单行、确认清单、清理历史三处共用这一份:候选带上标记,界面照标记清单出小标。
-// 标记只陈述事实,不是安全档(GLOSSARY「安全档」),也不参与自动勾选判定。
+// 清单行、确认清单、清理历史三处共用这一份:候选带上标志,界面照标志清单出小标。
+// 标志只陈述事实,不是安全档(GLOSSARY「安全档」),也不参与自动勾选判定。
 // 「需要管理员权限」由系统级条目给出(接 GLOSSARY「运行时授权」),「未识别」由
-// 通用发现给出(GLOSSARY「通用发现」);本票只登记标记,两个来源由后续票落地。
+// 通用发现给出(GLOSSARY「通用发现」);本票只登记标志,两个来源由后续票落地。
 // 文案与悬停说明只在这里定一处,免得三处各写一套。
+// 叫「标志」不叫「标记」:「标记」在本仓另有所指——空间地图的「可清理标记」、
+// 项目产物的「项目标记」(识别项目用的文件,如 package.json)。
 
-/// 候选上的客观标记。
-public enum JunkCandidateMarker: String, Sendable, Equatable, CaseIterable {
+/// 候选上的条目标志。
+public enum JunkCandidateFlag: String, Sendable, Equatable, CaseIterable {
     /// 系统目录里的条目:移走前要弹一次系统管理员密码框。
     case requiresAuthorization
     /// 名单外的条目:说不出它属于哪个工具,只能归「先检查」。
@@ -36,12 +38,12 @@ public enum JunkCandidateMarker: String, Sendable, Equatable, CaseIterable {
     }
 }
 
-extension JunkCandidateMarker {
-    /// 标记清单的规范形:按 `allCases` 的固定序排列并去重——需授权在前,它决定「点了会
+extension JunkCandidateFlag {
+    /// 标志清单的规范形:按 `allCases` 的固定序排列并去重——需授权在前,它决定「点了会
     /// 发生什么」,比认不认识更要紧。候选只存规范形,比较与显示都不必再各自排序。
     /// 模块内使用:候选的构造入口是唯一调用方,不对外暴露。
-    static func normalized(_ markers: [JunkCandidateMarker]) -> [JunkCandidateMarker] {
-        let present = Set(markers)
+    static func normalized(_ flags: [JunkCandidateFlag]) -> [JunkCandidateFlag] {
+        let present = Set(flags)
         return allCases.filter { present.contains($0) }
     }
 }
