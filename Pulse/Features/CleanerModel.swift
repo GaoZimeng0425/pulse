@@ -60,6 +60,8 @@ final class CleanerModel {
     private(set) var installedApps: InstalledAppInventory?
 
     private(set) var cleanPhase: CleanPhase = .idle
+    /// 这一轮清理含系统级条目:执行期间可能停着等用户输系统管理员密码(界面据此改文案)。
+    private(set) var runningNeedsAuthorization = false
     private(set) var selection = JunkSelection()
     /// 本会话已移入废纸篓的路径:树里还挂着(不重扫),清单里不再列。
     private(set) var recycledPaths: Set<String> = []
@@ -482,7 +484,7 @@ final class CleanerModel {
         sessionCleanedCount = 0
         loadedFromCache = false
         loadedCacheMeta = nil
-        if case .finished = cleanPhase {
+        if isCleanSettled {
             cleanPhase = .idle
         }
         let source = enumerator ?? directoryEnumerator
@@ -895,7 +897,7 @@ final class CleanerModel {
     func requestClean() {
         // 确认清单按此刻谁在运行来:刚启动的应用,它的缓存不进清单。
         noteRunningAppsMayHaveChanged()
-        guard !plan.isEmpty, cleanPhase == .idle || isSettledPhase else { return }
+        guard !plan.isEmpty, isCleanSettled else { return }
         cleanPhase = .confirming
     }
 
@@ -918,6 +920,7 @@ final class CleanerModel {
             return
         }
         cleanPhase = .running
+        runningNeedsAuthorization = plan.items.contains { $0.flags.contains(.requiresAuthorization) }
         Self.postCleanActivity(true)
         Task { [trash, systemTrash, history, weak self] in
             let termination = await CleanRunner.run(
@@ -928,6 +931,7 @@ final class CleanerModel {
                 Self.postCleanActivity(false)
                 return
             }
+            runningNeedsAuthorization = false
             switch termination {
             case let .aborted(reason):
                 cleanPhase = .notStarted(reason)
@@ -985,15 +989,16 @@ final class CleanerModel {
 
     /// 关掉结果卡 / 「没开始」的提示,回到空态。
     func dismissCleanReport() {
-        guard isSettledPhase else { return }
+        guard isCleanSettled else { return }
         cleanPhase = .idle
     }
 
-    /// 走完了或没开始就停了:提示可以关掉,清理可以重新发起。
-    private var isSettledPhase: Bool {
+    /// 清理没有在进行:空态,或已经收场(走完 / 没开始就停了)。这时提示可以关掉、清理可以
+    /// 重新发起;AI 清理桥也认它为非忙(确认中 / 执行中一律忙)。
+    var isCleanSettled: Bool {
         switch cleanPhase {
-        case .finished, .notStarted: true
-        case .idle, .confirming, .running: false
+        case .idle, .finished, .notStarted: true
+        case .confirming, .running: false
         }
     }
 

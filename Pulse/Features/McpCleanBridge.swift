@@ -120,7 +120,7 @@ final class McpCleanBridge {
         }
 
         // 2) busy 拦截:app 里已有确认单/清理在跑(用户自己或上一个请求)。
-        guard model.isCleanPhaseIdleOrFinished else {
+        guard model.isCleanSettled else {
             return McpCleanRunResponse(status: .busy)
         }
 
@@ -188,17 +188,5 @@ final class McpCleanBridge {
             model.cancelClean()
         }
         return McpCleanRunResponse(status: .timeout, unrecognized: matched.unrecognized)
-    }
-}
-
-// MARK: - 阶段判据小助手
-
-extension CleanerModel {
-    /// mcp-clean:外部请求只认空态/结果态(含「没开始就停了」);确认中/执行中一律 busy。
-    var isCleanPhaseIdleOrFinished: Bool {
-        switch cleanPhase {
-        case .idle, .finished, .notStarted: true
-        case .confirming, .running: false
-        }
     }
 }

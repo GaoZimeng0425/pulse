@@ -123,6 +123,78 @@ final class McpCleanBridgeTests: XCTestCase {
         XCTAssertEqual(model.cleanPhase, .idle, "超时撤单,确认单关掉")
     }
 
+    // MARK: 系统级条目:管理员授权没下来(p7-cleaner/05)
+
+    private let reportPath = "/Library/Logs/DiagnosticReports/old.diag"
+
+    /// 夹具:一份放满 8 天的系统崩溃报告(「可安全清理」档,在 AI 清理的求交范围内),
+    /// 授权接口回放给定的结果。
+    private func makeModelWithSystemReport(
+        mover: FakeCleanSystemTrashExecutor,
+        now: TimeInterval
+    ) -> CleanerModel {
+        var listings: [String: FakeCleanDirectoryEnumerator.Listing] = [:]
+        listings["/Library"] = .entries([CleanFixture.directory("Logs", fileID: 9_200_001)])
+        listings["/Library/Logs"] = .entries([CleanFixture.directory("DiagnosticReports", fileID: 9_200_002)])
+        listings["/Library/Logs/DiagnosticReports"] = .entries([
+            CleanFixture.file("old.diag", modified: now - 8 * 86400),
+        ])
+        let model = CleanerModel.testing(
+            trash: FakeCleanTrashExecutor(pathStates: [reportPath: .present(modifiedEpoch: now - 8 * 86400)]),
+            systemTrash: mover,
+            homeDirectory: "/Users/dev",
+            installedAppInventory: { _, _, _ in .complete([]) }
+        )
+        model.startScan(
+            using: FakeCleanDirectoryEnumerator(listings: listings, defaultForUnknown: .entries([])),
+            roots: ["/Library"]
+        )
+        return model
+    }
+
+    /// 用户在密码框点了取消:整批没动;回复如实说「已取消授权」,状态仍是用户取消。
+    func testSubmitReportsCancelledAuthorization() async {
+        let model = makeModelWithSystemReport(
+            mover: FakeCleanSystemTrashExecutor(handler: { _ in .authorizationCancelled }),
+            now: Date().timeIntervalSince1970
+        )
+        await waitUntil { !model.isScanning }
+        let bridge = makeBridge()
+        bridge.attachWindowModel(model)
+
+        let submitTask = Task { await bridge.submit(paths: [reportPath]) }
+        await waitUntil { model.cleanPhase == .confirming }
+        model.confirmClean()
+        let response = await submitTask.value
+
+        XCTAssertEqual(response.status, .cancelledByUser)
+        XCTAssertEqual(response.message, "已取消授权:未做任何改动,勾选保留——可以重新发起。")
+        XCTAssertEqual(response.items, [])
+        XCTAssertEqual(model.cleanPhase, .notStarted(.authorizationCancelled))
+    }
+
+    /// 通道不可用:整批没动;回复带出原因,不静默。
+    func testSubmitReportsUnavailableAuthorizationChannel() async {
+        let model = makeModelWithSystemReport(
+            mover: FakeCleanSystemTrashExecutor(handler: { _ in .channelUnavailable(reason: "复核脚本缺失(应用包不完整)") }),
+            now: Date().timeIntervalSince1970
+        )
+        await waitUntil { !model.isScanning }
+        let bridge = makeBridge()
+        bridge.attachWindowModel(model)
+
+        let submitTask = Task { await bridge.submit(paths: [reportPath]) }
+        await waitUntil { model.cleanPhase == .confirming }
+        model.confirmClean()
+        let response = await submitTask.value
+
+        XCTAssertEqual(response.status, .appError)
+        XCTAssertEqual(
+            response.message,
+            "系统级条目移不了:复核脚本缺失(应用包不完整)。这一批都没有动,勾选保留。"
+        )
+    }
+
     // MARK: 拒绝路径
 
     func testSubmitUnknownPathsGiveEmptySelection() async {

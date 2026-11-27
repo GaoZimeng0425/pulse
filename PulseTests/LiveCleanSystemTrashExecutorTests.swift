@@ -4,9 +4,11 @@ import XCTest
 
 /// 系统级条目移进废纸篓的真实现(p7-cleaner/05;ADR-0012)。
 /// 真实提权路径不进自动化测试:这里钉的是清单文件的写法、命令行的拼法、结果行与失败的
-/// 解析,外加「不带管理员授权」跑一遍随包分发的真脚本——不弹密码框、不提权,全在临时目录。
+/// 解析,外加「不带管理员授权」跑一遍随包分发的真脚本(不弹密码框、不提权)——成功、
+/// 脚本级失败、硬链接、改不了归属四条路都走真通道,全在临时目录。
 @MainActor
 final class LiveCleanSystemTrashExecutorTests: XCTestCase {
+    private let day: TimeInterval = 86400
     private var temporaryDirectory: String!
 
     override func setUp() async throws {
@@ -25,8 +27,10 @@ final class LiveCleanSystemTrashExecutorTests: XCTestCase {
         try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
     }
 
-    /// 临时目录下搭一套夹具:登记目录(一个放满 10 天的文件 + 一个刚写的)+ 废纸篓根。
-    private func makeFixture() throws -> (reports: String, old: String, young: String, trashRoot: String) {
+    /// 临时目录下搭一套夹具:登记目录(一个放满 10 天的文件 + 一个一小时前的)+ 暂存目录的
+    /// 上一级 + 废纸篓根。
+    private func makeFixture() throws
+        -> (reports: String, old: String, young: String, trashRoot: String, stagingParent: String) {
         let reports = temporaryDirectory + "/reports"
         try makeDirectory(reports)
         let old = reports + "/old.diag"
@@ -35,50 +39,85 @@ final class LiveCleanSystemTrashExecutorTests: XCTestCase {
             try Data("report".utf8).write(to: URL(fileURLWithPath: path))
         }
         try FileManager.default.setAttributes(
-            [.modificationDate: Date(timeIntervalSinceNow: -10 * 86400)], ofItemAtPath: old
+            [.modificationDate: Date(timeIntervalSinceNow: -10 * day)], ofItemAtPath: old
         )
         let trashRoot = temporaryDirectory + "/home/.Trash"
         try makeDirectory(trashRoot)
-        return (reports, old, young, trashRoot)
+        let stagingParent = temporaryDirectory + "/staging"
+        try makeDirectory(stagingParent)
+        return (reports, old, young, trashRoot, stagingParent)
     }
 
-    private func fixtureEnvironment(reports: String, trashRoot: String) -> [String: String] {
-        [
+    /// 脚本的自测开关(只在非 root 时生效):登记目录与暂存目录指到夹具,认调用者属主的文件。
+    private func fixtureEnvironment(
+        reports: String, stagingParent: String, chownStandIn: String? = nil
+    ) -> [String: String] {
+        var environment = [
             "PULSE_SYSTEM_TRASH_TEST_REPORTS_DIR": reports,
-            "PULSE_SYSTEM_TRASH_TEST_TRASH_ROOT": trashRoot,
             "PULSE_SYSTEM_TRASH_TEST_ALLOW_CALLER_OWNED": "1",
+            "PULSE_SYSTEM_TRASH_TEST_STAGING_PARENT": stagingParent,
         ]
+        if let chownStandIn {
+            environment["PULSE_SYSTEM_TRASH_TEST_CHOWN"] = chownStandIn
+        }
+        return environment
+    }
+
+    private func run(
+        paths: [String],
+        environment: [String: String],
+        trashRoot: String,
+        scriptPath: String? = LiveCleanSystemTrashExecutor.bundledScriptPath
+    ) async -> SystemTrashOutcome {
+        await LiveCleanSystemTrashExecutor.run(
+            SystemTrashRequest(paths: paths, requesterUID: UInt32(getuid())),
+            scriptPath: scriptPath,
+            privileged: false,
+            environment: environment,
+            trashRoot: trashRoot,
+            temporaryDirectory: temporaryDirectory
+        )
+    }
+
+    private func contentsOfTemporaryDirectory() throws -> [String] {
+        try FileManager.default.contentsOfDirectory(atPath: temporaryDirectory)
     }
 
     // MARK: 结果与失败的解析
 
-    private func outcome(status: Int32, stdout: String = "", stderr: String) -> SystemTrashOutcome {
+    private func outcome(status: Int32, stdout: String = "", stderr: String) -> LiveCleanSystemTrashExecutor
+        .ScriptTermination {
         LiveCleanSystemTrashExecutor.outcome(
             for: .init(status: status, stdout: stdout, stderr: stderr)
         )
     }
 
-    /// 用户在密码框点了取消:系统脚本的错误号是 -128。
+    /// 用户在密码框点了取消:系统脚本的错误号 -128,通道原样带回。
     func testCancelledAuthorizationIsRecognized() {
         XCTAssertEqual(
-            outcome(status: 1, stderr: "execution error: User canceled. (-128)\n"),
+            outcome(status: 1, stderr: "0:103: execution error: User canceled. (-128)\n"),
             .authorizationCancelled
         )
     }
 
-    /// 脚本级失败:脚本自己说的原因原样带出。
+    /// 脚本级失败:通道会把脚本的错误输出包一层(前面是位置与「execution error:」,后面是
+    /// 退出码),要取出脚本自己说的那一句。格式照不带授权的真通道实测抄。
     func testScriptFailureCarriesItsReason() {
         XCTAssertEqual(
-            outcome(status: 2, stderr: "channel-unavailable: 登记的目录是符号链接\n"),
+            outcome(status: 1, stderr: "0:212: execution error: channel-unavailable: 登记的目录是符号链接 (2)\n"),
             .channelUnavailable(reason: "登记的目录是符号链接")
         )
     }
 
-    /// 别的失败(系统拒绝运行这条授权通道等):留下系统说的第一行;一句没有就报退出码。
+    /// 别的失败(系统拒绝运行这条授权通道等):取系统说的第一句,去掉包的那层;一句没有就报退出码。
     func testOtherFailuresAreReportedNotSwallowed() {
         XCTAssertEqual(
-            outcome(status: 1, stderr: "execution error: 不允许请求管理员授权。 (-10004)\n"),
-            .channelUnavailable(reason: "execution error: 不允许请求管理员授权。 (-10004)")
+            outcome(status: 1, stderr: "error: 不允许请求管理员授权。 (-10004)\n"),
+            .channelUnavailable(reason: "error: 不允许请求管理员授权。")
+        )
+        XCTAssertEqual(
+            outcome(status: 1, stderr: "0:7: execution error: Operation not permitted (1)\n"),
+            .channelUnavailable(reason: "Operation not permitted")
         )
         XCTAssertEqual(
             outcome(status: 3, stderr: ""),
@@ -86,21 +125,23 @@ final class LiveCleanSystemTrashExecutorTests: XCTestCase {
         )
     }
 
-    /// 结果行三段、制表符分隔:MOVED 原→新,SKIPPED 原→原因(代码翻成人话);坏行忽略;
-    /// 路径里的空格与中文原样往返;换行符是回车也认(系统脚本通道回传的就是回车)。
+    /// 结果行制表符分隔,换行符是回车也认(系统脚本通道回传的就是回车):SKIPPED 的原因翻成人话,
+    /// 路径里的空格与中文原样往返,坏行忽略。
     func testResultLinesAreParsed() {
-        let stdout = "MOVED\t/Library/Logs/DiagnosticReports/a.diag\t/Users/t/.Trash/Pulse 系统级/2026-11-27 22.03/a.diag\r"
-            + "SKIPPED\t/Library/Logs/DiagnosticReports/新报告.ips\ttoo-young\r"
-            + "SKIPPED\t/Library/Logs/DiagnosticReports/b.diag\tsome-new-code\n"
+        let stdout = "SKIPPED\t/Library/Logs/DiagnosticReports/新报告.ips\ttoo-young\r"
+            + "SKIPPED\t/Library/Logs/DiagnosticReports/b.diag\tsome-new-code\r"
             + "garbage\r"
+            + "STAGING\t/var/tmp/pulse-system-trash.Ab12Cd\r"
+            + "MOVED\t/Library/Logs/DiagnosticReports/a.diag\t/var/tmp/pulse-system-trash.Ab12Cd/a.diag\r"
 
-        let receipt = LiveCleanSystemTrashExecutor.parse(stdout)
+        let handoff = LiveCleanSystemTrashExecutor.parse(stdout)
 
+        XCTAssertEqual(handoff.staging, "/var/tmp/pulse-system-trash.Ab12Cd")
         XCTAssertEqual(
-            receipt.recycled,
-            ["/Library/Logs/DiagnosticReports/a.diag": "/Users/t/.Trash/Pulse 系统级/2026-11-27 22.03/a.diag"]
+            handoff.receipt.recycled,
+            ["/Library/Logs/DiagnosticReports/a.diag": "/var/tmp/pulse-system-trash.Ab12Cd/a.diag"]
         )
-        XCTAssertEqual(receipt.failures, [
+        XCTAssertEqual(handoff.receipt.failures, [
             "/Library/Logs/DiagnosticReports/新报告.ips": "还没满 7 天(移动前又核了一次)",
             "/Library/Logs/DiagnosticReports/b.diag": "复核未通过(some-new-code)",
         ])
@@ -108,16 +149,17 @@ final class LiveCleanSystemTrashExecutorTests: XCTestCase {
 
     // MARK: 清单文件与命令行
 
-    /// 清单文件一行一个路径,仅本人可读写(0600)。
+    /// 清单文件一行一个路径,从建出来那一刻起就只有本人可读写(0600);已有同名文件时不覆盖。
     func testManifestIsOnePathPerLineAndOwnerOnly() throws {
-        let manifest = try LiveCleanSystemTrashExecutor.writeManifest(
-            for: ["/a/x.diag", "/b/y.ips"], in: temporaryDirectory
-        )
+        let path = temporaryDirectory + "/manifest"
+        try LiveCleanSystemTrashExecutor.writeManifest(to: path, paths: ["/a/x.diag", "/b/y.ips"])
 
-        let attributes = try FileManager.default.attributesOfItem(atPath: manifest)
+        let attributes = try FileManager.default.attributesOfItem(atPath: path)
         XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o600, "清单文件仅本人可读写")
-        let content = try String(contentsOfFile: manifest, encoding: .utf8)
-        XCTAssertEqual(content, "/a/x.diag\n/b/y.ips\n")
+        XCTAssertEqual(try String(contentsOfFile: path, encoding: .utf8), "/a/x.diag\n/b/y.ips\n")
+
+        XCTAssertThrowsError(try LiveCleanSystemTrashExecutor.writeManifest(to: path, paths: ["/c"]))
+        XCTAssertEqual(try String(contentsOfFile: path, encoding: .utf8), "/a/x.diag\n/b/y.ips\n", "不覆盖已有文件")
     }
 
     /// 命令行里路径全部严格引用:单引号、双引号、反斜杠、空格、中文都不会把命令拼坏;
@@ -132,33 +174,26 @@ final class LiveCleanSystemTrashExecutorTests: XCTestCase {
             "\"a \\\"b\\\" \\\\ c\""
         )
         XCTAssertEqual(
-            LiveCleanSystemTrashExecutor.appleScript(
-                "'/bin/sh' '/tmp/m' 501 '/Users/t/.Trash/Pulse 系统级/x'",
-                privileged: true
-            ),
-            "do shell script \"'/bin/sh' '/tmp/m' 501 '/Users/t/.Trash/Pulse 系统级/x'\" with administrator privileges"
+            LiveCleanSystemTrashExecutor.appleScript("'/bin/sh' '/tmp/m' 501", privileged: true),
+            "do shell script \"'/bin/sh' '/tmp/m' 501\" with administrator privileges"
         )
         XCTAssertEqual(
-            LiveCleanSystemTrashExecutor.appleScript("'/bin/sh' '/tmp/m' 501 '/t'", privileged: false),
-            "do shell script \"'/bin/sh' '/tmp/m' 501 '/t'\""
+            LiveCleanSystemTrashExecutor.appleScript("'/bin/sh' '/tmp/m' 501", privileged: false),
+            "do shell script \"'/bin/sh' '/tmp/m' 501\""
         )
     }
 
     // MARK: 整条通道(不带管理员授权跑真脚本)
 
-    /// 随包分发的真脚本 + 真的 osascript,只是不带管理员授权:放满 7 天的被移进废纸篓子目录,
-    /// 太新的带着原因留在原处;清单文件用完即删。
+    /// 真脚本 + 真的 osascript:放满 7 天的经暂存目录进了废纸篓子目录,太新的带着原因留在
+    /// 原处;清单文件与暂存目录用完都不剩。
     func testRunsTheBundledScriptWithoutElevation() async throws {
-        let scriptPath = try XCTUnwrap(LiveCleanSystemTrashExecutor.bundledScriptPath, "复核脚本应随应用包分发")
         let fixture = try makeFixture()
 
-        let termination = await LiveCleanSystemTrashExecutor.run(
-            SystemTrashRequest(paths: [fixture.old, fixture.young], requesterUID: UInt32(getuid())),
-            scriptPath: scriptPath,
-            privileged: false,
-            environment: fixtureEnvironment(reports: fixture.reports, trashRoot: fixture.trashRoot),
-            trashRoot: fixture.trashRoot,
-            temporaryDirectory: temporaryDirectory
+        let termination = await run(
+            paths: [fixture.old, fixture.young],
+            environment: fixtureEnvironment(reports: fixture.reports, stagingParent: fixture.stagingParent),
+            trashRoot: fixture.trashRoot
         )
 
         guard case let .completed(receipt) = termination else {
@@ -170,23 +205,18 @@ final class LiveCleanSystemTrashExecutorTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.old), "放满 7 天的离开原处")
         XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.young), "太新的原地不动")
         XCTAssertTrue(FileManager.default.fileExists(atPath: destination), "进了废纸篓子目录")
-        let leftovers = try FileManager.default.contentsOfDirectory(atPath: temporaryDirectory)
-            .filter { $0.hasSuffix(".manifest") }
-        XCTAssertTrue(leftovers.isEmpty, "清单文件用完即删")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: fixture.stagingParent), [], "暂存目录用完即收")
+        XCTAssertFalse(try contentsOfTemporaryDirectory().contains { $0.hasSuffix(".manifest") }, "清单文件用完即删")
     }
 
-    /// 一个都没移走:废纸篓里不留空文件夹。
-    func testNothingMovedLeavesNoEmptyFolderInTrash() async throws {
-        let scriptPath = try XCTUnwrap(LiveCleanSystemTrashExecutor.bundledScriptPath)
+    /// 一个都没移走:废纸篓里不留空文件夹,暂存目录也不剩。
+    func testNothingMovedLeavesNothingBehind() async throws {
         let fixture = try makeFixture()
 
-        let termination = await LiveCleanSystemTrashExecutor.run(
-            SystemTrashRequest(paths: [fixture.young], requesterUID: UInt32(getuid())),
-            scriptPath: scriptPath,
-            privileged: false,
-            environment: fixtureEnvironment(reports: fixture.reports, trashRoot: fixture.trashRoot),
-            trashRoot: fixture.trashRoot,
-            temporaryDirectory: temporaryDirectory
+        let termination = await run(
+            paths: [fixture.young],
+            environment: fixtureEnvironment(reports: fixture.reports, stagingParent: fixture.stagingParent),
+            trashRoot: fixture.trashRoot
         )
 
         guard case let .completed(receipt) = termination else {
@@ -195,8 +225,144 @@ final class LiveCleanSystemTrashExecutorTests: XCTestCase {
         XCTAssertEqual(receipt.recycled, [:])
         XCTAssertFalse(
             FileManager.default.fileExists(atPath: fixture.trashRoot + "/Pulse 系统级"),
-            "没移走任何东西时,专属子目录整个收掉"
+            "没移走任何东西时,废纸篓里什么都没多"
         )
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: fixture.stagingParent), [])
+    }
+
+    /// 脚本级失败走真通道:登记目录是符号链接 → 脚本整批没动;通道把原因原样带回,不带包的那层。
+    func testScriptFailureThroughTheRealChannel() async throws {
+        let fixture = try makeFixture()
+        let reportsLink = temporaryDirectory + "/reports-link"
+        try FileManager.default.createSymbolicLink(atPath: reportsLink, withDestinationPath: fixture.reports)
+
+        let termination = await run(
+            paths: [fixture.old],
+            environment: fixtureEnvironment(reports: reportsLink, stagingParent: fixture.stagingParent),
+            trashRoot: fixture.trashRoot
+        )
+
+        XCTAssertEqual(termination, .channelUnavailable(reason: "登记的目录是符号链接"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.old), "整批没动")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: fixture.stagingParent), [])
+    }
+
+    /// 和别的路径是同一个文件的硬链接:不碰(改归属会连那份一起改),两处都留在原地。
+    func testHardLinkedReportIsLeftAlone() async throws {
+        let fixture = try makeFixture()
+        let alias = fixture.reports + "/old-link.diag"
+        try FileManager.default.linkItem(atPath: fixture.old, toPath: alias)
+
+        let termination = await run(
+            paths: [fixture.old],
+            environment: fixtureEnvironment(reports: fixture.reports, stagingParent: fixture.stagingParent),
+            trashRoot: fixture.trashRoot
+        )
+
+        guard case let .completed(receipt) = termination else {
+            return XCTFail("应走完,实际 \(termination)")
+        }
+        XCTAssertEqual(receipt.failures, [fixture.old: "和别的路径是同一个文件的硬链接,没动"])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.old))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: alias))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: fixture.stagingParent), [])
+    }
+
+    /// 改不了归属:文件放回原处、内容与归属原样,按跳过报——不留「离开了原处、归属却不对」的状态。
+    func testOwnershipFailurePutsTheFileBack() async throws {
+        let fixture = try makeFixture()
+        let standIn = temporaryDirectory + "/chown-fails"
+        try Data("#!/bin/sh\nexit 1\n".utf8).write(to: URL(fileURLWithPath: standIn))
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: standIn)
+        let before = try ownership(of: fixture.old)
+
+        let termination = await run(
+            paths: [fixture.old],
+            environment: fixtureEnvironment(
+                reports: fixture.reports,
+                stagingParent: fixture.stagingParent,
+                chownStandIn: standIn
+            ),
+            trashRoot: fixture.trashRoot
+        )
+
+        guard case let .completed(receipt) = termination else {
+            return XCTFail("应走完,实际 \(termination)")
+        }
+        XCTAssertEqual(receipt.failures, [fixture.old: "归属改不成当前用户,已放回原处"])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.old), "放回了原处")
+        XCTAssertEqual(try String(contentsOfFile: fixture.old, encoding: .utf8), "report")
+        XCTAssertEqual(try ownership(of: fixture.old), before, "属主与组原样")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: fixture.stagingParent), [])
+    }
+
+    /// 一个文件的 [属主 uid, 组 gid]。
+    private func ownership(of path: String) throws -> [UInt32] {
+        let attributes = try FileManager.default.attributesOfItem(atPath: path)
+        return [
+            (attributes[.ownerAccountID] as? NSNumber)?.uint32Value ?? 0,
+            (attributes[.groupOwnerAccountID] as? NSNumber)?.uint32Value ?? 0,
+        ]
+    }
+
+    // MARK: 第二段:进废纸篓(以调用者身份)
+
+    private let stamp = Date(timeIntervalSince1970: 1_700_000_000)
+
+    /// 废纸篓 subdir 里已有同名文件:加序号,绝不覆盖。
+    func testRelocateAddsSequenceNumbersAndNeverOverwrites() throws {
+        let staging = temporaryDirectory + "/pulse-system-trash.Stage1"
+        try makeDirectory(staging)
+        try Data("new".utf8).write(to: URL(fileURLWithPath: staging + "/old.diag"))
+        let trashRoot = temporaryDirectory + "/Trash"
+        let occupied = trashRoot + "/Pulse 系统级/" + LiveCleanSystemTrashExecutor.stampDirectoryName(for: stamp) + "/old.diag"
+        try makeDirectory((occupied as NSString).deletingLastPathComponent)
+        try Data("keep".utf8).write(to: URL(fileURLWithPath: occupied))
+
+        let outcome = LiveCleanSystemTrashExecutor.relocate(
+            .init(staging: staging, receipt: TrashRecycleOutcome(recycled: ["/r/old.diag": staging + "/old.diag"])),
+            trashRoot: trashRoot,
+            now: stamp
+        )
+
+        let destination = try XCTUnwrap(outcome.recycled["/r/old.diag"])
+        XCTAssertEqual(destination, occupied + ".1")
+        XCTAssertEqual(try String(contentsOfFile: destination, encoding: .utf8), "new")
+        XCTAssertEqual(try String(contentsOfFile: occupied, encoding: .utf8), "keep", "原有的没被覆盖")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: staging), "都挪走了,空的暂存目录收掉")
+    }
+
+    /// 废纸篓进不去(建不了专属子目录):文件留在暂存目录,原因里写明在哪;不谎报已进废纸篓。
+    func testRelocateReportsWhereTheFileIsWhenTrashIsUnreachable() throws {
+        let staging = temporaryDirectory + "/pulse-system-trash.Stage2"
+        try makeDirectory(staging)
+        try Data("report".utf8).write(to: URL(fileURLWithPath: staging + "/old.diag"))
+        let notADirectory = temporaryDirectory + "/Trash-is-a-file"
+        try Data("x".utf8).write(to: URL(fileURLWithPath: notADirectory))
+
+        let outcome = LiveCleanSystemTrashExecutor.relocate(
+            .init(staging: staging, receipt: TrashRecycleOutcome(recycled: ["/r/old.diag": staging + "/old.diag"])),
+            trashRoot: notADirectory,
+            now: stamp
+        )
+
+        XCTAssertEqual(outcome.recycled, [:])
+        let reason = try XCTUnwrap(outcome.failures["/r/old.diag"])
+        XCTAssertTrue(reason.contains(staging + "/old.diag"), "原因里要写明文件现在在哪:\(reason)")
+        XCTAssertTrue(reason.contains("没能放进废纸篓"), reason)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: staging + "/old.diag"), "文件还在暂存目录里")
+    }
+
+    /// 脚本报了「已移走」却没交出暂存目录:不认,按失败报。
+    func testMovedWithoutAHandedOffStagingDirectoryIsNotTrusted() {
+        let outcome = LiveCleanSystemTrashExecutor.relocate(
+            .init(staging: nil, receipt: TrashRecycleOutcome(recycled: ["/r/old.diag": "/nowhere/old.diag"])),
+            trashRoot: temporaryDirectory + "/Trash",
+            now: stamp
+        )
+
+        XCTAssertEqual(outcome.recycled, [:])
+        XCTAssertEqual(outcome.failures, ["/r/old.diag": "复核脚本说已移走,却没有交出暂存目录"])
     }
 
     // MARK: 不该发的请求

@@ -202,6 +202,101 @@ final class CleanerSystemTrashWiringTests: XCTestCase {
 
         XCTAssertEqual(gate.values, [true, false])
     }
+
+    /// 含系统级条目的那一轮,从点「移入废纸篓」到收场前「正在等管理员密码」为真(界面据此
+    /// 改文案);只含用户态条目的那一轮恒假;收场后复位。
+    func testRunningNeedsAuthorizationTracksWhetherAPasswordPromptMayBeUp() async throws {
+        let hold = Hold()
+        let heldMover = FakeCleanSystemTrashExecutor(handler: { _ in
+            await hold.waitUntilOpened()
+            return .authorizationCancelled
+        })
+        let fixture = await scannedModel(mover: heldMover)
+        XCTAssertFalse(fixture.model.runningNeedsAuthorization, "还没开始")
+        try fixture.model.toggle(entry(fixture.model, at: oldReport))
+        fixture.model.requestClean()
+        fixture.model.confirmClean()
+        XCTAssertTrue(fixture.model.runningNeedsAuthorization, "点了「移入废纸篓」,授权接口在等用户")
+        await hold.open()
+        await waitUntil(isSettled(fixture.model))
+        XCTAssertFalse(fixture.model.runningNeedsAuthorization, "收场后复位")
+
+        // 只含用户态条目的那一轮:废纸篓执行器被按住,读得到执行中的状态。
+        let plainTrash = HoldingTrashExecutor()
+        let plain = CleanerModel.testing(
+            trash: plainTrash,
+            homeDirectory: home,
+            installedAppInventory: { _, _, _ in .complete([]) }
+        )
+        plain.startScan(using: makeEnumerator(now: Date().timeIntervalSince1970), roots: ["/Library", home])
+        await waitUntil(!plain.isScanning)
+        try plain.toggle(entry(plain, at: userCache))
+        plain.requestClean()
+        plain.confirmClean()
+        XCTAssertEqual(plain.cleanPhase, .running)
+        XCTAssertFalse(plain.runningNeedsAuthorization, "只含用户态条目:不弹密码框")
+        await plainTrash.open()
+        await waitUntil(isSettled(plain))
+    }
+
+    /// 重新扫描 = 新一轮真相:「没开始就停了」的提示随之收起。
+    func testRescanDismissesNotStartedNotice() async throws {
+        let fixture = await scannedModel(mover: FakeCleanSystemTrashExecutor(handler: { _ in .authorizationCancelled }))
+        try fixture.model.toggle(entry(fixture.model, at: oldReport))
+        fixture.model.requestClean()
+        fixture.model.confirmClean()
+        await waitUntil(isSettled(fixture.model))
+        XCTAssertEqual(fixture.model.cleanPhase, .notStarted(.authorizationCancelled))
+
+        fixture.model.startScan(using: makeEnumerator(now: Date().timeIntervalSince1970), roots: ["/Library", home])
+        XCTAssertEqual(fixture.model.cleanPhase, .idle, "重扫开始即收起提示")
+        await waitUntil(!fixture.model.isScanning)
+    }
+}
+
+/// 让一次调用停在「进行中」,直到测试放行。
+private actor Hold {
+    private var opened = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func waitUntilOpened() async {
+        if opened {
+            return
+        }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func open() {
+        opened = true
+        waiters.forEach { $0.resume() }
+        waiters = []
+    }
+}
+
+/// 按得住的假废纸篓执行器:`recycleToTrash` 停到放行为止,好在执行中读模型的状态。
+/// 绝不真删。`@unchecked Sendable` 的前提:自己无可变状态,等待全在 `Hold` actor 里。
+private final class HoldingTrashExecutor: CleanTrashExecutor, @unchecked Sendable {
+    private let hold = Hold()
+
+    func currentState(ofPath path: String) async -> PathSnapshot {
+        .present(modifiedEpoch: CleanFixture.directoryModified)
+    }
+
+    func recycleToTrash(_ paths: [String]) async -> TrashRecycleOutcome {
+        await hold.waitUntilOpened()
+        return TrashRecycleOutcome(recycled: Dictionary(uniqueKeysWithValues: paths.map { (
+            $0,
+            "/Users/test/.Trash/" + ($0 as NSString).lastPathComponent
+        ) }))
+    }
+
+    func emptyTrash() async -> TrashEmptySummary {
+        TrashEmptySummary(volumes: [])
+    }
+
+    func open() async {
+        await hold.open()
+    }
 }
 
 /// 清理活动门卫信号的记录。

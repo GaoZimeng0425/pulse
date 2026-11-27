@@ -4,13 +4,18 @@ import PulseCore
 // MARK: - Live 系统级条目移进废纸篓(p7-cleaner/05;ADR-0012)
 
 //
-// `CleanSystemTrashExecutor` 的真实现:经系统脚本的管理员授权,以 root 身份运行随包分发的
-// 复核脚本(Pulse/Resources/SystemTrash/pulse-system-trash.sh)。
-// 流程:建废纸篓专属子目录 → 写清单文件(一行一个路径,仅本人可读写)→ osascript
-// 「do shell script … with administrator privileges」跑脚本 → 解析逐项结果行 → 删清单文件。
+// `CleanSystemTrashExecutor` 的真实现,分两段:
+//   第一段(root):写清单文件(一行一个路径,仅本人可读写)→ osascript
+//     「do shell script … with administrator privileges」跑随包分发的复核脚本
+//     (Pulse/Resources/SystemTrash/pulse-system-trash.sh)→ 脚本把条目移进它私有的暂存目录、
+//     在那里逐条复核并改归属,再把暂存目录交给调用者。
+//   第二段(以调用者身份):把暂存目录里的文件挪进废纸篓的专属子目录。
+// root 不往任何用户可控的目录里写、不按那里的路径改归属(登记目录对某个用户组可写,
+// 用户能把 root 文件的硬链接放进去;废纸篓归用户所有,目录能被换成链接)——所以进废纸篓
+// 这一步由用户自己做。
 // 密码框可以一直开着等用户:不设超时。授权只在这一批动作发生时借一次,不常驻。
-// 提权一侧自己复核每一条(登记的路径形状 / 属主 / 年龄),这里的判断只是不把明显发不出去
-// 的请求送过去。
+// 提权一侧自己复核每一条(登记的路径形状 / 链接数 / 属主 / 年龄),这里的判断只是不把
+// 明显发不出去的请求送过去。
 // 真实提权路径不进自动化测试;离线钉住的是清单写法、命令行拼法、结果解析,外加「不带
 // 管理员授权」跑一遍真脚本(不弹密码框)。
 
@@ -34,6 +39,9 @@ struct LiveCleanSystemTrashExecutor: CleanSystemTrashExecutor {
     /// 专属子目录在废纸篓里的上一级。
     static let trashSubdirectory = "Pulse 系统级"
 
+    /// 专属子目录里同一个名字最多排到第几号;再往后按「挪不进废纸篓」如实报,绝不覆盖。
+    private static let maximumNameSequence = 9999
+
     private static let stampFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -47,6 +55,21 @@ struct LiveCleanSystemTrashExecutor: CleanSystemTrashExecutor {
         let status: Int32
         let stdout: String
         let stderr: String
+    }
+
+    /// 复核脚本的回执(第一段的结果)。
+    struct Handoff: Sendable, Equatable {
+        /// 暂存目录;一条都没移走时为 nil。
+        let staging: String?
+        /// 已移走的 原→暂存目录里的路径;没动的 原→原因(人话)。
+        let receipt: TrashRecycleOutcome
+    }
+
+    /// 第一段(root 脚本)怎么收场。
+    enum ScriptTermination: Equatable {
+        case completed(Handoff)
+        case authorizationCancelled
+        case channelUnavailable(reason: String)
     }
 
     // MARK: 整条通道
@@ -71,38 +94,112 @@ struct LiveCleanSystemTrashExecutor: CleanSystemTrashExecutor {
         guard request.paths.allSatisfy(isEncodableInManifest) else {
             return .channelUnavailable(reason: "有条目的路径含换行或制表符,没法写进清单文件")
         }
-        let target = trashRoot + "/" + trashSubdirectory + "/" + stampFormatter.string(from: Date())
-        do {
-            try FileManager.default.createDirectory(
-                atPath: target, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]
-            )
-        } catch {
-            return .channelUnavailable(reason: "废纸篓里建不了目标目录:\(error.localizedDescription)")
-        }
-        // 没移走任何东西时,别在废纸篓里留空文件夹。
-        defer { discardIfEmpty(target) }
-        let manifest: String
-        do {
-            manifest = try writeManifest(for: request.paths, in: temporaryDirectory)
-        } catch {
-            return .channelUnavailable(reason: "清单文件写不了:\(error.localizedDescription)")
-        }
+        let manifest = (temporaryDirectory as NSString).appendingPathComponent(
+            "pulse-system-trash-\(UUID().uuidString).manifest"
+        )
         // 用完即清:删的是本通道刚建的临时清单文件,不是用户数据,不属于 ADR-0008 管的
         // 删除出口(那两处删的是用户的东西)——所以在这里显式放行并写明理由。
         // swiftlint:disable:next no_remove_item_outside_deletion_gates
         defer { try? FileManager.default.removeItem(atPath: manifest) }
+        do {
+            try writeManifest(to: manifest, paths: request.paths)
+        } catch {
+            return .channelUnavailable(reason: "清单文件写不了:\(error.localizedDescription)")
+        }
 
-        // 路径不拼进命令之外的地方:三个路径各自整体单引号引用,用户 id 是数字。
+        // 路径不拼进命令之外的地方:两个路径各自整体单引号引用,用户 id 是数字。
         let command = [
-            "/bin/sh", shellQuoted(scriptPath), shellQuoted(manifest),
-            String(request.requesterUID), shellQuoted(target),
+            "/bin/sh", shellQuoted(scriptPath), shellQuoted(manifest), String(request.requesterUID),
         ].joined(separator: " ")
         let termination = await launch(
             "/usr/bin/osascript",
             arguments: ["-e", appleScript(command, privileged: privileged)],
             environment: environment
         )
-        return outcome(for: termination)
+        switch outcome(for: termination) {
+        case .authorizationCancelled:
+            return .authorizationCancelled
+        case let .channelUnavailable(reason):
+            return .channelUnavailable(reason: reason)
+        case let .completed(handoff):
+            return .completed(relocate(handoff, trashRoot: trashRoot))
+        }
+    }
+
+    // MARK: 第二段:进废纸篓(以调用者身份)
+
+    /// 把暂存目录里的文件挪进废纸篓的专属子目录。挪不动的留在暂存目录(已是调用者的
+    /// 文件),原因里写明在哪;都挪走了才收掉空的暂存目录。
+    /// - Parameter now: 子目录名里的时刻(测试注入,好预先摆好同名文件)。
+    static func relocate(_ handoff: Handoff, trashRoot: String, now: Date = Date()) -> TrashRecycleOutcome {
+        var outcome = TrashRecycleOutcome(failures: handoff.receipt.failures)
+        guard let staging = handoff.staging else {
+            // 没交接 = 一条都没移走;脚本这时候不该报「已移走」,报了也不认。
+            for source in handoff.receipt.recycled.keys {
+                outcome.failures[source] = "复核脚本说已移走,却没有交出暂存目录"
+            }
+            return outcome
+        }
+        let target = trashRoot + "/" + trashSubdirectory + "/" + stampDirectoryName(for: now)
+        do {
+            try FileManager.default.createDirectory(
+                atPath: target, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]
+            )
+        } catch {
+            for (source, staged) in handoff.receipt.recycled {
+                outcome.failures[source] = "已移出原处,暂存在 \(staged),没能放进废纸篓:\(error.localizedDescription)"
+            }
+            return outcome
+        }
+        for (source, staged) in handoff.receipt.recycled.sorted(by: { $0.key < $1.key }) {
+            let name = (staged as NSString).lastPathComponent
+            guard let destination = availableDestination(for: name, in: target) else {
+                outcome.failures[source] = "废纸篓子目录里同名文件太多,暂存在 \(staged)"
+                continue
+            }
+            do {
+                try FileManager.default.moveItem(atPath: staged, toPath: destination)
+                outcome.recycled[source] = destination
+            } catch {
+                outcome.failures[source] = "已移出原处,暂存在 \(staged),没能放进废纸篓:\(error.localizedDescription)"
+            }
+        }
+        if outcome.recycled.isEmpty {
+            discardIfEmpty(target)
+        }
+        if handoff.receipt.recycled.allSatisfy({ outcome.recycled[$0.key] != nil }) {
+            _ = rmdir(staging)
+        }
+        return outcome
+    }
+
+    /// 专属子目录里一批一个时间戳目录(查找与清点都按这个形状认)。
+    static func stampDirectoryName(for date: Date) -> String {
+        stampFormatter.string(from: date)
+    }
+
+    /// 专属子目录里还没被占用的去向:先是原名,被占了加序号。排到上限还没空位 = nil。
+    private static func availableDestination(for name: String, in directory: String) -> String? {
+        let base = (directory as NSString).appendingPathComponent(name)
+        if !FileManager.default.fileExists(atPath: base) {
+            return base
+        }
+        for sequence in 1 ... maximumNameSequence {
+            let candidate = base + "." + String(sequence)
+            if !FileManager.default.fileExists(atPath: candidate) {
+                return candidate
+            }
+        }
+        return nil
+    }
+
+    /// 目录空就收掉;它的上一级(专属子目录)也空就一并收掉。
+    /// 用 rmdir:它只收得下空目录,结构上删不了任何内容(比「先查空再删」还少一道竞态),
+    /// 不是 ADR-0008 管的删除出口。非空或不存在时它自己失败,忽略即可。
+    private static func discardIfEmpty(_ directory: String) {
+        for path in [directory, (directory as NSString).deletingLastPathComponent] {
+            _ = rmdir(path)
+        }
     }
 
     // MARK: 清单文件
@@ -112,16 +209,21 @@ struct LiveCleanSystemTrashExecutor: CleanSystemTrashExecutor {
         path.hasPrefix("/") && !path.contains("\n") && !path.contains("\r") && !path.contains("\t")
     }
 
-    /// 写清单文件并返回路径。仅本人可读写(0600):复核脚本按「属主 = 调用者」核对它。
-    /// 权限在建好后显式设——按普通方式建出来是 0644,别的人也读得到。
-    static func writeManifest(for paths: [String], in directory: String) throws -> String {
-        let path = (directory as NSString).appendingPathComponent("pulse-system-trash-\(UUID().uuidString).manifest")
+    /// 写清单文件。建文件的那一刻起就只有本人可读写(0600),不走「先建成 0644 再改权限」
+    /// 那条缝;复核脚本按「属主 = 调用者」核对它。文件已存在时不覆盖。
+    static func writeManifest(to path: String, paths: [String]) throws {
         let data = Data((paths.joined(separator: "\n") + "\n").utf8)
-        guard FileManager.default.createFile(atPath: path, contents: data) else {
-            throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: path])
+        let descriptor = open(path, O_WRONLY | O_CREAT | O_EXCL, mode_t(0o600))
+        guard descriptor >= 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
         }
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path)
-        return path
+        defer { close(descriptor) }
+        let written = data.withUnsafeBytes { buffer in
+            buffer.baseAddress.map { write(descriptor, $0, buffer.count) } ?? 0
+        }
+        guard written == data.count else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
     }
 
     // MARK: 命令行
@@ -194,48 +296,69 @@ struct LiveCleanSystemTrashExecutor: CleanSystemTrashExecutor {
 
     // MARK: 结果与失败
 
-    /// 退出码 0 = 走完;用户取消 = 系统脚本的错误号 -128;其余按通道不可用,原因如实带出。
-    static func outcome(for termination: Termination) -> SystemTrashOutcome {
+    /// 退出码 0 = 走完;用户取消 = 系统脚本的错误号 -128(通道原样带着它,认原始输出);
+    /// 其余按通道不可用,原因如实带出。
+    static func outcome(for termination: Termination) -> ScriptTermination {
         if termination.status == 0 {
             return .completed(parse(termination.stdout))
         }
-        if termination.stderr.contains("-128") {
+        let rawLines = termination.stderr.split(omittingEmptySubsequences: true, whereSeparator: \.isNewline)
+        if rawLines.contains(where: { $0.trimmingCharacters(in: .whitespaces).hasSuffix("(-128)") }) {
             return .authorizationCancelled
         }
         return .channelUnavailable(reason: failureReason(for: termination))
     }
 
-    private static func failureReason(for termination: Termination) -> String {
-        let lines = termination.stderr
-            .split(separator: "\n", omittingEmptySubsequences: true)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-        if let declared = lines.first(where: { $0.hasPrefix("channel-unavailable: ") }) {
-            return String(declared.dropFirst("channel-unavailable: ".count))
-        }
-        if let first = lines.first {
-            return first
-        }
-        return "系统脚本退出码 \(termination.status)"
+    private static func stderrLines(_ termination: Termination) -> [String] {
+        termination.stderr.split(omittingEmptySubsequences: true, whereSeparator: \.isNewline).map(unwrapped)
     }
 
-    /// 结果行三段、制表符分隔:MOVED 原→新,SKIPPED 原→原因代码(翻成人话)。坏行忽略——
-    /// 没有回执的条目由执行编排按失败记。换行按「任意换行」认:系统脚本通道把标准输出
-    /// 的换行回传成回车(系统脚本以回车分行),别只认 \n。
-    static func parse(_ stdout: String) -> TrashRecycleOutcome {
-        var outcome = TrashRecycleOutcome()
+    /// 系统脚本通道会把脚本的错误输出包一层:「<位置>: execution error: <脚本写到标准错误的
+    /// 内容> (<脚本退出码>)」。脚本自己说了原因就取那一句;没说就取系统的第一句。
+    private static func failureReason(for termination: Termination) -> String {
+        let lines = stderrLines(termination)
+        for line in lines {
+            if let range = line.range(of: "channel-unavailable: ") {
+                return String(line[range.upperBound...])
+            }
+        }
+        return lines.first ?? "系统脚本退出码 \(termination.status)"
+    }
+
+    /// 去掉通道包的那一层:前缀「<位置>: execution error: 」与尾部的「 (<退出码>)」。
+    private static func unwrapped(_ line: Substring) -> String {
+        var text = line.trimmingCharacters(in: .whitespaces)
+        if let range = text.range(of: "execution error: ") {
+            text = String(text[range.upperBound...])
+        }
+        if text.hasSuffix(")"), let open = text.lastIndex(of: "("), open > text.startIndex,
+           text[text.index(before: open)] == " ",
+           text[text.index(after: open)...].dropLast().allSatisfy({ $0 == "-" || $0.isNumber }) {
+            text = String(text[..<open]).trimmingCharacters(in: .whitespaces)
+        }
+        return text
+    }
+
+    /// 结果行制表符分隔:SKIPPED / MOVED 三段,STAGING 两段(交接成功才有)。SKIPPED 的原因
+    /// 代码翻成人话;坏行忽略——没有回执的条目由执行编排按失败记。换行按「任意换行」认:
+    /// 系统脚本通道把标准输出的换行回传成回车(系统脚本以回车分行),别只认 \n。
+    static func parse(_ stdout: String) -> Handoff {
+        var receipt = TrashRecycleOutcome()
+        var staging: String?
         for line in stdout.split(omittingEmptySubsequences: true, whereSeparator: \.isNewline) {
             let fields = line.split(separator: "\t", maxSplits: 2, omittingEmptySubsequences: false).map(String.init)
-            guard fields.count == 3 else { continue }
-            switch fields[0] {
-            case "MOVED":
-                outcome.recycled[fields[1]] = fields[2]
-            case "SKIPPED":
-                outcome.failures[fields[1]] = reasonText(fields[2])
+            switch fields.first {
+            case "STAGING" where fields.count == 2:
+                staging = fields[1]
+            case "MOVED" where fields.count == 3:
+                receipt.recycled[fields[1]] = fields[2]
+            case "SKIPPED" where fields.count == 3:
+                receipt.failures[fields[1]] = reasonText(fields[2])
             default:
                 continue
             }
         }
-        return outcome
+        return Handoff(staging: staging, receipt: receipt)
     }
 
     /// 复核脚本的原因代码 → 人话。代码是脚本的固定词表,没见过的照实报出来。
@@ -248,20 +371,12 @@ struct LiveCleanSystemTrashExecutor: CleanSystemTrashExecutor {
         case "hidden-file": "隐藏文件"
         case "symlink": "是符号链接"
         case "not-a-regular-file": "已不在原处,或不是普通文件"
+        case "stat-failed": "读不到文件的状态,没动"
+        case "hard-linked": "和别的路径是同一个文件的硬链接,没动"
         case "owner-not-system": "属主不是 root 或系统用户"
         case "too-young": "还没满 7 天(移动前又核了一次)"
-        case "move-failed": "移动失败"
+        case "ownership-not-changed": "归属改不成当前用户,已放回原处"
         default: "复核未通过(\(code))"
-        }
-    }
-
-    /// 目录空就收掉;它的上一级(专属子目录)也空就一并收掉。复核脚本在一个都没移走时
-    /// 自己会收掉目标目录,所以某一级已经不在了不算事,接着看上一级。
-    /// 用 rmdir:它只收得下空目录,结构上删不了任何内容(比「先查空再删」还少一道竞态),
-    /// 不是 ADR-0008 管的删除出口。非空或不存在时它自己失败,忽略即可。
-    private static func discardIfEmpty(_ directory: String) {
-        for path in [directory, (directory as NSString).deletingLastPathComponent] {
-            _ = rmdir(path)
         }
     }
 }

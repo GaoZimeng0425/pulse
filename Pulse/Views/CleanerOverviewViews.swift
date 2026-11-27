@@ -6,6 +6,9 @@ import SwiftUI
 //
 // 页面骨架:Hero 卡(可回收总量 + 一键清理)→ 模块大卡(每个有候选的品类一张,
 // 2 列自适应)→ 废纸篓卡(网格末位;清单为空时独占一行)。页内整页滚动。
+// 清理「没开始就停了」(管理员授权被取消 / 通道不可用)时,最上面出一张提示卡
+// (`CleanNotStartedNotice`,与全部清单页的结果卡位同一件;平时不占位)——AI 助手经清理桥
+// 发起的清理,用户可能正停在这一页。
 // 数据面全在 PulseCore 纯值,这里只排版:`JunkOverviewAggregator.overview` 出 Hero 与
 // 模块卡的数,`TrashInventory` 出废纸篓读数。
 
@@ -107,6 +110,11 @@ struct CleanerOverviewSection: View {
         let overview = model.junkOverview
         return ScrollView {
             VStack(alignment: .leading, spacing: 12) {
+                if case let .notStarted(abort) = model.cleanPhase {
+                    CleanNotStartedNotice(abort: abort) {
+                        model.dismissCleanReport()
+                    }
+                }
                 if overview.isEmpty {
                     CardEmptyState(
                         title: CleanerEmptyStateCopy.nothingFoundTitle,
