@@ -63,4 +63,13 @@ final class JunkCandidateMarkerTests: XCTestCase {
         }
         XCTAssertEqual(Set(all.map(\.title)).count, all.count, "标记文案互不相同")
     }
+
+    /// 占用重算会逐字段重建候选:标记必须跟着过去,不能静默回落成「无标记」。
+    func testAccountingRebuildKeepsMarkers() {
+        let rebuilt = candidate(requiresAuthorization: true, unidentified: true)
+            .withAccounting(bytes: 9, fileCount: 2, allReclaimable: false, note: "按整目录兜底")
+
+        XCTAssertEqual(rebuilt.markers, [.requiresAuthorization, .unidentified])
+        XCTAssertEqual(rebuilt.bytes, 9)
+    }
 }

@@ -24,13 +24,14 @@ public enum JunkCandidateMarker: String, Sendable, Equatable, CaseIterable {
         }
     }
 
-    /// 悬停说明:小标自己解释自己。
+    /// 悬停说明:小标自己解释自己。只陈述这条目是什么样的事实,不描述「点了会发生什么」
+    /// ——同一份说明也挂在清理历史的行上(那里可能是失败行),流程话在那处不成立。
     public var help: String {
         switch self {
         case .requiresAuthorization:
-            "在系统目录里:确认后会弹一次系统管理员密码框,授权后与其他项一起移入废纸篓,可在 Finder 找回"
+            "在系统目录里:移走它需要一次系统管理员授权(弹出系统密码框)"
         case .unidentified:
-            "不在已知名单里,说不出它属于哪个工具:只列在「先检查」,不会被自动勾选,清前看一眼路径"
+            "不在已知名单里,说不出它属于哪个工具:只列在「先检查」,不进自动勾选"
         }
     }
 }
