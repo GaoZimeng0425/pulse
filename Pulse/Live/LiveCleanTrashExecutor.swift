@@ -63,44 +63,44 @@ struct LiveCleanTrashExecutor: CleanTrashExecutor {
         }
     }
 
-    /// 清空用户可写的全部废纸篓:~/.Trash 与各卷 .Trashes/<uid>。逐项删顶层条目,无权限 /
-    /// 失败项跳过并计数(不中断、不伪造)。字节按删除前 FileManager 的分配大小求和
-    /// (这里不是「实际占用」口径——废纸篓里克隆的真实可释放量没必要精算,文案按"约"报)。
+    /// 清空用户可写的全部废纸篓:~/.Trash 与各卷 .Trashes/<uid>。读不到的卷跳过。
     func emptyTrash() async -> TrashEmptySummary {
-        var volumes: [TrashVolumeEmptySummary] = []
-        for (volume, directory) in Self.userTrashDirectories() {
-            var emptied = 0, skipped = 0
-            var freed: Int64 = 0
-            let manager = FileManager.default
-            guard let entries = try? manager.contentsOfDirectory(atPath: directory) else {
+        TrashEmptySummary(volumes: Self.userTrashDirectories().compactMap { volume, directory in
+            Self.emptyTrash(in: directory, volume: volume)
+        })
+    }
+
+    /// 清空一个废纸篓目录。逐项删顶层条目(含子目录整树——系统级条目移进来的「Pulse 系统级」
+    /// 子目录归属已是当前用户,不加权限就能删),无权限 / 失败项跳过并计数(不中断、不伪造)。
+    /// 字节按删除前 FileManager 的分配大小求和(这里不是「实际占用」口径——废纸篓里克隆的
+    /// 真实可释放量没必要精算,文案按"约"报)。nil = 目录读不到,调用方跳过这一卷。
+    /// 与发现逻辑分开,单测用临时目录钉住:删什么、绝不删什么。
+    static func emptyTrash(in directory: String, volume: String) -> TrashVolumeEmptySummary? {
+        var emptied = 0, skipped = 0
+        var freed: Int64 = 0
+        let manager = FileManager.default
+        guard let entries = try? manager.contentsOfDirectory(atPath: directory) else {
+            return nil
+        }
+        for name in entries where name != ".DS_Store" {
+            let itemPath = (directory as NSString).appendingPathComponent(name)
+            let size = allocatedSize(atPath: itemPath)
+            // 防御闸(p4-uninstaller/04,ADR-0008):删除动作只许落在废纸篓
+            // 目录之内。路径来自 contentsOfDirectory 本不该越界,这道 guard
+            // 是纵深防御——越界按跳过计,绝不出废纸篓一步(单测钉住边界)。
+            guard TrashEmptying.isInsideTrash(itemPath, trashDirectories: [directory]) else {
+                skipped += 1
                 continue
             }
-            for name in entries where name != ".DS_Store" {
-                let itemPath = (directory as NSString).appendingPathComponent(name)
-                let size = Self.allocatedSize(atPath: itemPath)
-                // 防御闸(p4-uninstaller/04,ADR-0008):删除动作只许落在废纸篓
-                // 目录之内。路径来自 contentsOfDirectory 本不该越界,这道 guard
-                // 是纵深防御——越界按跳过计,绝不出废纸篓一步(单测钉住边界)。
-                guard TrashEmptying.isInsideTrash(itemPath, trashDirectories: [directory]) else {
-                    skipped += 1
-                    continue
-                }
-                do {
-                    try manager.removeItem(atPath: itemPath)
-                    emptied += 1
-                    freed += size
-                } catch {
-                    skipped += 1
-                }
+            do {
+                try manager.removeItem(atPath: itemPath)
+                emptied += 1
+                freed += size
+            } catch {
+                skipped += 1
             }
-            volumes.append(TrashVolumeEmptySummary(
-                volume: volume,
-                emptiedItems: emptied,
-                freedBytes: freed,
-                skippedItems: skipped
-            ))
         }
-        return TrashEmptySummary(volumes: volumes)
+        return TrashVolumeEmptySummary(volume: volume, emptiedItems: emptied, freedBytes: freed, skippedItems: skipped)
     }
 
     /// (卷名, 废纸篓目录)。启动卷 = ~/.Trash;其余 = /Volumes/*/.Trashes/<uid>(存在才列)。

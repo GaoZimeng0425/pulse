@@ -14,9 +14,11 @@ import PulseCore
 //
 // 删除管线(04)全部由 PulseCore 纯值驱动,本类只做粘合与发布:
 //   清单 = JunkMatcher 跑在扫描树上(白名单命中才有;ADR-0008)+ 项目产物 / 卸载残留
-//     + 通用发现(名单外的缓存与日志,一律「先检查」;ADR-0013);
+//     + 通用发现(名单外的缓存与日志,一律「先检查」;ADR-0013)
+//     + 系统级规则(带「需要管理员权限」;p7-cleaner/05);
 //   勾选 = JunkSelection(默认全不勾);计划 = CleanPlan(删前排除二次判定);
 //   执行 = CleanRunner → CleanTrashExecutor(唯一删除出口;生产 Live、测试 spy);
+//     带「需要管理员权限」的条目另走 CleanSystemTrashExecutor(运行时授权,ADR-0012);
 //   历史 = CleanHistoryStore(历史库缺席照常删,只是不记,界面如实说)。
 
 @MainActor
@@ -28,13 +30,15 @@ final class CleanerModel {
         case finished(SpaceScanResult)
     }
 
-    /// 删除管线的阶段:确认清单只在 confirming 出现;finished 带战报供结果卡展示。
+    /// 删除管线的阶段:确认清单只在 confirming 出现;finished 带战报供结果卡展示;
+    /// notStarted = 没开始就停了(授权被取消 / 通道不可用),整批未动、勾选保留。
     enum CleanPhase: Equatable {
         case idle
         case confirming
         case running
         /// `historyRecorded` = 本次已写进清理历史(库缺席 / 写失败为 false,结果卡如实说)。
         case finished(CleanRunReport, historyRecorded: Bool)
+        case notStarted(CleanRunAbort)
     }
 
     private(set) var phase: Phase = .idle {
@@ -186,12 +190,16 @@ final class CleanerModel {
     ///     新测试漏传又调清空 = 清空用户真废纸篓——编译期挡住;生产传
     ///     LiveCleanTrashExecutor,测试传 FakeCleanTrashExecutor;同
     ///     AlertCenter 发送器必传纪律)。
+    ///   - systemTrash: 系统级条目的授权通道(p7-cleaner/05;ADR-0012)。**必传、无默认值**,
+    ///     理由同 trash:生产传 LiveCleanSystemTrashExecutor(会弹系统管理员密码框),
+    ///     测试传假实现。
     ///   - runningAppsFreshness: 运行中应用读数多久内算新鲜(生产 1s;测试注入)。
     init(
         exclusions: CleanExclusionsStore = CleanExclusionsStore(load: { [] }, persist: { _ in }),
         scanRoots: CleanScanRootsStore = CleanScanRootsStore(load: { [] }, persist: { _ in }),
         history: CleanHistoryStore? = nil,
         trash: any CleanTrashExecutor,
+        systemTrash: any CleanSystemTrashExecutor,
         directoryEnumerator: any CleanDirectoryEnumerator,
         activity: (any CleanActivitySource)? = nil,
         volumeSummaries: (@Sendable () -> [SpaceMapVolumeSummary])? = nil,
@@ -212,6 +220,7 @@ final class CleanerModel {
         self.scanRoots = scanRoots
         self.history = history
         self.trash = trash
+        self.systemTrash = systemTrash
         self.directoryEnumerator = directoryEnumerator
         self.activity = activity
         self.volumeSummaries = volumeSummaries
@@ -229,6 +238,9 @@ final class CleanerModel {
     @ObservationIgnored private let directoryEnumerator: any CleanDirectoryEnumerator
     @ObservationIgnored private let markerExists: (String) -> Bool
     @ObservationIgnored private let trashInventorySource: @Sendable () async -> TrashInventory?
+    /// 系统级条目的授权通道(p7-cleaner/05):生产 Live(弹系统管理员密码框、以 root 跑
+    /// 复核脚本);测试注入假实现。
+    @ObservationIgnored private let systemTrash: any CleanSystemTrashExecutor
     /// 运行中应用采集(p7-cleaner/02):生产 Live(系统工作区的应用列表);测试注入固定结果。
     /// 只读、同步,读清单时在主线程调;采集一次约两毫秒,所以新鲜期内、版本号没变的
     /// 重复读共用一份(`RunningAppsReading`)。
@@ -483,9 +495,11 @@ final class CleanerModel {
             roots: scanRoots,
             excludedPathPrefixes: exclusions.paths,
             retainFileNodes: false,
-            // p6-cleaner/02:Ollama 模型库定向保留文件节点(内容寻址记账要逐文件
-            // 字节;前缀出处单一 = OllamaStoreAccounting.retainedFilePrefixes)。
-            retainedFilePrefixes: OllamaStoreAccounting.retainedFilePrefixes(home: homeDirectory),
+            // 定向保留文件节点(其余只留目录):Ollama 模型库(内容寻址记账要逐文件字节,
+            // p6-cleaner/02)与系统级规则的目录(按文件判年龄,p7-cleaner/05)。前缀各由
+            // 自己的规则单出处给。
+            retainedFilePrefixes: OllamaStoreAccounting.retainedFilePrefixes(home: homeDirectory)
+                + SystemLevelRuleTable.retainedFilePrefixes,
             // petal 式并行(性能票):真机 Data 卷 ≈500 万项,6 个长驻 worker
             // 吃共享目录栈(注:注释史上的「测试注入假枚举器保持串行」豁免
             // 已不成立——并发恒 6,假枚举器测试只断计数不断请求序,2026-11-11 核)。
@@ -715,10 +729,16 @@ final class CleanerModel {
             claimedBy: claimed + leftovers,
             excludedPathPrefixes: excluded
         )
+        // 系统级规则(p7-cleaner/05):系统目录里按文件判年龄的条目,带「需要管理员权限」。
+        let systemLevel = SystemLevelDetector.detect(
+            in: result.trees,
+            now: Date().timeIntervalSince1970,
+            excludedPathPrefixes: excluded
+        )
 
         // 不过滤亚兆条目(2026-11-06 用户拍板:0 KB 产物也是该清的东西,照列;
         // 显示层由 memory() 的 KB 档给出真实读数)。
-        return (claimed + leftovers + generic)
+        return (claimed + leftovers + generic + systemLevel)
             .filter { !key.recycled.contains($0.path) }
     }
 
@@ -875,7 +895,7 @@ final class CleanerModel {
     func requestClean() {
         // 确认清单按此刻谁在运行来:刚启动的应用,它的缓存不进清单。
         noteRunningAppsMayHaveChanged()
-        guard !plan.isEmpty, cleanPhase == .idle || isFinishedPhase else { return }
+        guard !plan.isEmpty, cleanPhase == .idle || isSettledPhase else { return }
         cleanPhase = .confirming
     }
 
@@ -886,6 +906,8 @@ final class CleanerModel {
 
     /// 用户在确认清单上点了「移入废纸篓」:计划在此刻重新生成(排除二次判定),执行、
     /// 记历史、清单收敛。执行期间清单不可再动(UI 按 running 禁用)。
+    /// 清单里有系统级条目时,这一步会弹系统管理员密码框;取消或通道不可用 = 整批没动,
+    /// 停在「没开始」,勾选原样保留。
     func confirmClean() {
         guard cleanPhase == .confirming else { return }
         // 点「移入废纸篓」这一刻重采:确认单挂着的时候启动的应用,它的缓存不跟着走。
@@ -897,17 +919,30 @@ final class CleanerModel {
         }
         cleanPhase = .running
         Self.postCleanActivity(true)
-        Task { [trash, history, weak self] in
-            let report = await CleanRunner.run(plan, using: trash)
-            var recorded = false
-            if let history {
-                do {
-                    recorded = try await history.record(report) != nil
-                } catch {
-                    LogService.error("清理历史落库失败:\(error)", category: "Cleaner")
-                }
+        Task { [trash, systemTrash, history, weak self] in
+            let termination = await CleanRunner.run(
+                plan, using: trash, systemTrash: systemTrash, requesterUID: UInt32(getuid())
+            )
+            guard let self else {
+                // 窗口中途被关:门卫信号照样放开,别让「清理进行中」卡住退出。
+                Self.postCleanActivity(false)
+                return
             }
-            self?.applyCleanReport(report, historyRecorded: recorded)
+            switch termination {
+            case let .aborted(reason):
+                cleanPhase = .notStarted(reason)
+                Self.postCleanActivity(false)
+            case let .completed(report):
+                var recorded = false
+                if let history {
+                    do {
+                        recorded = try await history.record(report) != nil
+                    } catch {
+                        LogService.error("清理历史落库失败:\(error)", category: "Cleaner")
+                    }
+                }
+                applyCleanReport(report, historyRecorded: recorded)
+            }
         }
     }
 
@@ -948,16 +983,18 @@ final class CleanerModel {
         Task.detached(priority: .utility) { scanCache.save(payload) }
     }
 
+    /// 关掉结果卡 / 「没开始」的提示,回到空态。
     func dismissCleanReport() {
-        guard isFinishedPhase else { return }
+        guard isSettledPhase else { return }
         cleanPhase = .idle
     }
 
-    private var isFinishedPhase: Bool {
-        if case .finished = cleanPhase {
-            return true
+    /// 走完了或没开始就停了:提示可以关掉,清理可以重新发起。
+    private var isSettledPhase: Bool {
+        switch cleanPhase {
+        case .finished, .notStarted: true
+        case .idle, .confirming, .running: false
         }
-        return false
     }
 
     // MARK: 清理历史(04;独立入口 = 第三子药丸)

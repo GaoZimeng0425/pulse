@@ -417,12 +417,17 @@ final class GenericDiscoveryTests: XCTestCase {
         let plan = CleanPlan.make(selection: selection, candidates: [item], excludedPathPrefixes: [])
         XCTAssertEqual(plan.items.map(\.flags), [[.unidentified]])
 
-        let report = await CleanRunner.run(
+        let termination = await CleanRunner.run(
             plan,
             using: FakeCleanTrashExecutor(
                 nextRecycleOutcome: TrashRecycleOutcome(recycled: [path: "/Users/me/.Trash/SomeTool"])
-            )
+            ),
+            systemTrash: nil,
+            requesterUID: 501
         )
+        guard case let .completed(report) = termination else {
+            return XCTFail("没有系统级条目的计划不该停下来:\(termination)")
+        }
         let store = try CleanHistoryStore(database: HistoryDatabase.openInMemory())
         let runID = try await store.record(report)
 

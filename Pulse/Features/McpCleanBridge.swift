@@ -146,7 +146,8 @@ final class McpCleanBridge {
             )
         }
 
-        // 5) 等终态:finished = 执行完;idle = 用户取消;窗口中途被关 = 如实失败。
+        // 5) 等终态:finished = 执行完;idle = 用户取消;notStarted = 用户点了「移入废纸篓」
+        //    但管理员授权没下来(整批未动);窗口中途被关 = 如实失败。
         let deadline = Date().addingTimeInterval(TimeInterval(confirmTimeoutSeconds))
         while Date() < deadline {
             if windowModel !== model {
@@ -169,6 +170,13 @@ final class McpCleanBridge {
                     status: .cancelledByUser,
                     unrecognized: matched.unrecognized
                 )
+            case let .notStarted(abort):
+                return McpCleanRunResponse(
+                    status: abort == .authorizationCancelled ? .cancelledByUser : .appError,
+                    items: [],
+                    unrecognized: matched.unrecognized,
+                    message: "\(abort.title):\(abort.detail)"
+                )
             case .confirming, .running:
                 break
             }
@@ -186,10 +194,10 @@ final class McpCleanBridge {
 // MARK: - 阶段判据小助手
 
 extension CleanerModel {
-    /// mcp-clean:外部请求只认空态/结果态;确认中/执行中一律 busy。
+    /// mcp-clean:外部请求只认空态/结果态(含「没开始就停了」);确认中/执行中一律 busy。
     var isCleanPhaseIdleOrFinished: Bool {
         switch cleanPhase {
-        case .idle, .finished: true
+        case .idle, .finished, .notStarted: true
         case .confirming, .running: false
         }
     }

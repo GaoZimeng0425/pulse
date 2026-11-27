@@ -46,6 +46,14 @@ struct CleanConfirmSheet: View {
                         .font(.system(size: 12))
                         .foregroundStyle(Surface.warning)
                 }
+                // 运行时授权预告(p7-cleaner/05;ADR-0012):密码框是点了这个按钮才弹的,
+                // 先说清会弹、由谁发起、取消了会怎样。
+                let authorized = plan.items.filter { $0.flags.contains(.requiresAuthorization) }.count
+                if authorized > 0 {
+                    Text("其中 \(authorized) 项在系统目录里:点「移入废纸篓」后会弹一次系统管理员密码框(由系统工具 osascript 发起)。取消则这一批都不动,勾选保留。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
             }
             HStack(spacing: 8) {
                 Spacer()

@@ -157,6 +157,22 @@ final class CleanPlanTests: XCTestCase {
 
     // MARK: 执行
 
+    /// 跑一份计划并取出战报(这些用例都不该在授权那一步停下来)。
+    private func run(
+        _ plan: CleanPlan,
+        using spy: FakeCleanTrashExecutor,
+        systemTrash: FakeCleanSystemTrashExecutor? = nil,
+        now: @escaping @Sendable () -> Date = { Date() }
+    ) async -> CleanRunReport {
+        switch await CleanRunner.run(plan, using: spy, systemTrash: systemTrash, requesterUID: 501, now: now) {
+        case let .completed(report):
+            return report
+        case let .aborted(reason):
+            XCTFail("这份计划不该停下来:\(reason)")
+            return CleanRunReport(startedAt: Date(), finishedAt: Date(), items: [])
+        }
+    }
+
     func testRunnerHandsExactPathsToExecutorAndMapsOutcomes() async {
         let items = Array(candidates.prefix(3))
         let plan = CleanPlan(items: items)
@@ -167,7 +183,7 @@ final class CleanPlanTests: XCTestCase {
         let ticker = Ticker()
         let clock: @Sendable () -> Date = { ticker.next() }
 
-        let report = await CleanRunner.run(plan, using: spy, now: clock)
+        let report = await run(plan, using: spy, now: clock)
 
         let calls = await spy.recycleCalls
         XCTAssertEqual(calls, [items.map(\.path)], "一次调用、恰好计划里的路径、同序")
@@ -201,11 +217,14 @@ final class CleanPlanTests: XCTestCase {
         )
         let plain = candidate("/Users/t/Library/Caches/Homebrew", bytes: 3100)
         let spy = FakeCleanTrashExecutor(nextRecycleOutcome: TrashRecycleOutcome(recycled: [
-            flagged.path: "/Users/t/.Trash/x.ips",
             plain.path: "/Users/t/.Trash/Homebrew",
         ]))
+        // 带「需要管理员权限」的那一条走授权通道,不进废纸篓执行器。
+        let mover = FakeCleanSystemTrashExecutor(handler: { _ in
+            .completed(TrashRecycleOutcome(recycled: [flagged.path: "/Users/t/.Trash/x.ips"]))
+        })
 
-        let report = await CleanRunner.run(CleanPlan(items: [flagged, plain]), using: spy)
+        let report = await run(CleanPlan(items: [flagged, plain]), using: spy, systemTrash: mover)
 
         XCTAssertEqual(report.items.map(\.flags), [[.requiresAuthorization, .unidentified], []])
         XCTAssertEqual(report.items.allSatisfy(\.isRecycled), true)
@@ -215,14 +234,14 @@ final class CleanPlanTests: XCTestCase {
     func testUnreportedItemsCountAsFailed() async {
         let plan = CleanPlan(items: [candidates[0]])
         let spy = FakeCleanTrashExecutor(nextRecycleOutcome: TrashRecycleOutcome())
-        let report = await CleanRunner.run(plan, using: spy)
+        let report = await run(plan, using: spy)
         XCTAssertEqual(report.items[0].outcome, .failed(reason: "执行器未报告结果"))
         XCTAssertEqual(report.freedBytes, 0)
     }
 
     func testEmptyPlanNeverTouchesExecutor() async {
         let spy = FakeCleanTrashExecutor()
-        let report = await CleanRunner.run(CleanPlan(items: []), using: spy)
+        let report = await run(CleanPlan(items: []), using: spy)
         let calls = await spy.recycleCalls
         XCTAssertTrue(calls.isEmpty)
         XCTAssertTrue(report.items.isEmpty)
@@ -245,7 +264,7 @@ final class CleanPlanTests: XCTestCase {
             ]
         )
 
-        let report = await CleanRunner.run(plan, using: spy)
+        let report = await run(plan, using: spy)
 
         let calls = await spy.recycleCalls
         XCTAssertEqual(calls, [[unchanged.path]], "只有复核通过的项进执行器批次")
@@ -272,7 +291,7 @@ final class CleanPlanTests: XCTestCase {
     func testAllItemsSkippedNeverCallsRecycle() async {
         let item = candidate("/Users/t/Library/Caches/Homebrew")
         let spy = FakeCleanTrashExecutor(pathStates: [item.path: .unreadable])
-        let report = await CleanRunner.run(CleanPlan(items: [item]), using: spy)
+        let report = await run(CleanPlan(items: [item]), using: spy)
         let calls = await spy.recycleCalls
         XCTAssertTrue(calls.isEmpty, "全部复核不过 = 执行器零调用")
         XCTAssertEqual(report.failed.count, 1)

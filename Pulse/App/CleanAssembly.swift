@@ -21,6 +21,9 @@ struct CleanAssembly {
             scanRoots: scanRoots,
             history: monitor.features.history.cleanHistory,
             trash: LiveCleanTrashExecutor(),
+            // 系统级条目的授权通道(p7-cleaner/05;ADR-0012):用户点了「移入废纸篓」且清单里
+            // 有系统级条目时,才弹系统管理员密码框。
+            systemTrash: LiveCleanSystemTrashExecutor(),
             directoryEnumerator: enumerator,
             activity: LiveCleanActivitySource(board: monitor.activityBoard),
             volumeSummaries: { LiveCleanVolumeSummaries().internalSystemVolumes() },

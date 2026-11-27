@@ -103,8 +103,9 @@ struct LiveBrewUninstaller: Sendable {
     }
 }
 
-/// stderr 累积(readabilityHandler 在 FileHandle 私有队列回调,与等待方跨线程)。
-private final class OutputBuffer: @unchecked Sendable {
+/// 子进程输出累积(readabilityHandler 在 FileHandle 私有队列回调,与等待方跨线程)。
+/// brew 卸载与系统级条目移进废纸篓两条通道共用。
+final class OutputBuffer: @unchecked Sendable {
     /// @unchecked Sendable 前提:全部读写经 lock 串行。
     private let lock = NSLock()
     private var bytes = Data()

@@ -478,7 +478,7 @@ struct JunkListCard: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
             .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
-        case .idle, .finished, .confirming:
+        case .idle, .finished, .confirming, .notStarted:
             // 动作条常驻:空选时主按钮灰显 + 注脚,不整条消失——按钮消失时看不出
             // 下一步该干嘛;有选则出「清除勾选」+ 强调色主按钮。
             HStack(spacing: 12) {
@@ -546,6 +546,29 @@ struct JunkListCard: View {
                             .truncationMode(.middle)
                     }
                 }
+            }
+            .padding(12)
+            .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
+        } else if case let .notStarted(abort) = model.cleanPhase {
+            // 没开始就停了(管理员授权被取消 / 通道不可用):客观陈述,不催促;勾选还在,
+            // 动作条照常可以重新发起。
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: IconSize.inline, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Text(abort.title)
+                        .font(.system(size: 12, weight: .medium))
+                    Spacer()
+                    Button("知道了") {
+                        model.dismissCleanReport()
+                    }
+                    .buttonStyle(.link)
+                    .font(.system(size: 12))
+                }
+                Text(abort.detail)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
             }
             .padding(12)
             .background(Surface.cardHigh, in: .rect(cornerRadius: 12))

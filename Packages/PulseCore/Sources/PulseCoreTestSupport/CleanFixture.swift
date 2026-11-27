@@ -84,6 +84,42 @@ public actor FakeCleanTrashExecutor: CleanTrashExecutor {
     }
 }
 
+/// ④ 系统级条目移进废纸篓(需要授权)的假实现(p7-cleaner/05):记下收到的请求,结果由
+/// 注入的处理闭包给。绝不真移、绝不提权——断言面就是「收到了什么」。
+/// `@unchecked Sendable` 的前提:`handler` 与 `recorded` 的全部访问都经 `lock`(执行器从
+/// 调用方的任务里调);持锁段在同步方法里,处理闭包在锁外 await。
+public final class FakeCleanSystemTrashExecutor: CleanSystemTrashExecutor, @unchecked Sendable {
+    public typealias Handler = @Sendable (SystemTrashRequest) async -> SystemTrashOutcome
+
+    private let lock = NSLock()
+    private var handler: Handler
+    private var recorded: [SystemTrashRequest] = []
+
+    /// - Parameter handler: 默认 = 全部未报告结果(按失败记,同废纸篓 spy 的「未报告」口径)。
+    public init(handler: @escaping Handler = { _ in .completed(TrashRecycleOutcome()) }) {
+        self.handler = handler
+    }
+
+    public var requests: [SystemTrashRequest] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recorded
+    }
+
+    public func moveSystemItems(_ request: SystemTrashRequest) async -> SystemTrashOutcome {
+        let handle = record(request)
+        return await handle(request)
+    }
+
+    /// 记下请求并取出处理闭包。锁段留在同步方法里,锁内不 await。
+    private func record(_ request: SystemTrashRequest) -> Handler {
+        lock.lock()
+        defer { lock.unlock() }
+        recorded.append(request)
+        return handler
+    }
+}
+
 /// ③ 活动表:可变条目集(05 票在用保护测试用它切换「项目有没有终端在里面」,
 /// 以及「删除前重查」——两次调用之间改 entries 即可,判定永不缓存)。class 是
 /// 刻意的:模型捕获的是同一个实例,中途改表立刻被下一次现查看见。
