@@ -1,3 +1,7 @@
+---
+status: superseded by ADR-0012
+---
+
 # 清理一律用户态完成,不扩 root 帮手权限
 
 P3 的 root 常驻 daemon(SMAppService 注册,Energy Impact 真值)已在跑。清理功能理论上
@@ -15,3 +19,6 @@ P3 的 root 常驻 daemon(SMAppService 注册,Energy Impact 真值)已在跑。�
 
 后果:帮手协议面保持只读,后续给帮手加能力的提案都不得包含写 / 删文件系统;
 将来若真要清系统级垃圾,须以新 ADR 明确推翻本决定,不得默默扩权。
+
+→ 2026-11-26 已被 ADR-0012 推翻(用户改为要求清理可按次借管理员权限;「不常驻、不给
+助手动文件的能力」这一半保留进了新决定)。
