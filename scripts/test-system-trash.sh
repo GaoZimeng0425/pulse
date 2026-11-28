@@ -9,9 +9,11 @@
 # 测不到、如实记在这里的(评审要求把「没钉住」写明白):
 # · 「root 属主的文件被放行」:普通用户建不出 root 属主的夹具。自测开关让「属主 = 调用者」
 #   等价放行,非 root 属主被拒由第 2 节钉住;真实提权路径归用户目验。
-# · 「暂存目录与登记目录不在同一个卷」:本机没有第二个可写的卷,判定那一行没有用例。
-# · 「交接失败」与「被信号打断」共用同一个退出钩子,只测了前一种。
-# · 改归属、清空暂存目录这些动作在 root 下的真实表现。
+# · 「被信号打断」与「交接失败」共用同一个退出钩子,只测了后一种。
+# · 自愈放回时不回退属主:被强杀前已改归属的条目,回到登记目录时仍是调用者的属主(极窄的
+#   窗口;后果是它此后每次都被属主规则拒掉,留在原处)。
+# · 清单被换成命名管道时「是普通文件」的早筛防卡死:不拿真管道去卡测试。
+# · 改归属、清空暂存目录、交接这些动作在 root 下的真实表现。
 #
 # Usage: sh scripts/test-system-trash.sh
 set -u
@@ -229,10 +231,9 @@ assert_staging_cleaned "硬链接"
 
 # ── 3b. 绝不碰 root 文件的硬链接:冒充成一份过期报告放进登记目录,脚本必须原样留着 ──
 # 首版脚本的提权路径就在这里:root「移过去再按路径改归属」,改到的是 inode 本身。
-# 夹具硬链接到一个无关紧要的 root 文件 /etc/hosts——只增减链接,不改它的内容。链接数按
-# 前后比,不写死(两个工作区同时跑检查时各有各的链接)。
+# 夹具硬链接到一个无关紧要的 root 文件 /etc/hosts——只增减链接,不改它的内容。不断言链接数
+# (另一个工作区同时跑检查时各有各的链接,会假红);属主、组、有没有被拿走不受并发影响。
 make_fixture
-hosts_links_before=$(/usr/bin/stat -f %l /etc/hosts)
 hosts_group_before=$(/usr/bin/stat -f %g /etc/hosts)
 ln /etc/hosts "$reports/root-file.diag"
 write_manifest "$reports/root-file.diag" "$reports/old.diag"
@@ -247,9 +248,7 @@ assert_eq "root 文件的硬链接:只有真报告被移走" "$(cat "$out")" "$(
 assert_exists "root 文件的硬链接:还留在登记目录里,没被拿走" "$reports/root-file.diag"
 assert_eq "root 文件的属主没变" "$(/usr/bin/stat -f %u /etc/hosts)" "0"
 assert_eq "root 文件的组没变" "$(/usr/bin/stat -f %g /etc/hosts)" "$hosts_group_before"
-assert_eq "root 文件的链接数没变" "$(/usr/bin/stat -f %l /etc/hosts)" "$((hosts_links_before + 1))"
 rm "$reports/root-file.diag"
-assert_eq "清理夹具后 root 文件的链接数回到原值" "$(/usr/bin/stat -f %l /etc/hosts)" "$hosts_links_before"
 
 # ── 4. 读不到文件的状态:不动 ──
 # stat 替身:四项那一次回垃圾,其余转交真的 stat。
@@ -367,6 +366,7 @@ assert_exists "重复条目:暂存目录里只有一份" "$staging/old.diag"
 # 原处在这一轮里又有了同名条目(mv 替身把「往暂存目录那一步」改成复制,原处留着),被拒的
 # 条目放不回去。
 make_fixture
+# 替身原样转交参数:放回原处时带不带「不覆盖」由脚本自己决定,替身不替它写死。
 stand_in "$fx/commands" mv <<'STANDIN'
 #!/bin/sh
 if [ "$#" -eq 2 ]; then
@@ -374,7 +374,7 @@ if [ "$#" -eq 2 ]; then
         *"/pulse-system-trash."*) exec /bin/cp -p "$1" "$2" ;;
     esac
 fi
-exec /bin/mv -n "$@"
+exec /bin/mv "$@"
 STANDIN
 write_manifest "$reports/young.diag"
 run_script "$fx/manifest" 1 "$fx/commands"
@@ -388,18 +388,116 @@ assert_exists "放不回原处:条目留在暂存目录里等下一次自愈" "$
 
 # ── 10. 自愈:上一次被打断留下的暂存目录,条目按原名放回 ──
 make_fixture
-mkdir -p "$staging_parent/pulse-system-trash.Stale" "$staging_parent/pulse-system-trash.Fresh"
-aged "$staging_parent/pulse-system-trash.Stale/lost.diag" $((20 * 86400))
-touch -t "$(date -r $((now - 1200)) +%Y%m%d%H%M.%S)" "$staging_parent/pulse-system-trash.Stale"
+stale="$staging_parent/pulse-system-trash.Stale"
+mkdir -p "$stale" "$staging_parent/pulse-system-trash.Fresh"
+aged "$stale/lost.diag" $((20 * 86400))
 aged "$staging_parent/pulse-system-trash.Fresh/fresh.diag" 3600
+# 长得像暂存目录的符号链接(指向别处):自愈不跟随。stat 不跟随链接,看的是链接自己的属主与
+# 修改时间——所以链接自己要设成旧的,否则「只认放了一阵子的」那条规则会替它挡住,等于没测到。
+# 链接指向的目录里文件名要独一无二,否则「放回不覆盖」会替它挡住。
+decoy="$fx/decoy"
+mkdir -p "$decoy"
+aged "$decoy/only-in-decoy.diag" $((20 * 86400))
+ln -s "$decoy" "$staging_parent/pulse-system-trash.Symlink"
+stale_time=$(date -r $((now - 1200)) +%Y%m%d%H%M.%S)
+touch -t "$stale_time" "$stale/lost.diag" "$stale"
+touch -h -t "$stale_time" "$staging_parent/pulse-system-trash.Symlink"
 write_manifest "$reports/old.diag"
 run_script "$fx/manifest" 1
 assert_status "自愈:走完" 0
 assert_exists "自愈:旧暂存目录里的条目放回了登记目录" "$reports/lost.diag"
-assert_missing "自愈:放空的旧暂存目录收掉" "$staging_parent/pulse-system-trash.Stale"
+assert_missing "自愈:放空的旧暂存目录收掉" "$stale"
+assert_exists "自愈:长得像暂存目录的符号链接不跟随" "$decoy/only-in-decoy.diag"
+assert_missing "自愈:链接指向的目录里的东西没被搬进登记目录" "$reports/only-in-decoy.diag"
 assert_exists "自愈:刚建的暂存目录不动" "$staging_parent/pulse-system-trash.Fresh/fresh.diag"
 assert_eq "自愈:这一轮自己照常交接" "$(awk -F'\t' '$1 == "MOVED" { print $2 }' "$out")" "$reports/old.diag"
 rm -rf "$staging_parent/pulse-system-trash.Fresh"
+
+# 10b. 自愈放回时不覆盖:原处已有同名条目的,留在旧暂存目录里,目录也就不收。
+make_fixture
+stale="$staging_parent/pulse-system-trash.Stale"
+mkdir -p "$stale"
+printf 'stale\n' > "$stale/kept.diag"
+printf 'origin\n' > "$reports/kept.diag"
+touch -t "$(date -r $((now - 1200)) +%Y%m%d%H%M.%S)" "$stale/kept.diag" "$stale"
+write_manifest "$reports/old.diag"
+run_script "$fx/manifest" 1
+assert_eq "自愈不覆盖:原处的同名条目原样" "$(cat "$reports/kept.diag")" "origin"
+assert_exists "自愈不覆盖:放不回去的条目留在旧暂存目录里" "$stale/kept.diag"
+assert_exists "自愈不覆盖:还有东西的旧暂存目录不收" "$stale"
+
+# 10c. 自愈只认自己名下的暂存目录:stat 替身把那个旧目录的属主答成别人,里面的条目就不动。
+make_fixture
+stale="$staging_parent/pulse-system-trash.Stale"
+mkdir -p "$stale"
+aged "$stale/lost.diag" $((20 * 86400))
+touch -t "$(date -r $((now - 1200)) +%Y%m%d%H%M.%S)" "$stale/lost.diag" "$stale"
+stand_in "$fx/commands" stat <<STANDIN
+#!/bin/sh
+if [ "\$2" = "%u" ] && [ "\$3" = "$stale" ]; then echo 0; exit 0; fi
+exec /usr/bin/stat "\$@"
+STANDIN
+write_manifest "$reports/old.diag"
+run_script "$fx/manifest" 1 "$fx/commands"
+assert_status "自愈的属主核对:走完" 0
+assert_missing "自愈的属主核对:别人名下的暂存目录不动" "$reports/lost.diag"
+assert_exists "自愈的属主核对:条目还在原处" "$stale/lost.diag"
+assert_exists "自愈的属主核对:目录也没收" "$stale"
+rm -rf "$stale"
+
+# 10d. 暂存目录与登记目录必须在同一个卷:stat 替身把暂存目录的设备号答成别的。
+make_fixture
+write_manifest "$reports/old.diag"
+stand_in "$fx/commands" stat <<STANDIN
+#!/bin/sh
+if [ "\$2" = "%d" ]; then
+    case "\$3" in
+        *"/pulse-system-trash."*) echo 4294967294; exit 0 ;;
+    esac
+fi
+exec /usr/bin/stat "\$@"
+STANDIN
+run_script "$fx/manifest" 1 "$fx/commands"
+assert_status "跨卷:通道不可用" 2
+assert_channel_unavailable "跨卷"
+assert_untouched "跨卷"
+assert_staging_cleaned "跨卷"
+
+# 10e. 清单文件的属主是对着「打开的那份」核对的,不是对着路径:stat 替身把 /dev/fd/3 的属主
+#      答成 root,脚本必须拒(按路径核对的话这一次问不到替身,照常放行)。
+make_fixture
+write_manifest "$reports/old.diag"
+stand_in "$fx/commands" stat <<STANDIN
+#!/bin/sh
+if [ "\$2" = "%u" ] && [ "\$3" = "/dev/fd/3" ]; then echo 0; exit 0; fi
+exec /usr/bin/stat "\$@"
+STANDIN
+run_script "$fx/manifest" 1 "$fx/commands"
+assert_status "清单属主对着打开的那份核对:通道不可用" 2
+case "$(cat "$err")" in
+    *"清单文件不属于调用者"*) ok ;;
+    *) bad "清单属主对着打开的那份核对" "应当是这一句拒绝,实际: $(cat "$err")" ;;
+esac
+assert_untouched "清单属主对着打开的那份核对"
+assert_staging_cleaned "清单属主对着打开的那份核对"
+
+# 10f. 清单文件必须是普通文件,也是对着「打开的那份」判的:stat 替身把 /dev/fd/3 的类型答成
+#      目录,脚本必须拒。按路径早筛拦不住这种情形(路径上那份是普通文件)。
+make_fixture
+write_manifest "$reports/old.diag"
+stand_in "$fx/commands" stat <<STANDIN
+#!/bin/sh
+if [ "\$2" = "%HT" ] && [ "\$3" = "/dev/fd/3" ]; then echo Directory; exit 0; fi
+exec /usr/bin/stat "\$@"
+STANDIN
+run_script "$fx/manifest" 1 "$fx/commands"
+assert_status "清单类型对着打开的那份核对:通道不可用" 2
+case "$(cat "$err")" in
+    *"清单文件不是普通文件"*) ok ;;
+    *) bad "清单类型对着打开的那份核对" "应当是这一句拒绝,实际: $(cat "$err")" ;;
+esac
+assert_untouched "清单类型对着打开的那份核对"
+assert_staging_cleaned "清单类型对着打开的那份核对"
 
 # ── 11. 空清单:什么都不动 ──
 make_fixture
@@ -456,6 +554,20 @@ STANDIN
     assert_exists "函数顶替(标记=[$marker]):文件照样进了暂存目录" "$staging/old.diag"
 done
 
+# 13b. 重跑后环境是干净的,但自测变量照常带到:变量的值里恰好带「ENV=」也不能触发无限重跑
+#      (环境复查只认行首的变量名)。
+make_fixture
+write_manifest "$reports/old.diag"
+PULSE_SYSTEM_TRASH_TEST_REPORTS_DIR="$reports" \
+    PULSE_SYSTEM_TRASH_TEST_ALLOW_CALLER_OWNED=1 \
+    PULSE_SYSTEM_TRASH_TEST_STAGING_PARENT="$staging_parent" \
+    PULSE_SYSTEM_TRASH_TEST_COMMANDS_DIR="$fx/not-a-dir-ENV=-in-the-value" \
+    PULSE_SYSTEM_TRASH_REEXEC="" \
+    PATH="/usr/bin:/bin:/usr/sbin:/sbin" /bin/sh "$script" "$fx/manifest" "$uid" > "$out" 2> "$err"
+status=$?
+assert_status "值里带 ENV= 的自测变量:照常走完,没有无限重跑" 0
+assert_missing "值里带 ENV= 的自测变量:文件照样离开原处" "$reports/old.diag"
+
 # ── 14. 脚本级失败:整批没动 ──
 # 对照组:同一份夹具、入参齐全时走得通——后面的失败不是夹具自身的问题。
 make_fixture
@@ -504,6 +616,18 @@ ln -s manifest "$fx/manifest-link"
 run_script "$fx/manifest-link" 1
 assert_status "清单文件是符号链接:通道不可用" 2
 assert_untouched "清单文件是符号链接"
+
+mkdir "$fx/manifest-directory"
+run_script "$fx/manifest-directory" 1
+assert_status "清单文件是目录:通道不可用" 2
+assert_channel_unavailable "清单文件是目录"
+assert_untouched "清单文件是目录"
+
+cp "$fx/manifest" "$fx/manifest-unreadable"
+chmod 000 "$fx/manifest-unreadable"
+run_script "$fx/manifest-unreadable" 1
+assert_status "清单文件读不了:通道不可用" 2
+assert_untouched "清单文件读不了"
 
 # 14c 调用者 uid:不是普通用户,或冒用另一个普通用户的身份。三处核对(清单属主 / 查得到
 #    调用者)至少有一处对不上即可——黑盒只钉住「对不上就被拒」,不钉是哪一处。

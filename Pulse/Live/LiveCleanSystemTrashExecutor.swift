@@ -14,6 +14,10 @@ import PulseCore
 // 用户能把 root 文件的硬链接放进去;废纸篓归用户所有,目录能被换成链接)——所以进废纸篓
 // 这一步由用户自己做。
 // 密码框可以一直开着等用户:不设超时。授权只在这一批动作发生时借一次,不常驻。
+// 环境隔离的第一道防线在这里:启动系统脚本通道的进程显式给最小环境,调用方的环境变量一个都
+// 不传。系统脚本在运行复核脚本之前先起一个外层 shell 解释命令,那一步就带着这份环境——
+// 环境里的跟踪开关、带命令的提示符变量、导出的 shell 函数都会生效。脚本第一句在干净的环境里
+// 重跑自己是第二道。
 // 提权一侧自己复核每一条(登记的路径形状 / 链接数 / 属主 / 年龄),这里的判断只是不把
 // 明显发不出去的请求送过去。
 // 真实提权路径不进自动化测试;离线钉住的是清单写法、命令行拼法、结果解析,外加「不带
@@ -27,7 +31,8 @@ struct LiveCleanSystemTrashExecutor: CleanSystemTrashExecutor {
             privileged: true,
             environment: [:],
             trashRoot: NSHomeDirectory() + "/.Trash",
-            temporaryDirectory: NSTemporaryDirectory()
+            temporaryDirectory: NSTemporaryDirectory(),
+            stagingParent: Self.stagingParent
         )
     }
 
@@ -84,7 +89,8 @@ struct LiveCleanSystemTrashExecutor: CleanSystemTrashExecutor {
     ///     同一条命令但不弹密码框。
     ///   - environment: 追加给子进程的环境变量(生产为空;测试用它传自测开关)。
     ///   - trashRoot / temporaryDirectory / stagingParent: 生产 = 用户的废纸篓、临时目录与脚本的
-    ///     暂存目录所在;测试指向临时目录。
+    ///     暂存目录所在;测试指向临时目录(stagingParent 没有默认值:测试漏传就会去扫真的 /var/tmp)。
+    ///   - environment: 追加到最小环境之上的变量(生产为空;测试用它传自测开关)。
     static func run(
         _ request: SystemTrashRequest,
         scriptPath: String?,
@@ -92,7 +98,7 @@ struct LiveCleanSystemTrashExecutor: CleanSystemTrashExecutor {
         environment: [String: String],
         trashRoot: String,
         temporaryDirectory: String,
-        stagingParent: String = stagingParent
+        stagingParent: String
     ) async -> SystemTrashOutcome {
         guard let scriptPath else {
             return .channelUnavailable(reason: "复核脚本缺失(应用包不完整)")
@@ -111,13 +117,6 @@ struct LiveCleanSystemTrashExecutor: CleanSystemTrashExecutor {
         }
         // 一条都没进废纸篓时,别留空文件夹。
         defer { discardIfEmpty(target) }
-        let recovered = recoverLeftoverStaging(in: stagingParent, trashRoot: trashRoot)
-        if recovered > 0 {
-            LogService.info(
-                "系统级清理:上次没来得及进废纸篓的 \(recovered) 个文件已收进「\(trashSubdirectory)」",
-                category: "Cleaner"
-            )
-        }
         let manifest = (temporaryDirectory as NSString).appendingPathComponent(
             "pulse-system-trash-\(UUID().uuidString).manifest"
         )
@@ -146,21 +145,41 @@ struct LiveCleanSystemTrashExecutor: CleanSystemTrashExecutor {
         case let .channelUnavailable(reason):
             return .channelUnavailable(reason: reason)
         case let .completed(handoff):
+            // 授权过了才收走上次的残留:取消授权时「未做任何改动」必须是实话。这一轮自己刚交接的
+            // 暂存目录不算残留。
+            let recovered = recoverLeftoverStaging(
+                in: stagingParent, trashRoot: trashRoot, excluding: handoff.staging
+            )
+            if recovered > 0 {
+                LogService.info(
+                    "系统级清理:上次没来得及进废纸篓的 \(recovered) 个文件已收进「\(trashSubdirectory)」",
+                    category: "Cleaner"
+                )
+            }
             return .completed(relocate(handoff, target: target))
         }
     }
 
-    /// 收走上次没来得及进废纸篓的暂存目录:app 在脚本交接之后、挪进废纸篓之前被杀,文件就
-    /// 留在脚本的暂存目录里。它们是用户已经授权移走的,这次补挪进废纸篓(暂存目录名当
+    /// 交给系统脚本通道的环境:只有最小的一份,再加上调用方要点名追加的变量。不继承本进程的
+    /// 环境——调用方(Pulse)的环境里有什么不该由提权脚本承担。
+    static func childEnvironment(injected: [String: String]) -> [String: String] {
+        ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin"].merging(injected) { _, injected in injected }
+    }
+
+    /// 收走上次没来得及进废纸篓的暂存目录(授权通过之后才做):app 在脚本交接之后、挪进废纸篓
+    /// 之前被杀,文件就留在脚本的暂存目录里。它们是用户已经授权移走的,这次补挪进废纸篓(暂存目录名当
     /// 批次名,免得和这一批混)。只认属于当前用户的目录(交接过的);没交接的归脚本自己
     /// 在下一次运行时放回原处。返回收走的文件数。
-    static func recoverLeftoverStaging(in stagingParent: String, trashRoot: String) -> Int {
+    /// - Parameter excluding: 不算残留的目录(这一轮自己刚交接的那个)。
+    static func recoverLeftoverStaging(
+        in stagingParent: String, trashRoot: String, excluding current: String? = nil
+    ) -> Int {
         let manager = FileManager.default
         guard let names = try? manager.contentsOfDirectory(atPath: stagingParent) else { return 0 }
         var recovered = 0
         for name in names where name.hasPrefix(stagingDirectoryPrefix) {
             let leftover = (stagingParent as NSString).appendingPathComponent(name)
-            guard isDirectoryOwnedByCurrentUser(leftover) else { continue }
+            guard leftover != current, isDirectoryOwnedByCurrentUser(leftover) else { continue }
             let destination = trashRoot + "/" + trashSubdirectory + "/" + name
             do {
                 try manager.createDirectory(
@@ -317,9 +336,7 @@ struct LiveCleanSystemTrashExecutor: CleanSystemTrashExecutor {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
-        if !environment.isEmpty {
-            process.environment = ProcessInfo.processInfo.environment.merging(environment) { _, injected in injected }
-        }
+        process.environment = childEnvironment(injected: environment)
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
         process.standardOutput = stdoutPipe
@@ -441,7 +458,7 @@ struct LiveCleanSystemTrashExecutor: CleanSystemTrashExecutor {
         case "too-young": "还没满 7 天(移动前又核了一次)"
         case "ownership-not-changed": "归属改不成当前用户,已放回原处"
         case "duplicate": "同一个条目在清单里出现了不止一次,第二次没动"
-        case "not-restored": "没能放回原处(原处又出现了同名条目);文件暂时留在暂存目录,下次运行时收进废纸篓"
+        case "not-restored": "没能放回原处(原处又出现了同名条目);文件暂时留在暂存目录,下次运行时处理"
         default: "复核未通过(\(code))"
         }
     }

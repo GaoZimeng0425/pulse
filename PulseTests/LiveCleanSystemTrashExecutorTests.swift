@@ -315,6 +315,68 @@ final class LiveCleanSystemTrashExecutorTests: XCTestCase {
         ]
     }
 
+    /// 交给系统脚本通道的环境只有最小的一份加点名追加的变量,不继承本进程的——调用方环境里的
+    /// 跟踪开关、提示符变量、导出的 shell 函数到了 root 那一侧都会生效。
+    func testChildEnvironmentIsMinimalAndNeverInherited() {
+        let environment = LiveCleanSystemTrashExecutor
+            .childEnvironment(injected: ["PULSE_SYSTEM_TRASH_TEST_CHOWN": "/x"])
+
+        XCTAssertEqual(environment["PATH"], "/usr/bin:/bin:/usr/sbin:/sbin")
+        XCTAssertEqual(environment["PULSE_SYSTEM_TRASH_TEST_CHOWN"], "/x")
+        XCTAssertEqual(environment.count, 2, "除 PATH 与点名追加的之外一个都不带")
+    }
+
+    /// 走真的系统脚本通道(不带授权)看到的环境确实只有那几个:用一个「把环境逐行回传」的脚本
+    /// 代替复核脚本,通道那边跑什么环境就一目了然。
+    func testSystemScriptChannelReallyRunsOnTheMinimalEnvironment() async throws {
+        let probe = temporaryDirectory + "/print-env.sh"
+        // 通道那边:每个环境变量回传成一行结果行,原样带回来。
+        let script = "#!/bin/sh\n"
+            + #"/usr/bin/env | while IFS= read -r line; do printf 'SKIPPED\t%s\tprobe\n' "$line"; done"#
+            + "\n"
+        try Data(script.utf8).write(to: URL(fileURLWithPath: probe))
+
+        let termination = await LiveCleanSystemTrashExecutor.run(
+            SystemTrashRequest(paths: ["/Library/Logs/DiagnosticReports/a.diag"], requesterUID: UInt32(getuid())),
+            scriptPath: probe,
+            privileged: false,
+            environment: ["PULSE_SYSTEM_TRASH_INJECTED": "yes"],
+            trashRoot: temporaryDirectory + "/.Trash",
+            temporaryDirectory: temporaryDirectory,
+            stagingParent: temporaryDirectory
+        )
+
+        guard case let .completed(receipt) = termination else {
+            return XCTFail("探针脚本应当走完,实际 \(termination)")
+        }
+        let lines = receipt.failures.keys.sorted()
+        XCTAssertFalse(lines.isEmpty, "探针脚本跑到了,并且把它那边的环境带了回来")
+        // shell 自己会补 PWD / SHLVL / _ / OLDPWD,macOS 启动进程时加 __CF_USER_TEXT_ENCODING;
+        // 点名追加的那个在;别的都不该在。
+        let names = Set(lines.map { String($0.split(separator: "=", maxSplits: 1).first ?? "") })
+        XCTAssertTrue(
+            names.isSubset(of: [
+                "PATH", "PWD", "SHLVL", "_", "OLDPWD", "__CF_USER_TEXT_ENCODING", "PULSE_SYSTEM_TRASH_INJECTED",
+            ]),
+            "通道那边的环境变量:\(names.sorted())"
+        )
+        XCTAssertTrue(lines.contains("PULSE_SYSTEM_TRASH_INJECTED=yes"))
+        XCTAssertTrue(lines.contains("PATH=/usr/bin:/bin:/usr/sbin:/sbin"))
+        for forbidden in [
+            "HOME=",
+            "USER=",
+            "TMPDIR=",
+            "SHELL=",
+            "SHELLOPTS=",
+            "PS4=",
+            "BASH_FUNC_",
+            "ENV=",
+            "BASH_ENV=",
+        ] {
+            XCTAssertFalse(lines.contains { $0.hasPrefix(forbidden) }, "通道那边不该有:\(forbidden)")
+        }
+    }
+
     // MARK: 第二段:进废纸篓(以调用者身份)
 
     private func makeStagingDirectory(named name: String, files: [String: String]) throws -> String {
@@ -448,7 +510,8 @@ final class LiveCleanSystemTrashExecutorTests: XCTestCase {
         let termination = await LiveCleanSystemTrashExecutor.run(
             SystemTrashRequest(paths: ["/Library/Logs/DiagnosticReports/a.diag"], requesterUID: 501),
             scriptPath: nil, privileged: true, environment: [:],
-            trashRoot: temporaryDirectory + "/.Trash", temporaryDirectory: temporaryDirectory
+            trashRoot: temporaryDirectory + "/.Trash", temporaryDirectory: temporaryDirectory,
+            stagingParent: temporaryDirectory
         )
 
         guard case let .channelUnavailable(reason) = termination else {
@@ -463,7 +526,8 @@ final class LiveCleanSystemTrashExecutorTests: XCTestCase {
             let termination = await LiveCleanSystemTrashExecutor.run(
                 SystemTrashRequest(paths: [path], requesterUID: 501),
                 scriptPath: "/dev/null", privileged: false,
-                environment: [:], trashRoot: temporaryDirectory + "/.Trash", temporaryDirectory: temporaryDirectory
+                environment: [:], trashRoot: temporaryDirectory + "/.Trash", temporaryDirectory: temporaryDirectory,
+                stagingParent: temporaryDirectory
             )
 
             guard case let .channelUnavailable(reason) = termination else {
