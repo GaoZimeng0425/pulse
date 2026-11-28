@@ -341,9 +341,12 @@ extension SystemMonitor {
     static func preview(
         source: any ProcessSource = SyntheticProcessSource(processes: []),
         projectRoots: [String] = [],
-        historyEngine: HistoryEngine? = HistoryEngine(database: try? HistoryDatabase.openInMemory())
+        historyEngine: HistoryEngine? = HistoryEngine(database: try? HistoryDatabase.openInMemory()),
+        // 智能体账本读历史库里的已落账数据(离屏走查用真实账本画图;读源仍惰性,不扫描)。
+        agentUsageReadsHistory: Bool = false
     ) -> SystemMonitor {
-        SystemMonitor(
+        let history = HistoryFeature(engine: historyEngine)
+        return SystemMonitor(
             sources: MonitorSources(
                 process: source,
                 coreTicks: LiveCoreTickSource(),
@@ -360,9 +363,13 @@ extension SystemMonitor {
                 devServers: DevServerFeature(portScanner: InertDevServerPortScanner()),
                 ports: PortsFeature(scanner: InertGlobalPortScanner()),
                 agentSessions: AgentSessionFeature(reader: InertAgentSessionReader()),
-                agentUsage: AgentUsageFeature(reader: InertAgentUsageReader(), store: nil),
+                agentUsage: AgentUsageFeature(
+                    reader: InertAgentUsageReader(),
+                    store: agentUsageReadsHistory ? history.agentUsageStore : nil,
+                    checkpoints: agentUsageReadsHistory ? history.agentCheckpointStore : nil
+                ),
                 rankings: RankingsFeature(nettopSource: InertNettopCSVSource()),
-                history: HistoryFeature(engine: historyEngine),
+                history: history,
                 disk: DiskFeature(
                     capacitySource: InertDiskCapacitySource(),
                     throughputSource: InertDiskThroughputSource()
