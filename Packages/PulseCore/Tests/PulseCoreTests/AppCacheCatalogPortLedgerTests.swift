@@ -100,6 +100,7 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         ("spotlight", "medium", ["com.apple.Spotlight": .entry("spotlight")]),
         ("tipsd", "safe", ["com.apple.tipsd": .entry("tipsd")]),
         ("videoconference", "safe", ["com.apple.VideoConference": .entry("videoconference")]),
+        ("datadog", "safe", ["com.datadoghq": .entry("datadog")]),
         (
             "google-updater",
             "safe",
@@ -111,6 +112,7 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         ),
         ("microsoft-autoupdate", "safe", ["com.microsoft.autoupdate.fba": .entry("msAutoUpdate")]),
         ("microsoft-edge-updater", "safe", ["com.microsoft.EdgeUpdater": .entry("edgeUpdater")]),
+        ("nt-ware-smartclient", "medium", ["com.nt-ware.SmartClient": .entry("nt-ware-smartclient")]),
         ("openai-codex", "safe", ["com.openai.codex": .entry("openai-codex"), "Codex": .genericDiscovery]),
         ("todesktop-shipit", "safe", ["com.todesktop.230313mzl4w4u92.ShipIt": .entry("todesktop-shipit")]),
         (
@@ -124,9 +126,12 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
             ]
         ),
         ("family-circle", "medium", ["FamilyCircle": .notListed]),
+        ("purge-app", "safe", ["io.getpurge.app": .entry("purge-app")]),
+        ("sentry", "safe", ["io.sentry": .entry("sentry"), "SentryCrash": .entry("sentry")]),
         ("ms-playwright", "medium", ["ms-playwright-go": .ticket10]),
         ("node-modules", "safe", ["node_modules": .ticket10]),
         ("prisma-nodejs", "safe", ["prisma-nodejs": .ticket10]),
+        ("segment", "safe", ["segment": .entry("segment")]),
         ("ssu", "safe", ["ssu": .entry("ssu")]),
         ("macos-installer", "medium", ["macOS Installer": .elsewhere]),
         ("macos-install-data", "medium", ["macOS Install Data": .elsewhere]),
@@ -315,17 +320,31 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         ),
         ("proxyman", "safe", ["com.proxyman.NSProxy": .entry("proxyman"), "Proxyman": .entry("proxyman")]),
         ("tableplus", "safe", ["com.tinyapp.TablePlus": .entry("tableplus"), "TablePlus": .entry("tableplus")]),
+        ("postico", "safe", ["at.eggerapps.Postico": .entry("postico"), "Postico": .entry("postico")]),
         ("insomnia", "safe", ["com.insomnia.app": .entry("insomnia"), "Insomnia": .genericDiscovery]),
         (
             "paw-rapi",
             "safe",
             ["com.luckymarmot.Paw": .entry("paw-rapi"), "Paw": .genericDiscovery, "RapidAPI": .entry("paw-rapi")]
         ),
+        ("fork-git", "safe", ["com.DanPristupov.Fork": .entry("fork-git"), "Fork": .genericDiscovery]),
+        (
+            "sourcetree",
+            "safe",
+            ["com.torusknot.SourceTreeNotMAS": .entry("sourcetree"), "SourceTree": .entry("sourcetree")]
+        ),
+        ("tower-git", "safe", ["com.fournova.Tower3": .entry("tower-git"), "Tower": .genericDiscovery]),
+        ("screenflow", "safe", ["net.telestream.screenflow": .entry("screenflow"), "ScreenFlow": .entry("screenflow")]),
+        ("cleanmymac", "safe", ["com.macpaw.CleanMyMac4": .entry("cleanmymac"), "CleanMyMac": .entry("cleanmymac")]),
+        ("lungo", "safe", ["com.sindresorhus.Lungo": .entry("lungo"), "Lungo": .entry("lungo")]),
+        ("bartender", "safe", ["com.surteesstudios.Bartender": .entry("bartender"), "Bartender": .entry("bartender")]),
+        ("cleanshot", "safe", ["pl.maketheweb.cleanshotx": .entry("cleanshot"), "CleanShot": .entry("cleanshot")]),
         (
             "screenshot-app",
             "safe",
             ["com.apple.screencaptureui": .entry("screenshot-app"), "Screenshot": .genericDiscovery]
         ),
+        ("xnapper", "safe", ["com.xnapper.xnapper": .entry("xnapper"), "Xnapper": .entry("xnapper")]),
         ("apple-maps", "medium", ["com.apple.Maps": .entry("apple-maps"), "Maps": .genericDiscovery]),
         ("apple-photos", "medium", ["com.apple.Photos": .entry("apple-photos"), "Photos": .genericDiscovery]),
         ("apple-mail", "medium", ["com.apple.mail": .entry("apple-mail"), "Mail": .genericDiscovery]),
@@ -376,6 +395,7 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         ("cursor-compile-cache", "safe", ["cursor-compile-cache": .ticket10]),
         ("claude-cli-cache", "safe", ["claude-cli-nodejs": .entry("claude-cli-cache")]),
         ("apple-python-cache", "safe", ["com.apple.python": .ticket10]),
+        ("jna-libraries", "safe", ["JNA": .entry("jna-libraries")]),
         ("dictionary-services", "safe", ["com.apple.DictionaryServices": .entry("dictionary-services")]),
         ("promoted-content", "safe", ["com.apple.ap.PromotedContentJetService": .entry("promoted-content")]),
         ("device-software-updates", "safe", ["Device Software Updates": .elsewhere]),
@@ -393,6 +413,8 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
             "safe",
             ["EffectCraft": .entry("effectcraft"), "ai.storyteller.effectcraft": .entry("effectcraft")]
         ),
+        ("codexbar-cache", "safe", ["com.steipete.codexbar": .entry("codexbar-cache")]),
+        ("codexbar-usage-history", "medium", ["CodexBar": .entry("codexbar-usage-history")]),
         (
             "intelligenceflowd-cache",
             "safe",
@@ -486,6 +508,9 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
     func testLedgerMirrorsUpstreamOneForOne() {
         let keys = ledger.map(\.key) + withoutFolderNames
         XCTAssertEqual(Set(keys).count, keys.count, "上游 key 在账本里重复")
+
+        XCTAssertEqual(ledger.count, 260, "上游带目录名的条目数(提交 ceacaf8)")
+        XCTAssertEqual(withoutFolderNames.count, 51, "上游没登记目录名的条目数(提交 ceacaf8)")
     }
 
     // MARK: 搬了

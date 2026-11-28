@@ -699,6 +699,189 @@ public enum AppCacheCatalog {
             source: JunkRuleTable.purgeAppExplanations,
             symbolName: "cylinder"
         ),
+        Entry(
+            key: "postico",
+            names: ["at.eggerapps.Postico", "Postico"],
+            title: "Postico 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Postico(PostgreSQL 客户端)的临时文件;清了下次打开时重新生成。数据库本身不在这里。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "cylinder"
+        ),
+        Entry(
+            key: "fork-git",
+            names: ["com.DanPristupov.Fork"],
+            title: "Fork 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Fork(Git 客户端)的临时文件;清了下次打开时重新生成。仓库本身不在这里。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "arrow.triangle.branch"
+        ),
+        Entry(
+            key: "sourcetree",
+            names: ["com.torusknot.SourceTreeNotMAS", "SourceTree"],
+            title: "Sourcetree 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Sourcetree(Git 客户端)的临时文件;清了下次打开时重新生成。仓库本身不在这里。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "arrow.triangle.branch"
+        ),
+        Entry(
+            key: "tower-git",
+            names: ["com.fournova.Tower3"],
+            title: "Tower 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Tower(Git 客户端)的临时文件;清了下次打开时重新生成。仓库本身不在这里。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "arrow.triangle.branch"
+        ),
+        Entry(
+            key: "jna-libraries",
+            names: ["JNA"],
+            title: "Java 本地库解包缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Java 应用启动时解包到这里供加载的本地库;清了下次启动时重新解包。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "cube"
+        ),
+        // —— 录屏与截图 ——
+        Entry(
+            key: "screenflow",
+            names: ["net.telestream.screenflow", "ScreenFlow"],
+            title: "ScreenFlow 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "ScreenFlow 录屏软件的临时文件;清了下次打开时重新生成,录好的视频不在这里。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "video"
+        ),
+        Entry(
+            key: "cleanshot",
+            names: ["pl.maketheweb.cleanshotx", "CleanShot"],
+            title: "CleanShot X 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "CleanShot X(截图工具)的临时文件;清了下次打开时重新生成,截好的图不在这里。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "camera"
+        ),
+        Entry(
+            key: "xnapper",
+            names: ["com.xnapper.xnapper", "Xnapper"],
+            title: "Xnapper 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Xnapper(截图工具)的临时文件;清了下次打开时重新生成。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "camera"
+        ),
+        // —— 小工具、统计与错误报告 ——
+        // com.macpaw.CleanMyMac5 是 Pulse 本机实测补的版本号(上游只登记到 4)
+        Entry(
+            key: "cleanmymac",
+            names: ["com.macpaw.CleanMyMac4", "com.macpaw.CleanMyMac5", "CleanMyMac"],
+            title: "CleanMyMac 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "CleanMyMac 自己的临时文件;清了下次打开时重新生成。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "trash"
+        ),
+        Entry(
+            key: "lungo",
+            names: ["com.sindresorhus.Lungo", "Lungo"],
+            title: "Lungo 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Lungo(防止 Mac 休眠的工具)的临时文件;清了下次打开时重新生成。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "eye"
+        ),
+        Entry(
+            key: "bartender",
+            names: ["com.surteesstudios.Bartender", "Bartender"],
+            title: "Bartender 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Bartender(菜单栏整理工具)的临时文件;清了下次打开时重新生成。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "line.3.horizontal"
+        ),
+        Entry(
+            key: "codexbar-cache",
+            names: ["com.steipete.codexbar"],
+            title: "CodexBar 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "CodexBar(菜单栏用量显示工具)下载的网页与更新文件;清了下次需要时重新下载。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "chart.bar"
+        ),
+        Entry(
+            key: "codexbar-usage-history",
+            names: ["CodexBar"],
+            title: "CodexBar 用量历史",
+            group: .appCache,
+            tier: .checkFirst,
+            rationale: "CodexBar 根据 Claude 与 Codex 的会话日志算出来的用量合计;它能重算,但日志已经不在的那些天数会一直缺着。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "chart.bar"
+        ),
+        Entry(
+            key: "purge-app",
+            names: ["io.getpurge.app"],
+            title: "Purge 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Purge(清理工具)自己的临时数据;清了下次打开时重新生成。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "trash"
+        ),
+        Entry(
+            key: "sentry",
+            names: ["io.sentry", "SentryCrash"],
+            title: "Sentry 错误报告",
+            group: .appCache,
+            tier: .safe,
+            rationale: "应用里集成的 Sentry(开发者用来跟踪问题的工具)收集的错误与崩溃报告;清了不影响应用,新报告会重新写入。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "doc.text"
+        ),
+        Entry(
+            key: "datadog",
+            names: ["com.datadoghq"],
+            title: "Datadog 监控数据",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Datadog(开发者用的监控统计工具)的临时数据;清了不影响应用,它还在运行的话会重新生成。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "doc.text"
+        ),
+        Entry(
+            key: "segment",
+            names: ["segment"],
+            title: "Segment 统计数据",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Segment(开发者用来收集使用统计的工具)的临时数据;清了不影响应用。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "chart.bar"
+        ),
+        Entry(
+            key: "nt-ware-smartclient",
+            names: ["com.nt-ware.SmartClient"],
+            title: "NT-ware SmartClient 缓存",
+            group: .appCache,
+            tier: .checkFirst,
+            rationale: "办公室、学校常见的打印管理客户端的缓存;通常清了没事,但客户端可能要重新做一遍初始化。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "printer"
+        ),
     ]
 
     /// 苹果自家的应用与后台服务的缓存:恒「先检查」,不自动勾(见文件头)。
