@@ -28,11 +28,19 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
 
     /// 上游 key → (上游档位, 每个目录名的下落)。目录名 = 上游的 aliases 加 bundle_ids。
     private let ledger: [(key: String, tag: String, names: [String: Fate])] = [
+        ("adobe-media-cache-files", "safe", ["Adobe Media Cache Files": .entry("adobe-media-cache-files")]),
+        ("adobe-media-cache", "safe", ["Adobe Media Cache": .entry("adobe-media-cache")]),
+        (
+            "adobe-camera-raw",
+            "safe",
+            ["Adobe Camera Raw": .entry("adobe-camera-raw"), "Adobe Camera Raw 2": .entry("adobe-camera-raw")]
+        ),
         (
             "perplexity-updater",
             "safe",
             ["ai.perplexity.CometUpdater": .entry("perplexity-updater"), "CometUpdater": .entry("perplexity-updater")]
         ),
+        ("blender", "safe", ["Blender": .entry("blender"), "org.blenderfoundation.blender": .entry("blender")]),
         ("checkpoint-nodejs", "safe", ["checkpoint-nodejs": .genericDiscovery]),
         ("cloudkit", "medium", ["CloudKit": .notListed]),
         ("claude-updater", "safe", ["com.anthropic.claudefordesktop.ShipIt": .entry("claude-updater")]),
@@ -103,6 +111,7 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         ),
         ("microsoft-autoupdate", "safe", ["com.microsoft.autoupdate.fba": .entry("msAutoUpdate")]),
         ("microsoft-edge-updater", "safe", ["com.microsoft.EdgeUpdater": .entry("edgeUpdater")]),
+        ("openai-codex", "safe", ["com.openai.codex": .entry("openai-codex"), "Codex": .genericDiscovery]),
         ("todesktop-shipit", "safe", ["com.todesktop.230313mzl4w4u92.ShipIt": .entry("todesktop-shipit")]),
         (
             "arc-browser",
@@ -123,6 +132,7 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         ("macos-install-data", "medium", ["macOS Install Data": .elsewhere]),
         ("dart-tool", "safe", [".dart_tool": .ticket10]),
         ("ams-migrator", "safe", ["AMSDataMigratorTool": .entry("ams-migrator")]),
+        ("spokenly", "safe", ["app.spokenly": .entry("spokenly"), "app.spokenly.revenuecat": .entry("spokenly")]),
         ("container-managerd", "safe", ["com.apple.containermanagerd": .notListed]),
         ("storekitagent", "medium", ["com.apple.storekitagent": .entry("storekitagent")]),
         ("docker", "medium", ["com.docker.docker": .rule("docker.desktopData")]),
@@ -138,6 +148,7 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         ("figma-agent", "safe", ["com.figma.agent": .entry("figma")]),
         ("gamekit", "safe", ["GameKit": .entry("gamekit")]),
         ("image-cache", "safe", ["ImageCache": .genericDiscovery]),
+        ("revenuecat", "safe", ["RevenueCat": .entry("revenuecat"), "RevenueCatFonts": .entry("revenuecat")]),
         ("gitworktrees", "medium", ["worktrees": .ticket10]),
         ("vscode", "safe", ["Code": .ticket10, "CachedData": .ticket10, "CachedExtensionVSIXs": .ticket10]),
         ("cursor", "safe", ["Cursor": .ticket10]),
@@ -243,20 +254,72 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         ("telegram-media-cache", "medium", ["Telegram Media Cache": .elsewhere]),
         ("linear", "safe", ["com.linear": .entry("linear"), "Linear": .entry("linear")]),
         ("figma", "safe", ["com.figma.Desktop": .entry("figma"), "Figma": .entry("figma")]),
+        ("loom", "safe", ["com.loom.desktop": .entry("loom"), "Loom": .genericDiscovery]),
+        ("grammarly", "safe", ["com.grammarly.ProjectLlama": .entry("grammarly"), "Grammarly": .entry("grammarly")]),
         ("alfred", "safe", ["com.runningwithcrayons.Alfred": .entry("alfred"), "Alfred": .entry("alfred")]),
         (
             "1password",
             "medium",
             ["com.1password.1password": .notListed, "1Password 7": .notListed, "1Password 8": .notListed]
         ),
+        ("dropbox", "medium", ["com.dropbox.DropboxMacFileHelper": .entry("dropbox"), "Dropbox": .entry("dropbox")]),
+        (
+            "google-drive",
+            "medium",
+            ["com.google.GoogleDrive": .entry("google-drive"), "Google Drive": .entry("google-drive")]
+        ),
+        ("onedrive", "medium", ["com.microsoft.OneDrive": .entry("onedrive"), "OneDrive": .entry("onedrive")]),
+        (
+            "microsoft-teams",
+            "safe",
+            [
+                "com.microsoft.teams2": .entry("microsoft-teams"),
+                "Teams": .genericDiscovery,
+                "Microsoft Teams": .entry("microsoft-teams"),
+            ]
+        ),
+        (
+            "microsoft-word",
+            "safe",
+            ["com.microsoft.Word": .entry("microsoft-word"), "Microsoft Word": .entry("microsoft-word")]
+        ),
+        (
+            "microsoft-excel",
+            "safe",
+            ["com.microsoft.Excel": .entry("microsoft-excel"), "Microsoft Excel": .entry("microsoft-excel")]
+        ),
+        ("granola", "safe", ["com.granola.app": .entry("granola"), "Granola": .genericDiscovery]),
         ("claude-app", "safe", ["com.anthropic.claudefordesktop": .entry("claude"), "Claude": .entry("claude")]),
         ("chatgpt-app", "safe", ["com.openai.chat": .entry("chatgpt"), "ChatGPT": .entry("chatgpt")]),
+        ("ollama", "medium", ["com.ollama.Ollama": .entry("ollama"), "Ollama": .genericDiscovery]),
+        ("sketch", "safe", ["com.bohemiancoding.sketch3": .entry("sketch"), "Sketch": .genericDiscovery]),
+        (
+            "affinity-designer",
+            "safe",
+            [
+                "com.seriflabs.affinitydesigner2": .entry("affinity-designer"),
+                "Affinity Designer": .entry("affinity-designer"),
+            ]
+        ),
+        (
+            "affinity-photo",
+            "safe",
+            ["com.seriflabs.affinityphoto2": .entry("affinity-photo"), "Affinity Photo": .entry("affinity-photo")]
+        ),
         ("xcode-app", "safe", ["com.apple.dt.Xcode": .rule("xcode.caches"), "Xcode": .genericDiscovery]),
         ("simulator-cache", "safe", ["com.apple.iphonesimulator": .ticket10, "Simulator": .genericDiscovery]),
         (
             "android-studio",
             "safe",
             ["com.google.android.studio": .ticket10, "Android Studio": .ticket10, "AndroidStudio": .ticket10]
+        ),
+        ("proxyman", "safe", ["com.proxyman.NSProxy": .entry("proxyman"), "Proxyman": .entry("proxyman")]),
+        ("tableplus", "safe", ["com.tinyapp.TablePlus": .entry("tableplus"), "TablePlus": .entry("tableplus")]),
+        ("insomnia", "safe", ["com.insomnia.app": .entry("insomnia"), "Insomnia": .genericDiscovery]),
+        (
+            "paw-rapi",
+            "safe",
+            ["com.luckymarmot.Paw": .entry("paw-rapi"), "Paw": .genericDiscovery, "RapidAPI": .entry("paw-rapi")]
         ),
         (
             "screenshot-app",
@@ -311,6 +374,7 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         ("node-gyp-headers", "safe", ["node-gyp": .rule("electron.toolingCaches")]),
         ("typescript-type-cache", "safe", ["typescript": .ticket10]),
         ("cursor-compile-cache", "safe", ["cursor-compile-cache": .ticket10]),
+        ("claude-cli-cache", "safe", ["claude-cli-nodejs": .entry("claude-cli-cache")]),
         ("apple-python-cache", "safe", ["com.apple.python": .ticket10]),
         ("dictionary-services", "safe", ["com.apple.DictionaryServices": .entry("dictionary-services")]),
         ("promoted-content", "safe", ["com.apple.ap.PromotedContentJetService": .entry("promoted-content")]),
@@ -324,6 +388,11 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         ("xctest-devices", "safe", ["Xcode Test Devices": .rule("xcode.testDevices")]),
         ("pre-commit-cache", "safe", ["pre-commit": .ticket10]),
         ("puppeteer-browsers", "medium", ["puppeteer": .ticket10]),
+        (
+            "effectcraft",
+            "safe",
+            ["EffectCraft": .entry("effectcraft"), "ai.storyteller.effectcraft": .entry("effectcraft")]
+        ),
         (
             "intelligenceflowd-cache",
             "safe",

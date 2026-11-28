@@ -435,6 +435,270 @@ public enum AppCacheCatalog {
             source: JunkRuleTable.purgeAppExplanations,
             symbolName: "chart.bar"
         ),
+        // —— Adobe 与设计工具 ——
+        Entry(
+            key: "adobe-media-cache-files",
+            names: ["Adobe Media Cache Files"],
+            title: "Adobe 媒体缓存文件",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Premiere Pro 与 After Effects 渲染出来的预览和转换好的音频;清了下次打开工程时重新生成,大工程要等几分钟。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "film"
+        ),
+        Entry(
+            key: "adobe-media-cache",
+            names: ["Adobe Media Cache"],
+            title: "Adobe 媒体缓存索引",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Adobe 用来登记上面那些媒体缓存的索引;清了会随媒体缓存一起重建。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "film"
+        ),
+        Entry(
+            key: "adobe-camera-raw",
+            names: ["Adobe Camera Raw", "Adobe Camera Raw 2"],
+            title: "Adobe Camera Raw 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Photoshop、Lightroom、Bridge 打开原片时生成的预览;清了下次打开图片时自动重建。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "photo"
+        ),
+        Entry(
+            key: "blender",
+            names: ["Blender", "org.blenderfoundation.blender"],
+            title: "Blender 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Blender 工作时保存的临时文件;清了下次启动会慢一点。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "cube"
+        ),
+        Entry(
+            key: "sketch",
+            names: ["com.bohemiancoding.sketch3"],
+            title: "Sketch 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Sketch 设计工具的临时文件;清了下次打开时重新生成。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "square.on.circle"
+        ),
+        Entry(
+            key: "affinity-designer",
+            names: ["com.seriflabs.affinitydesigner2", "Affinity Designer"],
+            title: "Affinity Designer 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Affinity Designer 的临时文件;清了下次打开时重新生成。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "square.on.circle"
+        ),
+        Entry(
+            key: "affinity-photo",
+            names: ["com.seriflabs.affinityphoto2", "Affinity Photo"],
+            title: "Affinity Photo 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Affinity Photo 的临时文件;清了下次打开时重新生成。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "square.on.circle"
+        ),
+        Entry(
+            key: "effectcraft",
+            names: ["EffectCraft", "ai.storyteller.effectcraft"],
+            title: "EffectCraft 渲染缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "EffectCraft 为了预览特效而渲染好的帧;清了下次打开工程时重新渲染。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "film"
+        ),
+        // —— 办公、协作、云盘、AI 应用 ——
+        Entry(
+            key: "microsoft-teams",
+            names: ["com.microsoft.teams2", "Microsoft Teams"],
+            title: "Microsoft Teams 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Teams 的临时文件;清了下次打开时重新生成。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "phone"
+        ),
+        Entry(
+            key: "microsoft-word",
+            names: ["com.microsoft.Word", "Microsoft Word"],
+            title: "Microsoft Word 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Word 的临时文件;清了自动重建。文档本身不在这里。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "doc"
+        ),
+        Entry(
+            key: "microsoft-excel",
+            names: ["com.microsoft.Excel", "Microsoft Excel"],
+            title: "Microsoft Excel 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Excel 的临时文件;清了自动重建。表格文件本身不在这里。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "tablecells"
+        ),
+        Entry(
+            key: "grammarly",
+            names: ["com.grammarly.ProjectLlama", "Grammarly"],
+            title: "Grammarly 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Grammarly 写作助手的临时文件;清了下次打开时重新生成。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "doc"
+        ),
+        Entry(
+            key: "loom",
+            names: ["com.loom.desktop"],
+            title: "Loom 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Loom 录屏工具的临时文件;清了下次打开时重新生成。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "video"
+        ),
+        Entry(
+            key: "dropbox",
+            names: ["com.dropbox.DropboxMacFileHelper", "Dropbox"],
+            title: "Dropbox 缓存",
+            group: .appCache,
+            tier: .checkFirst,
+            rationale: "Dropbox 同步用的临时数据;你的文件不会丢,但 Dropbox 之后要把同步文件夹整个重新核对一遍,可能要等一阵。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "cloud"
+        ),
+        Entry(
+            key: "google-drive",
+            names: ["com.google.GoogleDrive", "Google Drive"],
+            title: "Google Drive 缓存",
+            group: .appCache,
+            tier: .checkFirst,
+            rationale: "Google Drive 同步用的临时数据;你的文件不会丢,但之后它要重新核对同步内容,可能重新下载一部分。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "cloud"
+        ),
+        Entry(
+            key: "onedrive",
+            names: ["com.microsoft.OneDrive", "OneDrive"],
+            title: "OneDrive 缓存",
+            group: .appCache,
+            tier: .checkFirst,
+            rationale: "OneDrive 同步用的临时数据;你的文件不会丢,但之后它要把同步文件夹整个重新核对一遍,可能要等一阵。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "cloud"
+        ),
+        Entry(
+            key: "openai-codex",
+            names: ["com.openai.codex"],
+            title: "Codex 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Codex 应用与命令行工具的页面和脚本缓存,用的时候重新生成;登录信息和会话记录不在这里。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "sparkles"
+        ),
+        Entry(
+            key: "granola",
+            names: ["com.granola.app"],
+            title: "Granola 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Granola(AI 会议笔记)的临时文件;清了下次打开时重新生成。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "sparkles"
+        ),
+        Entry(
+            key: "spokenly",
+            names: ["app.spokenly", "app.spokenly.revenuecat"],
+            title: "Spokenly 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Spokenly(语音听写应用)的临时数据;清了下次打开时重新生成。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "sparkles"
+        ),
+        Entry(
+            key: "ollama",
+            names: ["com.ollama.Ollama"],
+            title: "Ollama 应用缓存",
+            group: .appCache,
+            tier: .checkFirst,
+            rationale: "Ollama 应用的临时数据;清了不丢模型,但下次运行时可能要重新加载模型数据。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "brain"
+        ),
+        Entry(
+            key: "claude-cli-cache",
+            names: ["claude-cli-nodejs"],
+            title: "Claude Code 日志缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Claude Code 给各个项目的 MCP 服务写的日志,一个项目一个文件夹;清了不影响使用,新日志照常写入。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "doc.text"
+        ),
+        // 上游标 safe;拿不准(没联网时订阅状态可能暂时显示不对),落「先检查」
+        Entry(
+            key: "revenuecat",
+            names: ["RevenueCat", "RevenueCatFonts"],
+            title: "RevenueCat 缓存",
+            group: .appCache,
+            tier: .checkFirst,
+            rationale: "应用里集成的订阅与内购工具(RevenueCat)存的数据;清了下次启动时重新拉取,没联网时订阅状态可能暂时显示不对。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "bag"
+        ),
+        // —— 开发类应用(接口调试、数据库客户端、Git 客户端):是普通应用,不进「开发工具」组 ——
+        Entry(
+            key: "proxyman",
+            names: ["com.proxyman.NSProxy", "Proxyman"],
+            title: "Proxyman 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Proxyman(抓包与接口调试工具)的临时文件;清了下次打开时重新生成。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "network"
+        ),
+        Entry(
+            key: "insomnia",
+            names: ["com.insomnia.app"],
+            title: "Insomnia 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Insomnia(接口调试工具)的临时文件;清了下次打开时重新生成。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "network"
+        ),
+        Entry(
+            key: "paw-rapi",
+            names: ["com.luckymarmot.Paw", "RapidAPI"],
+            title: "Paw / RapidAPI 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "Paw 与 RapidAPI(接口开发工具)的临时文件;清了下次打开时重新生成。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "network"
+        ),
+        Entry(
+            key: "tableplus",
+            names: ["com.tinyapp.TablePlus", "TablePlus"],
+            title: "TablePlus 缓存",
+            group: .appCache,
+            tier: .safe,
+            rationale: "TablePlus(数据库管理工具)的临时文件;清了下次打开时重新生成。数据库本身不在这里。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "cylinder"
+        ),
     ]
 
     /// 苹果自家的应用与后台服务的缓存:恒「先检查」,不自动勾(见文件头)。
