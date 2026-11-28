@@ -237,18 +237,59 @@ public struct CleanRunReport: Sendable, Equatable {
     }
 }
 
-/// 执行计划:先删前复核,放行项一次交给执行器,按路径逐项对回执。
+/// 一次清理怎么收场。
+public enum CleanRunTermination: Sendable, Equatable {
+    /// 走完(含逐项失败项);payload 为战报——落清理历史、出结果卡。
+    case completed(CleanRunReport)
+    /// 没开始就停了:整批未动(用户态条目也没动)。调用方保留勾选、如实提示,不落历史。
+    case aborted(CleanRunAbort)
+}
+
+/// 清理没能开始的原因(p7-cleaner/05:确认清单含系统级条目时先要授权)。
+public enum CleanRunAbort: Sendable, Equatable {
+    /// 用户在系统管理员密码框点了取消。
+    case authorizationCancelled
+    /// 授权之后的通道用不了(复核脚本缺失 / 出错,或系统不再提供这条授权通道)。
+    case channelUnavailable(reason: String)
+
+    /// 「没开始」提示卡的标题。
+    public var title: String {
+        switch self {
+        case .authorizationCancelled: "已取消授权"
+        case .channelUnavailable: "系统级条目移不了"
+        }
+    }
+
+    /// 「没开始」提示卡的说明(清理页结果卡与 AI 清理桥共用,单出处):整批没动、勾选保留。
+    public var detail: String {
+        switch self {
+        case .authorizationCancelled:
+            "未做任何改动,勾选保留——可以重新发起。"
+        case let .channelUnavailable(reason):
+            "\(reason)。这一批没有清理,勾选保留。"
+        }
+    }
+}
+
+/// 执行计划:先删前复核;带「需要管理员权限」的条目走授权通道,其余一次交给废纸篓
+/// 执行器;按路径逐项对回执。
 public enum CleanRunner {
+    /// - Parameters:
+    ///   - systemTrash: 系统级条目的授权通道。清单里有系统级条目而这里是 nil = 通道不可用。
+    ///   - requesterUID: 调用者的用户 id(系统级条目移进废纸篓后把归属改成它)。
     public static func run(
         _ plan: CleanPlan,
         using executor: some CleanTrashExecutor,
+        systemTrash: (any CleanSystemTrashExecutor)?,
+        requesterUID: UInt32,
         now: @Sendable () -> Date = { Date() }
-    ) async -> CleanRunReport {
+    ) async -> CleanRunTermination {
         let startedAt = now()
         guard !plan.isEmpty else {
-            return CleanRunReport(startedAt: startedAt, finishedAt: startedAt, items: [])
+            return .completed(CleanRunReport(startedAt: startedAt, finishedAt: startedAt, items: []))
         }
-        // 删前复核(spec §15):逐项比对扫描快照;跳过项不进执行器批次,战报如实记原因。
+        // 删前复核(spec §15):系统级与用户态条目同一道闸。逐项比对扫描快照;跳过项不进
+        // 执行器批次,战报如实记原因。
         let check = await PreDeleteCheck.partition(
             plan.items,
             path: \.path,
@@ -256,19 +297,36 @@ public enum CleanRunner {
             origin: .scan,
             currentState: { await executor.currentState(ofPath: $0) }
         )
-        let outcome = check.cleared.isEmpty
+        let systemCleared = check.cleared.filter(requiresAuthorization)
+        let userCleared = check.cleared.filter { !requiresAuthorization($0) }
+        var systemReceipt = TrashRecycleOutcome()
+        if !systemCleared.isEmpty {
+            // 系统级条目先走授权通道。取消或通道不可用都在这里停住——用户态条目不接着做,
+            // 用户看到的仍是确认清单上那一份勾选。
+            guard let systemTrash else {
+                return .aborted(.channelUnavailable(reason: "系统级条目的授权通道没有装配"))
+            }
+            switch await systemTrash.moveSystemItems(
+                SystemTrashRequest(paths: systemCleared.map(\.path), requesterUID: requesterUID)
+            ) {
+            case let .completed(receipt):
+                systemReceipt = receipt
+            case .authorizationCancelled:
+                return .aborted(.authorizationCancelled)
+            case let .channelUnavailable(reason):
+                return .aborted(.channelUnavailable(reason: reason))
+            }
+        }
+        let userReceipt = userCleared.isEmpty
             ? TrashRecycleOutcome()
-            : await executor.recycleToTrash(check.cleared.map(\.path))
+            : await executor.recycleToTrash(userCleared.map(\.path))
         let items = plan.items.map { candidate -> CleanRunItem in
             let result: CleanItemOutcome = if let skipped = check.skipped[candidate.path] {
                 .failed(reason: skipped)
-            } else if let destination = outcome.recycled[candidate.path] {
-                .recycled(destination: destination)
-            } else if let reason = outcome.failures[candidate.path] {
-                .failed(reason: reason)
+            } else if requiresAuthorization(candidate) {
+                receipt(for: candidate.path, from: systemReceipt)
             } else {
-                // 执行器既没说成功也没说失败:按失败记,不默认成功。
-                .failed(reason: "执行器未报告结果")
+                receipt(for: candidate.path, from: userReceipt)
             }
             return CleanRunItem(
                 path: candidate.path,
@@ -280,6 +338,22 @@ public enum CleanRunner {
                 flags: candidate.flags
             )
         }
-        return CleanRunReport(startedAt: startedAt, finishedAt: now(), items: items)
+        return .completed(CleanRunReport(startedAt: startedAt, finishedAt: now(), items: items))
+    }
+
+    /// 条目要不要运行时授权:条目标志单出处(GLOSSARY「条目标志」「运行时授权」)。
+    private static func requiresAuthorization(_ candidate: JunkCandidate) -> Bool {
+        candidate.flags.contains(.requiresAuthorization)
+    }
+
+    private static func receipt(for path: String, from outcome: TrashRecycleOutcome) -> CleanItemOutcome {
+        if let destination = outcome.recycled[path] {
+            return .recycled(destination: destination)
+        }
+        if let reason = outcome.failures[path] {
+            return .failed(reason: reason)
+        }
+        // 执行器既没说成功也没说失败:按失败记,不默认成功。
+        return .failed(reason: "执行器未报告结果")
     }
 }

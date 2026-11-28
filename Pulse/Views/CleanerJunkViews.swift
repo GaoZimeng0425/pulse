@@ -3,7 +3,8 @@ import PulseCore
 import SwiftUI
 
 // 清单卡(JunkListCard):卡头(「全部清单」+ 合计;下钻态不画)→ 结果卡(清理完成后
-// 的报告,平时不占位)→ 组列表(自己滚:组头 + 条目)→ 动作条(钉在卡底常驻)。
+// 的报告,或「没开始就停了」的提示 CleanNotStartedNotice;平时不占位)→ 组列表(自己滚:
+// 组头 + 条目)→ 动作条(钉在卡底常驻)。
 // 确认单 CleanConfirmSheet 挂在这张卡上。行、档位 chip、年龄文案在
 // CleanerJunkRowViews.swift;尺寸表与勾选框在 CleanerListCommonViews.swift。
 
@@ -471,14 +472,16 @@ struct JunkListCard: View {
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
-                Text("正在移入废纸篓…(完成后才可退出 app)")
+                Text(model.runningNeedsAuthorization
+                    ? "正在移入废纸篓…出现密码框时请输入系统管理员密码(完成后才可退出 app)"
+                    : "正在移入废纸篓…(完成后才可退出 app)")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
             .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
-        case .idle, .finished, .confirming:
+        case .idle, .finished, .confirming, .notStarted:
             // 动作条常驻:空选时主按钮灰显 + 注脚,不整条消失——按钮消失时看不出
             // 下一步该干嘛;有选则出「清除勾选」+ 强调色主按钮。
             HStack(spacing: 12) {
@@ -549,6 +552,41 @@ struct JunkListCard: View {
             }
             .padding(12)
             .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
+        } else if case let .notStarted(abort) = model.cleanPhase {
+            CleanNotStartedNotice(abort: abort) {
+                model.dismissCleanReport()
+            }
         }
+    }
+}
+
+// MARK: 「没开始就停了」提示
+
+/// 清理没开始就停了(管理员授权被取消 / 通道不可用;`CleanPhase.notStarted`)的提示卡:
+/// 客观陈述,不催促。全部清单页的结果卡位与清理总览页各出一份——AI 助手经清理桥发起的
+/// 清理,用户可能正停在总览页。勾选还在,动作条照常可以重新发起。
+struct CleanNotStartedNotice: View {
+    let abort: CleanRunAbort
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "info.circle")
+                    .font(.system(size: IconSize.inline, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text(abort.title)
+                    .font(.system(size: 12, weight: .medium))
+                Spacer()
+                Button("知道了", action: onDismiss)
+                    .buttonStyle(.link)
+                    .font(.system(size: 12))
+            }
+            Text(abort.detail)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .background(Surface.cardHigh, in: .rect(cornerRadius: 12))
     }
 }

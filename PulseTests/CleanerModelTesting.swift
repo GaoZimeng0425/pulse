@@ -2,9 +2,10 @@ import Foundation
 @testable import Pulse
 import PulseCore
 
-/// 测试用工厂(arch-clean/01):参数与 `CleanerModel.init` 同名同序;生产走 Live 采集的
-/// 四个参数(目录枚举 / 已装清点 / 运行中应用 / 废纸篓清点)在这里默认给替身——测试
-/// 不碰本机真 /Applications、系统的工作区应用列表、真废纸篓、真目录树。其余默认与 init 一致。
+/// 测试用工厂(arch-clean/01):参数与 `CleanerModel.init` 同名同序;生产走 Live 采集或会
+/// 弹系统管理员密码框的参数(目录枚举 / 已装清点 / 运行中应用 / 废纸篓清点 / 系统级条目
+/// 的授权通道)在这里默认给替身——测试不碰本机真 /Applications、系统的工作区应用列表、
+/// 真废纸篓、真目录树,也不提权。其余默认与 init 一致。
 @MainActor
 extension CleanerModel {
     static func testing(
@@ -12,6 +13,7 @@ extension CleanerModel {
         scanRoots: CleanScanRootsStore = CleanScanRootsStore(load: { [] }, persist: { _ in }),
         history: CleanHistoryStore? = nil,
         trash: any CleanTrashExecutor,
+        systemTrash: any CleanSystemTrashExecutor = FakeCleanSystemTrashExecutor(),
         directoryEnumerator: any CleanDirectoryEnumerator = FakeCleanDirectoryEnumerator(),
         activity: (any CleanActivitySource)? = nil,
         volumeSummaries: (@Sendable () -> [SpaceMapVolumeSummary])? = nil,
@@ -32,6 +34,7 @@ extension CleanerModel {
             scanRoots: scanRoots,
             history: history,
             trash: trash,
+            systemTrash: systemTrash,
             directoryEnumerator: directoryEnumerator,
             activity: activity,
             volumeSummaries: volumeSummaries,

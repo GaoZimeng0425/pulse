@@ -2,10 +2,11 @@ import Foundation
 
 // MARK: - 清理系统边界(p4-cleaner/02,spec「唯一新接缝」,用户 2026-10-28 确认)
 
-// 三件事:枚举目录 / 废纸篓执行 / 进程活动查询。
+// 四件事:枚举目录 / 废纸篓执行 / 进程活动查询 / 系统级条目移进废纸篓(需要授权)。
 // 真实现(Live)在 app target:getattrlistbulk 扫描器(03 票)、NSWorkspace(04/08 票,
-// 探针 12:recycle 吃 [URL] 回赠 原→新 URL 字典)、采样器快照(05 票)。
-// 测试假实现同票交付(PulseCoreTestSupport:内存文件系统 / spy / 活动表)。
+// 探针 12:recycle 吃 [URL] 回赠 原→新 URL 字典)、采样器快照(05 票)、
+// 经系统脚本的管理员授权运行复核脚本(p7-cleaner/05 票)。
+// 测试假实现同票交付(PulseCoreTestSupport:内存文件系统 / spy / 活动表 / 假授权接口)。
 
 /// 目录枚举的一条快照记录。字段形状由探针 11 定死(docs/probes/11:macOS 27 布局与常量)。
 public struct FsEntrySnapshot: Sendable, Equatable {
@@ -181,6 +182,42 @@ public struct TrashEmptySummary: Sendable, Equatable {
     public var totalSkipped: Int {
         volumes.reduce(0) { $0 + $1.skippedItems }
     }
+}
+
+// MARK: 第四件边界(p7-cleaner/05;ADR-0012)
+
+/// ④ 系统级条目移进废纸篓(需要授权)。系统目录里的条目不归 ②:移走它们要用户先在系统
+/// 管理员密码框里授权一次,做完这一批即止。真实实现在 app target(经系统脚本的管理员
+/// 授权运行随包分发的复核脚本);测试假实现在 PulseCoreTestSupport。真实提权路径不进
+/// 自动化测试。
+public protocol CleanSystemTrashExecutor: Sendable {
+    /// 把确认清单里的系统级条目移进废纸篓。调用即请求授权——调用方只在用户点了「移入
+    /// 废纸篓」之后调它。
+    func moveSystemItems(_ request: SystemTrashRequest) async -> SystemTrashOutcome
+}
+
+/// 一次「系统级条目移进废纸篓」的请求。
+public struct SystemTrashRequest: Sendable, Equatable {
+    /// 确认清单里的系统级条目(删前复核放行的那些)的绝对路径。
+    public let paths: [String]
+    /// 调用者的用户 id:移进废纸篓后把归属改成它,用户不用权限就能查看、恢复、清空。
+    public let requesterUID: UInt32
+
+    public init(paths: [String], requesterUID: UInt32) {
+        self.paths = paths
+        self.requesterUID = requesterUID
+    }
+}
+
+/// 一次请求的结果。
+public enum SystemTrashOutcome: Sendable, Equatable {
+    /// 走完了:逐项回执,没动的条目带原因(人话)。
+    case completed(TrashRecycleOutcome)
+    /// 用户在密码框点了取消。
+    case authorizationCancelled
+    /// 授权之后的通道用不了:复核脚本缺失、自身出错,或系统不再提供这条授权通道
+    /// (ADR-0012:失效时回到该决定重议,不得静默换道)。
+    case channelUnavailable(reason: String)
 }
 
 /// ③ 进程活动查询:此刻哪些路径有进程活动、是什么性质的活动。
