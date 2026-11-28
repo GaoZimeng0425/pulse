@@ -316,6 +316,9 @@ final class JunkRuleTableTests: XCTestCase {
         XCTAssertEqual(JunkRuleTable.rule(id: "xcode.archives")?.tier, .checkFirst)
         XCTAssertEqual(JunkRuleTable.rule(id: "appcache.geoservices")?.tier, .checkFirst)
         XCTAssertEqual(JunkRuleTable.rule(id: "appcache.doubaoIme")?.tier, .checkFirst)
+        // p7-cleaner/09 逐条过目:上游只要用户下载过离线歌曲就不提供 Spotify 的缓存(清它会连
+        // 离线歌曲一起带走),我们查不了有没有离线歌曲——恒「先检查」。
+        XCTAssertEqual(JunkRuleTable.rule(id: "appcache.spotify")?.tier, .checkFirst)
         XCTAssertEqual(JunkRuleTable.rule(id: "pnpm.metadataCache")?.tier, .safe)
         XCTAssertEqual(JunkRuleTable.rule(id: "browser.arc")?.tier, .safe)
         for id in [

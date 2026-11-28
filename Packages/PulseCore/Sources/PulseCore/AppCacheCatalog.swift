@@ -66,6 +66,12 @@ public enum AppCacheCatalog {
             self.source = source
             self.symbolName = symbolName
         }
+
+        /// 这条条目生成的规则 id。知识库只进浏览器 / 应用缓存两组,前缀只有这两种;
+        /// 推导只留这一处(规则表与测试都从这里取)。
+        var ruleID: String {
+            (group == .browserCache ? "browser." : "appcache.") + key
+        }
     }
 
     /// 浏览器:网页缓存,清了重新加载,登录与书签不受影响。
@@ -106,6 +112,7 @@ public enum AppCacheCatalog {
             source: JunkRuleTable.purgeAppExplanations,
             symbolName: "globe"
         ),
+        // p7-cleaner/09 更正出处:上游说明库自建仓起就没有这条(2026-11-28 拉全史核过)
         Entry(
             key: "chromium",
             names: ["Chromium", "org.chromium.Chromium"],
@@ -113,9 +120,10 @@ public enum AppCacheCatalog {
             group: .browserCache,
             tier: .safe,
             rationale: "Chromium 的网页缓存;清了重新加载。",
-            source: JunkRuleTable.purgeAppExplanations,
+            source: "Pulse 自定(p6-cleaner/01:比照同内核的 Chrome / Brave 登记;上游说明库没有这一条)",
             symbolName: "globe"
         ),
+        // p7-cleaner/09 更正出处:上游说明库自建仓起就没有这条(2026-11-28 拉全史核过)
         Entry(
             key: "edge",
             names: ["com.microsoft.edgemac", "Microsoft Edge"],
@@ -123,7 +131,7 @@ public enum AppCacheCatalog {
             group: .browserCache,
             tier: .safe,
             rationale: "Edge 的网页缓存;清了重新加载,登录与收藏不受影响。",
-            source: JunkRuleTable.purgeAppExplanations,
+            source: "Pulse 自定(p6-cleaner/01:比照同内核的 Chrome / Brave 登记;上游说明库没有这一条)",
             symbolName: "globe"
         ),
         Entry(
@@ -251,13 +259,16 @@ public enum AppCacheCatalog {
             source: JunkRuleTable.purgeAppExplanations,
             symbolName: "doc"
         ),
+        // p7-cleaner/09 逐条过目,往严里改:p6 时是「可安全清理」。上游只要用户下载过离线歌曲
+        // 就不提供这个缓存(注释写明对齐对象的用户实测:清它会连离线歌曲一起带走),我们没法查
+        // 有没有离线歌曲——落「先检查」。
         Entry(
             key: "spotify",
             names: ["Spotify", "com.spotify.client"],
             title: "Spotify 缓存",
             group: .appCache,
-            tier: .safe,
-            rationale: "播放缓冲;清了重新缓冲,已下载的离线歌曲在别的目录不受影响。",
+            tier: .checkFirst,
+            rationale: "Spotify 的播放缓冲与封面缓存;清了重新缓冲。注意:下载过的离线歌曲可能跟着一起没了(对齐对象的用户实测),要联网重新下载;没下载过离线歌曲的随便清。",
             source: JunkRuleTable.purgeAppExplanations,
             symbolName: "music.note"
         ),
@@ -405,6 +416,7 @@ public enum AppCacheCatalog {
             source: JunkRuleTable.purgeAppExplanations,
             symbolName: "arrow.triangle.2.circlepath"
         ),
+        // 上游写的是「用 ToDesktop 打包的应用」;这个包名就是 Cursor,标题按实际归属收窄
         Entry(
             key: "todesktop-shipit",
             names: ["com.todesktop.230313mzl4w4u92.ShipIt"],
@@ -425,6 +437,7 @@ public enum AppCacheCatalog {
             source: JunkRuleTable.purgeAppExplanations,
             symbolName: "arrow.triangle.2.circlepath"
         ),
+        // 上游把它并排在「Google 更新器」一条里;它说的不是更新器,拆出来单列、文案自拟
         Entry(
             key: "google-sdks-events",
             names: ["google-sdks-events"],
@@ -452,7 +465,7 @@ public enum AppCacheCatalog {
             title: "Adobe 媒体缓存索引",
             group: .appCache,
             tier: .safe,
-            rationale: "Adobe 用来登记上面那些媒体缓存的索引;清了会随媒体缓存一起重建。",
+            rationale: "Adobe 用来登记媒体缓存文件的索引;清了会随媒体缓存一起重建。",
             source: JunkRuleTable.purgeAppExplanations,
             symbolName: "film"
         ),
@@ -619,7 +632,7 @@ public enum AppCacheCatalog {
         ),
         Entry(
             key: "spokenly",
-            names: ["app.spokenly", "app.spokenly.revenuecat"],
+            names: ["app.spokenly"],
             title: "Spokenly 缓存",
             group: .appCache,
             tier: .safe,
@@ -648,9 +661,10 @@ public enum AppCacheCatalog {
             symbolName: "doc.text"
         ),
         // 上游标 safe;拿不准(没联网时订阅状态可能暂时显示不对),落「先检查」
+        // app.spokenly.revenuecat 上游登记在 Spokenly 条目下;它是 RevenueCat 的缓存,挪到这里同档
         Entry(
             key: "revenuecat",
-            names: ["RevenueCat", "RevenueCatFonts"],
+            names: ["RevenueCat", "RevenueCatFonts", "app.spokenly.revenuecat"],
             title: "RevenueCat 缓存",
             group: .appCache,
             tier: .checkFirst,
@@ -1162,7 +1176,7 @@ public enum AppCacheCatalog {
             title: "提醒事项后台缓存",
             group: .appCache,
             tier: .checkFirst,
-            rationale: "提醒事项 app 在后台用的临时数据;清了安全,下次打开提醒事项时要重新加载一下。",
+            rationale: "提醒事项 app 在后台用的临时数据;清了下次打开提醒事项时要重新加载一下。",
             source: JunkRuleTable.purgeAppExplanations,
             symbolName: "checklist"
         ),
@@ -1390,13 +1404,14 @@ public enum AppCacheCatalog {
             source: JunkRuleTable.pulseCustom,
             symbolName: "character.book.closed"
         ),
+        // p7-cleaner/09 逐条过目:上游一律不提供输入法的缓存,说明里补上这一句
         Entry(
             key: "doubaoIme",
             names: ["com.bytedance.inputmethod.doubaoime", "com.bytedance.inputmethod.doubaoime.settings"],
             title: "豆包输入法缓存",
             group: .appCache,
             tier: .checkFirst,
-            rationale: "输入法模型与联想缓存;删除后要重新下载,期间联想与转写可能变慢。",
+            rationale: "输入法模型与联想缓存;删除后要重新下载,期间联想与转写可能变慢。注意:输入法这类缓存的旁边有时放着学到的词和个人词典,介意的话别清。",
             source: JunkRuleTable.pulseCustom,
             symbolName: "keyboard"
         ),
@@ -1416,9 +1431,8 @@ public enum AppCacheCatalog {
     /// id 前缀 `browser.` / `appcache.`;字面精确匹配保留规范大小写。
     public static let entries: [Entry] = browsers + apps + apple + custom
     public static let rules: [JunkRule] = entries.map { entry in
-        let idPrefix = entry.group == .browserCache ? "browser" : "appcache"
-        return JunkRule(
-            id: "\(idPrefix).\(entry.key)",
+        JunkRule(
+            id: entry.ruleID,
             group: entry.group,
             title: entry.title,
             patterns: entry.names.map { JunkPathPattern(homeRelative: "Library/Caches/\($0)") },

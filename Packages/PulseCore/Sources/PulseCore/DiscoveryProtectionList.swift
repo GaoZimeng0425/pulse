@@ -71,7 +71,8 @@ public enum DiscoveryProtectionList {
 
     /// 系统所有:`com.apple.` 前缀、名为「Apple」的目录,或不带前缀的那批守护进程缓存。
     /// 它们的守护进程常年常驻,「在运行就跳过」对它们没有可靠信号;认得的苹果缓存走
-    /// 知识库逐条担保——担保的结果恒为「先检查」,不自动勾(p7-cleaner/09)。
+    /// 知识库逐条担保——担保的结果恒为「先检查」,不自动勾(p7-cleaner/09)。例外只有
+    /// Safari 的缓存:浏览器一组同档是 p6 的既有决定。
     public static func isSystemOwned(name: String) -> Bool {
         let lowered = name.lowercased()
         return lowered.hasPrefix("com.apple.")

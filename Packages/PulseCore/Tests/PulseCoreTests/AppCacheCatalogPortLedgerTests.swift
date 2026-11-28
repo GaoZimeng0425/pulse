@@ -1,5 +1,4 @@
 @testable import PulseCore
-import PulseCoreTestSupport
 import XCTest
 
 /// 搬运账本(p7-cleaner/09):上游 purge-app 的 `purge/Resources/explanations.json`(MIT,
@@ -23,9 +22,6 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         case elsewhere
     }
 
-    private let home = "/Users/test"
-    private let engine = SpaceScanEngine()
-
     /// 上游 key → (上游档位, 每个目录名的下落)。目录名 = 上游的 aliases 加 bundle_ids。
     private let ledger: [(key: String, tag: String, names: [String: Fate])] = [
         ("adobe-media-cache-files", "safe", ["Adobe Media Cache Files": .entry("adobe-media-cache-files")]),
@@ -41,7 +37,7 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
             ["ai.perplexity.CometUpdater": .entry("perplexity-updater"), "CometUpdater": .entry("perplexity-updater")]
         ),
         ("blender", "safe", ["Blender": .entry("blender"), "org.blenderfoundation.blender": .entry("blender")]),
-        ("checkpoint-nodejs", "safe", ["checkpoint-nodejs": .genericDiscovery]),
+        ("checkpoint-nodejs", "safe", ["checkpoint-nodejs": .ticket10]),
         ("cloudkit", "medium", ["CloudKit": .notListed]),
         ("claude-updater", "safe", ["com.anthropic.claudefordesktop.ShipIt": .entry("claude-updater")]),
         ("accountsd", "medium", ["com.apple.accountsd": .notListed]),
@@ -137,7 +133,7 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         ("macos-install-data", "medium", ["macOS Install Data": .elsewhere]),
         ("dart-tool", "safe", [".dart_tool": .ticket10]),
         ("ams-migrator", "safe", ["AMSDataMigratorTool": .entry("ams-migrator")]),
-        ("spokenly", "safe", ["app.spokenly": .entry("spokenly"), "app.spokenly.revenuecat": .entry("spokenly")]),
+        ("spokenly", "safe", ["app.spokenly": .entry("spokenly"), "app.spokenly.revenuecat": .entry("revenuecat")]),
         ("container-managerd", "safe", ["com.apple.containermanagerd": .notListed]),
         ("storekitagent", "medium", ["com.apple.storekitagent": .entry("storekitagent")]),
         ("docker", "medium", ["com.docker.docker": .rule("docker.desktopData")]),
@@ -478,6 +474,21 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         "clang-module-cache",
     ]
 
+    /// p6 首批就登记、上游现行说明库(提交 ceacaf8)里没有的目录名:p6 的决定,保留。它们没有上游
+    /// 条目可对账,所以在这里点名。新加的目录名要么有账本下落,要么在这里登记——不然「往现有
+    /// 条目里塞一个目录名」就绕过了账本。
+    private let legacyNames: Set<String> = [
+        "Arc", "company.thebrowser.browser",
+        "Zen",
+        "Safari",
+        "zoom.us",
+        "Raycast",
+        "Microsoft AutoUpdate",
+        "com.google.Keystone",
+        // Pulse 本机实测补的版本号(上游只登记到 CleanMyMac4)
+        "com.macpaw.CleanMyMac5",
+    ]
+
     /// 规则 id → 档位:安全白名单规则表,或项目产物规则表(Pods 这类在那边)。
     private func tier(ofRule ruleID: String) -> CleanSafetyTier? {
         JunkRuleTable.rule(id: ruleID)?.tier
@@ -490,27 +501,21 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         }
     }
 
-    private func trees(cachesNames: [String]) async -> [SpaceNode] {
-        let directories = Dictionary(uniqueKeysWithValues: cachesNames.enumerated().map {
-            ("Library/Caches/" + $1, Int64(100 + $0))
-        })
-        let listings = CleanFixture.homeListings(home: home, directories: directories)
-        return await engine.scan(
-            SpaceScanOptions(roots: [home], retainFileNodes: false),
-            using: FakeCleanDirectoryEnumerator(listings: listings)
-        ).trees
-    }
-
     // MARK: 账本自身
 
-    /// 账本与上游一一对应:带目录名的 260 条、没登记目录名的 51 条,key 不重复。
-    /// 重新对照新版上游搬运时,这两个数随账本一起改。
-    func testLedgerMirrorsUpstreamOneForOne() {
+    /// 账本覆盖上游的每一条:带目录名的 260 条、没登记目录名的 51 条,key 不重复。
+    /// 另外钉住账本的形状——上游档位 197 条 safe / 63 条 medium、目录名共 404 个。档位是从上游
+    /// 抄进账本的,抄错了下面「不放宽」的检查就跟着错;这几个数是从上游原件另算的,抄错一条
+    /// 就对不上。重新对照新版上游搬运时,这些数随账本一起改。
+    func testLedgerCoversEveryUpstreamEntry() {
         let keys = ledger.map(\.key) + withoutFolderNames
         XCTAssertEqual(Set(keys).count, keys.count, "上游 key 在账本里重复")
 
         XCTAssertEqual(ledger.count, 260, "上游带目录名的条目数(提交 ceacaf8)")
         XCTAssertEqual(withoutFolderNames.count, 51, "上游没登记目录名的条目数(提交 ceacaf8)")
+        XCTAssertEqual(ledger.filter { $0.tag == "safe" }.count, 197, "上游带目录名、标 safe 的条目数")
+        XCTAssertEqual(ledger.filter { $0.tag == "medium" }.count, 63, "上游带目录名、标 medium 的条目数")
+        XCTAssertEqual(fates.count, 404, "上游目录名总数(aliases 加 bundle_ids)")
     }
 
     // MARK: 搬了
@@ -531,23 +536,26 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         }
     }
 
-    /// 反过来:凡标了上游出处的条目,账本里都有名字指向它——没有绕过账本进来的。
-    /// 例外是 p6 首批就有、上游现行说明库里已没有对应条目的两条(p6 的决定,保留,不计入这次搬运)。
-    func testEveryPortedEntryIsReachableFromTheLedger() {
-        let legacyEntries = ["chromium", "edge"]
-        let portedKeys = Set(fates.compactMap { row -> String? in
-            guard case let .entry(key) = row.fate else { return nil }
-            return key
-        })
+    /// 反过来:凡标了上游出处的条目,它的每个目录名在账本里都有下落——没有绕过账本进来的名字
+    /// (只查条目 key 的话,往现有条目里加一个目录名就绕过去了)。例外只在 `legacyNames` 里点名。
+    func testEveryPortedDirectoryNameIsReachableFromTheLedger() {
+        var ported: Set<[String]> = [] // [条目 key, 目录名]
+        for row in fates {
+            guard case let .entry(entryKey) = row.fate else { continue }
+            ported.insert([entryKey, row.name])
+        }
+        let catalogNames = Set(AppCacheCatalog.entries.flatMap(\.names))
 
         for entry in AppCacheCatalog.entries where entry.source == JunkRuleTable.purgeAppExplanations {
-            if legacyEntries.contains(entry.key) {
-                continue
+            for name in entry.names {
+                XCTAssertTrue(
+                    ported.contains([entry.key, name]) || legacyNames.contains(name),
+                    "\(entry.key) 的目录名「\(name)」标了上游出处,账本里却没有它的下落"
+                )
             }
-            XCTAssertTrue(portedKeys.contains(entry.key), "条目 \(entry.key) 标了上游出处,账本里却没有它的下落")
         }
-        for key in legacyEntries {
-            XCTAssertNotNil(AppCacheCatalog.entries.first { $0.key == key }, "例外清单里的条目 \(key) 已不存在,把例外删掉")
+        for name in legacyNames.sorted() {
+            XCTAssertTrue(catalogNames.contains(name), "点名保留的目录名「\(name)」已不在知识库里,把这一行删掉")
         }
     }
 
@@ -571,9 +579,14 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         let names = fates.filter { $0.fate == .notListed }.map(\.name)
         XCTAssertFalse(names.isEmpty, "护栏在空转")
 
-        let trees = await trees(cachesNames: names)
-        let byRule = JunkMatcher.candidates(in: trees, home: home)
-        let byDiscovery = GenericDiscovery.detect(in: trees, home: home, claimedBy: byRule, excludedPathPrefixes: [])
+        let trees = await JunkCacheScanFixture.trees(cachesNames: names)
+        let byRule = JunkMatcher.candidates(in: trees, home: JunkCacheScanFixture.home)
+        let byDiscovery = GenericDiscovery.detect(
+            in: trees,
+            home: JunkCacheScanFixture.home,
+            claimedBy: byRule,
+            excludedPathPrefixes: []
+        )
 
         XCTAssertEqual([byRule, byDiscovery].flatMap { $0.map(\.path) }, [], "不列的目录名被列出来了")
     }
@@ -585,9 +598,9 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         let names = fates.filter { $0.fate == .genericDiscovery }.map(\.name)
         XCTAssertFalse(names.isEmpty, "护栏在空转")
 
-        let trees = await trees(cachesNames: names)
+        let candidates = await JunkCacheScanFixture.candidates(cachesNames: names)
 
-        XCTAssertEqual(JunkMatcher.candidates(in: trees, home: home).map(\.path), [])
+        XCTAssertEqual(candidates.map(\.path), [])
     }
 
     /// 交给票 10 的目录名还没进知识库——进了就与账本不符,票 10 搬的时候要连账本一起改。
