@@ -53,8 +53,9 @@ final class JunkRuleTableTests: XCTestCase {
         "browser.opera": ("Library/Caches/com.operasoftware.Opera", 10),
         "browser.zen": ("Library/Caches/Zen", 10),
         "browser.safari": ("Library/Caches/com.apple.Safari", 30),
-        // p6-cleaner/01 知识库:应用缓存(含三条 Pulse 自定真案)
-        "appcache.cloudkit": ("Library/Caches/CloudKit", 1200),
+        // p6-cleaner/01 知识库:应用缓存(含三条 Pulse 自定真案)。
+        // CloudKit 那条 p7-cleaner/09 撤了(iCloud 同步的元数据库,不是可丢弃缓存;
+        // 「谁都不列它」由 AppCacheCatalogPortLedgerTests 钉住)。
         "appcache.geoservices": ("Library/Caches/GeoServices", 50),
         "appcache.slack": ("Library/Caches/Slack", 10),
         "appcache.discord": ("Library/Caches/Discord", 10),
@@ -78,6 +79,61 @@ final class JunkRuleTableTests: XCTestCase {
         "appcache.easydict": ("Library/Caches/com.izual.Easydict", 120),
         "appcache.doubaoIme": ("Library/Caches/com.bytedance.inputmethod.doubaoime", 200),
         "appcache.zcodeUpdater": ("Library/Caches/@zcodedesktop-updater", 560),
+        // p7-cleaner/09:自 purge-app 搬来的知识库条目,一条规则一行正例
+        "browser.yab": ("Library/Caches/Yab", 11),
+        "appcache.perplexity-updater": ("Library/Caches/ai.perplexity.CometUpdater", 12),
+        "appcache.claude-updater": ("Library/Caches/com.anthropic.claudefordesktop.ShipIt", 13),
+        "appcache.todesktop-shipit": ("Library/Caches/com.todesktop.230313mzl4w4u92.ShipIt", 14),
+        "appcache.shipit-updater-cache": ("Library/Caches/ShipIt", 15),
+        "appcache.google-sdks-events": ("Library/Caches/google-sdks-events", 16),
+        "appcache.amp-library-agent": ("Library/Caches/com.apple.AMPLibraryAgent", 17),
+        "appcache.amsengagementd": ("Library/Caches/com.apple.amsengagementd", 18),
+        "appcache.adprivacyd": ("Library/Caches/com.apple.ap.adprivacyd", 19),
+        "appcache.apple-media-services": ("Library/Caches/com.apple.AppleMediaServices", 20),
+        "appcache.appstoreagent": ("Library/Caches/com.apple.appstoreagent", 21),
+        "appcache.assistantd": ("Library/Caches/com.apple.assistantd", 22),
+        "appcache.beta-enrollment": ("Library/Caches/com.apple.betaenrollmentagent", 23),
+        "appcache.bird": ("Library/Caches/com.apple.bird", 24),
+        "appcache.businessservicesd": ("Library/Caches/com.apple.businessservicesd", 25),
+        "appcache.cloudd": ("Library/Caches/com.apple.cloudd", 26),
+        "appcache.cloud-telemetry": ("Library/Caches/com.apple.CloudTelemetry", 27),
+        "appcache.ctcategories": ("Library/Caches/com.apple.ctcategories.service", 28),
+        "appcache.donotdisturbd": ("Library/Caches/com.apple.donotdisturbd", 29),
+        "appcache.duetexpertd": ("Library/Caches/com.apple.duetexpertd", 30),
+        "appcache.feature-access-agent": ("Library/Caches/com.apple.FeatureAccessAgent", 31),
+        "appcache.feedbacklogger": ("Library/Caches/com.apple.feedbacklogger", 32),
+        "appcache.fileprovider-appstore": ("Library/Caches/com.apple.FileProviderDaemon.AppStoreService", 33),
+        "appcache.findmy": ("Library/Caches/com.apple.findmy.fmipcore", 34),
+        "appcache.geoanalyticsd": ("Library/Caches/com.apple.geoanalyticsd", 35),
+        "appcache.helpd": ("Library/Caches/com.apple.helpd", 36),
+        "appcache.homed": ("Library/Caches/com.apple.homed", 37),
+        "appcache.itunes": ("Library/Caches/com.apple.iTunes", 38),
+        "appcache.managedappdistribution": ("Library/Caches/com.apple.managedappdistributionagent", 39),
+        "appcache.nsurlsessiond": ("Library/Caches/com.apple.nsurlsessiond", 40),
+        "appcache.parsecd": ("Library/Caches/com.apple.parsecd", 41),
+        "appcache.proactive-eventtracker": ("Library/Caches/com.apple.proactive.eventtracker", 42),
+        "appcache.remindd": ("Library/Caches/com.apple.remindd", 43),
+        "appcache.shazam": ("Library/Caches/com.apple.shazamlibrary.cloud", 44),
+        "appcache.siri-tts": ("Library/Caches/com.apple.sirittsd", 45),
+        "appcache.spotlight": ("Library/Caches/com.apple.Spotlight", 46),
+        "appcache.tipsd": ("Library/Caches/com.apple.tipsd", 47),
+        "appcache.videoconference": ("Library/Caches/com.apple.VideoConference", 48),
+        "appcache.gamed": ("Library/Caches/com.apple.gamed", 49),
+        "appcache.chrono": ("Library/Caches/com.apple.chrono", 50),
+        "appcache.translation": ("Library/Caches/com.apple.translationd", 51),
+        "appcache.gamekit": ("Library/Caches/GameKit", 52),
+        "appcache.apple-maps": ("Library/Caches/com.apple.Maps", 53),
+        "appcache.apple-photos": ("Library/Caches/com.apple.Photos", 54),
+        "appcache.apple-mail": ("Library/Caches/com.apple.mail", 55),
+        "appcache.apple-music-app": ("Library/Caches/com.apple.Music", 56),
+        "appcache.network-cache": ("Library/Caches/com.apple.networkserviceproxy", 57),
+        "appcache.screenshot-app": ("Library/Caches/com.apple.screencaptureui", 58),
+        "appcache.dictionary-services": ("Library/Caches/com.apple.DictionaryServices", 59),
+        "appcache.promoted-content": ("Library/Caches/com.apple.ap.PromotedContentJetService", 60),
+        "appcache.intelligenceflowd-cache": ("Library/Caches/com.apple.intelligenceflow.intelligenceflowd", 11),
+        "appcache.ssu": ("Library/Caches/ssu", 12),
+        "appcache.storekitagent": ("Library/Caches/com.apple.storekitagent", 13),
+        "appcache.ams-migrator": ("Library/Caches/AMSDataMigratorTool", 14),
         "appcache.logs": ("Library/Logs", 100),
         // p6-cleaner/02:AI 模型四存储位(全「先检查」)
         "ai.ollama": (".ollama/models", 1100),
@@ -214,7 +270,6 @@ final class JunkRuleTableTests: XCTestCase {
         // p6-cleaner/01 点名档位:归档不可重建恒先检查;系统联动类先检查;
         // pnpm 元数据缓存与浏览器缓存可安全清理。
         XCTAssertEqual(JunkRuleTable.rule(id: "xcode.archives")?.tier, .checkFirst)
-        XCTAssertEqual(JunkRuleTable.rule(id: "appcache.cloudkit")?.tier, .checkFirst)
         XCTAssertEqual(JunkRuleTable.rule(id: "appcache.geoservices")?.tier, .checkFirst)
         XCTAssertEqual(JunkRuleTable.rule(id: "appcache.doubaoIme")?.tier, .checkFirst)
         XCTAssertEqual(JunkRuleTable.rule(id: "pnpm.metadataCache")?.tier, .safe)

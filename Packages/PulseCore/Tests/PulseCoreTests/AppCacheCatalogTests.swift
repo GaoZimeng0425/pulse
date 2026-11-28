@@ -1,9 +1,34 @@
 @testable import PulseCore
+import PulseCoreTestSupport
 import XCTest
 
-/// 应用缓存知识库完整性(p6-cleaner/01):条目良构 + 跨条目不撞名 +
-/// 不与开发工具规则的 Caches 目录撞名(撞名 = 同路径两张卡、重复计数)。
+/// 应用缓存知识库完整性(p6-cleaner/01 建;p7-cleaner/09 自 purge-app 全量搬运):条目良构 +
+/// 跨条目不撞名 + 不与开发工具规则的 Caches 目录撞名(撞名 = 同路径两张卡、重复计数);
+/// 每个目录名都有正例、相似名不被认领、不碰保护名单、苹果自家的恒「先检查」;
+/// 搬运前被通用发现标「未识别」的目录,搬运后按规则表档位出现。
+/// 全部打在假家目录上(CleanFixture.homeListings),零真盘。
 final class AppCacheCatalogTests: XCTestCase {
+    private let home = "/Users/test"
+    private let engine = SpaceScanEngine()
+
+    private func trees(cachesNames: [String]) async -> [SpaceNode] {
+        let directories = Dictionary(uniqueKeysWithValues: cachesNames.enumerated().map {
+            ("Library/Caches/" + $1, Int64(100 + $0))
+        })
+        let listings = CleanFixture.homeListings(home: home, directories: directories)
+        return await engine.scan(
+            SpaceScanOptions(roots: [home], retainFileNodes: false),
+            using: FakeCleanDirectoryEnumerator(listings: listings)
+        ).trees
+    }
+
+    private func candidates(cachesNames: [String]) async -> [JunkCandidate] {
+        let scanned = await trees(cachesNames: cachesNames)
+        return JunkMatcher.candidates(in: scanned, home: home)
+    }
+
+    // MARK: 条目良构
+
     func testEntriesAreWellFormed() {
         for entry in AppCacheCatalog.entries {
             XCTAssertFalse(entry.key.isEmpty, "key 不能为空")
@@ -15,6 +40,11 @@ final class AppCacheCatalogTests: XCTestCase {
             XCTAssertTrue(entry.group == .browserCache || entry.group == .appCache, "\(entry.key):知识库只进浏览器/应用缓存两组")
             XCTAssertFalse(entry.title.isEmpty, "\(entry.key):标题非空")
             XCTAssertFalse(entry.rationale.isEmpty, "\(entry.key):rationale 非空(确认清单靠它说话)")
+            // 出处只有两种:移植自上游(MIT,可移植)或 Pulse 自定。写别的等于没写。
+            XCTAssertTrue(
+                entry.source == JunkRuleTable.purgeAppExplanations || entry.source == JunkRuleTable.pulseCustom,
+                "\(entry.key):出处必须是上游说明库或 Pulse 自定,现在是「\(entry.source)」"
+            )
         }
     }
 
@@ -67,6 +97,142 @@ final class AppCacheCatalogTests: XCTestCase {
                 }
                 XCTAssertEqual(first, "Library", "\(rule.id):只允许 Library 域")
             }
+        }
+    }
+
+    // MARK: 登记完整性(p7-cleaner/09)
+
+    /// 每个目录名一个正例:一次扫描里把知识库登记的全部目录名都摆进假家目录,一个目录名出一条
+    /// 候选,规则、档位、分组、标题、说明、图标都与条目一致,不带任何条目标志。目录名取自条目
+    /// 本身,新增条目不必另写用例。
+    func testEveryDirectoryNameYieldsOneCandidateAtTheEntryTier() async {
+        let allNames = AppCacheCatalog.entries.flatMap(\.names)
+        let byPath = await Dictionary(uniqueKeysWithValues: candidates(cachesNames: allNames).map { ($0.path, $0) })
+
+        XCTAssertEqual(byPath.count, allNames.count, "一个目录名一条,不多不少")
+        for entry in AppCacheCatalog.entries {
+            let ruleID = (entry.group == .browserCache ? "browser." : "appcache.") + entry.key
+            for name in entry.names {
+                let candidate = byPath[home + "/Library/Caches/" + name]
+                XCTAssertNotNil(candidate, "\(entry.key) 的目录名「\(name)」没有被规则表认领")
+                XCTAssertEqual(candidate?.ruleID, ruleID, name)
+                XCTAssertEqual(candidate?.tier, entry.tier, name)
+                XCTAssertEqual(candidate?.group, entry.group, name)
+                XCTAssertEqual(candidate?.title, entry.title, name)
+                XCTAssertEqual(candidate?.rationale, entry.rationale, name)
+                XCTAssertEqual(candidate?.symbolName, entry.symbolName, name)
+                XCTAssertEqual(candidate?.flags, [], "\(name):规则表候选不带条目标志")
+            }
+        }
+    }
+
+    /// 相似名不被认领:每个目录名加后缀(-old、.old、Backup)或只改大小写,都不是知识库担保的
+    /// 那个目录,规则表一条都不出(名单外的另由通用发现以「先检查」列出)。字面精确匹配,所以
+    /// 只差大小写的写法不算;同一条目自己登记了另一种大小写的(「Zen」与「zen」)照认。
+    func testLookalikeNamesAreNotClaimed() async {
+        let registered = Set(AppCacheCatalog.entries.flatMap(\.names))
+        var lookalikes = Set<String>()
+        for name in registered {
+            lookalikes.insert(name + "-old")
+            lookalikes.insert(name + ".old")
+            lookalikes.insert(name + " Backup")
+            lookalikes.insert(name.lowercased())
+            lookalikes.insert(name.uppercased())
+        }
+        lookalikes.subtract(registered)
+
+        let claimed = await candidates(cachesNames: lookalikes.sorted())
+
+        XCTAssertEqual(claimed.map(\.path), [], "相似名被规则表认领了")
+    }
+
+    // MARK: 安全闸(p7-cleaner/09)
+
+    /// 知识库的规则命中不经通用发现那道保护名单的闸(规则表先认领),所以名单上的东西这里一条
+    /// 都不能有。保护名单的常量是唯一出处;两处例外,各有缘由:
+    ///   · 「google」「mbx」两个词是通用发现「不认识却整个扫走」时的硬跳过(对齐对象的事故:
+    ///     Chrome 在跑、Rust 构建缓存在用),管不到知识库逐条担保的浏览器缓存;
+    ///   · Safari 条目的目录名「Safari」(p6 登记)与个人数据名单里的 `~/Library/Safari` 资料目录
+    ///     同名不同处——名单按名字整名相等,拦的是资料目录,不是缓存目录下的同名文件夹。
+    func testCatalogNeverClaimsProtectedNames() {
+        let tokens = DiscoveryProtectionList.nameTokens.filter { $0 != "google" && $0 != "mbx" }
+            + DiscoveryProtectionList.vendorTokens
+        for entry in AppCacheCatalog.entries {
+            for name in entry.names {
+                let lowered = name.lowercased()
+                XCTAssertFalse(
+                    tokens.contains(where: lowered.contains),
+                    "\(entry.key) 的目录名「\(name)」命中保护名单"
+                )
+                let isSafariCacheSpelling = entry.key == "safari" && name == "Safari"
+                XCTAssertFalse(
+                    !isSafariCacheSpelling && DiscoveryProtectionList.dataDirectoryNames.contains(lowered),
+                    "\(entry.key) 的目录名「\(name)」是个人数据目录"
+                )
+            }
+        }
+    }
+
+    /// 苹果自家的缓存恒「先检查」:守护进程常驻,没有可靠的「在运行」信号;上游把其中不少
+    /// 标成安全,我们一律不自动勾。按目录名判归属(`com.apple.` 前缀,加保护名单里那批不带
+    /// 前缀的守护进程缓存)。例外只有 Safari——浏览器一组同档是 p6 的既有决定,本票不动。
+    func testAppleOwnedEntriesAreNeverAutoSelected() {
+        var offenders: [String] = []
+        var appleNames: [String] = []
+        for entry in AppCacheCatalog.entries {
+            for name in entry.names where DiscoveryProtectionList.isSystemOwned(name: name) {
+                appleNames.append(name)
+                if entry.key != "safari", entry.tier == .safe {
+                    offenders.append("\(entry.key):\(name)")
+                }
+            }
+        }
+        XCTAssertFalse(appleNames.isEmpty, "护栏在空转:知识库里一个苹果的目录名都没有")
+        XCTAssertTrue(AppCacheCatalog.entries.contains { $0.key == "safari" }, "例外里的条目 safari 已不存在,把例外删掉")
+        XCTAssertEqual(offenders, [], "苹果自家的缓存不能进「可安全清理」")
+    }
+
+    /// 票面验收:搬运前被通用发现标「未识别」的样例目录,搬运后按规则表档位出现、不再带
+    /// 「未识别」;苹果的样例搬运前根本不列(通用发现不列苹果自家的),搬运后带着说明出现在
+    /// 「先检查」。名单外的目录,前后都只在通用发现里。
+    func testPortedDirectoriesMoveFromUnidentifiedToRuleTier() async {
+        let samples: [(name: String, tier: CleanSafetyTier, group: JunkGroup)] = [
+            ("ai.perplexity.CometUpdater", .safe, .appCache),
+            ("Yab", .checkFirst, .browserCache),
+            ("com.apple.helpd", .checkFirst, .appCache),
+        ]
+        let unknown = "SomeUnknownTool"
+        let scanned = await trees(cachesNames: samples.map(\.name) + [unknown])
+
+        // 搬运前:规则表里去掉知识库的目录规则,其余规则照旧。
+        let catalogRuleIDs = Set(AppCacheCatalog.rules.map(\.id))
+        let before = JunkMatcher.candidates(
+            in: scanned,
+            rules: JunkRuleTable.builtin.filter { !catalogRuleIDs.contains($0.id) },
+            home: home
+        )
+        let beforeGeneric = GenericDiscovery.detect(
+            in: scanned,
+            home: home,
+            claimedBy: before,
+            excludedPathPrefixes: []
+        )
+        XCTAssertEqual(
+            Set(beforeGeneric.map(\.path)),
+            Set([samples[0].name, samples[1].name, unknown].map { home + "/Library/Caches/" + $0 })
+        )
+        XCTAssertTrue(beforeGeneric.allSatisfy { $0.flags == [.unidentified] && $0.tier == .checkFirst })
+
+        // 搬运后。
+        let after = JunkMatcher.candidates(in: scanned, home: home)
+        let afterGeneric = GenericDiscovery.detect(in: scanned, home: home, claimedBy: after, excludedPathPrefixes: [])
+        XCTAssertEqual(afterGeneric.map(\.path), [home + "/Library/Caches/" + unknown], "样例都被知识库认领,通用发现只剩名单外的")
+        for sample in samples {
+            let candidate = after.first { $0.path == home + "/Library/Caches/" + sample.name }
+            XCTAssertNotNil(candidate, "\(sample.name):搬运后规则表不认它")
+            XCTAssertEqual(candidate?.tier, sample.tier, sample.name)
+            XCTAssertEqual(candidate?.group, sample.group, sample.name)
+            XCTAssertEqual(candidate?.flags, [], "\(sample.name):不再带「未识别」")
         }
     }
 }
