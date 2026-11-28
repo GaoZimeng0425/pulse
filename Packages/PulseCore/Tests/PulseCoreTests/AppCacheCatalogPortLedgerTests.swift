@@ -12,8 +12,6 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         /// 这条说的东西已由这条现有规则担保(安全白名单规则表或项目产物规则表的规则 id);
         /// 名字本身多半不是缓存目录一级名。
         case rule(String)
-        /// 交给后续的票(目前为空:票 10 已落定;以后再有整批交接时可用)。
-        case ticket10
         /// 有意不列(缘由在票 09 的 Comments)。
         case notListed
         /// 别名没证实是缓存目录名;真有那个目录,由通用发现以「先检查」列出。
@@ -675,7 +673,7 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         XCTAssertEqual([byRule, byDiscovery].flatMap { $0.map(\.path) }, [], "不列的目录名被列出来了")
     }
 
-    // MARK: 留给通用发现 / 交给票 10
+    // MARK: 留给通用发现
 
     /// 没证实是缓存目录名的别名:规则表不认领(真有那个目录,通用发现按「先检查」处理)。
     func testUnverifiedAliasesAreNotClaimedByAnyRule() async {
@@ -685,14 +683,5 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         let candidates = await JunkCacheScanFixture.candidates(cachesNames: names)
 
         XCTAssertEqual(candidates.map(\.path), [])
-    }
-
-    /// 交给票 10 的目录名还没进知识库——进了就与账本不符,票 10 搬的时候要连账本一起改。
-    func testTicket10NamesAreNotInCatalogYet() {
-        let catalogNames = Set(AppCacheCatalog.entries.flatMap(\.names))
-
-        for row in fates where row.fate == .ticket10 {
-            XCTAssertFalse(catalogNames.contains(row.name), "上游 \(row.key) 的「\(row.name)」标着交给票 10,却已在知识库里")
-        }
     }
 }

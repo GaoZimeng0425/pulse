@@ -391,8 +391,6 @@ final class JunkRuleTableTests: XCTestCase {
         )
     }
 
-    /// p6-cleaner/01 组序与归属(spec 定案 8):CaseIterable 序即 UI / 总览品类序。
-    /// p7-cleaner/01 在卸载残留之后追加「系统级」「安装包」两组(空组不出段)。
     /// p7-cleaner/10 验收 1:每条规则说明非空、出处注明。开发工具规则没有单独的「重建说明」字段,
     /// 重建办法写在说明那一句里(「清了下次……重新下载」)。
     func testEveryRuleExplainsItselfAndNamesItsSource() {
@@ -431,6 +429,8 @@ final class JunkRuleTableTests: XCTestCase {
         }
     }
 
+    /// p6-cleaner/01 组序与归属(spec 定案 8):CaseIterable 序即 UI / 总览品类序。
+    /// p7-cleaner/01 在卸载残留之后追加「系统级」「安装包」两组(空组不出段)。
     func testGroupOrderAndOwnership() {
         XCTAssertEqual(
             JunkGroup.allCases.map(\.title),

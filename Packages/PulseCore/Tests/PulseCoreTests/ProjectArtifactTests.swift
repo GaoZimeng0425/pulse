@@ -439,12 +439,21 @@ final class ProjectArtifactTests: XCTestCase {
             at: directory.appendingPathComponent("assets.TF"),
             withIntermediateDirectories: false
         )
+        // 两个符号链接:一个悬空,一个指向旁边一个真文件。都不算工程文件(只认普通文件,不跟着链接走)。
+        try Data().write(to: directory.appendingPathComponent("real.txt"))
         try FileManager.default.createSymbolicLink(
-            atPath: directory.appendingPathComponent("link.sln").path,
+            atPath: directory.appendingPathComponent("dangling.sln").path,
             withDestinationPath: "/nonexistent/target.sln"
         )
+        try FileManager.default.createSymbolicLink(
+            atPath: directory.appendingPathComponent("alias.CSPROJ").path,
+            withDestinationPath: directory.appendingPathComponent("real.txt").path
+        )
 
-        XCTAssertEqual(ProjectArtifactMatcher.fileExtensions(ofDirectory: directory.path), ["csproj", "md"])
+        XCTAssertEqual(
+            ProjectArtifactMatcher.fileExtensions(ofDirectory: directory.path),
+            ["csproj", "md", "txt"]
+        )
         XCTAssertEqual(
             ProjectArtifactMatcher.fileExtensions(ofDirectory: directory.appendingPathComponent("missing").path),
             []

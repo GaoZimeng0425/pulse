@@ -258,7 +258,7 @@ final class ProjectArtifactPortLedgerTests: XCTestCase {
     /// 上游有、我们没搬的行 → 缘由。
     private let deferred: [String: String] = [
         "node_modules/.vite": "在 node_modules 里面;匹配器不下潜产物内部,它的字节已算在 node_modules 那一条里",
-        "vendor/bundle": "在 vendor 里面;只有旁边有 Gemfile 才算,而 Gemfile 在再上一级,现有标记表达不了",
+        "vendor/bundle": "产物目录名是 bundle,规则按目录名登记,钉不住「它的上一级必须叫 vendor」;按名字 bundle 认的话任何叫 bundle 的目录都会被扫进来",
     ]
 
     /// 上游的根标记我们**没有**照搬的行 → 缘由。只有这三种,多一种都要在这里登记理由。

@@ -30,7 +30,8 @@ import Foundation
 // `SpaceNode.newestChangeEpoch`)。
 
 /// 项目标记:佐证「这个同名目录真是构建产物」的盘上事实(cleaner-hardening/02)。
-/// 扫描树只留目录节点,标记要现查盘——经 `fileExists` / `fileExtensions` 注入,本文件仍无 IO。
+/// 扫描树只留目录节点,标记要现查盘——经 `fileExists` / `fileExtensions` 注入,匹配本身无 IO;
+/// 本文件唯一的 IO 是生产用的目录清单探测 `ProjectArtifactMatcher.fileExtensions(ofDirectory:)`。
 public enum ArtifactMarker: Sendable, Equatable {
     /// 产物旁边的同级文件(`target` 旁的 `Cargo.toml`;可以带一级子目录,如 `ProjectSettings/ProjectVersion.txt`)。
     case sibling(String)
@@ -588,7 +589,8 @@ public enum ProjectArtifactRuleTable {
     ]
 }
 
-/// 项目产物匹配器:跑在扫描树上(与 04 同一棵树,不二次扫盘)。纯值、无 IO。
+/// 项目产物匹配器:跑在扫描树上(与 04 同一棵树,不二次扫盘)。匹配是纯值:盘上事实一律经闭包注入;
+/// 只有末尾那个生产用的目录清单探测自己列目录。
 public enum ProjectArtifactMatcher {
     /// - Parameters:
     ///   - trees: 扫描产出(`SpaceScanResult.trees`)。

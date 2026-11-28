@@ -894,7 +894,6 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // None
         // 上游这一行是动态的(.gem/specs 加各 Ruby 版本目录下的 cache);只有 .gem/specs 是固定路径
         JunkRule(
             id: "rubygems.downloads",
@@ -964,7 +963,6 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "square.stack.3d.up"
         ),
-        // None
         // 上游还登记了一个文件 .zcompdump;规则只认目录,那个文件很小,不收
         JunkRule(
             id: "zsh.sessions",
@@ -976,7 +974,6 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "terminal"
         ),
-        // None
         // 与上游的差异:上游只列没有任何项目在用的浏览器版本(读各项目的锁文件现算);我们整目录一条、恒先检查
         JunkRule(
             id: "playwright.browsers",
@@ -1066,6 +1063,7 @@ public enum JunkRuleTable {
             symbolName: "swift"
         ),
         // 上游「Go Module Cache」是 medium(要联网重下、缓存里改过的内容会丢);p6 时与构建缓存合成一条 go.caches
+        // 与上游的差异:上游要有「目录里只有模块」的证据才整目录列,否则只列下载子目录;我们整目录一条、恒先检查
         JunkRule(
             id: "go.moduleCache",
             group: .globalToolCache,
