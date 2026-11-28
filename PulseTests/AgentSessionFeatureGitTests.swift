@@ -7,8 +7,8 @@ import XCTest
 // (假注册表 JSON + 假 git reader),时钟用注入的 takenAt,零真 git。
 
 /// 假会话注册表:可变条目集(cwd 集变化测试要在两轮之间加第二个实例)。
-/// @unchecked 前提:entries 只在 NSLock 下读写(onRound 主线程写 / 读同线程,
-/// 锁是给 Sendable 检查器的串行化证明)。
+/// @unchecked 前提:entries 与读计数只在 NSLock 下读写(测试主线程加条目,盘点的
+/// utility 任务读——跨线程,锁即串行化)。
 private final class StubSessionReader: AgentSessionReading, @unchecked Sendable {
     private let lock = NSLock()
     private var entries: [Data]
@@ -29,7 +29,16 @@ private final class StubSessionReader: AgentSessionReading, @unchecked Sendable 
     func claudeRegistryFiles() -> [Data] {
         lock.lock()
         defer { lock.unlock() }
+        reads += 1
         return entries
+    }
+
+    /// 注册表读次数(盘点闸断言点:不可见期不得碰会话文件)。
+    private var reads = 0
+    var registryReads: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return reads
     }
 
     func claudeUsageSnapshotFile() -> Data? {
@@ -44,8 +53,12 @@ private final class StubSessionReader: AgentSessionReading, @unchecked Sendable 
         0
     }
 
-    func zcodeAgentMetadataFiles(lookback: TimeInterval, now: Date) -> [(session: String, data: Data)] {
+    func zcodeAgentMetadataCandidates(lookback: TimeInterval, now: Date) -> [ZCodeMetadataCandidate] {
         []
+    }
+
+    func zcodeAgentMetadata(atPath path: String) -> Data? {
+        nil
     }
 }
 
@@ -211,5 +224,61 @@ final class AgentSessionFeatureGitTests: XCTestCase {
         await settleGit(feature)
         XCTAssertEqual(feature.gitStatuses["/repo"]?.branch, "develop")
         XCTAssertEqual(git.callLog, ["/repo"])
+    }
+
+    // MARK: - 盘点闸(agent-scan-cost)
+
+    /// 等盘点落到 snapshot(detached → MainActor 回跳)。
+    private func settleSnapshot(_ feature: AgentSessionFeature, timeout: TimeInterval = 2) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while feature.snapshot.claudeSessions.isEmpty, Date() < deadline {
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+    }
+
+    func testInvisibleTabNeverReadsSessionFiles() async {
+        let sessions = StubSessionReader()
+        sessions.addEntry(pid: 42, cwd: "/repo")
+        let feature = makeFeature(git: CountingGitReader(), sessions: sessions)
+        feature.visibilityChanged(otherTabVisible)
+        feature.onRound(round(at: t0, pids: [42]))
+        feature.onRound(round(at: t0.addingTimeInterval(6), pids: [42]))
+        await pause()
+        XCTAssertEqual(sessions.registryReads, 0, "智能体页不可见时不得盘点会话文件")
+        XCTAssertTrue(feature.snapshot.claudeSessions.isEmpty)
+    }
+
+    func testOpeningAgentsTabRefreshesWithoutWaitingForNextRound() async {
+        let sessions = StubSessionReader()
+        sessions.addEntry(pid: 42, cwd: "/repo")
+        let feature = makeFeature(git: CountingGitReader(), sessions: sessions)
+        feature.visibilityChanged(otherTabVisible)
+        feature.onRound(round(at: t0, pids: [42]))
+
+        // 打开智能体页:不再来新的一轮,也要用最近一轮的进程表立即盘点上屏。
+        feature.visibilityChanged(agentsVisible)
+        await settleSnapshot(feature)
+        XCTAssertEqual(feature.snapshot.claudeSessions.map(\.pid), [42])
+        XCTAssertEqual(sessions.registryReads, 1)
+    }
+
+    func testAdvancedCatalogIsWrittenBackSoThrottledRoundsSkipIO() async {
+        let sessions = StubSessionReader()
+        sessions.addEntry(pid: 42, cwd: "/repo")
+        let feature = makeFeature(git: CountingGitReader(), sessions: sessions)
+        feature.visibilityChanged(agentsVisible)
+        feature.onRound(round(at: t0, pids: [42]))
+        await settleSnapshot(feature)
+        XCTAssertEqual(sessions.registryReads, 1)
+
+        // +1s 仍在 5s 节流窗内:后台算完的 catalog 若没写回,这里会再读一遍盘。
+        feature.onRound(round(at: t0.addingTimeInterval(1), pids: [42]))
+        await pause()
+        XCTAssertEqual(sessions.registryReads, 1, "节流窗内不得重读会话文件")
+
+        // 进程退出:节流轮照样按存活过滤下榜。
+        feature.onRound(round(at: t0.addingTimeInterval(2), pids: []))
+        await pause()
+        XCTAssertTrue(feature.snapshot.claudeSessions.isEmpty, "退出实例应在一轮内下榜")
     }
 }

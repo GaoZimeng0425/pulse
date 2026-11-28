@@ -111,8 +111,12 @@ final class AgentSessionReaderTests: XCTestCase {
         try write(meta, to: ".zcode/cli/agents/sess_fresh/agent_a/metadata.json", mtime: fresh)
         try write(meta, to: ".zcode/cli/agents/sess_stale/agent_x/metadata.json", mtime: stale)
 
-        let files = reader.zcodeAgentMetadataFiles(lookback: 24 * 3600, now: now)
-        XCTAssertEqual(files.map(\.session), ["sess_fresh"])
-        XCTAssertEqual(ZCodeAgentMetadata.parse(files[0].data)?.totalTokens, 556_100)
+        let candidates = reader.zcodeAgentMetadataCandidates(lookback: 24 * 3600, now: now)
+        XCTAssertEqual(candidates.map(\.session), ["sess_fresh"])
+        // 修改时间按文件真值上报(编排器靠它判增量),内容另按路径读。
+        XCTAssertEqual(candidates[0].modifiedAt.timeIntervalSince1970, fresh.timeIntervalSince1970, accuracy: 0.001)
+        let data = try XCTUnwrap(reader.zcodeAgentMetadata(atPath: candidates[0].path))
+        XCTAssertEqual(ZCodeAgentMetadata.parse(data)?.totalTokens, 556_100)
+        XCTAssertNil(reader.zcodeAgentMetadata(atPath: candidates[0].path + ".gone"))
     }
 }
