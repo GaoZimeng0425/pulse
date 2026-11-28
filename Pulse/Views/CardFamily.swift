@@ -332,12 +332,10 @@ struct CardEmptyState: View {
 
 /// 自适应列数的卡片网格(数据驱动):列数 = 内容宽容纳的最多列(单卡最小宽 +
 /// 列距),夹在 1…上限——比系统 `.adaptive` 多一个**上限**(ultrawide 不出更多列)。
-/// 逐行 HStack 排布,末行不满自动满宽。行内等高**尚未**接入 `EqualHeightRow`:这里的
-/// 弹性框在卡壳外面,底色不跟着拉伸,同排卡只在自然高相同时看着齐。不用 LazyVGrid
+/// 排布交给 `AdaptiveColumnsLayout`:行高取该行最高一张、末行不满自动满宽。行内的
+/// 弹性框在卡壳外面,卡底色不跟着拉伸,同排卡只在自然高相同时看着齐(尚未改成先撑框
+/// 后铺底)。不用 LazyVGrid
 /// (行内不拉齐高度)也不用 GridItem minimum(硬下限,窄容器溢出裁剪)。
-/// 宽度经 `onGeometryChange` 读取(挂外层普通容器——lazy 容器几何不随窗口缩放
-/// 逐帧上报,挂 LazyVGrid 自身列数会算一次就冻住,2026-11-21 用户实报总览六卡
-/// 恒 3 列),只在跨档时改状态,拖拽缩放不逐帧重排。
 /// 数值由调用方按 DESIGN.md 令牌传入(指标页 340·16·3,清理总览 340·12·2)。
 struct AdaptiveCardGrid<Item: Identifiable, Card: View>: View {
     let items: [Item]
@@ -347,9 +345,6 @@ struct AdaptiveCardGrid<Item: Identifiable, Card: View>: View {
     /// 单卡最大宽(nil = 不封顶;现无调用方,参数保留)。
     var maximumCardWidth: CGFloat?
     @ViewBuilder let card: (Item) -> Card
-
-    /// 初值取默认窗宽(880)的档位,首帧即正确;onGeometryChange 随后按实测纠正。
-    @State private var columnCount = 2
 
     init(
         items: [Item],
@@ -368,42 +363,100 @@ struct AdaptiveCardGrid<Item: Identifiable, Card: View>: View {
     }
 
     var body: some View {
-        // 网格参数先取局部(非隔离 transform 闭包不得直引隔离存储属性)。
-        let minimumCardWidth = minimumCardWidth
-        let spacing = spacing
-        let maximumColumns = maximumColumns
-        // 监听宿主 = 外层普通容器(VStack 即网格本体,几何逐帧跟窗口)。
-        return VStack(alignment: .leading, spacing: spacing) {
-            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                HStack(alignment: .top, spacing: spacing) {
-                    ForEach(row) { item in
-                        card(item)
-                            .frame(
-                                maxWidth: maximumCardWidth,
-                                maxHeight: .infinity,
-                                alignment: .topLeading
-                            )
-                    }
-                }
-            }
-        }
-        .onGeometryChange(for: Int.self) { proxy in
-            let perColumn = minimumCardWidth + spacing
-            let fitted = Int((proxy.size.width + spacing) / perColumn)
-            return min(maximumColumns, max(1, fitted))
-        } action: { newValue in
-            if newValue != columnCount {
-                columnCount = newValue
+        AdaptiveColumnsLayout(
+            minimumItemWidth: minimumCardWidth,
+            spacing: spacing,
+            maximumColumns: maximumColumns
+        ) {
+            ForEach(items) { item in
+                card(item)
+                    .frame(maxWidth: maximumCardWidth, maxHeight: .infinity, alignment: .topLeading)
             }
         }
     }
+}
 
-    /// 按列数分行(不足列的末行自动满宽——行内卡 maxWidth ∞ 均分行宽)。
-    private var rows: [[Item]] {
-        guard columnCount > 1 else { return items.map { [$0] } }
-        return stride(from: 0, to: items.count, by: columnCount).map {
-            Array(items[$0 ..< min($0 + columnCount, items.count)])
+/// 按宽度定列数的等高网格(main-window-native-list,2026-11-28):列数 = 提案宽容纳的
+/// 最多列(单项最小宽 + 列距),夹在 1…上限;逐行等高——行高 = 该行各项在列宽下
+/// 不限高时量出的最高值,再把「列宽 × 行高」明确提给每一项(EqualHeightRow 同一机制);
+/// 末行不满时各项变宽铺满。
+/// 为什么是 Layout 而不是「onGeometryChange 量宽 → @State 列数」:原生列表先在离屏按
+/// 列宽量行高、再把内容装进可见行,两处是不同的视图实例,状态式列数各算各的,行高与
+/// 内容对不上;行内 `.frame(maxHeight: .infinity)` 在不限高的量法下更会把整行量成
+/// 天文数字(主窗口接原生列表时总览页实测滚动范围 3.5e13pt)。Layout 由提案宽当场
+/// 决定列数,量高与显示同一结果,拖拽缩放也是逐帧确定。
+struct AdaptiveColumnsLayout: Layout {
+    let minimumItemWidth: CGFloat
+    let spacing: CGFloat
+    let maximumColumns: Int
+
+    /// 同一宽度下的行高(sizeThatFits 算一次,placeSubviews 复用;子视图变了即作废)。
+    struct Cache {
+        var width: CGFloat?
+        var rowHeights: [CGFloat] = []
+    }
+
+    func makeCache(subviews _: Subviews) -> Cache {
+        Cache()
+    }
+
+    func updateCache(_ cache: inout Cache, subviews _: Subviews) {
+        cache = Cache()
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) -> CGSize {
+        // 不给宽(问理想尺寸)时按单列、最宽一项自然宽回答。
+        guard let width = proposal.width else {
+            let width = subviews.map { $0.sizeThatFits(.unspecified).width }.max() ?? 0
+            let heights = subviews.map { $0.sizeThatFits(ProposedViewSize(width: width, height: nil)).height }
+            return CGSize(width: width, height: heights.reduce(0, +) + spacing * CGFloat(max(heights.count - 1, 0)))
         }
+        let heights = rowHeights(width: width, subviews: subviews, cache: &cache)
+        let total = heights.reduce(0, +) + spacing * CGFloat(max(heights.count - 1, 0))
+        return CGSize(width: width, height: total)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal _: ProposedViewSize, subviews: Subviews, cache: inout Cache) {
+        let heights = rowHeights(width: bounds.width, subviews: subviews, cache: &cache)
+        var y = bounds.minY
+        for (row, height) in zip(rows(width: bounds.width, count: subviews.count), heights) {
+            let column = columnWidth(total: bounds.width, count: row.count)
+            for (offset, index) in row.enumerated() {
+                subviews[index].place(
+                    at: CGPoint(x: bounds.minX + CGFloat(offset) * (column + spacing), y: y),
+                    anchor: .topLeading,
+                    proposal: ProposedViewSize(width: column, height: height)
+                )
+            }
+            y += height + spacing
+        }
+    }
+
+    /// 列数:宽能容纳的最多列,夹在 1…上限。
+    func columnCount(width: CGFloat) -> Int {
+        let fitted = Int((width + spacing) / (minimumItemWidth + spacing))
+        return min(maximumColumns, max(1, fitted))
+    }
+
+    private func rows(width: CGFloat, count: Int) -> [Range<Int>] {
+        let columns = columnCount(width: width)
+        return stride(from: 0, to: count, by: columns).map { $0 ..< min($0 + columns, count) }
+    }
+
+    private func rowHeights(width: CGFloat, subviews: Subviews, cache: inout Cache) -> [CGFloat] {
+        if let cached = cache.width, abs(cached - width) < 0.5 {
+            return cache.rowHeights
+        }
+        let heights = rows(width: width, count: subviews.count).map { row in
+            let column = columnWidth(total: width, count: row.count)
+            return row.map { subviews[$0].sizeThatFits(ProposedViewSize(width: column, height: nil)).height }.max() ?? 0
+        }
+        cache = Cache(width: width, rowHeights: heights)
+        return heights
+    }
+
+    private func columnWidth(total: CGFloat, count: Int) -> CGFloat {
+        (total - spacing * CGFloat(max(count - 1, 0))) / CGFloat(max(count, 1))
     }
 }
 

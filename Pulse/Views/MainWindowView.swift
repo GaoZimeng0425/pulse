@@ -67,25 +67,24 @@ struct MainWindowView: View {
 
     var body: some View {
         @Bindable var model = model
-        // 清理页(p4-uninstaller/08 后续):列表区自己滚 + 合计条钉底,
-        // 不进外层页面滚动(嵌套滚动 = 按钮跟着内容滚走,用户实报);
-        // 其余 tab 保持整页滚(卡片流)。
-        let pageContent = VStack(alignment: .leading, spacing: 16) {
-            // 窗口矮时页头 shrink-0(layoutPriority):高度紧张只压缩 tabBody 的弹性区
-            // (清理页地图最小高兜底),页头「清理」标题不再被挤得上移/晃动
-            // (2026-11-09 用户实报两轮:第一轮只保了卡内标题,漏了页头)。
-            // 触发中告警走页头右侧小条(AlertHeaderIndicator,2026-11-16 用户实报
-            // 「横幅在页头下方把内容推下移」)——页头下方不再铺横幅,告警出没内容不动。
-            pageHeader
-                .layoutPriority(1)
-            tabBody
-        }
-        .padding(.horizontal, 24)
         return Group {
             if tabSelection.current == .cleaner {
-                pageContent
+                // 清理页(p4-uninstaller/08 后续):列表区自己滚 + 合计条钉底,
+                // 不进外层页面滚动(嵌套滚动 = 按钮跟着内容滚走,用户实报)。
+                // 窗口矮时页头 shrink-0(layoutPriority):高度紧张只压缩清理页的弹性区
+                // (地图最小高兜底),页头「清理」标题不再被挤得上移/晃动
+                // (2026-11-09 用户实报两轮:第一轮只保了卡内标题,漏了页头)。
+                VStack(alignment: .leading, spacing: 16) {
+                    CleanerPageHeader(model: cleanerModel, alerts: monitor.features.alerts)
+                        .layoutPriority(1)
+                    cleanerBody
+                }
+                .padding(.horizontal, 24)
             } else {
-                ScrollView { pageContent }
+                // 其余 tab 整页滚(卡片流),容器与弹窗同一个原生列表(main-window-native-list,
+                // 2026-11-28 用户拍板「两窗一个列表组件」):只挂可见行,滚动平移已画好的行。
+                // 原 ScrollView + 普通 VStack 让排行上百行全部常驻,真机滚动 ~37%。
+                NativeList(rows: pageRows, resetToken: tabSelection.current, showsVerticalScroller: true)
             }
         }
         .padding(.top, 12)
@@ -202,88 +201,111 @@ struct MainWindowView: View {
         }
     }
 
-    /// 内容头(SHOT1:`Overview` 大标题 + `Apple M1 Max · 10 cores · 64 GB`):统一组件
-    /// `PageHeader` 全尺寸档(popover-header/01)——本机一行**只有总览带**(用户拍板
-    /// 2026-11-02,判据在 PageHeader 单点);清理页的页头(标题 + 扫描状态 + 扫描按钮)
-    /// 由 `CleanerPageHeader` 在同一槽位画,`CleanerTabView` 不再自画标题——每个 tab
-    /// 恰一个标题。
-    @ViewBuilder
-    private var pageHeader: some View {
-        if tabSelection.current == .cleaner {
-            CleanerPageHeader(model: cleanerModel, alerts: monitor.features.alerts)
-        } else {
-            PageHeader(tab: tabSelection.current, style: .full) {
-                AlertHeaderIndicator(center: monitor.features.alerts)
-            }
-        }
-    }
-
-    /// tab 内容:与弹窗共用一份(MetricTabStack),主窗口用全尺寸档;组排行卡
-    /// 带搜索过滤与可排序进程表。
-    @ViewBuilder
-    private var tabBody: some View {
-        @Bindable var model = model
-        // 清理页(p4-cleaner/03):整页自持(按需扫描,无 MonitorFeatures 卡片栈),
-        // 不进 MetricTabStack;弹窗侧不会走到(popoverAxis 已排除)。
-        if tabSelection.current == .cleaner {
-            CleanerTabView(
-                model: cleanerModel,
-                uninstallModel: uninstallModel,
-                pendingCrossPageJunkGroup: $model.pendingCleanerJunkGroup
+    /// 页头 + tab 内容的原生列表行。内容头(SHOT1:`Overview` 大标题 + `Apple M1 Max ·
+    /// 10 cores · 64 GB`)是统一组件 `PageHeader` 全尺寸档(popover-header/01),本机一行
+    /// **只有总览带**(用户拍板 2026-11-02,判据在 PageHeader 单点);触发中告警走页头右侧
+    /// 小条(AlertHeaderIndicator,2026-11-16 用户实报「横幅在页头下方把内容推下移」)。
+    /// 页头随内容一起滚(同原整页滚)。页头 → 首卡 16 = 页头底 8 + 首卡上半间距 8。
+    private var pageRows: [NativeListRow] {
+        let tab = tabSelection.current
+        let alerts = monitor.features.alerts
+        let header = NativeListRow(kind: "page-header", height: .measured(key: "page-header-\(tab)")) {
+            AnyView(
+                PageHeader(tab: tab, style: .full) {
+                    AlertHeaderIndicator(center: alerts)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 8)
             )
-            // flex:1(用户拍板 2026-11-05):title 顶格,content 吃满剩余——
-            // 沿链路逐层传 .infinity,任何一层断了整列回退「按内容自适应」。
-            .frame(maxHeight: .infinity)
-        } else {
-            MetricTabStack(
-                tab: tabSelection.current,
-                isCompact: false,
-                monitor: monitor,
-                model: model,
-                cleanerModel: cleanerModel,
-                content: content,
-                onSelectTab: { tabSelection.current = $0 },
-                overflowPolicy: .expandInPlace
-            ) {
-                rankingCard
-            }
         }
+        return [header] + tabRows
     }
 
-    /// 排行卡:全部组;搜索生效时换成过滤后的组(无命中 → 卡内专用空态,与首轮
-    /// 空载区分开);点行展开主窗口版进程表(表头可排序)。
-    /// meter 归一榜首仍取全榜单(content 口径),过滤不改变条的相对读数。
+    /// tab 内容:卡片序列与弹窗同一份(MetricTabStack.blocks),拼行同一份
+    /// (MetricTabNativeRows);主窗口用全尺寸档、卡间距 16、页边 24,组排行带搜索过滤、
+    /// 原地展开截断与可排序进程表。
     /// 截断(ranking-limit/01,与弹窗同规则):只列前 20,末行「显示全部」原地展开;
-    /// 搜索命中不截——过滤本身已经收窄。
-    private var rankingCard: some View {
+    /// 搜索命中不截——过滤本身已经收窄。meter 归一榜首仍取全榜单(content 口径),
+    /// 过滤不改变条的相对读数。
+    private var tabRows: [NativeListRow] {
+        let tab = tabSelection.current
+        let stack = MetricTabStack(
+            tab: tab,
+            isCompact: false,
+            monitor: monitor,
+            model: model,
+            cleanerModel: cleanerModel,
+            content: content,
+            onSelectTab: { tabSelection.current = $0 },
+            overflowPolicy: .expandInPlace
+        ) { EmptyView() }
         let filter = searchFilter
-        let rankingID = MetricTabBlockBuilder.groupRankingID(for: tabSelection.current)
-        return RankingCardView(
-            groups: filter.isActive ? displayGroups : content.ranking,
-            metric: content.metric,
-            cpuLeader: content.cpuLeader,
-            memoryLeaderBytes: content.memoryLeaderBytes,
-            expandedGroupIDs: model.expandedGroupIDs,
-            emptyMessage: filter.isActive
-                ? RankingEmptyMessage(
-                    title: "没有匹配“\(filter.normalized)”的结果",
-                    detail: "试试应用名的片段,或输入纯数字按 PID 前缀搜"
-                )
-                : RankingEmptyMessage(title: "暂无活动组", detail: "首轮采样尚未完成,或系统极端空闲"),
-            overflow: filter.isActive ? nil : RankingOverflowPolicy.expandInPlace.action(for: rankingID, model: model),
-            onToggle: model.toggleExpansion(of:),
-            onEndGroup: model.requestEndGroup
-        ) { group in
-            if let drilldown = monitor.drilldown {
-                SortableProcessTableView(
-                    group: group,
-                    drilldown: drilldown,
-                    searchFilter: filter,
-                    selectedProcessID: $model.selectedProcessID,
-                    onEndProcess: model.requestEndProcess
-                )
-            }
-        }
+        let content = content
+        let model = model
+        let drilldown = monitor.drilldown
+        return MetricTabNativeRows(
+            blocks: stack.blocks,
+            isCompact: false,
+            groupRanking: GroupRankingRowsSpec(
+                groups: filter.isActive ? displayGroups : content.ranking,
+                metric: content.metric,
+                cpuLeader: content.cpuLeader,
+                memoryLeaderBytes: content.memoryLeaderBytes,
+                expandedGroupIDs: model.expandedGroupIDs,
+                emptyMessage: filter.isActive
+                    ? RankingEmptyMessage(
+                        title: "没有匹配“\(filter.normalized)”的结果",
+                        detail: "试试应用名的片段,或输入纯数字按 PID 前缀搜"
+                    )
+                    : RankingEmptyMessage(title: "暂无活动组", detail: "首轮采样尚未完成,或系统极端空闲"),
+                overflow: filter.isActive
+                    ? nil
+                    : RankingOverflowPolicy.expandInPlace.action(
+                        for: MetricTabBlockBuilder.groupRankingID(for: tab), model: model
+                    ),
+                onToggle: model.toggleExpansion(of:),
+                onEndGroup: model.requestEndGroup,
+                expandedContent: { group in
+                    AnyView(Group {
+                        if let drilldown {
+                            SortableProcessTableView(
+                                group: group,
+                                drilldown: drilldown,
+                                searchFilter: filter,
+                                selectedProcessID: Binding(
+                                    get: { model.selectedProcessID },
+                                    set: { model.selectedProcessID = $0 }
+                                ),
+                                onEndProcess: model.requestEndProcess
+                            )
+                            // 展开的组共用一种复用行:按组定身份,排序等表内 @State 不串到
+                            // 别的组(评审 MEDIUM)。
+                            .id(group.id)
+                        }
+                    })
+                }
+            ),
+            moduleOverflow: { RankingOverflowPolicy.expandInPlace.action(for: $0, model: model) },
+            halfGap: 8,
+            horizontalInset: 24,
+            trimsTrailingGap: true
+        ).rows
+    }
+
+    /// 清理页(p4-cleaner/03):整页自持(按需扫描,无 MonitorFeatures 卡片栈),不进
+    /// MetricTabStack;弹窗侧不会走到(popoverAxis 已排除)。页头 `CleanerPageHeader`
+    /// (标题 + 扫描状态 + 扫描按钮)在同一槽位画,`CleanerTabView` 不再自画标题。
+    private var cleanerBody: some View {
+        @Bindable var model = model
+        return CleanerTabView(
+            model: cleanerModel,
+            uninstallModel: uninstallModel,
+            pendingCrossPageJunkGroup: $model.pendingCleanerJunkGroup
+        )
+        // flex:1(用户拍板 2026-11-05):title 顶格,content 吃满剩余——
+        // 沿链路逐层传 .infinity,任何一层断了整列回退「按内容自适应」。
+        .frame(maxHeight: .infinity)
     }
 }
 
@@ -375,7 +397,9 @@ struct SortableProcessTableView: View {
         let cpuLeader = Leaderboard.leader(rows, by: \.cpuPercent)
         VStack(spacing: 0) {
             tableHeader
-            LazyVStack(spacing: 0) {
+            // 普通堆叠:本表装在原生列表的自量行里,惰性容器在「高度无上限」的量法下
+            // 报不准(DESIGN.md 排行列表条;弹窗下钻同理)。
+            VStack(spacing: 0) {
                 ForEach(rows) { row in
                     ProcessRowView(
                         row: row,

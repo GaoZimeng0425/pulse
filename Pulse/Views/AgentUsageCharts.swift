@@ -223,8 +223,19 @@ struct AgentHeatWall: View {
     /// nil = 随容器宽等比缩放、不滚动。
     var fixedCellSide: CGFloat?
 
-    /// 可视宽(容器宽;不滚动时就是墙宽)。
-    @State private var width: CGFloat = 640
+    /// 容器宽由宿主直接给(main-window-native-list):主窗口原生列表里,量高的离屏实例与
+    /// 可见行是两个实例,「量宽 → @State」各算各的,格边长(= 卡高)对不上;宿主确定地
+    /// 知道卡宽就传进来。nil = 退回自己量(定边长的弹窗不看它)。
+    var containerWidth: CGFloat?
+
+    /// 自己量到的可视宽(容器宽;不滚动时就是墙宽)。
+    @State private var measuredWidth: CGFloat = 640
+
+    /// 可视宽:宿主给的优先。
+    private var width: CGFloat {
+        containerWidth ?? measuredWidth
+    }
+
     /// 横向滚动偏移(只在定边长时非 0;浮层锚点据此从墙坐标换到可视坐标)。
     @State private var scrollOffset: CGFloat = 0
     /// 悬停命中:按天 = 天序号;按周 = 列序号。
@@ -299,8 +310,8 @@ struct AgentHeatWall: View {
         }
         .frame(height: gridHeight + AgentChartAxis.height)
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { newValue in
-            if abs(newValue - width) > 0.5 {
-                width = newValue
+            if abs(newValue - measuredWidth) > 0.5 {
+                measuredWidth = newValue
             }
         }
         // 悬停下标两档含义不同(天序号 / 列序号),切档必须清,否则按旧义错位命中。

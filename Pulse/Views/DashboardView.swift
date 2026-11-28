@@ -120,8 +120,8 @@ struct DashboardView: View {
         }
     }
 
-    /// 原生列表的行(native-list):卡片一卡一行,排行拆成卡头 / 每行 / 卡尾。卡片序列
-    /// 与 SwiftUI 宿主同出 MetricTabStack.blocks。
+    /// 原生列表的行(native-list):拼装逻辑与主窗口同一份(MetricTabNativeRows),
+    /// 弹窗只给紧凑档、卡间距 8、全部组 + 简版下钻、「查看全部」跳主窗口。
     private var nativeRows: [NativeListRow] {
         let stack = MetricTabStack(
             tab: tabSelection.current,
@@ -133,85 +133,29 @@ struct DashboardView: View {
             onSelectTab: { tabSelection.current = $0 },
             overflowPolicy: overflowPolicy
         ) { EmptyView() }
-        return stack.blocks.flatMap { block -> [NativeListRow] in
-            switch block.kind {
-            case let .card(view):
-                // 卡外 8pt 间距 = 上下各 4 透明边(原生列表无行内距)。
-                [NativeListRow(kind: block.id, height: .measured(key: block.id)) {
-                    AnyView(view.padding(.vertical, 4))
-                }]
-            case .groupRanking:
-                groupRankingRows(id: block.id)
-            case let .moduleRanking(spec):
-                moduleRankingRows(id: block.id, spec: spec)
-            }
-        }
-    }
-
-    /// 组排行逐行:组行同高(按 kind 量一次),展开的组连同下钻自量。
-    private func groupRankingRows(id: String) -> [NativeListRow] {
         let content = content
-        let header = RankingListHeader(
-            title: GroupRankingStyle.title,
-            accent: GroupRankingStyle.accent(content.metric),
-            valueLabel: GroupRankingStyle.valueLabel(content.metric),
+        let model = model
+        let policy = overflowPolicy
+        return MetricTabNativeRows(
+            blocks: stack.blocks,
             isCompact: true,
-            isEmpty: content.ranking.isEmpty,
-            emptyMessage: RankingEmptyMessage(title: "暂无活动组", detail: "首轮采样尚未完成,或系统极端空闲")
-        )
-        var rows = [NativeListRow(kind: "\(id)-header", height: .measured(key: "\(id)-header-\(header.isEmpty)")) {
-            AnyView(RankingListSlices.Header(content: header, isCompact: true))
-        }]
-        for group in content.ranking.prefix(RankingOverflow.limit) {
-            let isExpanded = model.expandedGroupIDs.contains(group.id)
-            let cell = RankingGroupCell(
-                group: group,
+            groupRanking: GroupRankingRowsSpec(
+                groups: content.ranking,
                 metric: content.metric,
-                meterFraction: GroupRankingStyle.meterFraction(
-                    group, metric: content.metric,
-                    cpuLeader: content.cpuLeader, memoryLeaderBytes: content.memoryLeaderBytes
+                cpuLeader: content.cpuLeader,
+                memoryLeaderBytes: content.memoryLeaderBytes,
+                expandedGroupIDs: model.expandedGroupIDs,
+                emptyMessage: RankingEmptyMessage(title: "暂无活动组", detail: "首轮采样尚未完成,或系统极端空闲"),
+                overflow: policy.action(
+                    for: MetricTabBlockBuilder.groupRankingID(for: tabSelection.current), model: model
                 ),
-                isExpanded: isExpanded,
-                isCompact: true,
-                onToggle: { model.toggleExpansion(of: group.id) },
-                onEndGroup: { model.requestEndGroup(group) },
-                expandedContent: { drilldown(for: group) }
-            )
-            rows.append(isExpanded
-                ? NativeListRow(kind: "\(id)-row-expanded", height: .measured(key: "\(id)-x-\(group.id)")) {
-                    AnyView(cell.rankingRowSlice(compact: true))
-                }
-                : NativeListRow(kind: "\(id)-row", height: .uniform) {
-                    AnyView(cell.rankingRowSlice(compact: true))
-                })
-        }
-        rows += showAllRows(id: id, total: content.ranking.count)
-        rows.append(NativeListRow(kind: "\(id)-footer", height: .measured(key: "\(id)-footer")) {
-            AnyView(RankingListSlices.Footer(footnote: nil, isCompact: true))
-        })
-        return rows
-    }
-
-    /// 模块排行逐行(只读,行同高)。
-    private func moduleRankingRows(id: String, spec: ModuleRankingSpec) -> [NativeListRow] {
-        let header = RankingListHeader(
-            title: spec.title, accent: spec.accent, valueLabel: spec.valueLabel,
-            isCompact: true, isEmpty: spec.rows.isEmpty, emptyMessage: spec.resolvedEmptyMessage
-        )
-        var rows = [NativeListRow(kind: "\(id)-header", height: .measured(key: "\(id)-header-\(header.isEmpty)")) {
-            AnyView(RankingListSlices.Header(content: header, isCompact: true))
-        }]
-        rows += spec.rows.prefix(RankingOverflow.limit).map { row in
-            NativeListRow(kind: "\(id)-row", height: .uniform) {
-                AnyView(ModuleRankingRowView(row: row, accent: spec.accent, isCompact: true)
-                    .rankingRowSlice(compact: true))
-            }
-        }
-        rows += showAllRows(id: id, total: spec.rows.count)
-        rows.append(NativeListRow(kind: "\(id)-footer", height: .measured(key: "\(id)-footer")) {
-            AnyView(RankingListSlices.Footer(footnote: spec.cadenceNote, isCompact: true))
-        })
-        return rows
+                onToggle: model.toggleExpansion(of:),
+                onEndGroup: model.requestEndGroup,
+                expandedContent: { AnyView(drilldown(for: $0)) }
+            ),
+            moduleOverflow: { policy.action(for: $0, model: model) },
+            halfGap: 4
+        ).rows
     }
 
     /// 弹窗的排行溢出策略:「查看全部」跳主窗口并带上卡 id,主窗口落地即展开该卡
@@ -219,18 +163,6 @@ struct DashboardView: View {
     private var overflowPolicy: RankingOverflowPolicy {
         let tab = tabSelection.current
         return .jumpToMainWindow { rankingID in Self.openMainWindow(tab: tab, rankingID: rankingID) }
-    }
-
-    /// 超出前 20 名时补一行「查看全部」(原生列表逐行拼装;整卡形态由 RankingListCard 自画)。
-    private func showAllRows(id: String, total: Int) -> [NativeListRow] {
-        guard let rowModel = RankingOverflow.rowModel(
-            total: total,
-            action: overflowPolicy.action(for: id, model: model)
-        )
-        else { return [] }
-        return [NativeListRow(kind: "\(id)-show-all", height: .uniform) {
-            AnyView(RankingOverflowRow(model: rowModel, isCompact: true).rankingRowSlice(compact: true))
-        }]
     }
 
     /// 开主窗口:先激活再开窗(历史:LSUIElement 时代开窗不抢前台会开在别的 app 后面;

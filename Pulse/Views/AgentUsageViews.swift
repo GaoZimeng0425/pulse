@@ -62,10 +62,21 @@ struct AgentUsagePaneView: View {
     @State private var expandedProjects: Set<String> = []
     /// 项目超过上限时是否列出全部(切 7/30 保持;重进子页回默认收起)。
     @State private var projectsExpanded = false
-    /// 走势 | 日历的列数(按内容宽 ≥ 断点判定;弹窗恒 1)。
-    @State private var chartColumns = 1
+    /// 内容宽(原生列表行宽扣掉页边,main-window-native-list):走势 | 日历按它当场定
+    /// 列数与日历高。不再「onGeometryChange 量宽 → @State」——原生列表离屏量高的实例
+    /// 与可见行是两个实例,状态各算各的,宽窗下行高与内容对不上。不在原生列表里 = nil
+    /// → 按单列。
+    @Environment(\.listContentWidth) private var contentWidth
+
     /// 走势 | 日历这一行的内容宽(并排时据此算日历高,走势跟它同高)。
-    @State private var chartRowWidth: CGFloat = 0
+    private var chartRowWidth: CGFloat {
+        contentWidth ?? 0
+    }
+
+    /// 走势 | 日历的列数(按内容宽 ≥ 断点判定;弹窗恒 1)。
+    private var chartColumns: Int {
+        !isCompact && chartRowWidth >= Self.chartTwoColumnMinWidth ? 2 : 1
+    }
 
     private var cardSpacing: CGFloat {
         isCompact ? 8 : 16
@@ -115,35 +126,31 @@ struct AgentUsagePaneView: View {
 
     // MARK: 卡 2 / 3:走势 | 日历
 
+    @ViewBuilder
     private var chartRow: some View {
-        // 断点先取局部(非隔离的几何闭包不得直引 actor 隔离的 static)。
-        let minWidth = Self.chartTwoColumnMinWidth
-        let compact = isCompact
-        return Group {
-            if chartColumns == 2 {
-                // 等高靠 `EqualHeightRow`(行高 = 两卡自然高的较大者,卡底铺到行底);
-                // 只在并排时让卡撑高——弹窗量高是「高度无上限」,弹性高会被量成天文数字。
-                EqualHeightRow(spacing: cardSpacing) {
-                    trendCard(fillsHeight: true)
-                    calendarCard(fillsHeight: true)
-                }
-            } else {
-                VStack(alignment: .leading, spacing: cardSpacing) {
-                    trendCard(fillsHeight: false)
-                        .zIndex(1)
-                    calendarCard(fillsHeight: false)
-                }
+        if chartColumns == 2 {
+            // 等高靠 `EqualHeightRow`(行高 = 两卡自然高的较大者,卡底铺到行底);
+            // 只在并排时让卡撑高——弹窗量高是「高度无上限」,弹性高会被量成天文数字。
+            EqualHeightRow(spacing: cardSpacing) {
+                trendCard(fillsHeight: true)
+                calendarCard(fillsHeight: true)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: cardSpacing) {
+                trendCard(fillsHeight: false)
+                    .zIndex(1)
+                calendarCard(fillsHeight: false)
             }
         }
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
-            let columns = !compact && width >= minWidth ? 2 : 1
-            if columns != chartColumns {
-                chartColumns = columns
-            }
-            if abs(width - chartRowWidth) > 0.5 {
-                chartRowWidth = width
-            }
-        }
+    }
+
+    /// 日历墙宽 = 日历卡宽 − 两侧卡内距;卡宽并排时取半行(同 `trendHeightForLayout`)。
+    /// 不知道内容宽(不在原生列表里)时 nil,墙自己量。
+    private var heatWallWidth: CGFloat? {
+        guard !isCompact, let contentWidth else { return nil }
+        let padding = CardMetrics.padding(compact: false)
+        let cardWidth = chartColumns == 2 ? (contentWidth - cardSpacing) / 2 : contentWidth
+        return max(cardWidth - padding * 2, 0)
     }
 
     /// 走势整体高:弹窗 / 上下排取定高;并排时取日历在半宽下的高(格墙 + 月份轴带),
@@ -212,7 +219,8 @@ struct AgentUsagePaneView: View {
             AgentHeatWall(
                 totals: totals,
                 granularity: heatGranularity,
-                fixedCellSide: isCompact ? Self.compactHeatCellSide : nil
+                fixedCellSide: isCompact ? Self.compactHeatCellSide : nil,
+                containerWidth: heatWallWidth
             )
             .frame(maxHeight: fillsHeight ? .infinity : nil)
             .zIndex(1)

@@ -481,45 +481,21 @@ private struct OverviewCardItem: Identifiable {
 /// 两卡一组(主窗口):内容宽容纳两列(DESIGN.md
 /// `{layout.card-pair-two-column-min-width}`)→ 并排**等高**(行内每卡
 /// `.frame(maxHeight: .infinity)` 顶对齐,短卡背景铺满行高,agent 页同行等高
-/// 同款机制),否则上下排。宽度监听挂外层普通容器(lazy 容器几何不随窗口缩放
-/// 逐帧上报,同 AdaptiveCardGrid 注释)。用户拍板 2026-11-21。
+/// 同款机制),否则上下排。用户拍板 2026-11-21。排布交给 `AdaptiveColumnsLayout`
+/// (单卡最小宽 340 + 列距 16、最多 2 列 = 断点 696):宽度当场定排法,不经状态——
+/// 原生列表离屏量高与可见行显示同一结果(main-window-native-list)。
 private struct AdaptiveCardPair<A: View, B: View>: View {
     @ViewBuilder let first: () -> A
     @ViewBuilder let second: () -> B
 
-    /// 初值 false(上下排,窄安全侧):首帧任何窗口都不溢出,量宽后再并排
-    /// (agent 项目网格初值 1 列同哲学)。
-    @State private var isTwoColumns = false
-
     var body: some View {
-        // 断点常量先取局部(非隔离 transform 闭包不得直引隔离计算属性)。
-        let pairTwoColumnMinWidth = twoColumnMinWidth
-        return Group {
-            if isTwoColumns {
-                HStack(alignment: .top, spacing: AdaptiveCardGridMetrics.spacing) {
-                    first().frame(maxHeight: .infinity, alignment: .top)
-                    second().frame(maxHeight: .infinity, alignment: .top)
-                }
-            } else {
-                VStack(alignment: .leading, spacing: AdaptiveCardGridMetrics.spacing) {
-                    first()
-                    second()
-                }
-            }
+        AdaptiveColumnsLayout(
+            minimumItemWidth: AdaptiveCardGridMetrics.minimumCardWidth,
+            spacing: AdaptiveCardGridMetrics.spacing,
+            maximumColumns: 2
+        ) {
+            first().frame(maxHeight: .infinity, alignment: .top)
+            second().frame(maxHeight: .infinity, alignment: .top)
         }
-        .onGeometryChange(for: Bool.self) { proxy in
-            proxy.size.width >= pairTwoColumnMinWidth
-        } action: { newValue in
-            if newValue != isTwoColumns {
-                isTwoColumns = newValue
-            }
-        }
-    }
-
-    /// 并排断点(DESIGN.md `{layout.card-pair-two-column-min-width}` 696
-    /// = 单卡最小宽 ×2 + 列距,与总览网格两列同档;泛型 struct 不支持 static
-    /// 存储属性,计算属性承载)。
-    private var twoColumnMinWidth: CGFloat {
-        AdaptiveCardGridMetrics.minimumCardWidth * 2 + AdaptiveCardGridMetrics.spacing
     }
 }

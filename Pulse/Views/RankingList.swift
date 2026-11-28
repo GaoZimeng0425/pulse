@@ -263,26 +263,29 @@ enum RankingListSlices {
     struct Header: View {
         let content: RankingListHeader
         let isCompact: Bool
+        /// 卡外间距的一半(弹窗卡间距 8 → 4;主窗口 16 → 8,main-window-native-list)。
+        var outerGap: CGFloat = 4
 
         var body: some View {
             content
                 .padding([.top, .horizontal], CardMetrics.padding(compact: isCompact))
                 .padding(.bottom, 2)
                 .cardSlice(.top, compact: isCompact)
-                .padding(.top, 4)
+                .padding(.top, outerGap)
         }
     }
 
     struct Footer: View {
         let footnote: String?
         let isCompact: Bool
+        var outerGap: CGFloat = 4
 
         var body: some View {
             // 无注脚时卡尾只剩下内距(VStack 包住,空内容也要占出这一段)。
             VStack(alignment: .leading, spacing: 0) { RankingListFootnote(text: footnote) }
                 .padding([.bottom, .horizontal], CardMetrics.padding(compact: isCompact))
                 .cardSlice(.bottom, compact: isCompact)
-                .padding(.bottom, 4)
+                .padding(.bottom, outerGap)
         }
     }
 }
