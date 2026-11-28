@@ -393,6 +393,44 @@ final class JunkRuleTableTests: XCTestCase {
 
     /// p6-cleaner/01 组序与归属(spec 定案 8):CaseIterable 序即 UI / 总览品类序。
     /// p7-cleaner/01 在卸载残留之后追加「系统级」「安装包」两组(空组不出段)。
+    /// p7-cleaner/10 验收 1:每条规则说明非空、出处注明。开发工具规则没有单独的「重建说明」字段,
+    /// 重建办法写在说明那一句里(「清了下次……重新下载」)。
+    func testEveryRuleExplainsItselfAndNamesItsSource() {
+        for rule in JunkRuleTable.builtin {
+            XCTAssertFalse(rule.rationale.isEmpty, "\(rule.id):说明非空")
+            XCTAssertFalse(rule.source.isEmpty, "\(rule.id):出处非空")
+            XCTAssertTrue(
+                rule.source.contains("MIT") || rule.source.contains("Pulse 自定"),
+                "\(rule.id):出处要么标 MIT 来源,要么标 Pulse 自定,现在是「\(rule.source)」"
+            )
+        }
+    }
+
+    /// com.apple.* 的缓存不自动勾(票 09 给应用缓存定的规矩;这里覆盖**整张规则表**——开发工具、
+    /// 固定路径、知识库、AI 模型)。常驻的进程没有可靠的「在运行」信号。例外只有 Safari 的缓存
+    /// (浏览器一组同档,p6 的既有决定)。按模式最后一段的目录名判归属,与保护名单同一个判法。
+    func testAppleOwnedCachesAreNeverAutoSelectedAcrossTheWholeTable() {
+        var appleRules: [String] = []
+        var offenders: [String] = []
+        for rule in JunkRuleTable.builtin {
+            let leafNames = rule.patterns.compactMap { pattern -> String? in
+                guard let last = pattern.components.last, case let .literal(name) = last else { return nil }
+                return name
+            }
+            guard leafNames.contains(where: DiscoveryProtectionList.isSystemOwned(name:)) else { continue }
+            appleRules.append(rule.id)
+            if rule.id != "browser.safari", rule.tier == .safe {
+                offenders.append(rule.id)
+            }
+        }
+        XCTAssertGreaterThan(appleRules.count, 10, "护栏在空转")
+        XCTAssertTrue(JunkRuleTable.builtin.contains { $0.id == "browser.safari" }, "例外里的条目 browser.safari 已不存在,把例外删掉")
+        XCTAssertEqual(offenders, [], "苹果自家的缓存不能进「可安全清理」")
+        for id in ["xcode.caches", "apple.pythonCache", "simulator.runtimeCache", "xcode.deviceSoftwareService"] {
+            XCTAssertEqual(JunkRuleTable.rule(id: id)?.tier, .checkFirst, id)
+        }
+    }
+
     func testGroupOrderAndOwnership() {
         XCTAssertEqual(
             JunkGroup.allCases.map(\.title),

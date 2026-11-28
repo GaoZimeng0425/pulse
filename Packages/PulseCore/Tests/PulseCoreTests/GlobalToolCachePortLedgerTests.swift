@@ -100,7 +100,7 @@ final class GlobalToolCachePortLedgerTests: XCTestCase {
         ("Bazel Cache", "medium", "bazel.cache", [".cache/bazel"]),
         ("Swift Package Cache", "safe", "swiftpm.cache", ["Library/Caches/org.swift.swiftpm", ".swiftpm/cache"]),
         ("Android Build Cache", "safe", "android.buildCache", [".android/cache", ".android/build-cache"]),
-        ("Docker Desktop", "medium", nil, []),
+        ("Docker Desktop", "medium", "docker.desktopData", []),
         (
             "VS Code Cache",
             "safe",
@@ -117,9 +117,9 @@ final class GlobalToolCachePortLedgerTests: XCTestCase {
             "cursor.cache",
             ["Library/Application Support/Cursor/Cache", "Library/Application Support/Cursor/CachedData"]
         ),
-        ("JetBrains Cache", "safe", nil, []),
+        ("JetBrains Cache", "safe", "jetbrains.caches", []),
         ("Zed Cache", "safe", "zed.caches", ["Library/Caches/Zed"]),
-        ("GoModuleCacheScanPolicy.label", "medium", nil, []),
+        ("GoModuleCacheScanPolicy.label", "medium", "go.moduleCache", []),
         ("Go Build Cache", "safe", "go.buildCache", ["Library/Caches/go-build", ".cache/go-build"]),
         ("Maven Cache", "medium", "maven.repository", [".m2/repository"]),
         ("SBT Cache", "medium", "sbt.ivyCache", [".ivy2/cache"]),
@@ -152,6 +152,48 @@ final class GlobalToolCachePortLedgerTests: XCTestCase {
         "Library/Containers/com.docker.docker": "只取它的 Data 子目录(镜像 / 容器 / 卷所在),不动容器根下 Docker 自己的设置文件",
     ]
 
+    /// 我们规则里**不是**上游全局缓存定义里的路径 → 缘由。账本正着查「上游的路径都在规则里」,
+    /// 反着查「规则里的路径都在上游、或在这里登记过」——两头都对上,才没有来历不明的路径。
+    private let pulseAdded: [String: String] = [
+        "Library/Caches/CocoaPods": "p6 自加:说明库 cocoapods-cache 条目登记的目录名(上游的全局缓存定义里是 .cocoapods/repos)",
+        "Library/Caches/Code": "说明库 vscode 条目登记的目录名(缓存目录一级)",
+        "Library/Caches/Cursor": "说明库 cursor 条目登记的目录名(缓存目录一级)",
+        "Library/Caches/Cypress": "说明库 cypress-cache 条目登记的目录名",
+        "Library/Caches/JetBrains": "上游 JetBrains 一行的根目录(上游逐个 IDE 子目录列、剔掉 LocalHistory;我们整目录一条)",
+        "Library/Caches/bun": "本机实测:新版 Bun 把包缓存放在这里",
+        "Library/Caches/com.apple.dt.Xcode.ITunesSoftwareService": "说明库 xcode-itunes-service 条目登记的目录名",
+        "Library/Caches/com.apple.iphonesimulator": "说明库 simulator-cache 条目登记的目录名",
+        "Library/Caches/com.apple.python": "说明库 apple-python-cache 条目登记的目录名",
+        "Library/Caches/com.google.android.studio": "说明库 android-studio 条目登记的目录名",
+        "Library/Caches/electron": "p4 自加(说明库 electron 条目):Electron 预编译二进制",
+        "Library/Caches/electron-builder": "p4 自加:打包器缓存",
+        "Library/Caches/mise": "说明库 mise-cache 条目登记的目录名",
+        "Library/Caches/ms-playwright": "说明库 ms-playwright 条目的 key 就是目录名",
+        "Library/Caches/ms-playwright-go": "说明库 ms-playwright 条目登记的别名(Go 版)",
+        "Library/Caches/node-gyp": "p4 自加(说明库 node-gyp-headers 条目):头文件缓存",
+        "Library/Caches/pnpm": "Pulse 自定(p6):pnpm 的注册表元数据缓存,2026-11-09 本机真案",
+        "Library/Caches/prisma-nodejs": "说明库 prisma-nodejs 条目登记的目录名",
+        "Library/Caches/pulse-swiftpm": "Pulse 自定:本机构建用的 SwiftPM 包缓存",
+        "Library/Caches/rtx": "同上(Mise 的旧名)",
+        "Library/Caches/typescript": "说明库 typescript-type-cache 条目登记的目录名",
+        "Library/Caches/zed": "上游登记的是 Library/Caches/Zed;Zed 实际用小写,两种写法都登记",
+        "Library/Containers/com.docker.docker/Data": "上游是整容器目录;我们只取 Data 子目录",
+        "Library/Logs": "上游的「应用日志」扫描(说明库 applogs 条目),不在全局缓存定义里",
+        "go/pkg/mod": "上游 Go Module Cache 的默认根目录(上游按环境现算,这是默认值)",
+    ]
+
+    /// 全字面的家目录相对路径;带后缀分量的模式不算(Xcode 的 `< DeviceSupport>`)。
+    private func literalPaths(of rule: JunkRule) -> [String] {
+        rule.patterns.compactMap { pattern in
+            var parts: [String] = []
+            for component in pattern.components {
+                guard case let .literal(name) = component else { return nil }
+                parts.append(name)
+            }
+            return parts.joined(separator: "/")
+        }
+    }
+
     private func rule(_ id: String) -> JunkRule? {
         JunkRuleTable.rule(id: id)
     }
@@ -180,7 +222,7 @@ final class GlobalToolCachePortLedgerTests: XCTestCase {
         let labels = ledger.map(\.label)
         XCTAssertEqual(Set(labels).count, labels.count, "上游标签在账本里重复")
         XCTAssertEqual(ledger.count, 63, "上游全局缓存定义的条数(提交 ceacaf8)")
-        XCTAssertEqual(ledger.filter { $0.rule == nil }.count, 5, "不按固定路径搬的条数")
+        XCTAssertEqual(ledger.filter { $0.rule == nil }.count, 2, "不按固定路径搬的条数")
         XCTAssertEqual(ledger.filter { $0.rule != nil }.flatMap(\.paths).count, 96, "由规则担保的路径数")
         XCTAssertEqual(
             ledger.filter { $0.rule != nil }.flatMap(\.paths).filter { $0 != ".gem/specs" }.count + notCovered.count,
@@ -208,6 +250,29 @@ final class GlobalToolCachePortLedgerTests: XCTestCase {
                 XCTAssertEqual(rule.tier, .checkFirst, "上游标 medium 的 \(id) 不能是 safe")
             }
         }
+    }
+
+    /// 反查:由账本担保的规则,每个不是上游登记的路径都在 `pulseAdded` 里登记过缘由;登记了的都还在用、
+    /// 且确实不是上游登记的——名单不许烂在这里。
+    func testEveryPathOfOurOwnIsRegistered() {
+        var upstream = Set(ledger.filter { $0.rule != nil }.flatMap(\.paths))
+        upstream.formUnion(notCovered.keys)
+        // 两张表里的每一条规则都在范围内:账本点名的、说明库里登记的、Pulse 自加的。
+        var ours = Set<String>()
+        for rule in JunkRuleTable.globalToolCacheRules + JunkRuleTable.appCacheFixedRules {
+            ours.formUnion(literalPaths(of: rule))
+        }
+        for path in ours.sorted() where !upstream.contains(path) {
+            XCTAssertNotNil(pulseAdded[path], "规则用到的路径 \(path) 不在上游的登记里,也没在 pulseAdded 里登记缘由")
+        }
+        XCTAssertEqual(
+            Set(pulseAdded.keys).subtracting(ours).sorted(), [],
+            "pulseAdded 里有已经没有规则在用的路径,删掉这几行"
+        )
+        XCTAssertEqual(
+            Set(pulseAdded.keys).filter { upstream.contains($0) }.sorted(), [],
+            "这几条其实上游登记了,从 pulseAdded 里删掉"
+        )
     }
 
     // MARK: 没搬的

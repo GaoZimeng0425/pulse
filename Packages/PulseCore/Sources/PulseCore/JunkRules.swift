@@ -234,12 +234,14 @@ public enum JunkRuleTable {
             source: purgeApp,
             symbolName: "iphone"
         ),
+        // p7-cleaner/10:com.apple.* 的缓存不自动勾(票 09 给应用缓存定的规矩,这里补齐到开发工具规则;
+        // p4 时是「可安全清理」,上游也是 safe)——常驻的进程没有可靠的「在运行」信号,这个缓存很小。
         JunkRule(
             id: "xcode.caches",
             group: .globalToolCache,
             title: "Xcode 缓存",
             patterns: [JunkPathPattern(homeRelative: "Library/Caches/com.apple.dt.Xcode")],
-            tier: .safe,
+            tier: .checkFirst,
             rationale: "Xcode 自身的临时缓存,下次启动自动重建。",
             source: purgeApp,
             symbolName: "hammer"
@@ -541,7 +543,9 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "book"
         ),
-        // 缓存目录一级的开发工具缓存:路径按工具的惯例位置登记(上游说明库有这条,路径写在本票)
+        // —— 缓存目录一级的开发工具缓存 ——
+        // 上游的全局缓存定义里没有这些(它们登记在说明库里、按名字认);路径按各工具的惯例位置写在本票,
+        // 每一条都在账本测试的 pulseAdded 里登记了缘由。
         JunkRule(
             id: "xcode.deviceSoftwareService",
             group: .globalToolCache,
@@ -600,6 +604,7 @@ public enum JunkRuleTable {
             symbolName: "shippingbox"
         ),
         // 上游「prek Cache」
+        // 与上游的差异:上游要求 prek 空闲时清;在不在用我们这里不判,靠先检查
         JunkRule(
             id: "prek.cache",
             group: .globalToolCache,
@@ -615,7 +620,6 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 缓存目录一级的开发工具缓存:路径按工具的惯例位置登记(上游说明库有这条,路径写在本票)
         JunkRule(
             id: "prisma.cache",
             group: .globalToolCache,
@@ -707,6 +711,7 @@ public enum JunkRuleTable {
             symbolName: "doc.text"
         ),
         // 上游「Hermes Agent Cache」
+        // 与上游的差异:上游要求 Hermes 空闲时清(运行中的任务可能在用);在不在用我们这里不判,靠先检查
         JunkRule(
             id: "hermes.agentCache",
             group: .globalToolCache,
@@ -718,6 +723,7 @@ public enum JunkRuleTable {
             symbolName: "sparkles"
         ),
         // 上游「opencode Cache」
+        // 与上游的差异:上游要求 opencode 空闲时清;在不在用我们这里不判,靠先检查
         JunkRule(
             id: "opencode.cache",
             group: .globalToolCache,
@@ -729,6 +735,7 @@ public enum JunkRuleTable {
             symbolName: "sparkles"
         ),
         // 上游「Conda Package Cache」
+        // 与上游的差异:上游的说明是「用 conda clean --all 更合适」;照列,档位先检查
         JunkRule(
             id: "conda.packageCache",
             group: .globalToolCache,
@@ -863,7 +870,6 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "hammer"
         ),
-        // 缓存目录一级的开发工具缓存:路径按工具的惯例位置登记(上游说明库有这条,路径写在本票)
         JunkRule(
             id: "zed.caches",
             group: .globalToolCache,
@@ -888,7 +894,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 缓存目录一级的开发工具缓存:路径按工具的惯例位置登记(上游说明库有这条,路径写在本票)
+        // None
         // 上游这一行是动态的(.gem/specs 加各 Ruby 版本目录下的 cache);只有 .gem/specs 是固定路径
         JunkRule(
             id: "rubygems.downloads",
@@ -958,7 +964,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "square.stack.3d.up"
         ),
-        // 缓存目录一级的开发工具缓存:路径按工具的惯例位置登记(上游说明库有这条,路径写在本票)
+        // None
         // 上游还登记了一个文件 .zcompdump;规则只认目录,那个文件很小,不收
         JunkRule(
             id: "zsh.sessions",
@@ -970,7 +976,8 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "terminal"
         ),
-        // 缓存目录一级的开发工具缓存:路径按工具的惯例位置登记(上游说明库有这条,路径写在本票)
+        // None
+        // 与上游的差异:上游只列没有任何项目在用的浏览器版本(读各项目的锁文件现算);我们整目录一条、恒先检查
         JunkRule(
             id: "playwright.browsers",
             group: .globalToolCache,
@@ -984,7 +991,6 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "globe"
         ),
-        // 缓存目录一级的开发工具缓存:路径按工具的惯例位置登记(上游说明库有这条,路径写在本票)
         JunkRule(
             id: "typescript.typeCache",
             group: .globalToolCache,
@@ -995,7 +1001,6 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "chevron.left.forwardslash.chevron.right"
         ),
-        // 缓存目录一级的开发工具缓存:路径按工具的惯例位置登记(上游说明库有这条,路径写在本票)
         JunkRule(
             id: "cypress.binaries",
             group: .globalToolCache,
@@ -1006,7 +1011,6 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "hammer"
         ),
-        // 缓存目录一级的开发工具缓存:路径按工具的惯例位置登记(上游说明库有这条,路径写在本票)
         JunkRule(
             id: "mise.cache",
             group: .globalToolCache,
@@ -1020,7 +1024,6 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 缓存目录一级的开发工具缓存:路径按工具的惯例位置登记(上游说明库有这条,路径写在本票)
         JunkRule(
             id: "androidStudio.caches",
             group: .globalToolCache,
@@ -1031,24 +1034,22 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "chevron.left.forwardslash.chevron.right"
         ),
-        // 缓存目录一级的开发工具缓存:路径按工具的惯例位置登记(上游说明库有这条,路径写在本票)
         JunkRule(
             id: "apple.pythonCache",
             group: .globalToolCache,
             title: "系统 Python 编译缓存",
             patterns: [JunkPathPattern(homeRelative: "Library/Caches/com.apple.python")],
-            tier: .safe,
+            tier: .checkFirst,
             rationale: "macOS 开发者工具自带的 Python 的编译文件;下次运行时重建。",
             source: JunkRuleTable.purgeApp,
             symbolName: "chevron.left.forwardslash.chevron.right"
         ),
-        // 缓存目录一级的开发工具缓存:路径按工具的惯例位置登记(上游说明库有这条,路径写在本票)
         JunkRule(
             id: "simulator.runtimeCache",
             group: .globalToolCache,
             title: "模拟器运行时缓存",
             patterns: [JunkPathPattern(homeRelative: "Library/Caches/com.apple.iphonesimulator")],
-            tier: .safe,
+            tier: .checkFirst,
             rationale: "iOS 模拟器跑应用时产生的临时文件;下次启动模拟器时重建。",
             source: JunkRuleTable.purgeApp,
             symbolName: "ipad"

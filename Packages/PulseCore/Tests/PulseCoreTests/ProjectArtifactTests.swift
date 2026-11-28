@@ -191,13 +191,16 @@ final class ProjectArtifactTests: XCTestCase {
             ["/dev/proj/bin", "/dev/proj/obj", "/dev/proj/dist-newstyle"],
             "按扩展名认的工程文件"
         )
-        XCTAssertTrue(out.allSatisfy { $0.tier == .safe })
+        XCTAssertEqual(out.first { $0.path == "/dev/proj/bin" }?.tier, .safe)
+        XCTAssertEqual(out.first { $0.path == "/dev/proj/dist-newstyle" }?.tier, .checkFirst, "重建可能很久,先检查")
         // 工程文件在别的目录里不算:清单是按产物所在的目录取的。
         XCTAssertTrue(match(in: [root], roots: ["/dev"], extensions: { $0 == "/dev" ? ["sln"] : [] }).isEmpty)
     }
 
-    /// 产物在子目录里时,工程文件在再上一级:React Native / Flutter 的 `android/.gradle`、sbt 的 `project/target`。
-    func testParentSiblingMarkerLooksOneLevelUp() {
+    /// 带子目录的产物,根标记按上游「相对项目根」的写法折算到产物所在的目录:`android/.gradle` 的
+    /// 工程文件 `android/build.gradle` 就在它旁边(同级文件),上一级的 `build.gradle` 不算;
+    /// sbt 的元构建 `project/target` 的工程文件 `build.sbt` 在项目根,也就是再上一级。
+    func testNestedArtifactsLookForProjectFilesRelativeToTheirOwnFolder() {
         let project = dir("proj", under: "/dev", children: [
             dir("android", under: "/dev/proj", children: [
                 dir(".gradle", under: "/dev/proj/android", bytes: 10),
@@ -212,8 +215,44 @@ final class ProjectArtifactTests: XCTestCase {
             match(in: [root], roots: ["/dev"], files: ["/dev/proj/android/build.gradle.bak"]).isEmpty,
             "名字差一点的工程文件不算"
         )
-        let out = match(in: [root], roots: ["/dev"], files: ["/dev/proj/build.gradle", "/dev/proj/build.sbt"])
+        // 只有项目根的 build.gradle(上一级):android/.gradle 不算——上游登记的是 android/build.gradle。
+        let onlyRoot = match(in: [root], roots: ["/dev"], files: ["/dev/proj/build.gradle"])
+        XCTAssertTrue(onlyRoot.isEmpty, "上一级的 build.gradle 不认 android/.gradle")
+        // 工程文件在 android/ 里、build.sbt 在项目根:两个产物都认。
+        let out = match(in: [root], roots: ["/dev"], files: ["/dev/proj/android/build.gradle", "/dev/proj/build.sbt"])
         XCTAssertEqual(Set(out.map(\.path)), ["/dev/proj/android/.gradle", "/dev/proj/project/target"])
+    }
+
+    /// 「在场才列」:规则登记了、盘上没有那个目录,就不产出候选——38 条规则一个都不凭空出现。
+    func testRulesWithoutALocationOnDiskProduceNothing() {
+        let empty = dir("empty-project", under: "/dev", children: [dir("src", under: "/dev/empty-project", bytes: 10)])
+        let root = dir("dev", under: "/", children: [empty])
+        XCTAssertTrue(match(in: [root], roots: ["/dev"]).isEmpty)
+        // 标记探测一律说「有」也一样:树里没有目录名对得上的节点,就没有候选。
+        XCTAssertTrue(match(
+            in: [root],
+            roots: ["/dev"],
+            files: nil,
+            extensions: { _ in ["sln", "tf", "uproject", "cabal"] }
+        ).isEmpty)
+    }
+
+    /// 重建要花真实时间的(重新下载依赖、重新编译很久),即使上游标 safe 也落「先检查」(票面范围 1)。
+    func testSlowRebuildsStayCheckFirst() {
+        let rules = Dictionary(uniqueKeysWithValues: ProjectArtifactRuleTable.builtin.map { ($0.id, $0) })
+        for id in [
+            "artifact.tox",
+            "artifact.stack-work",
+            "artifact.cabal-dist",
+            "artifact.unity-library",
+            "artifact.unity-temp",
+            "artifact.unreal-intermediate",
+            "artifact.unreal-derived-data",
+            "artifact.terraform-plugins",
+        ] {
+            XCTAssertEqual(rules[id]?.tier, .checkFirst, id)
+            XCTAssertTrue(rules[id]?.reinstall.isEmpty == false, id)
+        }
     }
 
     /// 拒绝条件:`.terraform` 里只要有状态文件就整个不列——丢了状态等于丢了对真实运行中基础设施的跟踪。
@@ -350,6 +389,86 @@ final class ProjectArtifactTests: XCTestCase {
 
         out = match(in: [root], roots: ["/dev"], excludedPathPrefixes: ["/dev/proj/target"])
         XCTAssertTrue(out.isEmpty, "排除双保险:扫后新加的排除立即生效")
+    }
+
+    /// 登记完整性的正例是按规则自己的标记铺盘上事实的(同源,标记写错发现不了;标记与上游的逐个对应在
+    /// `ProjectArtifactPortLedgerTests`)。这里手写几种真实工程的盘上事实,确认标记内容本身没写错。
+    func testMarkerContentsMatchRealProjectLayouts() {
+        let project = dir("proj", under: "/dev", children: [
+            dir(".dart_tool", under: "/dev/proj", bytes: 10),
+            dir("Pods", under: "/dev/proj", bytes: 10),
+            dir(".godot", under: "/dev/proj", bytes: 10),
+            dir(".tox", under: "/dev/proj", bytes: 10),
+            dir(".stack-work", under: "/dev/proj", bytes: 10),
+            dir(".zig-cache", under: "/dev/proj", bytes: 10),
+            dir("vendor", under: "/dev/proj", bytes: 10),
+            dir("deps", under: "/dev/proj", bytes: 10),
+            dir(".nuxt", under: "/dev/proj", bytes: 10),
+            dir(".svelte-kit", under: "/dev/proj", bytes: 10),
+            dir(".pytest_cache", under: "/dev/proj", bytes: 10),
+        ])
+        let root = dir("dev", under: "/", children: [project])
+        func hit(_ files: [String]) -> Set<String> {
+            Set(match(in: [root], roots: ["/dev"], files: Set(files)).map(\.ruleID))
+        }
+        // 一个 Flutter 工程:只有 pubspec.yaml。
+        XCTAssertEqual(hit(["/dev/proj/pubspec.yaml"]), ["artifact.dart-tool"])
+        // 一个只有依赖清单的 Python 工程。
+        XCTAssertEqual(hit(["/dev/proj/requirements.txt"]), ["artifact.pytest-cache"])
+        // 一个 Godot 工程。
+        XCTAssertEqual(hit(["/dev/proj/project.godot"]), ["artifact.godot-cache"])
+        // 一个 Composer 的 PHP 工程:vendor 认;deps 不认(它只认 mix.exs)。
+        XCTAssertEqual(hit(["/dev/proj/composer.json"]), ["artifact.composer-vendor"])
+        // 一个 Nuxt 工程(nuxt.config 的四种写法之一)。
+        XCTAssertEqual(hit(["/dev/proj/nuxt.config.mjs"]), ["artifact.nuxt-build"])
+        // 一个 Zig 工程:zig-cache(旧名)与 .zig-cache 都认。
+        XCTAssertEqual(hit(["/dev/proj/build.zig"]), ["artifact.zig-cache"])
+        // 工程文件在上一级不算(除了 sbt 的 project/target,见上面那条用例)。
+        XCTAssertEqual(hit(["/dev/build.zig"]), [])
+    }
+
+    /// 生产用的目录清单:只认普通文件、扩展名转小写;目录名带点的不算,符号链接不算,读不了给空集。
+    func testLiveExtensionProbeListsRegularFilesOnlyInLowercase() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("pulse-marker-probe-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try Data().write(to: directory.appendingPathComponent("App.CSPROJ"))
+        try Data().write(to: directory.appendingPathComponent("readme.md"))
+        try FileManager.default.createDirectory(
+            at: directory.appendingPathComponent("assets.TF"),
+            withIntermediateDirectories: false
+        )
+        try FileManager.default.createSymbolicLink(
+            atPath: directory.appendingPathComponent("link.sln").path,
+            withDestinationPath: "/nonexistent/target.sln"
+        )
+
+        XCTAssertEqual(ProjectArtifactMatcher.fileExtensions(ofDirectory: directory.path), ["csproj", "md"])
+        XCTAssertEqual(
+            ProjectArtifactMatcher.fileExtensions(ofDirectory: directory.appendingPathComponent("missing").path),
+            []
+        )
+    }
+
+    /// 一次匹配里每个目录只列一次清单(一条规则可以带好几个按扩展名认的标记,同一个目录下也可以有几个产物)。
+    func testExtensionProbeListsEachDirectoryOnce() {
+        let project = dir("proj", under: "/dev", children: [
+            dir("bin", under: "/dev/proj", bytes: 10),
+            dir("obj", under: "/dev/proj", bytes: 10),
+        ])
+        let root = dir("dev", under: "/", children: [project])
+        var listed: [String] = []
+        let out = ProjectArtifactMatcher.artifacts(
+            in: [root], roots: ["/dev"], excludedPathPrefixes: [],
+            fileExists: { _ in false },
+            fileExtensions: { directory in
+                listed.append(directory)
+                return ["sln"]
+            }
+        )
+        XCTAssertEqual(Set(out.map(\.path)), ["/dev/proj/bin", "/dev/proj/obj"])
+        XCTAssertEqual(listed, ["/dev/proj"])
     }
 
     // MARK: 年龄口径(票面钉死:重装依赖不刷新年龄)

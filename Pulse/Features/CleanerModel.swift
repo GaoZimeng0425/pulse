@@ -181,8 +181,8 @@ final class CleanerModel {
     ///   - volumeSummaries: 只读系统卷卷级摘要源(生产 statfs;测试固定值)。
     ///   - homeDirectory: 规则表相对它展开;测试注入假家目录。
     ///   - markerExists: 项目产物标记探测(cleaner-hardening/02;生产查盘,测试注入假集合)。
-    ///   - markerFileExtensions: 按扩展名认的项目标记要的目录清单(p7-cleaner/10;生产列目录,
-    ///     测试注入固定集合)。
+    ///   - markerFileExtensions: 按扩展名认的项目标记要的目录清单(p7-cleaner/10;生产用
+    ///     `ProjectArtifactMatcher.fileExtensions(ofDirectory:)`,测试注入固定集合)。
     ///   - directoryEnumerator: 生产扫描用的目录枚举器(arch-clean/01:必传,组装点在
     ///     `CleanAssembly`);测试可另经 `startScan(using:)` 单次覆盖。
     ///   - installedAppInventory / runningApps / trashInventory: **必传**(arch-clean/01)——
@@ -210,7 +210,8 @@ final class CleanerModel {
         scanCache: CleanScanResultStore? = nil,
         homeDirectory: String = NSHomeDirectory(),
         markerExists: @escaping (String) -> Bool = { FileManager.default.fileExists(atPath: $0) },
-        markerFileExtensions: @escaping (String) -> Set<String> = { CleanerModel.fileExtensions(ofDirectory: $0) },
+        markerFileExtensions: @escaping (String)
+            -> Set<String> = { ProjectArtifactMatcher.fileExtensions(ofDirectory: $0) },
         installedAppInventory: @escaping @Sendable ([SpaceNode], Bool, String) -> InstalledAppInventory,
         runningApps: @escaping @Sendable () -> [RunningAppIdentity],
         trashInventory: @escaping @Sendable () async -> TrashInventory?,
@@ -239,14 +240,6 @@ final class CleanerModel {
         self.aiManifestReader = aiManifestReader
         trashInventorySource = trashInventory
         overviewTrashCounter = OverviewTrashCounter(source: trashInventory)
-    }
-
-    /// 按扩展名认的项目标记要的目录清单(p7-cleaner/10):某个目录的直接子项里,文件扩展名
-    /// (小写)的集合;读不了 = 空集(这种标记就不成立)。只在规则带 `siblingExtension` 标记、
-    /// 且目录名已经对上时才调,一次候选一次列目录。
-    nonisolated static func fileExtensions(ofDirectory path: String) -> Set<String> {
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: path)) ?? []
-        return Set(names.map { ($0 as NSString).pathExtension.lowercased() }.filter { !$0.isEmpty })
     }
 
     @ObservationIgnored private let directoryEnumerator: any CleanDirectoryEnumerator

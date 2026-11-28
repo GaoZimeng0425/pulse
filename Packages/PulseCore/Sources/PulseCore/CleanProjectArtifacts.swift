@@ -13,8 +13,9 @@ import Foundation
 // 一张表 47 行,这边 38 条——同名的几行(target、_build、.gradle、Pods、build)合成一条,标记取
 // 并集。每条带四样东西,都是上游的形状:
 //   · 根标记(`markers`):旁边的工程文件证明「这真是构建产物」。上游相对项目根写,这里相对
-//     产物所在的目录写——产物在子目录里时工程文件在再上一级(`parentSibling`);没有固定文件名
-//     的工程文件按扩展名认(`siblingExtension`)。
+//     产物所在的目录写。上游带子目录的产物里,`ios/Pods`、`android/.gradle` 的工程文件就在产物
+//     旁边(同级文件);只有 sbt 的 `project/target` 的工程文件在再上一级(`parentSibling`)。没有
+//     固定文件名的工程文件按扩展名认(`siblingExtension`)。
 //   · 拒绝条件(`refuseWhenPresent`):产物里只要有这些文件之一就整个不列(`.terraform` 里
 //     偶尔会有的状态文件——丢了它等于丢了对真实基础设施的跟踪)。
 //   · 重建说明(`reinstall`):怎么把它装回来,随说明一起给用户看。
@@ -33,8 +34,8 @@ import Foundation
 public enum ArtifactMarker: Sendable, Equatable {
     /// 产物旁边的同级文件(`target` 旁的 `Cargo.toml`;可以带一级子目录,如 `ProjectSettings/ProjectVersion.txt`)。
     case sibling(String)
-    /// 产物所在目录的上一级里的文件:产物在子目录里时工程文件在再上一级
-    /// (`android/.gradle` 旁的 `build.gradle`、`project/target` 旁的 `build.sbt`,都在上面一层)。
+    /// 产物所在目录的上一级里的文件:sbt 的元构建 `project/target`,工程文件 `build.sbt` 在项目根,
+    /// 也就是产物所在目录的上一级(上游的根标记一律相对项目根写)。
     case parentSibling(String)
     /// 产物里面的文件(`.venv/pyvenv.cfg`)。
     case inside(String)
@@ -209,8 +210,7 @@ public enum ProjectArtifactRuleTable {
             tier: .checkFirst,
             rationale: "构建输出目录;个别项目把源码或资源放在 build 下,先检查",
             reinstall: "运行项目平时的构建(./gradlew build、flutter build、cmake --build 等)",
-            markers: [
-            ],
+            markers: [],
             source: JunkRuleTable.purgeAppArtifacts,
             symbolName: "hammer"
         ),
@@ -222,8 +222,7 @@ public enum ProjectArtifactRuleTable {
             tier: .checkFirst,
             rationale: "分发输出;多数是构建产物,但也有仓库直接把它当产物库,先检查",
             reinstall: "运行项目平时的构建",
-            markers: [
-            ],
+            markers: [],
             source: JunkRuleTable.pulseCustom,
             symbolName: "shippingbox"
         ),
@@ -360,7 +359,7 @@ public enum ProjectArtifactRuleTable {
         ProjectArtifactRule(
             id: "artifact.tox",
             directoryName: ".tox",
-            tier: .safe,
+            tier: .checkFirst,
             rationale: "tox 为跑测试搭的一次性 Python 环境",
             reinstall: "运行 tox(重新下载依赖,较慢)",
             markers: [.sibling("tox.ini")],
@@ -391,10 +390,6 @@ public enum ProjectArtifactRuleTable {
                 .sibling("build.gradle.kts"),
                 .sibling("settings.gradle"),
                 .sibling("settings.gradle.kts"),
-                .parentSibling("build.gradle"),
-                .parentSibling("build.gradle.kts"),
-                .parentSibling("settings.gradle"),
-                .parentSibling("settings.gradle.kts"),
             ],
             source: JunkRuleTable.purgeAppArtifacts,
             symbolName: "hammer"
@@ -429,7 +424,7 @@ public enum ProjectArtifactRuleTable {
         ProjectArtifactRule(
             id: "artifact.stack-work",
             directoryName: ".stack-work",
-            tier: .safe,
+            tier: .checkFirst,
             rationale: "Stack 为这个 Haskell 项目留的编译产物与依赖",
             reinstall: "stack build(可能要一阵)",
             markers: [.sibling("stack.yaml")],
@@ -440,7 +435,7 @@ public enum ProjectArtifactRuleTable {
         ProjectArtifactRule(
             id: "artifact.cabal-dist",
             directoryName: "dist-newstyle",
-            tier: .safe,
+            tier: .checkFirst,
             rationale: "Cabal 为这个 Haskell 项目编译出的产物",
             reinstall: "cabal build(可能要一阵)",
             markers: [.siblingExtension("cabal")],
@@ -614,6 +609,17 @@ public enum ProjectArtifactMatcher {
     ) -> [JunkCandidate] {
         let rulesByName = Dictionary(uniqueKeysWithValues: rules.map { ($0.directoryName, $0) })
         var out: [JunkCandidate] = []
+        // 目录清单按目录记住:同一次匹配里一个目录只列一次(一条规则可以带好几个按扩展名认的标记,
+        // 同一个目录下也可以有几个产物——bin、obj 并排)。
+        var listedExtensions: [String: Set<String>] = [:]
+        let extensionsOf: (String) -> Set<String> = { directory in
+            if let listed = listedExtensions[directory] {
+                return listed
+            }
+            let value = fileExtensions(directory)
+            listedExtensions[directory] = value
+            return value
+        }
 
         for root in roots {
             let rootPath = PathNormalization.normalize(root)
@@ -626,7 +632,7 @@ public enum ProjectArtifactMatcher {
                 rulesByName: rulesByName,
                 excluded: excludedPathPrefixes,
                 fileExists: fileExists,
-                fileExtensions: fileExtensions,
+                fileExtensions: extensionsOf,
                 into: &out
             )
 
@@ -639,7 +645,7 @@ public enum ProjectArtifactMatcher {
                         rulesByName: rulesByName,
                         excluded: excludedPathPrefixes,
                         fileExists: fileExists,
-                        fileExtensions: fileExtensions,
+                        fileExtensions: extensionsOf,
                         into: &out
                     )
                     for child in node.children
@@ -696,6 +702,23 @@ public enum ProjectArtifactMatcher {
                 modifiedAtScan: child.ownModifiedEpoch
             ))
         }
+    }
+
+    /// 生产用的目录清单:某个目录的直接子项里,**普通文件**扩展名(小写)的集合;读不了 = 空。
+    /// 只认普通文件——目录名带点(`.terraform.d`)、符号链接都不算工程文件。放在核心包是为了能直接测
+    /// (只依赖 Foundation;这一处列目录就是本文件全部的 IO)。调用方经 `fileExtensions` 注入。
+    public static func fileExtensions(ofDirectory path: String) -> Set<String> {
+        let children = (try? FileManager.default.contentsOfDirectory(
+            at: URL(fileURLWithPath: path, isDirectory: true),
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: []
+        )) ?? []
+        return Set(children.compactMap { child -> String? in
+            guard let isRegular = try? child.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile,
+                  isRegular else { return nil }
+            let fileExtension = child.pathExtension.lowercased()
+            return fileExtension.isEmpty ? nil : fileExtension
+        })
     }
 
     /// 项目年龄:项目子树内文件 mtime 最大值,**跳过产物子树**(重装依赖不刷新年龄)。

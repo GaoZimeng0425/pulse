@@ -17,160 +17,241 @@ final class ProjectArtifactPortLedgerTests: XCTestCase {
     )
 
     private let ledger: [Row] = [
-        ("nodeModules", "node", "node_modules", ["package.json"], [], [], "safe", "artifact.node_modules"),
-        ("nextBuild", "node", ".next", ["package.json"], [], [], "safe", "artifact.next-cache"),
         (
-            "nuxtBuild",
-            "node",
-            ".nuxt",
+            "nodeModules", "node", "node_modules",
+            ["package.json"],
+            [], [], "safe", "artifact.node_modules"
+        ),
+        (
+            "nextBuild", "node", ".next",
+            ["package.json"],
+            [], [], "safe", "artifact.next-cache"
+        ),
+        (
+            "nuxtBuild", "node", ".nuxt",
             ["nuxt.config.ts", "nuxt.config.js", "nuxt.config.mjs", "nuxt.config.cjs"],
-            [],
-            [],
-            "safe",
-            "artifact.nuxt-build"
+            [], [], "safe", "artifact.nuxt-build"
         ),
         (
-            "nuxtOutput",
-            "node",
-            ".output",
+            "nuxtOutput", "node", ".output",
             ["nuxt.config.ts", "nuxt.config.js", "nuxt.config.mjs", "nuxt.config.cjs"],
-            [],
-            [],
-            "safe",
-            "artifact.nuxt-output"
+            [], [], "safe", "artifact.nuxt-output"
         ),
-        ("svelteKitBuild", "node", ".svelte-kit", ["package.json"], [], [], "safe", "artifact.sveltekit-build"),
-        ("astroBuild", "node", ".astro", ["package.json"], [], [], "safe", "artifact.astro-build"),
-        ("angularCache", "node", ".angular", ["package.json"], [], [], "safe", "artifact.angular-cache"),
-        ("turboCache", "node", ".turbo", ["package.json"], [], [], "safe", "artifact.turbo-cache"),
-        ("parcelCache", "node", ".parcel-cache", ["package.json"], [], [], "safe", "artifact.parcel-cache"),
-        ("viteCache", "node", "node_modules/.vite", ["package.json"], [], [], "safe", nil),
-        ("target", "rust", "target", ["Cargo.toml"], [], [], "safe", "artifact.target"),
-        ("venv", "python", "venv", ["requirements.txt", "pyproject.toml"], [], [], "safe", "artifact.venv"),
-        ("venv", "python", ".venv", ["requirements.txt", "pyproject.toml"], [], [], "safe", "artifact.dot-venv"),
         (
-            "pytestCache",
-            "python",
-            ".pytest_cache",
+            "svelteKitBuild", "node", ".svelte-kit",
+            ["package.json"],
+            [], [], "safe", "artifact.sveltekit-build"
+        ),
+        (
+            "astroBuild", "node", ".astro",
+            ["package.json"],
+            [], [], "safe", "artifact.astro-build"
+        ),
+        (
+            "angularCache", "node", ".angular",
+            ["package.json"],
+            [], [], "safe", "artifact.angular-cache"
+        ),
+        (
+            "turboCache", "node", ".turbo",
+            ["package.json"],
+            [], [], "safe", "artifact.turbo-cache"
+        ),
+        (
+            "parcelCache", "node", ".parcel-cache",
+            ["package.json"],
+            [], [], "safe", "artifact.parcel-cache"
+        ),
+        (
+            "viteCache", "node", "node_modules/.vite",
+            ["package.json"],
+            [], [], "safe", nil
+        ),
+        (
+            "target", "rust", "target",
+            ["Cargo.toml"],
+            [], [], "safe", "artifact.target"
+        ),
+        (
+            "venv", "python", "venv",
             ["requirements.txt", "pyproject.toml"],
-            [],
-            [],
-            "safe",
-            "artifact.pytest-cache"
+            [], [], "safe", "artifact.venv"
         ),
         (
-            "mypyCache",
-            "python",
-            ".mypy_cache",
+            "venv", "python", ".venv",
             ["requirements.txt", "pyproject.toml"],
-            [],
-            [],
-            "safe",
-            "artifact.mypy-cache"
+            [], [], "safe", "artifact.dot-venv"
         ),
         (
-            "ruffCache",
-            "python",
-            ".ruff_cache",
+            "pytestCache", "python", ".pytest_cache",
             ["requirements.txt", "pyproject.toml"],
-            [],
-            [],
-            "safe",
-            "artifact.ruff-cache"
+            [], [], "safe", "artifact.pytest-cache"
         ),
-        ("toxEnvironments", "python", ".tox", ["tox.ini"], [], [], "safe", "artifact.tox"),
-        ("dartTool", "flutter", ".dart_tool", ["pubspec.yaml"], [], [], "safe", "artifact.dart-tool"),
-        ("flutterBuild", "flutter", "build", ["pubspec.yaml"], [], [], "safe", "artifact.gradle-build"),
         (
-            "dotGradle",
-            "androidGradle",
-            ".gradle",
+            "mypyCache", "python", ".mypy_cache",
+            ["requirements.txt", "pyproject.toml"],
+            [], [], "safe", "artifact.mypy-cache"
+        ),
+        (
+            "ruffCache", "python", ".ruff_cache",
+            ["requirements.txt", "pyproject.toml"],
+            [], [], "safe", "artifact.ruff-cache"
+        ),
+        (
+            "toxEnvironments", "python", ".tox",
+            ["tox.ini"],
+            [], [], "safe", "artifact.tox"
+        ),
+        (
+            "dartTool", "flutter", ".dart_tool",
+            ["pubspec.yaml"],
+            [], [], "safe", "artifact.dart-tool"
+        ),
+        (
+            "flutterBuild", "flutter", "build",
+            ["pubspec.yaml"],
+            [], [], "safe", "artifact.gradle-build"
+        ),
+        (
+            "dotGradle", "androidGradle", ".gradle",
             ["build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"],
-            [],
-            [],
-            "safe",
-            "artifact.gradle-project-state"
+            [], [], "safe", "artifact.gradle-project-state"
         ),
         (
-            "dotGradle",
-            "androidGradle",
-            "android/.gradle",
+            "dotGradle", "androidGradle", "android/.gradle",
             ["android/build.gradle", "android/build.gradle.kts"],
-            [],
-            [],
-            "safe",
-            "artifact.gradle-project-state"
+            [], [], "safe", "artifact.gradle-project-state"
         ),
-        ("pods", "xcode", "Pods", ["Podfile"], [], [], "safe", "artifact.pods"),
-        ("pods", "xcode", "ios/Pods", ["ios/Podfile"], [], [], "safe", "artifact.pods"),
-        ("swiftPMBuild", "swiftPackage", ".build", ["Package.swift"], [], [], "safe", "artifact.swiftpm-build"),
-        ("elixirBuild", "elixir", "_build", ["mix.exs"], [], [], "safe", "artifact.mix-build"),
-        ("elixirDeps", "elixir", "deps", ["mix.exs"], [], [], "safe", "artifact.elixir-deps"),
-        ("mavenTarget", "maven", "target", ["pom.xml"], [], [], "safe", "artifact.target"),
         (
-            "gradleBuild",
-            "gradleJVM",
-            "build",
+            "pods", "xcode", "Pods",
+            ["Podfile"],
+            [], [], "safe", "artifact.pods"
+        ),
+        (
+            "pods", "xcode", "ios/Pods",
+            ["ios/Podfile"],
+            [], [], "safe", "artifact.pods"
+        ),
+        (
+            "swiftPMBuild", "swiftPackage", ".build",
+            ["Package.swift"],
+            [], [], "safe", "artifact.swiftpm-build"
+        ),
+        (
+            "elixirBuild", "elixir", "_build",
+            ["mix.exs"],
+            [], [], "safe", "artifact.mix-build"
+        ),
+        (
+            "elixirDeps", "elixir", "deps",
+            ["mix.exs"],
+            [], [], "safe", "artifact.elixir-deps"
+        ),
+        (
+            "mavenTarget", "maven", "target",
+            ["pom.xml"],
+            [], [], "safe", "artifact.target"
+        ),
+        (
+            "gradleBuild", "gradleJVM", "build",
             ["build.gradle", "build.gradle.kts"],
-            [],
-            [],
-            "safe",
-            "artifact.gradle-build"
+            [], [], "safe", "artifact.gradle-build"
         ),
-        ("sbtTarget", "sbt", "target", ["build.sbt"], [], [], "safe", "artifact.target"),
-        ("sbtTarget", "sbt", "project/target", ["build.sbt"], [], [], "safe", "artifact.target"),
-        ("dotnetBin", "dotnet", "bin", [], ["csproj", "fsproj", "vbproj", "sln"], [], "safe", "artifact.dotnet-bin"),
-        ("dotnetObj", "dotnet", "obj", [], ["csproj", "fsproj", "vbproj", "sln"], [], "safe", "artifact.dotnet-obj"),
-        ("composerVendor", "composer", "vendor", ["composer.json"], [], [], "safe", "artifact.composer-vendor"),
-        ("bundlerVendor", "bundler", "vendor/bundle", ["Gemfile"], [], [], "safe", nil),
-        ("stackWork", "haskellStack", ".stack-work", ["stack.yaml"], [], [], "safe", "artifact.stack-work"),
-        ("cabalDist", "haskellCabal", "dist-newstyle", [], ["cabal"], [], "safe", "artifact.cabal-dist"),
-        ("zigCache", "zig", ".zig-cache", ["build.zig"], [], [], "safe", "artifact.zig-cache"),
-        ("zigCache", "zig", "zig-cache", ["build.zig"], [], [], "safe", "artifact.zig-cache-legacy"),
-        ("zigOut", "zig", "zig-out", ["build.zig"], [], [], "safe", "artifact.zig-out"),
-        ("duneBuild", "ocamlDune", "_build", ["dune-project"], [], [], "safe", "artifact.mix-build"),
-        ("cmakeBuild", "cmake", "build", ["CMakeLists.txt"], [], [], "safe", "artifact.gradle-build"),
         (
-            "terraformPlugins",
-            "terraform",
-            ".terraform",
+            "sbtTarget", "sbt", "target",
+            ["build.sbt"],
+            [], [], "safe", "artifact.target"
+        ),
+        (
+            "sbtTarget", "sbt", "project/target",
+            ["build.sbt"],
+            [], [], "safe", "artifact.target"
+        ),
+        (
+            "dotnetBin", "dotnet", "bin",
             [],
-            ["tf"],
-            ["terraform.tfstate", "terraform.tfstate.backup", "environment"],
-            "medium",
+            ["csproj", "fsproj", "vbproj", "sln"], [], "safe", "artifact.dotnet-bin"
+        ),
+        (
+            "dotnetObj", "dotnet", "obj",
+            [],
+            ["csproj", "fsproj", "vbproj", "sln"], [], "safe", "artifact.dotnet-obj"
+        ),
+        (
+            "composerVendor", "composer", "vendor",
+            ["composer.json"],
+            [], [], "safe", "artifact.composer-vendor"
+        ),
+        (
+            "bundlerVendor", "bundler", "vendor/bundle",
+            ["Gemfile"],
+            [], [], "safe", nil
+        ),
+        (
+            "stackWork", "haskellStack", ".stack-work",
+            ["stack.yaml"],
+            [], [], "safe", "artifact.stack-work"
+        ),
+        (
+            "cabalDist", "haskellCabal", "dist-newstyle",
+            [],
+            ["cabal"], [], "safe", "artifact.cabal-dist"
+        ),
+        (
+            "zigCache", "zig", ".zig-cache",
+            ["build.zig"],
+            [], [], "safe", "artifact.zig-cache"
+        ),
+        (
+            "zigCache", "zig", "zig-cache",
+            ["build.zig"],
+            [], [], "safe", "artifact.zig-cache-legacy"
+        ),
+        (
+            "zigOut", "zig", "zig-out",
+            ["build.zig"],
+            [], [], "safe", "artifact.zig-out"
+        ),
+        (
+            "duneBuild", "ocamlDune", "_build",
+            ["dune-project"],
+            [], [], "safe", "artifact.mix-build"
+        ),
+        (
+            "cmakeBuild", "cmake", "build",
+            ["CMakeLists.txt"],
+            [], [], "safe", "artifact.gradle-build"
+        ),
+        (
+            "terraformPlugins", "terraform", ".terraform",
+            [],
+            ["tf"], ["terraform.tfstate", "terraform.tfstate.backup", "environment"], "medium",
             "artifact.terraform-plugins"
         ),
-        ("godotCache", "godot", ".godot", ["project.godot"], [], [], "safe", "artifact.godot-cache"),
         (
-            "unityLibrary",
-            "unity",
-            "Library",
+            "godotCache", "godot", ".godot",
+            ["project.godot"],
+            [], [], "safe", "artifact.godot-cache"
+        ),
+        (
+            "unityLibrary", "unity", "Library",
             ["ProjectSettings/ProjectVersion.txt"],
-            [],
-            [],
-            "medium",
-            "artifact.unity-library"
-        ),
-        ("unityTemp", "unity", "Temp", ["ProjectSettings/ProjectVersion.txt"], [], [], "medium", "artifact.unity-temp"),
-        (
-            "unrealIntermediate",
-            "unreal",
-            "Intermediate",
-            [],
-            ["uproject"],
-            [],
-            "medium",
-            "artifact.unreal-intermediate"
+            [], [], "medium", "artifact.unity-library"
         ),
         (
-            "unrealDerivedData",
-            "unreal",
-            "DerivedDataCache",
+            "unityTemp", "unity", "Temp",
+            ["ProjectSettings/ProjectVersion.txt"],
+            [], [], "medium", "artifact.unity-temp"
+        ),
+        (
+            "unrealIntermediate", "unreal", "Intermediate",
             [],
-            ["uproject"],
+            ["uproject"], [], "medium", "artifact.unreal-intermediate"
+        ),
+        (
+            "unrealDerivedData", "unreal", "DerivedDataCache",
             [],
-            "medium",
-            "artifact.unreal-derived-data"
+            ["uproject"], [], "medium", "artifact.unreal-derived-data"
         ),
     ]
 
@@ -180,11 +261,14 @@ final class ProjectArtifactPortLedgerTests: XCTestCase {
         "vendor/bundle": "在 vendor 里面;只有旁边有 Gemfile 才算,而 Gemfile 在再上一级,现有标记表达不了",
     ]
 
-    /// 上游的根标记我们用别的、更直接的办法认的行(或有意的更严),不逐个比标记。
-    private let differentlyMarked: [String: String] = [
-        "venv": "产物里面有 pyvenv.cfg,比旁边的 requirements.txt / pyproject.toml 更直接",
+    /// 上游的根标记我们**没有**照搬的行 → 缘由。只有这三种,多一种都要在这里登记理由。
+    ///   · venv / .venv:上游认「旁边有 requirements.txt / pyproject.toml」,我们认「里面有 pyvenv.cfg」(p4 的
+    ///     既有决定)。比上游宽:旁边没有依赖清单的虚拟环境我们也列。要收紧就改这两条规则的标记。
+    ///   · build:目录名太通用,不设标记、恒「先检查」(比上游严);上游的根标记在这里没有对应物。
+    private let notMirrored: [String: String] = [
+        "venv": "认里面的 pyvenv.cfg,不认旁边的依赖清单(比上游宽)",
         ".venv": "同上",
-        "build": "目录名太通用:不设标记、恒「先检查」(比上游严)",
+        "build": "不设标记、恒先检查(比上游严)",
     ]
 
     private var rulesByID: [String: ProjectArtifactRule] {
@@ -224,6 +308,18 @@ final class ProjectArtifactPortLedgerTests: XCTestCase {
 
     // MARK: 账本自身
 
+    /// 登记了例外的三种,规则必须还是例外所说的样子——名单不许烂在这里。
+    func testEveryDocumentedExceptionStillApplies() {
+        let rules = rulesByID
+        for id in ["artifact.venv", "artifact.dot-venv"] {
+            XCTAssertEqual(rules[id]?.markers, [.inside("pyvenv.cfg")], id)
+            XCTAssertEqual(rules[id]?.tier, .safe, id)
+        }
+        XCTAssertEqual(rules["artifact.gradle-build"]?.markers, [])
+        XCTAssertEqual(rules["artifact.gradle-build"]?.tier, .checkFirst)
+        XCTAssertEqual(Set(notMirrored.keys), ["venv", ".venv", "build"], "多了一种例外就要在这里登记理由")
+    }
+
     func testLedgerCoversEveryUpstreamRow() {
         XCTAssertEqual(ledger.count, 47, "上游项目产物表的行数(提交 ceacaf8)")
         XCTAssertEqual(Set(deferred.keys), Set(ledger.filter { $0.rule == nil }.map(\.folder)), "没搬的行与缘由清单一一对应")
@@ -242,18 +338,8 @@ final class ProjectArtifactPortLedgerTests: XCTestCase {
                 XCTFail("上游 \(row.folder)(\(row.projectType))指向不存在的规则 \(id)")
                 continue
             }
-            if let reason = differentlyMarked[row.folder] {
-                XCTAssertTrue(
-                    rule.rationale.contains("先检查") || rule.markers
-                        .contains {
-                            if case .inside = $0 {
-                                true
-                            } else {
-                                false
-                            }
-                        },
-                    "\(row.folder) 记着「用别的办法认」(\(reason)),规则 \(id) 却两者都不是了"
-                )
+            // 登记了例外的行不逐个比标记;它们的样子由 testEveryDocumentedExceptionStillApplies 钉住
+            if notMirrored[row.folder] != nil {
                 continue
             }
             let missing = expectedMarkers(row).subtracting(ourMarkers(rule))

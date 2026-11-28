@@ -37,7 +37,7 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
             ["ai.perplexity.CometUpdater": .entry("perplexity-updater"), "CometUpdater": .entry("perplexity-updater")]
         ),
         ("blender", "safe", ["Blender": .entry("blender"), "org.blenderfoundation.blender": .entry("blender")]),
-        ("checkpoint-nodejs", "safe", ["checkpoint-nodejs": .ticket10]),
+        ("checkpoint-nodejs", "safe", ["checkpoint-nodejs": .elsewhere]),
         ("cloudkit", "medium", ["CloudKit": .notListed]),
         ("claude-updater", "safe", ["com.anthropic.claudefordesktop.ShipIt": .entry("claude-updater")]),
         ("accountsd", "medium", ["com.apple.accountsd": .notListed]),
@@ -155,7 +155,15 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         ("image-cache", "safe", ["ImageCache": .genericDiscovery]),
         ("revenuecat", "safe", ["RevenueCat": .entry("revenuecat"), "RevenueCatFonts": .entry("revenuecat")]),
         ("gitworktrees", "medium", ["worktrees": .elsewhere]),
-        ("vscode", "safe", ["Code": .rule("vscode.cache"), "CachedData": .ticket10, "CachedExtensionVSIXs": .ticket10]),
+        (
+            "vscode",
+            "safe",
+            [
+                "Code": .rule("vscode.cache"),
+                "CachedData": .rule("vscode.cache"),
+                "CachedExtensionVSIXs": .rule("vscode.cache"),
+            ]
+        ),
         ("cursor", "safe", ["Cursor": .rule("cursor.cache")]),
         ("jetbrains", "safe", ["JetBrains": .rule("jetbrains.caches"), "JetPackCache": .genericDiscovery]),
         ("zed", "safe", ["zed": .rule("zed.caches"), "Zed": .rule("zed.caches")]),
@@ -180,13 +188,13 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         (
             "zsh",
             "safe",
-            [
-                "zsh_sessions": .rule("zsh.sessions"),
-                ".zsh_sessions": .rule("zsh.sessions"),
-                "zcompdump": .rule("zsh.sessions"),
-            ]
+            ["zsh_sessions": .rule("zsh.sessions"), ".zsh_sessions": .rule("zsh.sessions"), "zcompdump": .elsewhere]
         ),
-        ("electron", "safe", ["electron": .rule("appcache.electronApps"), "Code Cache": .ticket10]),
+        (
+            "electron",
+            "safe",
+            ["electron": .rule("appcache.electronApps"), "Code Cache": .rule("appcache.electronApps")]
+        ),
         ("applogs", "safe", ["Logs": .rule("appcache.logs"), "applogs": .genericDiscovery]),
         ("crashreports", "safe", ["DiagnosticReports": .rule("appcache.logs"), "crashreports": .genericDiscovery]),
         ("crashpad-pending", "medium", ["Unsent Crash Reports": .elsewhere]),
@@ -246,7 +254,7 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         (
             "flutter-cache",
             "safe",
-            [".flutter-plugins": .ticket10, ".flutter-plugins-dependencies": .ticket10, "flutter_cache": .ticket10]
+            [".flutter-plugins": .elsewhere, ".flutter-plugins-dependencies": .elsewhere, "flutter_cache": .elsewhere]
         ),
         ("pub-cache", "safe", ["pub-cache": .rule("dart.pubCache"), ".pub-cache": .rule("dart.pubCache")]),
         ("xcode-archives", "medium", ["xcarchive": .rule("xcode.archives")]),
@@ -364,7 +372,11 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         (
             "android-studio",
             "safe",
-            ["com.google.android.studio": .ticket10, "Android Studio": .ticket10, "AndroidStudio": .ticket10]
+            [
+                "com.google.android.studio": .rule("androidStudio.caches"),
+                "Android Studio": .rule("androidStudio.caches"),
+                "AndroidStudio": .rule("androidStudio.caches"),
+            ]
         ),
         ("proxyman", "safe", ["com.proxyman.NSProxy": .entry("proxyman"), "Proxyman": .entry("proxyman")]),
         ("tableplus", "safe", ["com.tinyapp.TablePlus": .entry("tableplus"), "TablePlus": .entry("tableplus")]),
@@ -478,59 +490,59 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         ("swift-frontend-cache", "safe", ["swift-frontend": .elsewhere]),
     ]
 
-    /// 上游没登记目录名的条目:开发工具的固定路径与项目产物。每条的下落同上(票 10 落定)。
-    private let withoutFolderNames: [(key: String, fate: Fate)] = [
-        ("android-sdk", .rule("android.buildCache")),
-        ("playwright-unused-builds", .rule("playwright.browsers")),
-        ("archives", .elsewhere),
-        ("go", .rule("go.moduleCache")),
-        ("nextjs-cache", .rule("artifact.next-cache")),
-        ("android-build", .rule("artifact.gradle-build")),
-        ("cocoapods-spec-repos", .rule("cocoapods.specRepos")),
-        ("orphaned-editor-workspace-storage", .elsewhere),
-        ("spotlight-profiles-cache", .elsewhere),
-        ("swiftpm-build", .rule("artifact.swiftpm-build")),
-        ("maven-target", .rule("artifact.target")),
-        ("gradle-build", .rule("artifact.gradle-build")),
-        ("sbt-target", .rule("artifact.target")),
-        ("dotnet-bin", .rule("artifact.dotnet-bin")),
-        ("dotnet-obj", .rule("artifact.dotnet-obj")),
-        ("composer-vendor", .rule("artifact.composer-vendor")),
-        ("bundler-vendor", .elsewhere),
-        ("zig-out", .rule("artifact.zig-out")),
-        ("dune-build", .rule("artifact.mix-build")),
-        ("cmake-build", .rule("artifact.gradle-build")),
-        ("unity-library", .rule("artifact.unity-library")),
-        ("unity-temp", .rule("artifact.unity-temp")),
-        ("unreal-intermediate", .rule("artifact.unreal-intermediate")),
-        ("unreal-derived-data", .rule("artifact.unreal-derived-data")),
-        ("old-cli-versions", .elsewhere),
-        ("cursor-agent-install-leftovers", .elsewhere),
-        ("claude-code-downloads", .elsewhere),
-        ("android-ndk-version", .elsewhere),
-        ("android-system-images", .elsewhere),
-        ("old-figma-profiles", .elsewhere),
-        ("prek-cache", .rule("prek.cache")),
-        ("expo-cache", .rule("expo.cache")),
-        ("version-manager-downloads", .rule("pyenv.rbenvDownloads")),
-        ("oh-my-zsh-cache", .rule("ohmyzsh.cache")),
-        ("opam-download-cache", .rule("opam.downloads")),
-        ("conda-packages", .rule("conda.packageCache")),
-        ("dart-analysis-cache", .rule("dart.analysisCache")),
-        ("hermes-agent-cache", .rule("hermes.agentCache")),
-        ("opencode-cache", .rule("opencode.cache")),
-        ("antigravity-browser-cache", .elsewhere),
-        ("nvm-download-cache", .rule("nvm.downloads")),
-        ("nvm-node-version", .elsewhere),
-        ("vite-plus-node-version", .elsewhere),
-        ("vite-plus-node-install-leftovers", .elsewhere),
-        ("pyenv-python-version", .elsewhere),
-        ("rustup-toolchain", .elsewhere),
-        ("uv-python-version", .elsewhere),
-        ("giget-cache", .rule("giget.cache")),
-        ("firebase-emulators", .rule("firebase.emulators")),
-        ("gradle-leftovers", .elsewhere),
-        ("clang-module-cache", .elsewhere),
+    /// 上游没登记目录名的条目:开发工具的固定路径与项目产物。每条带上游档位与下落(票 10 落定)。
+    private let withoutFolderNames: [(key: String, tag: String, fate: Fate)] = [
+        ("android-sdk", "safe", .rule("android.buildCache")),
+        ("playwright-unused-builds", "medium", .rule("playwright.browsers")),
+        ("archives", "medium", .elsewhere),
+        ("go", "medium", .rule("go.moduleCache")),
+        ("nextjs-cache", "safe", .rule("artifact.next-cache")),
+        ("android-build", "safe", .rule("artifact.gradle-build")),
+        ("cocoapods-spec-repos", "medium", .rule("cocoapods.specRepos")),
+        ("orphaned-editor-workspace-storage", "medium", .elsewhere),
+        ("spotlight-profiles-cache", "medium", .elsewhere),
+        ("swiftpm-build", "safe", .rule("artifact.swiftpm-build")),
+        ("maven-target", "safe", .rule("artifact.target")),
+        ("gradle-build", "safe", .rule("artifact.gradle-build")),
+        ("sbt-target", "safe", .rule("artifact.target")),
+        ("dotnet-bin", "safe", .rule("artifact.dotnet-bin")),
+        ("dotnet-obj", "safe", .rule("artifact.dotnet-obj")),
+        ("composer-vendor", "safe", .rule("artifact.composer-vendor")),
+        ("bundler-vendor", "safe", .elsewhere),
+        ("zig-out", "safe", .rule("artifact.zig-out")),
+        ("dune-build", "safe", .rule("artifact.mix-build")),
+        ("cmake-build", "safe", .rule("artifact.gradle-build")),
+        ("unity-library", "medium", .rule("artifact.unity-library")),
+        ("unity-temp", "medium", .rule("artifact.unity-temp")),
+        ("unreal-intermediate", "medium", .rule("artifact.unreal-intermediate")),
+        ("unreal-derived-data", "medium", .rule("artifact.unreal-derived-data")),
+        ("old-cli-versions", "safe", .elsewhere),
+        ("cursor-agent-install-leftovers", "medium", .elsewhere),
+        ("claude-code-downloads", "medium", .elsewhere),
+        ("android-ndk-version", "medium", .elsewhere),
+        ("android-system-images", "medium", .elsewhere),
+        ("old-figma-profiles", "medium", .elsewhere),
+        ("prek-cache", "medium", .rule("prek.cache")),
+        ("expo-cache", "safe", .rule("expo.cache")),
+        ("version-manager-downloads", "safe", .rule("pyenv.rbenvDownloads")),
+        ("oh-my-zsh-cache", "safe", .rule("ohmyzsh.cache")),
+        ("opam-download-cache", "safe", .rule("opam.downloads")),
+        ("conda-packages", "medium", .rule("conda.packageCache")),
+        ("dart-analysis-cache", "safe", .rule("dart.analysisCache")),
+        ("hermes-agent-cache", "medium", .rule("hermes.agentCache")),
+        ("opencode-cache", "medium", .rule("opencode.cache")),
+        ("antigravity-browser-cache", "safe", .elsewhere),
+        ("nvm-download-cache", "safe", .rule("nvm.downloads")),
+        ("nvm-node-version", "medium", .elsewhere),
+        ("vite-plus-node-version", "medium", .elsewhere),
+        ("vite-plus-node-install-leftovers", "medium", .elsewhere),
+        ("pyenv-python-version", "medium", .elsewhere),
+        ("rustup-toolchain", "medium", .elsewhere),
+        ("uv-python-version", "medium", .elsewhere),
+        ("giget-cache", "safe", .rule("giget.cache")),
+        ("firebase-emulators", "safe", .rule("firebase.emulators")),
+        ("gradle-leftovers", "safe", .elsewhere),
+        ("clang-module-cache", "safe", .elsewhere),
     ]
 
     /// p6 首批就登记、上游现行说明库(提交 ceacaf8)里没有的目录名:p6 的决定,保留。它们没有上游
@@ -630,12 +642,15 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         }
     }
 
-    /// 没登记目录名的那些条目,下落同样要成立:是规则的,规则真在、档位不放宽。
+    /// 没登记目录名的那些条目,下落同样要成立:是规则的,规则真在;上游标「先检查」的,规则不能是「可安全清理」。
     func testEntriesWithoutFolderNamesAreAccountedFor() {
         for entry in withoutFolderNames {
             guard case let .rule(ruleID) = entry.fate else { continue }
             let tier = tier(ofRule: ruleID)
             XCTAssertNotNil(tier, "上游 \(entry.key) 指向不存在的规则 \(ruleID)")
+            if entry.tag == "medium" {
+                XCTAssertEqual(tier, .checkFirst, "上游标 medium 的 \(ruleID) 不能是 safe")
+            }
         }
         XCTAssertTrue(withoutFolderNames.contains { $0.fate == .elsewhere }, "护栏在空转")
     }
