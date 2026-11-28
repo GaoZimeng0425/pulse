@@ -230,7 +230,20 @@ spec `p7-cleaner/spec.md`;GLOSSARY「安全白名单」「应用缓存」。上�
 - `1password`(medium;「1Password」):`com.1password.1password`, `1Password 7`, `1Password 8`
 - `screen-time`(medium;「Screen Time」):`com.apple.ScreenTimeAgent`, `ScreenTime`
 
-**不属于任何在办票(16 条;去向见下)**
+不列的缘由(逐条):
+- `cloudkit`:iCloud 同步的元数据库,不是可丢弃缓存;上游安全策略明确永不列出(默认项第 2 条)。
+- `accountsd` / `akd` / `amsaccountsd` / `appleaccountd` / `authentication-services` / `icloud-notification-agent` / `itunes` 的 `com.apple.itunescloudd`:Apple 账号登录与认证类的后台服务,上游安全策略明确永不列出(清了会被要求重新登录、弹钥匙串密码)。
+- `container-managerd`:应用的沙盒容器元数据;上游永不列出(清了个别应用会找不到自己的容器)。
+- `family-circle`:家族共享缓存;上游与系统都保护。
+- `passd` / `PassKit`:钱包卡票;PassKit 上游永不列出,`com.apple.passd` 是我们逐条过目时否决的(默认项第 3 条)。
+- `screen-time`:屏幕使用时间的历史删了不回来,还关系着家长控制;本机裸名字 `ScreenTime` 原先会被通用发现列出,已补进保护名单(默认项第 6 条)。
+- `1password`:密码管理器;保护名单在列,上游也永不列出。
+- `e5bundlecache`:票 02 的保护名单在列(编译模型缓存,守护进程在跑时清了识别功能会坏)。
+- `cache-delete`:系统清理守护进程的记账文件,不是缓存(默认项第 3 条)。
+- `dataaccessd`:联系人与日历的同步代理,与受保护的日历缓存同类(默认项第 3 条)。
+- `safari` 的 `com.apple.Safari.SafeBrowsing`:苹果后台服务的缓存;并进 Safari 条目会让它进安全档,而它小到不值得单列。
+
+**不属于任何在办票(16 条)**
 
 - `macos-installer`(medium;「macOS Installer」):`macOS Installer`
 - `macos-install-data`(medium;「Leftover macOS update files」):`macOS Install Data`
@@ -248,6 +261,18 @@ spec `p7-cleaner/spec.md`;GLOSSARY「安全白名单」「应用缓存」。上�
 - `messages-previews`(safe;「Messages Previews」):`Messages Previews`
 - `mail-downloads`(medium;「Mail Attachment Copies」):`Mail Downloads`
 - `unfinished-downloads`(medium;「Unfinished Downloads」):`Unfinished Downloads`
+
+每条的去向:
+- `macos-install-data`:数据卷根目录的系统更新残留,要管理员权限 → 票 06(系统级规则族)的候选。
+- `macos-installer`:应用程序文件夹里的系统安装器 → 安装包类,但在票 04 定的范围(下载 / 桌面 / Homebrew 缓存)之外;后续候选。
+- `device-software-updates`:iTunes 资料库里的设备固件包(`~/Library/iTunes/{iPhone,iPad,iPod} Software Updates`,一个 5–8 GB)→ 安装包类,在票 04 定的范围之外;后续候选。
+- `aerial-wallpaper-videos`:应用数据目录下的航拍壁纸视频(`~/Library/Application Support/com.apple.wallpaper/aerials/videos`,常见几 GB;用户级路径,不要管理员权限)→ 不属于任何在办票,体量大,值得单独评估。
+- `davinci-cacheclip`:用户工程目录里的 DaVinci 渲染缓存(`CacheClip`)→ 票 11 / 10 的范围。
+- `messages-previews`:信息 app 的预览(`~/Library/Messages/Caches/Previews`,个人数据域)→ 不列。
+- `mail-downloads`:邮件附件副本(`~/Library/Containers/com.apple.mail/Data/Library/Mail Downloads`),可能带着只改过没另存的编辑(个人数据域)→ 不列。
+- `crashpad-pending` / `unfinished-downloads` / `stale-browser-framework` / `electron-updater-downloads` / `cursor-agent-leftover` / `orphaned-git-worktree`:按位置、形状或新旧识别的规则,不是目录名(还没上报的崩溃报告、停了一周以上的未完成下载、运行中的浏览器没在用的旧框架、`<应用>-updater/pending`、Cursor 的临时工作区、Git 已不跟踪的检出)→ 票 12 或之后的批次。
+- `telegram-media-cache`:另一处位置的登记名,不是缓存目录名。
+- `link-thumbnail-cache` / `chat-media-cache`:应用缓存里更深一层的子目录名(`LinkThumbnail` / `ChatMedia`),不是缓存目录一级名 → 票 12 或之后的批次。
 
 合计:进知识库 179 个名字、现有规则担保 27、交给票 10 131、留给通用发现 30、不列 21、不属于任何在办票 16。
 
