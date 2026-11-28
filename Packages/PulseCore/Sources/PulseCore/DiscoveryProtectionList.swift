@@ -26,6 +26,9 @@ public enum DiscoveryProtectionList {
         "pasteboard", "useractivityd", "handoff",
         // 编译模型缓存:守护进程在跑时清了,识别功能坏到它重启。
         "e5bundlecache",
+        // 屏幕使用时间:使用历史删了不回来,还关系着家长控制。只挡 `com.apple.` 前缀会漏掉
+        // 不带前缀的写法(对齐对象的同款规则按这个词片段拦;p7-cleaner/09 搬运时补)。
+        "screentime",
         // 对齐对象在通用扫描上的两个硬跳过:`Google` 目录名下是 Chrome 运行时的网络缓存,
         // 整个扫走时 Chrome 还在跑,它的记录是连着七次清理都失败;`mbx` 是 Rust 构建缓存的
         // 垫片与调度租约,正在用的检出链接进来,整个扫走断了构建。
@@ -59,14 +62,17 @@ public enum DiscoveryProtectionList {
     /// 不带 `com.apple.` 前缀的系统守护进程缓存(整名相等,小写比较):iCloud 同步库、
     /// 地图瓦片、钱包卡票、游戏中心、家庭圈、缩略图。只认前缀会漏掉它们。首批按本机
     /// 缓存目录实测,发现一个补一个;对齐对象的通用扫描同样硬跳过 CloudKit 与 FamilyCircle。
+    /// p7-cleaner/09 自对齐对象说明库补三个:软件更新、Siri 语音、App Store 数据迁移工具。
     public static let systemDaemonCacheNames: Set<String> = [
         "cloudkit", "geoservices", "passkit", "gamekit", "quicklook",
         "familycircle", "familycircled", "thumbnailscache",
+        "ssu", "siritts", "amsdatamigratortool",
     ]
 
     /// 系统所有:`com.apple.` 前缀、名为「Apple」的目录,或不带前缀的那批守护进程缓存。
     /// 它们的守护进程常年常驻,「在运行就跳过」对它们没有可靠信号;认得的苹果缓存走
-    /// 知识库逐条担保。
+    /// 知识库逐条担保——担保的结果恒为「先检查」,不自动勾(p7-cleaner/09)。例外只有
+    /// Safari 的缓存:浏览器一组同档是 p6 的既有决定。
     public static func isSystemOwned(name: String) -> Bool {
         let lowered = name.lowercased()
         return lowered.hasPrefix("com.apple.")
