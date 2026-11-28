@@ -29,3 +29,13 @@ Blocked by: 无(可立即开始)
 ## 依据与纪律
 
 spec `p7-cleaner/spec.md`;GLOSSARY「安全白名单」「项目产物」「安全档」。上游许可 MIT,可移植,逐条注明出处。
+
+## Comments
+
+**2026-11-28 票 09 交接(上游说明库 ceacaf8 逐条对账后,归本票的部分;未动本票正文)**
+
+- 上游说明库里交给本票的:**带目录名的 83 条,加没登记目录名的 51 条**。逐条清单(上游 key、档位、原名)在票 09 的 Comments「交接」一节;机器可读的版本是 `Packages/PulseCore/Tests/PulseCoreTests/AppCacheCatalogPortLedgerTests.swift` 搬运账本里下落为 `.ticket10` 的行——本票搬一条,就把那一行的下落改成 `.rule("<规则 id>")`,账本测试会盯着。
+- **本机在场、值得先看**:`ms-playwright`(上游 medium;本机 572 MB,清了测试会失败,要重新 `npx playwright install`)、`bun-cache`(本机 `bun` 47 MB)、`typescript-type-cache`、`cypress-cache`、`mise-cache`、`pre-commit-cache`、`puppeteer-browsers`。另:本机 `pulse-swiftpm`(399 MB)是 Pulse 自己的 SwiftPM 构建缓存,上游表里没有,也归开发工具规则。
+- **现有规则里档位比上游松的两处**(p6 的决定,上游 medium → 我们「可安全清理」;本票范围 1「档位对齐上游」时要表态):`gradle.caches`(`.gradle/caches`;上游 `gradle-global-cache` medium)、`maven.repository`(`.m2/repository`;上游 `maven` medium)。账本里这两条上游条目的下落因此记成「交给票 10」,没记成「已由现有规则担保」。
+- **先读上游的二级闸门再搬**:`DeletionSafetyPolicy.isOfferedForCleanup` 有一串动态拒绝(Playwright 构建在用、CLI 版本在用、旧工具版本、链接竞态、Go 模块缓存的形状),`SafetyTierList` 有按后缀 / 形状的规则(`.shipit`、Chromium 形状、`-updater/pending`)。票 09 的教训:说明表 ≠ 会列出的东西。
+- **手法**:条目与账本行由脚本从上游 JSON 生成,写出前逐名对照原件(票 09 的自检抓到一处手抄错字)。上游的浅克隆在 `/tmp/purge-app-src-09/repo`(临时,可能已清;提交 ceacaf8)。
