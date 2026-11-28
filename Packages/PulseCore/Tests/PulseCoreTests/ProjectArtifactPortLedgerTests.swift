@@ -353,6 +353,25 @@ final class ProjectArtifactPortLedgerTests: XCTestCase {
         }
     }
 
+    /// 反查:我们规则里的每个标记,都得是上游指向它的那些行登记过的——没有自加的标记
+    /// (曾经多出过四个上游没有的「上一级」标记,就是这样混进来的)。登记了例外的行不比。
+    func testOurMarkersAreAllUpstreamMarkers() {
+        let rules = rulesByID
+        var expected: [String: Set<String>] = [:]
+        for row in ledger where notMirrored[row.folder] == nil {
+            if let id = row.rule {
+                expected[id, default: []].formUnion(expectedMarkers(row))
+            }
+        }
+        // 只由「登记了例外的行」担保的规则(venv / .venv)不比:它们的标记本来就不照上游。
+        let mirrored = Set(ledger.filter { notMirrored[$0.folder] == nil }.compactMap(\.rule))
+        for (id, ours) in rules.map({ ($0.key, ourMarkers($0.value)) }) where !ours.isEmpty && mirrored.contains(id) {
+            let extra = ours.subtracting(expected[id] ?? [])
+            XCTAssertEqual(extra, [], "规则 \(id) 里有上游没登记的标记 \(extra)")
+        }
+        XCTAssertGreaterThan(expected.keys.count, 30, "护栏在空转")
+    }
+
     /// 反过来:知识库里的每条规则,账本里都有上游的行指向它——没有绕过账本进来的规则。
     func testEveryRuleIsReachableFromTheLedger() {
         let ported = Set(ledger.compactMap(\.rule))

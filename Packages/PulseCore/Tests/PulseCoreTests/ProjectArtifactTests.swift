@@ -223,18 +223,22 @@ final class ProjectArtifactTests: XCTestCase {
         XCTAssertEqual(Set(out.map(\.path)), ["/dev/proj/android/.gradle", "/dev/proj/project/target"])
     }
 
-    /// 「在场才列」:规则登记了、盘上没有那个目录,就不产出候选——38 条规则一个都不凭空出现。
+    /// 「在场才列」:盘上只有一部分规则的目录时,只有它们出候选——其余规则登记了也不凭空出现
+    /// (标记探测一律说「有」也一样:树里没有目录名对得上的节点,就没有候选)。
     func testRulesWithoutALocationOnDiskProduceNothing() {
-        let empty = dir("empty-project", under: "/dev", children: [dir("src", under: "/dev/empty-project", bytes: 10)])
-        let root = dir("dev", under: "/", children: [empty])
-        XCTAssertTrue(match(in: [root], roots: ["/dev"]).isEmpty)
-        // 标记探测一律说「有」也一样:树里没有目录名对得上的节点,就没有候选。
-        XCTAssertTrue(match(
-            in: [root],
-            roots: ["/dev"],
-            files: nil,
-            extensions: { _ in ["sln", "tf", "uproject", "cabal"] }
-        ).isEmpty)
+        let project = dir("proj", under: "/dev", children: [
+            dir("node_modules", under: "/dev/proj", bytes: 10),
+            dir("src", under: "/dev/proj", bytes: 5),
+        ])
+        let root = dir("dev", under: "/", children: [project])
+
+        let out = match(
+            in: [root], roots: ["/dev"], files: nil,
+            extensions: { _ in ["csproj", "sln", "cabal", "tf", "uproject"] }
+        )
+        XCTAssertEqual(out.map(\.ruleID), ["artifact.node_modules"], "只有盘上有的那条出候选")
+        let absent = Set(ProjectArtifactRuleTable.builtin.map(\.id)).subtracting(out.map(\.ruleID))
+        XCTAssertGreaterThan(absent.count, 30, "其余三十多条规则都登记了,一条都没凭空出现")
     }
 
     /// 重建要花真实时间的(重新下载依赖、重新编译很久),即使上游标 safe 也落「先检查」(票面范围 1)。
