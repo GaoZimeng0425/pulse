@@ -266,7 +266,7 @@ public enum CleanRunAbort: Sendable, Equatable {
         case .authorizationCancelled:
             "未做任何改动,勾选保留——可以重新发起。"
         case let .channelUnavailable(reason):
-            "\(reason)。这一批都没有动,勾选保留。"
+            "\(reason)。这一批没有清理,勾选保留。"
         }
     }
 }

@@ -39,6 +39,10 @@ struct LiveCleanSystemTrashExecutor: CleanSystemTrashExecutor {
     /// 专属子目录在废纸篓里的上一级。
     static let trashSubdirectory = "Pulse 系统级"
 
+    /// 复核脚本放暂存目录的地方与名字前缀(与 pulse-system-trash.sh 保持一致)。
+    static let stagingParent = "/var/tmp"
+    static let stagingDirectoryPrefix = "pulse-system-trash."
+
     /// 专属子目录里同一个名字最多排到第几号;再往后按「挪不进废纸篓」如实报,绝不覆盖。
     private static let maximumNameSequence = 9999
 
@@ -79,20 +83,40 @@ struct LiveCleanSystemTrashExecutor: CleanSystemTrashExecutor {
     ///   - privileged: 带不带「with administrator privileges」。生产恒 true;测试用 false 跑
     ///     同一条命令但不弹密码框。
     ///   - environment: 追加给子进程的环境变量(生产为空;测试用它传自测开关)。
-    ///   - trashRoot / temporaryDirectory: 生产 = 用户的废纸篓与临时目录;测试指向临时目录。
+    ///   - trashRoot / temporaryDirectory / stagingParent: 生产 = 用户的废纸篓、临时目录与脚本的
+    ///     暂存目录所在;测试指向临时目录。
     static func run(
         _ request: SystemTrashRequest,
         scriptPath: String?,
         privileged: Bool,
         environment: [String: String],
         trashRoot: String,
-        temporaryDirectory: String
+        temporaryDirectory: String,
+        stagingParent: String = stagingParent
     ) async -> SystemTrashOutcome {
         guard let scriptPath else {
             return .channelUnavailable(reason: "复核脚本缺失(应用包不完整)")
         }
         guard request.paths.allSatisfy(isEncodableInManifest) else {
             return .channelUnavailable(reason: "有条目的路径含换行或制表符,没法写进清单文件")
+        }
+        // 废纸篓进不去就不必让用户输密码:这一批的专属子目录先建出来,建不出来 = 通道不可用。
+        let target = trashRoot + "/" + trashSubdirectory + "/" + stampDirectoryName(for: Date())
+        do {
+            try FileManager.default.createDirectory(
+                atPath: target, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]
+            )
+        } catch {
+            return .channelUnavailable(reason: "废纸篓里建不了目标目录:\(error.localizedDescription)")
+        }
+        // 一条都没进废纸篓时,别留空文件夹。
+        defer { discardIfEmpty(target) }
+        let recovered = recoverLeftoverStaging(in: stagingParent, trashRoot: trashRoot)
+        if recovered > 0 {
+            LogService.info(
+                "系统级清理:上次没来得及进废纸篓的 \(recovered) 个文件已收进「\(trashSubdirectory)」",
+                category: "Cleaner"
+            )
         }
         let manifest = (temporaryDirectory as NSString).appendingPathComponent(
             "pulse-system-trash-\(UUID().uuidString).manifest"
@@ -122,32 +146,72 @@ struct LiveCleanSystemTrashExecutor: CleanSystemTrashExecutor {
         case let .channelUnavailable(reason):
             return .channelUnavailable(reason: reason)
         case let .completed(handoff):
-            return .completed(relocate(handoff, trashRoot: trashRoot))
+            return .completed(relocate(handoff, target: target))
         }
+    }
+
+    /// 收走上次没来得及进废纸篓的暂存目录:app 在脚本交接之后、挪进废纸篓之前被杀,文件就
+    /// 留在脚本的暂存目录里。它们是用户已经授权移走的,这次补挪进废纸篓(暂存目录名当
+    /// 批次名,免得和这一批混)。只认属于当前用户的目录(交接过的);没交接的归脚本自己
+    /// 在下一次运行时放回原处。返回收走的文件数。
+    static func recoverLeftoverStaging(in stagingParent: String, trashRoot: String) -> Int {
+        let manager = FileManager.default
+        guard let names = try? manager.contentsOfDirectory(atPath: stagingParent) else { return 0 }
+        var recovered = 0
+        for name in names where name.hasPrefix(stagingDirectoryPrefix) {
+            let leftover = (stagingParent as NSString).appendingPathComponent(name)
+            guard isDirectoryOwnedByCurrentUser(leftover) else { continue }
+            let destination = trashRoot + "/" + trashSubdirectory + "/" + name
+            do {
+                try manager.createDirectory(
+                    atPath: destination, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]
+                )
+            } catch {
+                continue // 这一个收不了,原样留着
+            }
+            guard let entries = try? manager.contentsOfDirectory(atPath: leftover) else {
+                discardIfEmpty(destination)
+                continue
+            }
+            var remaining = false
+            for entry in entries {
+                do {
+                    try manager.moveItem(
+                        atPath: (leftover as NSString).appendingPathComponent(entry),
+                        toPath: (destination as NSString).appendingPathComponent(entry)
+                    )
+                    recovered += 1
+                } catch {
+                    remaining = true
+                }
+            }
+            if remaining {
+                discardIfEmpty(destination)
+            } else {
+                _ = rmdir(leftover)
+            }
+        }
+        return recovered
+    }
+
+    private static func isDirectoryOwnedByCurrentUser(_ path: String) -> Bool {
+        var status = stat()
+        guard lstat(path, &status) == 0 else { return false }
+        return (status.st_mode & S_IFMT) == S_IFDIR && status.st_uid == getuid()
     }
 
     // MARK: 第二段:进废纸篓(以调用者身份)
 
-    /// 把暂存目录里的文件挪进废纸篓的专属子目录。挪不动的留在暂存目录(已是调用者的
-    /// 文件),原因里写明在哪;都挪走了才收掉空的暂存目录。
-    /// - Parameter now: 子目录名里的时刻(测试注入,好预先摆好同名文件)。
-    static func relocate(_ handoff: Handoff, trashRoot: String, now: Date = Date()) -> TrashRecycleOutcome {
+    /// 把暂存目录里的文件挪进废纸篓的专属子目录(目标目录由调用方在要授权之前建好)。挪不动
+    /// 的留在暂存目录(已是调用者的文件),原因里写明在哪,下次运行时收走;都挪走了才收掉
+    /// 空的暂存目录。
+    /// - Parameter target: 这一批在废纸篓里的专属子目录(已存在)。
+    static func relocate(_ handoff: Handoff, target: String) -> TrashRecycleOutcome {
         var outcome = TrashRecycleOutcome(failures: handoff.receipt.failures)
         guard let staging = handoff.staging else {
             // 没交接 = 一条都没移走;脚本这时候不该报「已移走」,报了也不认。
             for source in handoff.receipt.recycled.keys {
                 outcome.failures[source] = "复核脚本说已移走,却没有交出暂存目录"
-            }
-            return outcome
-        }
-        let target = trashRoot + "/" + trashSubdirectory + "/" + stampDirectoryName(for: now)
-        do {
-            try FileManager.default.createDirectory(
-                atPath: target, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]
-            )
-        } catch {
-            for (source, staged) in handoff.receipt.recycled {
-                outcome.failures[source] = "已移出原处,暂存在 \(staged),没能放进废纸篓:\(error.localizedDescription)"
             }
             return outcome
         }
@@ -376,6 +440,8 @@ struct LiveCleanSystemTrashExecutor: CleanSystemTrashExecutor {
         case "owner-not-system": "属主不是 root 或系统用户"
         case "too-young": "还没满 7 天(移动前又核了一次)"
         case "ownership-not-changed": "归属改不成当前用户,已放回原处"
+        case "duplicate": "同一个条目在清单里出现了不止一次,第二次没动"
+        case "not-restored": "没能放回原处(原处又出现了同名条目);文件暂时留在暂存目录,下次运行时收进废纸篓"
         default: "复核未通过(\(code))"
         }
     }

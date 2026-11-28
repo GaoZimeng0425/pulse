@@ -12,7 +12,8 @@ echo "🐚  2/4 脚本自测(合成夹具,秒级)"
 # scripts/gc-build.sh 会 rm -rf:「删什么 / 绝不删什么」由它的自测钉住,规则被改坏在这里红。
 sh scripts/test-gc-build.sh
 # Pulse/Resources/SystemTrash/pulse-system-trash.sh 以 root 身份移动文件(提权一侧的复核):
-# 「哪些形状放行、哪些拒绝」由它的自测钉住,不提权、不要密码。
+# 「哪些形状放行、哪些拒绝」由它的自测钉住,不提权、不要密码。改过复核脚本或它的自测之后,
+# 另跑一次 scripts/test-system-trash-mutations.sh(逐条弄坏规则验自测,约一分半,不挂在这里)。
 sh scripts/test-system-trash.sh
 
 echo "🛠  3/4 构建"

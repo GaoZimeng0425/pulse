@@ -191,7 +191,7 @@ final class McpCleanBridgeTests: XCTestCase {
         XCTAssertEqual(response.status, .appError)
         XCTAssertEqual(
             response.message,
-            "系统级条目移不了:复核脚本缺失(应用包不完整)。这一批都没有动,勾选保留。"
+            "系统级条目移不了:复核脚本缺失(应用包不完整)。这一批没有清理,勾选保留。"
         )
     }
 
