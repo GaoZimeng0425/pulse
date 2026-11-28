@@ -46,11 +46,11 @@ struct MenuBarPopoverGate: View {
                 )
             }
         }
-        // 可见性信号原位保留(采样节奏 1s/5s 与排行闸门的既有驱动,工单 spec):
-        // onAppear / onDisappear 的挂点从 DashboardView 挪到本根视图。上报所在
-        // tab(进场还原上次所在页),关闭 = nil;后续切换由 onTabChange 续报。
-        .onAppear { monitor.setPopoverTab(lastTab) }
-        .onDisappear { monitor.setPopoverTab(nil) }
+        // 可见性开合只由 AppKit 层 MenuBarController.openPanel / closePanel 上报,本视图
+        // 只续报弹窗开着时的 tab 切换(onTabChange)。不在 onAppear / onDisappear 里写:
+        // 面板从没上屏时 onAppear 照样触发、onDisappear 永不触发(phantom-popover,
+        // 2026-11-28 探针实测)——「重开主窗口」路径会顺手建出面板,Pulse 便认定弹窗
+        // 开着,采样卡 1s、隐形弹窗每秒整页重算(实测 ~15% CPU → 复位后 1.6%)。
         // 菜单栏标签常驻:app 拉起即开始采样(start 幂等)。
         .task { monitor.start() }
     }

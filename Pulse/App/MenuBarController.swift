@@ -28,10 +28,14 @@ final class MenuBarController: NSObject {
     /// 开主窗口的落点簿(与主窗口共用一份):冷开窗时把广播里的 tab / 排行卡先记进去。
     private let landing: MainWindowLanding
     private let statusItem: NSStatusItem
+    /// 面板是否已建:closePanel 只收已存在的面板,不为「收起」去建一个(phantom-popover:
+    /// 「重开主窗口」路径会先 closePanel,从没开过弹窗时那一下等于白建整棵弹窗视图树)。
+    private var panelCreated = false
     /// 面板懒创建:首开才建。常驻菜单栏 app 启动即零可见窗,提前把
     /// NSVisualEffectView + NSHostingView 塞进一个隐藏面板,等于让窗口服务
     /// 从拉起就养着一棵可能自扰的视图树(40% 空转的头号嫌疑,懒创建一举排除)。
     private lazy var panel: PopupPanel = {
+        panelCreated = true
         // TEMP-EXPERIMENT(终局二分):debug.staticPanelContent=YES 时面板只挂
         // 静态文本(可见性管线照常驱动)——0% = 内容管线纵火,40% = 面板机制。
         let content: MenuBarPopoverGate? = UserDefaults.standard
@@ -159,7 +163,9 @@ final class MenuBarController: NSObject {
         monitor.setPopoverTab(nil)
         closedAt = Date()
         statusItem.button?.isHighlighted = false
-        panel.orderOut(nil)
+        if panelCreated {
+            panel.orderOut(nil)
+        }
     }
 
     // MARK: - 徽标
