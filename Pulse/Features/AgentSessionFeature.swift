@@ -8,6 +8,12 @@ import PulseCore
 /// 按 catalog 内部节流(≥5s 一轮),节流轮只按 pid 存活过滤缓存并重算时长;实例
 /// 退出 ≤1 轮内下榜。智能体 tab 卡片直读 `snapshot`。
 ///
+/// 盘点两道闸(agent-scan-cost,2026-11-28 用户报「Pulse 常驻 CPU 近 10%」,采样定位
+/// 这里占 Pulse 主线程开销近一半):①智能体页可见才盘点——快照只有这一页在读
+/// (ADR-0006 可见性门控同理),不可见期只记最近一轮的进程表,页面一打开立即补一轮,
+/// 不等下一拍;②盘点(文件 IO + 解析)跑在 utility 任务里不上主线程,单飞互斥,
+/// 落地回主线程发布,同轮接着判 git 闸(git 要用新快照的工作目录集)。
+///
 /// git 状态(agent-git-status/01)是旁挂读数,不走 catalog:会话工作目录 → 分支 +
 /// 未提交,`gitStatuses` 查表给会话卡。三道闸:智能体页可见才采(分支/脏是慢变
 /// 读数)、节流双档(cwd 集变化 5s / 稳态 15s——探针 30ms/仓,16 仓上限一轮
@@ -32,6 +38,11 @@ final class AgentSessionFeature: MonitorFeature {
     @ObservationIgnored private var lastGitKickAt: Date?
     @ObservationIgnored private var lastGitDirs: [String] = []
     @ObservationIgnored private var gitTaskInFlight = false
+    @ObservationIgnored private var catalogTaskInFlight = false
+    /// 在飞期间来了新一轮:落地后用最新进程表补跑一次(退出实例 ≤1 轮下榜不打折)。
+    @ObservationIgnored private var catalogRerunPending = false
+    /// 最近一轮的进程表与时刻:不可见期只记不算,页面打开那一刻用它立即补一轮。
+    @ObservationIgnored private var lastRound: (processes: [RawProcess], takenAt: Date)?
 
     init(reader: any AgentSessionReading, gitReader: (any SessionGitStatusReading)? = nil) {
         self.reader = reader
@@ -40,16 +51,52 @@ final class AgentSessionFeature: MonitorFeature {
 
     /// 盘点时刻与快照同一时间轴(不另取钟)。
     func onRound(_ context: RoundContext) {
-        let alivePids = Set(context.update.snapshot.processes.map(\.pid))
-        let next = catalog.update(reader: reader, alivePids: alivePids, now: context.takenAt)
-        if next != snapshot {
-            snapshot = next
-        }
-        kickGitStatusesIfDue(now: context.takenAt)
+        lastRound = (context.update.snapshot.processes, context.takenAt)
+        guard agentsVisible else { return }
+        kickCatalog()
     }
 
     func visibilityChanged(_ visibility: MonitorVisibility) {
+        let wasVisible = agentsVisible
         agentsVisible = visibility.popoverTab == .agents || visibility.mainWindowTab == .agents
+        if agentsVisible, !wasVisible {
+            kickCatalog()
+        }
+    }
+
+    /// 用最近一轮的进程表推进 catalog:值拷贝进 detached 任务算,算完连同推进后的
+    /// catalog 一起回主线程落定(单飞:catalog 只有一份真身;在飞期间来的轮次记一笔,
+    /// 落地后补跑一次,不排队累积)。
+    private func kickCatalog() {
+        guard let lastRound else { return }
+        guard !catalogTaskInFlight else {
+            catalogRerunPending = true
+            return
+        }
+        catalogTaskInFlight = true
+        let working = catalog
+        let reader = reader
+        let (processes, now) = lastRound
+        Task.detached(priority: .utility) { [weak self] in
+            var advanced = working
+            let next = advanced.update(reader: reader, alivePids: Set(processes.map(\.pid)), now: now)
+            let finished = advanced
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                catalog = finished
+                catalogTaskInFlight = false
+                if next != snapshot {
+                    snapshot = next
+                }
+                kickGitStatusesIfDue(now: now)
+                if catalogRerunPending {
+                    catalogRerunPending = false
+                    if agentsVisible {
+                        kickCatalog()
+                    }
+                }
+            }
+        }
     }
 
     /// 三道闸全过才采一批;读数下一轮自然上屏(detached + MainActor 回跳,

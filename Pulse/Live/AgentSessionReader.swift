@@ -13,7 +13,7 @@ import PulseCore
 /// - `~/.claude/sessions/<pid>.json`(活跃实例注册表)
 /// - `~/.claude/usage-snapshot.json`(订阅用量)
 /// - `~/.claude/projects/<cwd-slug>/<sessionId>.jsonl`(slug = cwd 的 "/"→"-")
-/// - `~/.zcode/cli/agents/sess_*/agent_*/metadata.json`(近窗按文件 mtime)
+/// - `~/.zcode/cli/agents/sess_*/agent_*/metadata.json`(近窗按文件 mtime;清单与内容分读)
 struct LiveAgentSessionReader: AgentSessionReading {
     /// jsonl 尾读窗口:末 128KB(末条 assistant usage 记录远小于此;窗口头部的
     /// 半行由解析器自然丢弃)。
@@ -105,37 +105,58 @@ struct LiveAgentSessionReader: AgentSessionReading {
 
     // MARK: ZCode
 
-    func zcodeAgentMetadataFiles(lookback: TimeInterval, now: Date) -> [(session: String, data: Data)] {
-        let fileManager = FileManager.default
+    /// 清单只走 POSIX `readdir` + `stat`(agent-scan-cost,2026-11-28 实测):原先用
+    /// `contentsOfDirectory` + 不带目录提示的 `appendingPathComponent` + `attributesOfItem`,
+    /// 每个 agent 目录要多跑两三次 getattrlist 与整套属性字典,本机 1146 个目录一轮
+    /// ~100ms+;同样的遍历 readdir + stat 约 20ms。内容不在这里读(编排器按修改时间增量)。
+    func zcodeAgentMetadataCandidates(lookback: TimeInterval, now: Date) -> [ZCodeMetadataCandidate] {
         let cutoff = now.addingTimeInterval(-lookback)
-        let sessionNames = (try? fileManager.contentsOfDirectory(atPath: zcodeAgentsDirectory.path)) ?? []
-        // 每会话:收集近窗 metadata(URL, mtime),按 agent 数上限截(新者优先),
-        // 全空(近窗无更新)不进结果;会话按最新 agent mtime 排序并按上限截。
-        var sessions: [(name: String, files: [(url: URL, mtime: Date)])] = []
-        for name in sessionNames where name.hasPrefix("sess_") {
-            let sessionDirectory = zcodeAgentsDirectory.appendingPathComponent(name, isDirectory: true)
-            let agentNames = (try? fileManager.contentsOfDirectory(atPath: sessionDirectory.path)) ?? []
-            var files: [(url: URL, mtime: Date)] = []
-            for agent in agentNames where agent.hasPrefix("agent_") {
-                let url = sessionDirectory
-                    .appendingPathComponent(agent, isDirectory: true)
-                    .appendingPathComponent("metadata.json")
-                guard let mtime = modificationDate(of: url), mtime >= cutoff else { continue }
-                files.append((url, mtime))
+        let root = zcodeAgentsDirectory.path
+        // 每会话:收集近窗 metadata,按 agent 数上限截(新者优先),全空(近窗无更新)
+        // 不进结果;会话按最新 agent mtime 排序并按上限截。
+        var sessions: [[ZCodeMetadataCandidate]] = []
+        for name in Self.entryNames(in: root) where name.hasPrefix("sess_") {
+            let sessionPath = root + "/" + name
+            var files: [ZCodeMetadataCandidate] = []
+            for agent in Self.entryNames(in: sessionPath) where agent.hasPrefix("agent_") {
+                let path = sessionPath + "/" + agent + "/metadata.json"
+                guard let mtime = Self.modificationDate(atPath: path), mtime >= cutoff else { continue }
+                files.append(ZCodeMetadataCandidate(session: name, path: path, modifiedAt: mtime))
             }
             guard !files.isEmpty else { continue }
-            files.sort { $0.mtime > $1.mtime }
-            sessions.append((name, Array(files.prefix(AgentSessionCatalog.maxZCodeAgentsPerSession))))
+            files.sort { $0.modifiedAt > $1.modifiedAt }
+            sessions.append(Array(files.prefix(AgentSessionCatalog.maxZCodeAgentsPerSession)))
         }
-        sessions.sort { $0.files.first?.mtime ?? .distantPast > $1.files.first?.mtime ?? .distantPast }
-        return sessions.prefix(AgentSessionCatalog.maxZCodeSessions).flatMap { session in
-            session.files.compactMap { file in
-                (try? Data(contentsOf: file.url)).map { (session: session.name, data: $0) }
-            }
-        }
+        sessions.sort { ($0.first?.modifiedAt ?? .distantPast) > ($1.first?.modifiedAt ?? .distantPast) }
+        return Array(sessions.prefix(AgentSessionCatalog.maxZCodeSessions).joined())
     }
 
-    private func modificationDate(of url: URL) -> Date? {
-        try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date
+    func zcodeAgentMetadata(atPath path: String) -> Data? {
+        FileManager.default.contents(atPath: path)
+    }
+
+    /// 目录项名(不含 . / ..);目录不存在或不可读返回空。
+    private static func entryNames(in directory: String) -> [String] {
+        guard let handle = opendir(directory) else { return [] }
+        defer { closedir(handle) }
+        var names: [String] = []
+        while let entry = readdir(handle) {
+            var nameBuffer = entry.pointee.d_name
+            let name = withUnsafeBytes(of: &nameBuffer) { raw in
+                String(bytes: raw.prefix(Int(entry.pointee.d_namlen)), encoding: .utf8)
+            }
+            if let name, name != ".", name != ".." {
+                names.append(name)
+            }
+        }
+        return names
+    }
+
+    /// 文件修改时间(纳秒精度——编排器拿它判「变没变」);不存在返回 nil。
+    private static func modificationDate(atPath path: String) -> Date? {
+        var info = stat()
+        guard stat(path, &info) == 0 else { return nil }
+        let spec = info.st_mtimespec
+        return Date(timeIntervalSince1970: TimeInterval(spec.tv_sec) + TimeInterval(spec.tv_nsec) / 1_000_000_000)
     }
 }

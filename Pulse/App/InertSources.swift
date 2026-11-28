@@ -267,8 +267,12 @@ struct InertAgentSessionReader: AgentSessionReading {
         0
     }
 
-    func zcodeAgentMetadataFiles(lookback: TimeInterval, now: Date) -> [(session: String, data: Data)] {
+    func zcodeAgentMetadataCandidates(lookback: TimeInterval, now: Date) -> [ZCodeMetadataCandidate] {
         []
+    }
+
+    func zcodeAgentMetadata(atPath path: String) -> Data? {
+        nil
     }
 }
 
