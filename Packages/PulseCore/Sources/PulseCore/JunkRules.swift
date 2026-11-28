@@ -205,9 +205,9 @@ public enum JunkRuleTable {
     static let purgeAppArtifacts = "purge-app (MIT) ProjectArtifactCatalog.swift"
 
     /// 「重建要花真实时间」的门槛(票面 p7-cleaner/10:这类一律先检查;与项目产物规则表同一个口径):
-    /// 重建要重新下载一大批依赖、或重新编译一个不小的工程——Gradle / Maven / uv / sbt / Conda /
-    /// NuGet / Vagrant / Puppeteer / Cypress / Playwright 这些落「先检查」;只是「下一次用的时候重新
-    /// 下载」的(npm、Homebrew、Dart、Hex 这些包缓存)照上游归「可安全清理」。
+    /// 重建的是**环境或编译结果**、而且上游或我们自己的说明里写着慢——Gradle / Maven / uv / sbt /
+    /// Conda / NuGet / Vagrant / Puppeteer / Cypress / Playwright 这些落「先检查」。单纯的包下载缓存
+    /// (npm、Homebrew、Dart pub、Hex)工具每次都会重做,照上游归「可安全清理」。拿不准的以本表清单为准。
     ///
     /// 开发工具规则(p4 首批 + p6-cleaner/01 补行 + p7-cleaner/10 自上游补差);浏览器 / 应用缓存
     /// 目录规则由 `AppCacheCatalog` 生成,固定路径条目(日志、Electron 应用的缓存)在 `appCacheFixedRules`。
@@ -537,7 +537,7 @@ public enum JunkRuleTable {
         // —— p7-cleaner/10:自上游 DevScanner.globalCacheDefinitions 补差(路径逐字取自上游源码)——
         // 上游标「先检查」(medium)的照搬是「先检查」;逐条的下落由 GlobalToolCachePortLedgerTests 的账本钉住。
         // —— 上游全局缓存定义里有的(路径逐字取自上游源码;与上游档位不同的逐条注明)——
-        // 上游「Xcode Documentation Cache
+        // 上游「Xcode Documentation Cache」
         JunkRule(
             id: "xcode.documentationCache",
             group: .globalToolCache,
@@ -548,7 +548,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "book"
         ),
-        // 上游「CocoaPods
+        // 上游「CocoaPods」
         JunkRule(
             id: "cocoapods.specRepos",
             group: .globalToolCache,
@@ -559,7 +559,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 上游「npm Logs
+        // 上游「npm Logs」
         JunkRule(
             id: "npm.logs",
             group: .globalToolCache,
@@ -570,7 +570,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "doc.text"
         ),
-        // 上游「Dart Pub Cache
+        // 上游「Dart Pub Cache」
         JunkRule(
             id: "dart.pubCache",
             group: .globalToolCache,
@@ -584,7 +584,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 上游「pre-commit Environments
+        // 上游「pre-commit Environments」
         JunkRule(
             id: "precommit.environments",
             group: .globalToolCache,
@@ -595,7 +595,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 上游「prek Cache
+        // 上游「prek Cache」
         // 与上游的差异:上游要求 prek 空闲时清;在不在用我们这里不判,靠先检查
         JunkRule(
             id: "prek.cache",
@@ -612,7 +612,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 上游「Expo Cache
+        // 上游「Expo Cache」
         JunkRule(
             id: "expo.cache",
             group: .globalToolCache,
@@ -631,7 +631,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "iphone"
         ),
-        // 上游「pyenv and rbenv Downloads
+        // 上游「pyenv and rbenv Downloads」
         JunkRule(
             id: "pyenv.rbenvDownloads",
             group: .globalToolCache,
@@ -645,7 +645,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 上游「Oh My Zsh Cache
+        // 上游「Oh My Zsh Cache」
         JunkRule(
             id: "ohmyzsh.cache",
             group: .globalToolCache,
@@ -656,7 +656,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "terminal"
         ),
-        // 上游「opam Download Cache
+        // 上游「opam Download Cache」
         JunkRule(
             id: "opam.downloads",
             group: .globalToolCache,
@@ -667,7 +667,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 上游「Puppeteer Browsers
+        // 上游「Puppeteer Browsers」
         JunkRule(
             id: "puppeteer.browsers",
             group: .globalToolCache,
@@ -678,7 +678,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "globe"
         ),
-        // 上游「Dart Analysis Cache
+        // 上游「Dart Analysis Cache」
         JunkRule(
             id: "dart.analysisCache",
             group: .globalToolCache,
@@ -689,7 +689,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "doc.text"
         ),
-        // 上游「Hermes Agent Cache
+        // 上游「Hermes Agent Cache」
         // 与上游的差异:上游要求 Hermes 空闲时清(运行中的任务可能在用);在不在用我们这里不判,靠先检查
         JunkRule(
             id: "hermes.agentCache",
@@ -701,7 +701,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "sparkles"
         ),
-        // 上游「opencode Cache
+        // 上游「opencode Cache」
         // 与上游的差异:上游要求 opencode 空闲时清;在不在用我们这里不判,靠先检查
         JunkRule(
             id: "opencode.cache",
@@ -713,7 +713,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "sparkles"
         ),
-        // 上游「Conda Package Cache
+        // 上游「Conda Package Cache」
         // 与上游的差异:上游的说明是「用 conda clean --all 更合适」;照列,档位先检查
         JunkRule(
             id: "conda.packageCache",
@@ -733,7 +733,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "cube"
         ),
-        // 上游「nvm Download Cache
+        // 上游「nvm Download Cache」
         JunkRule(
             id: "nvm.downloads",
             group: .globalToolCache,
@@ -744,7 +744,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 上游「giget Template Cache
+        // 上游「giget Template Cache」
         JunkRule(
             id: "giget.cache",
             group: .globalToolCache,
@@ -755,7 +755,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "doc"
         ),
-        // 上游「Firebase Emulators
+        // 上游「Firebase Emulators」
         JunkRule(
             id: "firebase.emulators",
             group: .globalToolCache,
@@ -766,7 +766,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "flame"
         ),
-        // 上游「Hex Package Cache
+        // 上游「Hex Package Cache」
         JunkRule(
             id: "hex.packages",
             group: .globalToolCache,
@@ -777,7 +777,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 上游「Rebar3 Cache
+        // 上游「Rebar3 Cache」
         JunkRule(
             id: "rebar3.cache",
             group: .globalToolCache,
@@ -788,7 +788,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 上游「NuGet Packages
+        // 上游「NuGet Packages」
         JunkRule(
             id: "nuget.packages",
             group: .globalToolCache,
@@ -799,7 +799,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 上游「Cabal Packages
+        // 上游「Cabal Packages」
         JunkRule(
             id: "cabal.packages",
             group: .globalToolCache,
@@ -810,7 +810,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 上游「Stack Cache
+        // 上游「Stack Cache」
         JunkRule(
             id: "stack.cache",
             group: .globalToolCache,
@@ -824,7 +824,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 上游「Bazel Cache
+        // 上游「Bazel Cache」
         JunkRule(
             id: "bazel.cache",
             group: .globalToolCache,
@@ -835,7 +835,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "hammer"
         ),
-        // 上游「Android Build Cache
+        // 上游「Android Build Cache」
         JunkRule(
             id: "android.buildCache",
             group: .globalToolCache,
@@ -849,7 +849,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "hammer"
         ),
-        // 上游「Zed Cache
+        // 上游「Zed Cache」
         JunkRule(
             id: "zed.caches",
             group: .globalToolCache,
@@ -860,7 +860,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "chevron.left.forwardslash.chevron.right"
         ),
-        // 上游「SBT Cache
+        // 上游「SBT Cache」
         JunkRule(
             id: "sbt.ivyCache",
             group: .globalToolCache,
@@ -882,7 +882,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 上游「Bundler Cache
+        // 上游「Bundler Cache」
         JunkRule(
             id: "bundler.cache",
             group: .globalToolCache,
@@ -893,7 +893,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 上游「Composer Cache
+        // 上游「Composer Cache」
         JunkRule(
             id: "composer.cache",
             group: .globalToolCache,
@@ -904,7 +904,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 上游「Terraform Cache
+        // 上游「Terraform Cache」
         JunkRule(
             id: "terraform.pluginCache",
             group: .globalToolCache,
@@ -915,7 +915,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 上游「GitHub Actions Cache
+        // 上游「GitHub Actions Cache」
         JunkRule(
             id: "githubActions.cache",
             group: .globalToolCache,
@@ -926,7 +926,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 上游「Vagrant Cache
+        // 上游「Vagrant Cache」
         JunkRule(
             id: "vagrant.cache",
             group: .globalToolCache,
@@ -979,7 +979,7 @@ public enum JunkRuleTable {
         ),
         // —— 上游全局缓存定义里没有的路径:说明库里按名字登记的、上游动态行留下的固定部分、Pulse 自加——
         // 每条路径的来历写在规则旁,并登记在账本测试的 pulseAdded 里(反查:来历不明的路径过不了账本)。
-        // 来历(与账本测试的 pulseAdded 同一份缘由):
+        // 来历:
         //   Library/Caches/com.apple.dt.Xcode.ITunesSoftwareService:说明库 xcode-itunes-service 条目登记的目录名
         JunkRule(
             id: "xcode.deviceSoftwareService",
@@ -991,7 +991,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "iphone"
         ),
-        // 来历(与账本测试的 pulseAdded 同一份缘由):
+        // 来历:
         //   .cache/prisma:上游登记的路径
         //   Library/Caches/prisma-nodejs:说明库 prisma-nodejs 条目登记的目录名
         JunkRule(
@@ -1007,7 +1007,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "cylinder"
         ),
-        // 来历(与账本测试的 pulseAdded 同一份缘由):
+        // 来历:
         //   Library/Caches/ms-playwright:说明库 ms-playwright 条目的 key 就是目录名(上游按版本现算,只列没人用的)
         //   Library/Caches/ms-playwright-go:说明库 ms-playwright 条目登记的别名(Go 版)
         // 与上游的差异:上游只列没有任何项目在用的浏览器版本(读各项目的锁文件现算);我们整目录一条、恒先检查
@@ -1024,7 +1024,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "globe"
         ),
-        // 来历(与账本测试的 pulseAdded 同一份缘由):
+        // 来历:
         //   Library/Caches/typescript:说明库 typescript-type-cache 条目登记的目录名
         JunkRule(
             id: "typescript.typeCache",
@@ -1036,7 +1036,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "chevron.left.forwardslash.chevron.right"
         ),
-        // 来历(与账本测试的 pulseAdded 同一份缘由):
+        // 来历:
         //   Library/Caches/Cypress:说明库 cypress-cache 条目登记的目录名
         JunkRule(
             id: "cypress.binaries",
@@ -1048,7 +1048,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "hammer"
         ),
-        // 来历(与账本测试的 pulseAdded 同一份缘由):
+        // 来历:
         //   Library/Caches/mise:说明库 mise-cache 条目登记的目录名
         //   Library/Caches/rtx:同上(Mise 的旧名)
         JunkRule(
@@ -1064,7 +1064,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "shippingbox"
         ),
-        // 来历(与账本测试的 pulseAdded 同一份缘由):
+        // 来历:
         //   Library/Caches/com.google.android.studio:说明库 android-studio 条目登记的目录名
         JunkRule(
             id: "androidStudio.caches",
@@ -1076,7 +1076,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "chevron.left.forwardslash.chevron.right"
         ),
-        // 来历(与账本测试的 pulseAdded 同一份缘由):
+        // 来历:
         //   Library/Caches/com.apple.python:说明库 apple-python-cache 条目登记的目录名
         JunkRule(
             id: "apple.pythonCache",
@@ -1088,7 +1088,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "chevron.left.forwardslash.chevron.right"
         ),
-        // 来历(与账本测试的 pulseAdded 同一份缘由):
+        // 来历:
         //   Library/Caches/com.apple.iphonesimulator:说明库 simulator-cache 条目登记的目录名
         JunkRule(
             id: "simulator.runtimeCache",
@@ -1100,7 +1100,7 @@ public enum JunkRuleTable {
             source: JunkRuleTable.purgeApp,
             symbolName: "ipad"
         ),
-        // 来历(与账本测试的 pulseAdded 同一份缘由):
+        // 来历:
         //   Library/Caches/pulse-swiftpm:Pulse 自定:本机构建用的 SwiftPM 包缓存
         JunkRule(
             id: "pulse.swiftpmCache",

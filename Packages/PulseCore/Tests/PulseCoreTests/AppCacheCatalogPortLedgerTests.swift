@@ -164,7 +164,7 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         ),
         ("cursor", "safe", ["Cursor": .rule("cursor.cache")]),
         ("jetbrains", "safe", ["JetBrains": .rule("jetbrains.caches"), "JetPackCache": .genericDiscovery]),
-        ("zed", "safe", ["zed": .rule("zed.caches"), "Zed": .rule("zed.caches")]),
+        ("zed", "safe", ["zed": .genericDiscovery, "Zed": .rule("zed.caches")]),
         ("go-build-cache", "safe", ["go-build": .rule("go.buildCache")]),
         ("maven", "medium", ["maven": .rule("maven.repository"), ".m2": .rule("maven.repository")]),
         ("sbt", "medium", ["sbt": .rule("sbt.ivyCache"), ".ivy2": .rule("sbt.ivyCache")]),

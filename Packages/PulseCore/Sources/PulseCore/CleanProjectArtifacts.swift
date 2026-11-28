@@ -24,10 +24,11 @@ import Foundation
 // 通用的 build / dist 不设标记)→ 先检查。逐行的下落由 `ProjectArtifactPortLedgerTests` 的
 // 搬运账本钉住。
 //
-// 「重建要花真实时间」的门槛(票面:这类一律先检查):重建要**重新下载一大批依赖、或重新编译
-// 一个不小的工程**——分钟以上,离不开网络或大量处理器时间(tox 重新下载依赖、Stack / Cabal 重新
+// 「重建要花真实时间」的门槛(票面:这类一律先检查):重建的是**环境或编译结果**、而且上游或我们
+// 自己的说明里写着慢——分钟以上,离不开网络或大量处理器时间(tox 重搭测试环境、Stack / Cabal 重新
 // 编译、Unity 重新导入、Unreal 重新烘焙、Xcode 重新复制设备符号)。慢几十秒的不算:下一次构建、
-// 下一次提交慢一点(DerivedData、Turborepo 缓存、pre-commit 环境),照上游归「可安全清理」。
+// 下一次提交慢一点(DerivedData、Turborepo 缓存、pre-commit 环境),照上游归「可安全清理」;单纯的
+// 包下载(`flutter pub get` 这类)也不算。拿不准的以本表清单为准。
 // 上游 safe 而按这个门槛落「先检查」的三个(tox / .stack-work / dist-newstyle),账本测试允许比上游严。
 //
 // 年龄口径(票面钉死):项目年龄 = 项目内**文件** mtime 的最大值,但**跳过产物
