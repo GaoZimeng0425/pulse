@@ -12,13 +12,11 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         /// 这条说的东西已由这条现有规则担保(安全白名单规则表或项目产物规则表的规则 id);
         /// 名字本身多半不是缓存目录一级名。
         case rule(String)
-        /// 交给票 10:开发工具缓存、项目产物、别处的路径。
-        case ticket10
         /// 有意不列(缘由在票 09 的 Comments)。
         case notListed
         /// 别名没证实是缓存目录名;真有那个目录,由通用发现以「先检查」列出。
         case genericDiscovery
-        /// 不属于任何在办票,去向记在票 09 的 Comments。
+        /// 不属于任何在办票(或交给别的后续批次),去向记在票 09 / 票 10 的 Comments。
         case elsewhere
     }
 
@@ -37,7 +35,7 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
             ["ai.perplexity.CometUpdater": .entry("perplexity-updater"), "CometUpdater": .entry("perplexity-updater")]
         ),
         ("blender", "safe", ["Blender": .entry("blender"), "org.blenderfoundation.blender": .entry("blender")]),
-        ("checkpoint-nodejs", "safe", ["checkpoint-nodejs": .ticket10]),
+        ("checkpoint-nodejs", "safe", ["checkpoint-nodejs": .elsewhere]),
         ("cloudkit", "medium", ["CloudKit": .notListed]),
         ("claude-updater", "safe", ["com.anthropic.claudefordesktop.ShipIt": .entry("claude-updater")]),
         ("accountsd", "medium", ["com.apple.accountsd": .notListed]),
@@ -124,14 +122,14 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         ("family-circle", "medium", ["FamilyCircle": .notListed]),
         ("purge-app", "safe", ["io.getpurge.app": .entry("purge-app")]),
         ("sentry", "safe", ["io.sentry": .entry("sentry"), "SentryCrash": .entry("sentry")]),
-        ("ms-playwright", "medium", ["ms-playwright-go": .ticket10]),
-        ("node-modules", "safe", ["node_modules": .ticket10]),
-        ("prisma-nodejs", "safe", ["prisma-nodejs": .ticket10]),
+        ("ms-playwright", "medium", ["ms-playwright-go": .rule("playwright.browsers")]),
+        ("node-modules", "safe", ["node_modules": .rule("artifact.node_modules")]),
+        ("prisma-nodejs", "safe", ["prisma-nodejs": .rule("prisma.cache")]),
         ("segment", "safe", ["segment": .entry("segment")]),
         ("ssu", "safe", ["ssu": .entry("ssu")]),
         ("macos-installer", "medium", ["macOS Installer": .elsewhere]),
         ("macos-install-data", "medium", ["macOS Install Data": .elsewhere]),
-        ("dart-tool", "safe", [".dart_tool": .ticket10]),
+        ("dart-tool", "safe", [".dart_tool": .rule("artifact.dart-tool")]),
         ("ams-migrator", "safe", ["AMSDataMigratorTool": .entry("ams-migrator")]),
         ("spokenly", "safe", ["app.spokenly": .entry("spokenly"), "app.spokenly.revenuecat": .entry("revenuecat")]),
         ("container-managerd", "safe", ["com.apple.containermanagerd": .notListed]),
@@ -142,7 +140,11 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         ("swiftpm", "safe", ["org.swift.swiftpm": .rule("swiftpm.cache")]),
         ("zen", "safe", ["zen": .entry("zen")]),
         ("yab", "safe", ["Yab": .entry("yab")]),
-        ("xcode-itunes-service", "medium", ["com.apple.dt.Xcode.ITunesSoftwareService": .ticket10]),
+        (
+            "xcode-itunes-service",
+            "medium",
+            ["com.apple.dt.Xcode.ITunesSoftwareService": .rule("xcode.deviceSoftwareService")]
+        ),
         ("gamed", "safe", ["com.apple.gamed": .entry("gamed")]),
         ("chrono", "safe", ["com.apple.chrono": .entry("chrono")]),
         ("translation", "safe", ["com.apple.translationd": .entry("translation")]),
@@ -150,57 +152,109 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         ("gamekit", "safe", ["GameKit": .entry("gamekit")]),
         ("image-cache", "safe", ["ImageCache": .genericDiscovery]),
         ("revenuecat", "safe", ["RevenueCat": .entry("revenuecat"), "RevenueCatFonts": .entry("revenuecat")]),
-        ("gitworktrees", "medium", ["worktrees": .ticket10]),
-        ("vscode", "safe", ["Code": .ticket10, "CachedData": .ticket10, "CachedExtensionVSIXs": .ticket10]),
-        ("cursor", "safe", ["Cursor": .ticket10]),
+        ("gitworktrees", "medium", ["worktrees": .elsewhere]),
+        (
+            "vscode",
+            "safe",
+            [
+                "Code": .rule("vscode.cache"),
+                "CachedData": .rule("vscode.cache"),
+                "CachedExtensionVSIXs": .rule("vscode.cache"),
+            ]
+        ),
+        ("cursor", "safe", ["Cursor": .rule("cursor.cache")]),
         ("jetbrains", "safe", ["JetBrains": .rule("jetbrains.caches"), "JetPackCache": .genericDiscovery]),
-        ("zed", "safe", ["zed": .ticket10, "Zed": .ticket10]),
-        ("go-build-cache", "safe", ["go-build": .rule("go.caches")]),
-        ("maven", "medium", ["maven": .ticket10, ".m2": .ticket10]),
-        ("sbt", "medium", ["sbt": .ticket10, ".ivy2": .ticket10]),
-        ("rubygems", "safe", ["rubygems": .ticket10, ".gem": .ticket10]),
-        ("bundler", "safe", ["bundler": .ticket10, ".bundle": .ticket10]),
-        ("composer", "safe", ["composer": .ticket10, ".composer": .ticket10]),
-        ("cargo", "safe", ["cargo": .ticket10, ".cargo": .ticket10]),
-        ("terraform", "safe", ["terraform": .ticket10, ".terraform.d": .ticket10]),
-        ("githubactions", "safe", ["act": .ticket10, "github-actions": .ticket10]),
-        ("vagrant", "medium", ["vagrant": .ticket10, ".vagrant.d": .ticket10]),
-        ("zsh", "safe", ["zsh_sessions": .ticket10, ".zsh_sessions": .ticket10, "zcompdump": .ticket10]),
-        ("electron", "safe", ["electron": .rule("electron.toolingCaches"), "Code Cache": .ticket10]),
+        ("zed", "safe", ["zed": .genericDiscovery, "Zed": .rule("zed.caches")]),
+        ("go-build-cache", "safe", ["go-build": .rule("go.buildCache")]),
+        ("maven", "medium", ["maven": .rule("maven.repository"), ".m2": .rule("maven.repository")]),
+        ("sbt", "medium", ["sbt": .rule("sbt.ivyCache"), ".ivy2": .rule("sbt.ivyCache")]),
+        ("rubygems", "safe", ["rubygems": .rule("rubygems.downloads"), ".gem": .rule("rubygems.downloads")]),
+        ("bundler", "safe", ["bundler": .rule("bundler.cache"), ".bundle": .rule("bundler.cache")]),
+        ("composer", "safe", ["composer": .rule("composer.cache"), ".composer": .rule("composer.cache")]),
+        ("cargo", "safe", ["cargo": .rule("cargo.registry"), ".cargo": .rule("cargo.registry")]),
+        (
+            "terraform",
+            "safe",
+            ["terraform": .rule("terraform.pluginCache"), ".terraform.d": .rule("terraform.pluginCache")]
+        ),
+        (
+            "githubactions",
+            "safe",
+            ["act": .rule("githubActions.cache"), "github-actions": .rule("githubActions.cache")]
+        ),
+        ("vagrant", "medium", ["vagrant": .rule("vagrant.cache"), ".vagrant.d": .rule("vagrant.cache")]),
+        (
+            "zsh",
+            "safe",
+            ["zsh_sessions": .rule("zsh.sessions"), ".zsh_sessions": .rule("zsh.sessions"), "zcompdump": .elsewhere]
+        ),
+        (
+            "electron",
+            "safe",
+            ["electron": .rule("appcache.electronApps"), "Code Cache": .rule("appcache.electronApps")]
+        ),
         ("applogs", "safe", ["Logs": .rule("appcache.logs"), "applogs": .genericDiscovery]),
         ("crashreports", "safe", ["DiagnosticReports": .rule("appcache.logs"), "crashreports": .genericDiscovery]),
         ("crashpad-pending", "medium", ["Unsent Crash Reports": .elsewhere]),
-        ("iossimulators", "medium", ["CoreSimulator": .ticket10, "iossimulators": .ticket10]),
-        ("bun-cache", "safe", [".bun": .ticket10, "bun-install": .ticket10]),
+        ("iossimulators", "medium", ["CoreSimulator": .elsewhere, "iossimulators": .elsewhere]),
+        ("bun-cache", "safe", [".bun": .rule("bun.cache"), "bun-install": .rule("bun.cache")]),
         ("deno-cache", "safe", ["deno": .rule("deno.cache")]),
-        ("turbo-cache", "safe", [".turbo": .ticket10, "turbo-cache": .ticket10]),
-        ("mise-cache", "safe", ["mise": .ticket10, "rtx": .ticket10]),
-        ("vite-cache", "safe", [".vite": .ticket10, "vite-cache": .ticket10]),
-        ("parcel-cache", "safe", [".parcel-cache": .ticket10, "parcel-cache": .ticket10]),
-        ("eslint-cache", "safe", [".eslintcache": .ticket10]),
-        ("jest-cache", "safe", ["jest-cache": .ticket10, ".jest-cache": .ticket10, "jest_cache": .ticket10]),
-        ("vitest-cache", "safe", [".vitest-cache": .ticket10, "vitest-cache": .ticket10]),
-        ("cypress-cache", "medium", ["Cypress": .ticket10, "cypress": .ticket10, "cypress-cache": .ticket10]),
-        ("python-cache", "safe", ["__pycache__": .ticket10, ".pyc": .ticket10, "pycache": .ticket10]),
-        ("uv-cache", "medium", ["uv": .ticket10, "uv-cache": .ticket10, ".uv": .ticket10]),
-        ("ruff-cache", "safe", [".ruff_cache": .ticket10, "ruff-cache": .ticket10]),
-        ("mypy-cache", "safe", [".mypy_cache": .ticket10, "mypy-cache": .ticket10]),
-        ("kotlin-build", "safe", [".kotlin": .ticket10, "kotlin-build": .ticket10]),
-        ("gradle-cache", "safe", [".gradle": .ticket10, "gradle-cache": .ticket10]),
-        ("gradle-global-cache", "medium", ["Gradle Dependency Cache": .ticket10]),
+        (
+            "turbo-cache",
+            "safe",
+            [".turbo": .rule("artifact.turbo-cache"), "turbo-cache": .rule("artifact.turbo-cache")]
+        ),
+        ("mise-cache", "safe", ["mise": .rule("mise.cache"), "rtx": .rule("mise.cache")]),
+        ("vite-cache", "safe", [".vite": .rule("artifact.node_modules"), "vite-cache": .rule("artifact.node_modules")]),
+        (
+            "parcel-cache",
+            "safe",
+            [".parcel-cache": .rule("artifact.parcel-cache"), "parcel-cache": .rule("artifact.parcel-cache")]
+        ),
+        ("eslint-cache", "safe", [".eslintcache": .elsewhere]),
+        ("jest-cache", "safe", ["jest-cache": .elsewhere, ".jest-cache": .elsewhere, "jest_cache": .elsewhere]),
+        ("vitest-cache", "safe", [".vitest-cache": .elsewhere, "vitest-cache": .elsewhere]),
+        (
+            "cypress-cache",
+            "medium",
+            [
+                "Cypress": .rule("cypress.binaries"),
+                "cypress": .rule("cypress.binaries"),
+                "cypress-cache": .rule("cypress.binaries"),
+            ]
+        ),
+        ("python-cache", "safe", ["__pycache__": .elsewhere, ".pyc": .elsewhere, "pycache": .elsewhere]),
+        ("uv-cache", "medium", ["uv": .rule("uv.cache"), "uv-cache": .rule("uv.cache"), ".uv": .rule("uv.cache")]),
+        (
+            "ruff-cache",
+            "safe",
+            [".ruff_cache": .rule("artifact.ruff-cache"), "ruff-cache": .rule("artifact.ruff-cache")]
+        ),
+        (
+            "mypy-cache",
+            "safe",
+            [".mypy_cache": .rule("artifact.mypy-cache"), "mypy-cache": .rule("artifact.mypy-cache")]
+        ),
+        ("kotlin-build", "safe", [".kotlin": .elsewhere, "kotlin-build": .elsewhere]),
+        (
+            "gradle-cache",
+            "safe",
+            [".gradle": .rule("artifact.gradle-project-state"), "gradle-cache": .rule("artifact.gradle-project-state")]
+        ),
+        ("gradle-global-cache", "medium", ["Gradle Dependency Cache": .rule("gradle.caches")]),
         (
             "cocoapods-cache",
             "safe",
             ["CocoaPods": .rule("cocoapods.cache"), "Pods": .rule("artifact.pods"), "pod-cache": .genericDiscovery]
         ),
-        ("swift-build", "safe", ["swift-build": .ticket10]),
-        ("rust-target", "safe", ["target": .ticket10, "rust-target": .ticket10]),
+        ("swift-build", "safe", ["swift-build": .elsewhere]),
+        ("rust-target", "safe", ["target": .rule("artifact.target"), "rust-target": .rule("artifact.target")]),
         (
             "flutter-cache",
             "safe",
-            [".flutter-plugins": .ticket10, ".flutter-plugins-dependencies": .ticket10, "flutter_cache": .ticket10]
+            [".flutter-plugins": .elsewhere, ".flutter-plugins-dependencies": .elsewhere, "flutter_cache": .elsewhere]
         ),
-        ("pub-cache", "safe", ["pub-cache": .ticket10, ".pub-cache": .ticket10]),
+        ("pub-cache", "safe", ["pub-cache": .rule("dart.pubCache"), ".pub-cache": .rule("dart.pubCache")]),
         ("xcode-archives", "medium", ["xcarchive": .rule("xcode.archives")]),
         (
             "xcode-device-support",
@@ -217,19 +271,19 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
             "safe",
             ["Homebrew": .rule("homebrew.cache"), "homebrew": .genericDiscovery, "homebrew-cache": .genericDiscovery]
         ),
-        ("nvm-cache", "medium", [".nvm": .ticket10, "nvm": .ticket10]),
-        ("volta-cache", "safe", ["volta": .ticket10]),
+        ("nvm-cache", "medium", [".nvm": .elsewhere, "nvm": .elsewhere]),
+        ("volta-cache", "safe", ["volta": .elsewhere]),
         ("pnpm-store", "safe", ["pnpm-store": .rule("pnpm.store"), ".pnpm-store": .rule("pnpm.store")]),
         (
             "yarn-cache",
             "safe",
             ["yarn-cache": .genericDiscovery, "yarn": .rule("yarn.cache"), "berry": .rule("yarn.cache")]
         ),
-        ("npm-cache", "safe", ["npm-cache": .ticket10, "npm": .ticket10]),
-        ("husky-cache", "safe", ["_husky": .ticket10]),
-        ("storybook-cache", "safe", [".storybook-cache": .ticket10, "storybook-static": .ticket10]),
-        ("nx-cache", "safe", ["nx-cache": .ticket10]),
-        ("moon-cache", "safe", ["moon-cache": .ticket10]),
+        ("npm-cache", "safe", ["npm-cache": .rule("npm.cache"), "npm": .rule("npm.cache")]),
+        ("husky-cache", "safe", ["_husky": .elsewhere]),
+        ("storybook-cache", "safe", [".storybook-cache": .elsewhere, "storybook-static": .elsewhere]),
+        ("nx-cache", "safe", ["nx-cache": .elsewhere]),
+        ("moon-cache", "safe", ["moon-cache": .elsewhere]),
         ("warp-terminal", "safe", ["dev.warp.Warp-Stable": .entry("warp"), "Warp": .entry("warp")]),
         (
             "iterm2",
@@ -308,11 +362,19 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
             ["com.seriflabs.affinityphoto2": .entry("affinity-photo"), "Affinity Photo": .entry("affinity-photo")]
         ),
         ("xcode-app", "safe", ["com.apple.dt.Xcode": .rule("xcode.caches"), "Xcode": .genericDiscovery]),
-        ("simulator-cache", "safe", ["com.apple.iphonesimulator": .ticket10, "Simulator": .genericDiscovery]),
+        (
+            "simulator-cache",
+            "safe",
+            ["com.apple.iphonesimulator": .rule("simulator.runtimeCache"), "Simulator": .genericDiscovery]
+        ),
         (
             "android-studio",
             "safe",
-            ["com.google.android.studio": .ticket10, "Android Studio": .ticket10, "AndroidStudio": .ticket10]
+            [
+                "com.google.android.studio": .rule("androidStudio.caches"),
+                "Android Studio": .rule("androidStudio.caches"),
+                "AndroidStudio": .rule("androidStudio.caches"),
+            ]
         ),
         ("proxyman", "safe", ["com.proxyman.NSProxy": .entry("proxyman"), "Proxyman": .entry("proxyman")]),
         ("tableplus", "safe", ["com.tinyapp.TablePlus": .entry("tableplus"), "TablePlus": .entry("tableplus")]),
@@ -352,9 +414,16 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         ),
         ("screen-time", "medium", ["com.apple.ScreenTimeAgent": .notListed, "ScreenTime": .notListed]),
         ("npm-npx-cache", "safe", ["npm-npx-cache": .genericDiscovery, "_npx": .rule("npm.npx")]),
-        ("npm-logs", "safe", ["npm-logs": .ticket10, "_logs": .ticket10]),
-        ("xcode-docs-cache", "safe", ["xcode-docs-cache": .ticket10, "DocumentationCache": .ticket10]),
-        ("corepack-cache", "safe", ["corepack-cache": .ticket10, "corepack": .ticket10]),
+        ("npm-logs", "safe", ["npm-logs": .rule("npm.logs"), "_logs": .rule("npm.logs")]),
+        (
+            "xcode-docs-cache",
+            "safe",
+            [
+                "xcode-docs-cache": .rule("xcode.documentationCache"),
+                "DocumentationCache": .rule("xcode.documentationCache"),
+            ]
+        ),
+        ("corepack-cache", "safe", ["corepack-cache": .rule("corepack.cache"), "corepack": .rule("corepack.cache")]),
         ("cursor-agent-leftover", "medium", ["cursor-agent-leftover": .elsewhere]),
         ("orphaned-git-worktree", "medium", ["orphaned-git-worktree": .elsewhere]),
         ("stale-browser-framework", "medium", ["stale-browser-framework": .elsewhere]),
@@ -363,34 +432,34 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         ("app-installation-binary-deltas", "safe", ["AppInstallationBinaryDeltas": .genericDiscovery]),
         ("shipit-updater-cache", "safe", ["ShipIt": .entry("shipit-updater-cache")]),
         ("electron-updater-downloads", "safe", ["Electron Updater Downloads": .elsewhere]),
-        ("elixir-build", "safe", ["_build": .ticket10, "elixir-build": .ticket10]),
-        ("elixir-deps", "safe", ["elixir-deps": .ticket10]),
-        ("hex-packages", "safe", ["Hex Package Cache": .ticket10]),
-        ("rebar3-cache", "safe", ["Rebar3 Cache": .ticket10, "rebar3": .ticket10]),
-        ("next-build", "safe", [".next": .ticket10]),
-        ("nuxt-build", "safe", [".nuxt": .ticket10]),
-        ("nuxt-output", "safe", [".output": .ticket10]),
-        ("sveltekit-build", "safe", [".svelte-kit": .ticket10]),
-        ("astro-build", "safe", [".astro": .ticket10]),
-        ("angular-cache", "safe", [".angular": .ticket10]),
-        ("pytest-cache", "safe", [".pytest_cache": .ticket10]),
-        ("tox-environments", "safe", [".tox": .ticket10]),
-        ("stack-work", "safe", [".stack-work": .ticket10]),
-        ("cabal-dist", "safe", ["dist-newstyle": .ticket10]),
-        ("zig-cache", "safe", [".zig-cache": .ticket10]),
-        ("terraform-plugins", "safe", [".terraform": .ticket10]),
-        ("godot-cache", "safe", [".godot": .ticket10]),
-        ("nuget-packages", "medium", ["NuGet Packages": .ticket10]),
-        ("stack-global", "medium", ["Stack Cache": .ticket10]),
-        ("cabal-packages", "medium", ["Cabal Packages": .ticket10]),
-        ("bazel-cache", "medium", ["Bazel Cache": .ticket10]),
-        ("swiftpm-cache", "safe", ["Swift Package Cache": .ticket10]),
-        ("venv", "safe", ["venv": .ticket10, ".venv": .ticket10]),
+        ("elixir-build", "safe", ["_build": .rule("artifact.mix-build"), "elixir-build": .rule("artifact.mix-build")]),
+        ("elixir-deps", "safe", ["elixir-deps": .rule("artifact.elixir-deps")]),
+        ("hex-packages", "safe", ["Hex Package Cache": .rule("hex.packages")]),
+        ("rebar3-cache", "safe", ["Rebar3 Cache": .rule("rebar3.cache"), "rebar3": .rule("rebar3.cache")]),
+        ("next-build", "safe", [".next": .rule("artifact.next-cache")]),
+        ("nuxt-build", "safe", [".nuxt": .rule("artifact.nuxt-build")]),
+        ("nuxt-output", "safe", [".output": .rule("artifact.nuxt-output")]),
+        ("sveltekit-build", "safe", [".svelte-kit": .rule("artifact.sveltekit-build")]),
+        ("astro-build", "safe", [".astro": .rule("artifact.astro-build")]),
+        ("angular-cache", "safe", [".angular": .rule("artifact.angular-cache")]),
+        ("pytest-cache", "safe", [".pytest_cache": .rule("artifact.pytest-cache")]),
+        ("tox-environments", "safe", [".tox": .rule("artifact.tox")]),
+        ("stack-work", "safe", [".stack-work": .rule("artifact.stack-work")]),
+        ("cabal-dist", "safe", ["dist-newstyle": .rule("artifact.cabal-dist")]),
+        ("zig-cache", "safe", [".zig-cache": .rule("artifact.zig-cache")]),
+        ("terraform-plugins", "safe", [".terraform": .rule("artifact.terraform-plugins")]),
+        ("godot-cache", "safe", [".godot": .rule("artifact.godot-cache")]),
+        ("nuget-packages", "medium", ["NuGet Packages": .rule("nuget.packages")]),
+        ("stack-global", "medium", ["Stack Cache": .rule("stack.cache")]),
+        ("cabal-packages", "medium", ["Cabal Packages": .rule("cabal.packages")]),
+        ("bazel-cache", "medium", ["Bazel Cache": .rule("bazel.cache")]),
+        ("swiftpm-cache", "safe", ["Swift Package Cache": .rule("swiftpm.cache")]),
+        ("venv", "safe", ["venv": .rule("artifact.venv"), ".venv": .rule("artifact.dot-venv")]),
         ("node-gyp-headers", "safe", ["node-gyp": .rule("electron.toolingCaches")]),
-        ("typescript-type-cache", "safe", ["typescript": .ticket10]),
-        ("cursor-compile-cache", "safe", ["cursor-compile-cache": .ticket10]),
+        ("typescript-type-cache", "safe", ["typescript": .rule("typescript.typeCache")]),
+        ("cursor-compile-cache", "safe", ["cursor-compile-cache": .elsewhere]),
         ("claude-cli-cache", "safe", ["claude-cli-nodejs": .entry("claude-cli-cache")]),
-        ("apple-python-cache", "safe", ["com.apple.python": .ticket10]),
+        ("apple-python-cache", "safe", ["com.apple.python": .rule("apple.pythonCache")]),
         ("jna-libraries", "safe", ["JNA": .entry("jna-libraries")]),
         ("dictionary-services", "safe", ["com.apple.DictionaryServices": .entry("dictionary-services")]),
         ("promoted-content", "safe", ["com.apple.ap.PromotedContentJetService": .entry("promoted-content")]),
@@ -402,8 +471,8 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         ("unfinished-downloads", "medium", ["Unfinished Downloads": .elsewhere]),
         ("coresimulator-caches", "safe", ["Simulator Caches": .rule("xcode.simulatorCaches")]),
         ("xctest-devices", "safe", ["Xcode Test Devices": .rule("xcode.testDevices")]),
-        ("pre-commit-cache", "safe", ["pre-commit": .ticket10]),
-        ("puppeteer-browsers", "medium", ["puppeteer": .ticket10]),
+        ("pre-commit-cache", "safe", ["pre-commit": .rule("precommit.environments")]),
+        ("puppeteer-browsers", "medium", ["puppeteer": .rule("puppeteer.browsers")]),
         (
             "effectcraft",
             "safe",
@@ -416,62 +485,62 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
             "safe",
             ["com.apple.intelligenceflow.intelligenceflowd": .entry("intelligenceflowd-cache")]
         ),
-        ("swift-frontend-cache", "safe", ["swift-frontend": .ticket10]),
+        ("swift-frontend-cache", "safe", ["swift-frontend": .elsewhere]),
     ]
 
-    /// 上游没登记目录名的条目:开发工具的固定路径与项目产物,整批交给票 10。
-    private let withoutFolderNames: [String] = [
-        "android-sdk",
-        "playwright-unused-builds",
-        "archives",
-        "go",
-        "nextjs-cache",
-        "android-build",
-        "cocoapods-spec-repos",
-        "orphaned-editor-workspace-storage",
-        "spotlight-profiles-cache",
-        "swiftpm-build",
-        "maven-target",
-        "gradle-build",
-        "sbt-target",
-        "dotnet-bin",
-        "dotnet-obj",
-        "composer-vendor",
-        "bundler-vendor",
-        "zig-out",
-        "dune-build",
-        "cmake-build",
-        "unity-library",
-        "unity-temp",
-        "unreal-intermediate",
-        "unreal-derived-data",
-        "old-cli-versions",
-        "cursor-agent-install-leftovers",
-        "claude-code-downloads",
-        "android-ndk-version",
-        "android-system-images",
-        "old-figma-profiles",
-        "prek-cache",
-        "expo-cache",
-        "version-manager-downloads",
-        "oh-my-zsh-cache",
-        "opam-download-cache",
-        "conda-packages",
-        "dart-analysis-cache",
-        "hermes-agent-cache",
-        "opencode-cache",
-        "antigravity-browser-cache",
-        "nvm-download-cache",
-        "nvm-node-version",
-        "vite-plus-node-version",
-        "vite-plus-node-install-leftovers",
-        "pyenv-python-version",
-        "rustup-toolchain",
-        "uv-python-version",
-        "giget-cache",
-        "firebase-emulators",
-        "gradle-leftovers",
-        "clang-module-cache",
+    /// 上游没登记目录名的条目:开发工具的固定路径与项目产物。每条带上游档位与下落(票 10 落定)。
+    private let withoutFolderNames: [(key: String, tag: String, fate: Fate)] = [
+        ("android-sdk", "safe", .rule("android.buildCache")),
+        ("playwright-unused-builds", "medium", .rule("playwright.browsers")),
+        ("archives", "medium", .elsewhere),
+        ("go", "medium", .rule("go.moduleCache")),
+        ("nextjs-cache", "safe", .rule("artifact.next-cache")),
+        ("android-build", "safe", .rule("artifact.gradle-build")),
+        ("cocoapods-spec-repos", "medium", .rule("cocoapods.specRepos")),
+        ("orphaned-editor-workspace-storage", "medium", .elsewhere),
+        ("spotlight-profiles-cache", "medium", .elsewhere),
+        ("swiftpm-build", "safe", .rule("artifact.swiftpm-build")),
+        ("maven-target", "safe", .rule("artifact.target")),
+        ("gradle-build", "safe", .rule("artifact.gradle-build")),
+        ("sbt-target", "safe", .rule("artifact.target")),
+        ("dotnet-bin", "safe", .rule("artifact.dotnet-bin")),
+        ("dotnet-obj", "safe", .rule("artifact.dotnet-obj")),
+        ("composer-vendor", "safe", .rule("artifact.composer-vendor")),
+        ("bundler-vendor", "safe", .elsewhere),
+        ("zig-out", "safe", .rule("artifact.zig-out")),
+        ("dune-build", "safe", .rule("artifact.mix-build")),
+        ("cmake-build", "safe", .rule("artifact.gradle-build")),
+        ("unity-library", "medium", .rule("artifact.unity-library")),
+        ("unity-temp", "medium", .rule("artifact.unity-temp")),
+        ("unreal-intermediate", "medium", .rule("artifact.unreal-intermediate")),
+        ("unreal-derived-data", "medium", .rule("artifact.unreal-derived-data")),
+        ("old-cli-versions", "safe", .elsewhere),
+        ("cursor-agent-install-leftovers", "medium", .elsewhere),
+        ("claude-code-downloads", "medium", .elsewhere),
+        ("android-ndk-version", "medium", .elsewhere),
+        ("android-system-images", "medium", .elsewhere),
+        ("old-figma-profiles", "medium", .elsewhere),
+        ("prek-cache", "medium", .rule("prek.cache")),
+        ("expo-cache", "safe", .rule("expo.cache")),
+        ("version-manager-downloads", "safe", .rule("pyenv.rbenvDownloads")),
+        ("oh-my-zsh-cache", "safe", .rule("ohmyzsh.cache")),
+        ("opam-download-cache", "safe", .rule("opam.downloads")),
+        ("conda-packages", "medium", .rule("conda.packageCache")),
+        ("dart-analysis-cache", "safe", .rule("dart.analysisCache")),
+        ("hermes-agent-cache", "medium", .rule("hermes.agentCache")),
+        ("opencode-cache", "medium", .rule("opencode.cache")),
+        ("antigravity-browser-cache", "safe", .elsewhere),
+        ("nvm-download-cache", "safe", .rule("nvm.downloads")),
+        ("nvm-node-version", "medium", .elsewhere),
+        ("vite-plus-node-version", "medium", .elsewhere),
+        ("vite-plus-node-install-leftovers", "medium", .elsewhere),
+        ("pyenv-python-version", "medium", .elsewhere),
+        ("rustup-toolchain", "medium", .elsewhere),
+        ("uv-python-version", "medium", .elsewhere),
+        ("giget-cache", "safe", .rule("giget.cache")),
+        ("firebase-emulators", "safe", .rule("firebase.emulators")),
+        ("gradle-leftovers", "safe", .elsewhere),
+        ("clang-module-cache", "safe", .elsewhere),
     ]
 
     /// p6 首批就登记、上游现行说明库(提交 ceacaf8)里没有的目录名:p6 的决定,保留。它们没有上游
@@ -508,7 +577,7 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
     /// 抄进账本的,抄错了下面「不放宽」的检查就跟着错;这几个数是从上游原件另算的,抄错一条
     /// 就对不上。重新对照新版上游搬运时,这些数随账本一起改。
     func testLedgerCoversEveryUpstreamEntry() {
-        let keys = ledger.map(\.key) + withoutFolderNames
+        let keys = ledger.map(\.key) + withoutFolderNames.map(\.key)
         XCTAssertEqual(Set(keys).count, keys.count, "上游 key 在账本里重复")
 
         XCTAssertEqual(ledger.count, 260, "上游带目录名的条目数(提交 ceacaf8)")
@@ -571,6 +640,19 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         }
     }
 
+    /// 没登记目录名的那些条目,下落同样要成立:是规则的,规则真在;上游标「先检查」的,规则不能是「可安全清理」。
+    func testEntriesWithoutFolderNamesAreAccountedFor() {
+        for entry in withoutFolderNames {
+            guard case let .rule(ruleID) = entry.fate else { continue }
+            let tier = tier(ofRule: ruleID)
+            XCTAssertNotNil(tier, "上游 \(entry.key) 指向不存在的规则 \(ruleID)")
+            if entry.tag == "medium" {
+                XCTAssertEqual(tier, .checkFirst, "上游标 medium 的 \(ruleID) 不能是 safe")
+            }
+        }
+        XCTAssertTrue(withoutFolderNames.contains { $0.fate == .elsewhere }, "护栏在空转")
+    }
+
     // MARK: 不列
 
     /// 有意不列的目录名,谁都不列:规则表不出它,通用发现也把它挡在保护名单外。知识库的规则
@@ -591,7 +673,7 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         XCTAssertEqual([byRule, byDiscovery].flatMap { $0.map(\.path) }, [], "不列的目录名被列出来了")
     }
 
-    // MARK: 留给通用发现 / 交给票 10
+    // MARK: 留给通用发现
 
     /// 没证实是缓存目录名的别名:规则表不认领(真有那个目录,通用发现按「先检查」处理)。
     func testUnverifiedAliasesAreNotClaimedByAnyRule() async {
@@ -601,14 +683,5 @@ final class AppCacheCatalogPortLedgerTests: XCTestCase {
         let candidates = await JunkCacheScanFixture.candidates(cachesNames: names)
 
         XCTAssertEqual(candidates.map(\.path), [])
-    }
-
-    /// 交给票 10 的目录名还没进知识库——进了就与账本不符,票 10 搬的时候要连账本一起改。
-    func testTicket10NamesAreNotInCatalogYet() {
-        let catalogNames = Set(AppCacheCatalog.entries.flatMap(\.names))
-
-        for row in fates where row.fate == .ticket10 {
-            XCTAssertFalse(catalogNames.contains(row.name), "上游 \(row.key) 的「\(row.name)」标着交给票 10,却已在知识库里")
-        }
     }
 }

@@ -202,9 +202,16 @@ public enum JunkRuleTable {
     static let purgeApp = "purge-app (MIT) DevScanner.globalCacheDefinitions + explanations.json"
     static let purgeAppExplanations = "purge-app (MIT) explanations.json"
     static let pulseCustom = "Pulse 自定"
+    static let purgeAppArtifacts = "purge-app (MIT) ProjectArtifactCatalog.swift"
 
-    /// 开发工具规则(p4 首批 + p6-cleaner/01 补行);浏览器 / 应用缓存目录规则由
-    /// `AppCacheCatalog` 生成,固定路径条目(日志)在 `appCacheFixedRules`。
+    /// 「重建要花真实时间」的门槛(票面 p7-cleaner/10:这类一律先检查;与项目产物规则表同一个口径):
+    /// 重建的是**环境或编译结果**、而且上游或我们自己的说明里写着慢——Gradle / Maven / uv / sbt /
+    /// Conda / NuGet / Vagrant / Puppeteer / Cypress / Playwright 这些落「先检查」。单纯的包下载缓存
+    /// (npm、Homebrew、Dart pub、Hex)工具每次都会重做,照上游归「可安全清理」。拿不准的以本表清单为准。
+    ///
+    /// 开发工具规则(p4 首批 + p6-cleaner/01 补行 + p7-cleaner/10 自上游补差);浏览器 / 应用缓存
+    /// 目录规则由 `AppCacheCatalog` 生成,固定路径条目(日志、Electron 应用的缓存)在 `appCacheFixedRules`。
+    /// p7-cleaner/10 起上游 63 条全局缓存定义逐条有下落,由 `GlobalToolCachePortLedgerTests` 的账本钉住。
     static let globalToolCacheRules: [JunkRule] = [
         JunkRule(
             id: "xcode.derivedData",
@@ -232,12 +239,14 @@ public enum JunkRuleTable {
             source: purgeApp,
             symbolName: "iphone"
         ),
+        // p7-cleaner/10:com.apple.* 的缓存不自动勾(票 09 给应用缓存定的规矩,这里补齐到开发工具规则;
+        // p4 时是「可安全清理」,上游也是 safe)——常驻的进程没有可靠的「在运行」信号,这个缓存很小。
         JunkRule(
             id: "xcode.caches",
             group: .globalToolCache,
             title: "Xcode 缓存",
             patterns: [JunkPathPattern(homeRelative: "Library/Caches/com.apple.dt.Xcode")],
-            tier: .safe,
+            tier: .checkFirst,
             rationale: "Xcode 自身的临时缓存,下次启动自动重建。",
             source: purgeApp,
             symbolName: "hammer"
@@ -257,7 +266,11 @@ public enum JunkRuleTable {
             id: "swiftpm.cache",
             group: .globalToolCache,
             title: "Swift Package 缓存",
-            patterns: [JunkPathPattern(homeRelative: "Library/Caches/org.swift.swiftpm")],
+            patterns: [
+                JunkPathPattern(homeRelative: "Library/Caches/org.swift.swiftpm"),
+                // p7-cleaner/10 补:上游登记的第二个位置
+                JunkPathPattern(homeRelative: ".swiftpm/cache"),
+            ],
             tier: .safe,
             rationale: "Swift Package Manager 的包下载与解析缓存;下次 resolve 时重新拉取。",
             source: purgeApp,
@@ -317,14 +330,18 @@ public enum JunkRuleTable {
             source: purgeApp,
             symbolName: "shippingbox"
         ),
-        // 上游 medium(重下载很慢)→ Pulse 判「可安全清理」:纯可重建,与 DerivedData 同性质。
+        // p7-cleaner/10 对齐上游档位(上游是 medium):p6 时判「可安全清理」,现在「先检查」——
+        // 自己装进去的构建也要重新编译;另补上游登记的 wrapper 各版本分发目录。
         JunkRule(
             id: "gradle.caches",
             group: .globalToolCache,
             title: "Gradle 缓存",
-            patterns: [JunkPathPattern(homeRelative: ".gradle/caches")],
-            tier: .safe,
-            rationale: "Gradle 下载的依赖与构建缓存;下次构建重新下载,会慢一些。",
+            patterns: [
+                JunkPathPattern(homeRelative: ".gradle/caches"),
+                JunkPathPattern(homeRelative: ".gradle/wrapper/dists"),
+            ],
+            tier: .checkFirst,
+            rationale: "Gradle 下载的依赖、构建缓存与 wrapper 的各个版本;不丢东西,但下次构建要重新下载、重新编译,比较慢。",
             source: purgeApp,
             symbolName: "shippingbox"
         ),
@@ -347,6 +364,8 @@ public enum JunkRuleTable {
                 JunkPathPattern(homeRelative: "Library/Application Support/Code/Cache"),
                 JunkPathPattern(homeRelative: "Library/Application Support/Code/CachedData"),
                 JunkPathPattern(homeRelative: "Library/Application Support/Code/CachedExtensionVSIXs"),
+                // p7-cleaner/10 补:VS Code 在缓存目录下的那份(说明库 vscode 条目登记的目录名)
+                JunkPathPattern(homeRelative: "Library/Caches/Code"),
             ],
             tier: .safe,
             rationale: "VS Code 的临时缓存;再次启动时重建。设置与扩展不在这里。",
@@ -360,6 +379,8 @@ public enum JunkRuleTable {
             patterns: [
                 JunkPathPattern(homeRelative: "Library/Application Support/Cursor/Cache"),
                 JunkPathPattern(homeRelative: "Library/Application Support/Cursor/CachedData"),
+                // p7-cleaner/10 补:Cursor 在缓存目录下的那份(说明库 cursor 条目登记的目录名)
+                JunkPathPattern(homeRelative: "Library/Caches/Cursor"),
             ],
             tier: .safe,
             rationale: "Cursor 的临时缓存;再次启动时重建。设置与扩展不在这里。",
@@ -379,14 +400,15 @@ public enum JunkRuleTable {
             symbolName: "square.stack.3d.up"
         ),
         // ↓ p6-cleaner/01 补行(spec 定案 12):本机实测漏网的开发缓存 + 常用位。
-        // 上游 medium → 判 safe 的同 Gradle 先例:纯可重建,慢一次而已。
+        // p7-cleaner/10 对齐上游档位(上游是 medium):p6 时判「可安全清理」,现在「先检查」——
+        // 自己 mvn install 装进去的构建只有重新构建才回来。
         JunkRule(
             id: "maven.repository",
             group: .globalToolCache,
             title: "Maven 本地仓库",
             patterns: [JunkPathPattern(homeRelative: ".m2/repository")],
-            tier: .safe,
-            rationale: "Java 依赖的本地缓存;下次构建重新下载,量大时会等一阵。",
+            tier: .checkFirst,
+            rationale: "Maven 下载的库,以及你自己 mvn install 装进去的构建;库下次构建会重新下载,自己装的那部分只有重新构建才回来。",
             source: purgeApp,
             symbolName: "shippingbox"
         ),
@@ -403,29 +425,20 @@ public enum JunkRuleTable {
             source: purgeApp,
             symbolName: "shippingbox"
         ),
+        // p7-cleaner/10 对齐上游档位(上游是 medium):p6 时判「可安全清理」,现在「先检查」——
+        // 经 uvx 运行的工具会中断,符号链接模式装的环境会坏。
         JunkRule(
             id: "uv.cache",
             group: .globalToolCache,
             title: "uv 缓存",
             patterns: [JunkPathPattern(homeRelative: ".cache/uv")],
-            tier: .safe,
-            rationale: "Python uv 的包与编译缓存;下次安装重新下载。",
+            tier: .checkFirst,
+            rationale: "Python uv 下载、编译过的包;需要时它会重新获取,但经 uvx 运行的工具会中断,用符号链接模式装的环境也会坏。",
             source: purgeApp,
             symbolName: "shippingbox"
         ),
-        JunkRule(
-            id: "go.caches",
-            group: .globalToolCache,
-            title: "Go 模块与构建缓存",
-            patterns: [
-                JunkPathPattern(homeRelative: "go/pkg/mod"),
-                JunkPathPattern(homeRelative: "Library/Caches/go-build"),
-            ],
-            tier: .safe,
-            rationale: "Go 依赖模块与编译缓存;下次构建重新拉取、重新编译。",
-            source: purgeApp,
-            symbolName: "shippingbox"
-        ),
+        // go.caches 在 p7-cleaner/10 拆成 go.moduleCache(先检查)与 go.buildCache(可安全清理),
+        // 两条都在下面「自上游补差」那一块里:上游本来就是两行、两个档位。
         // 2026-11-09 真案漏网:pnpm 的元数据缓存在 Library/Caches/pnpm,
         // 与包仓(Library/pnpm/store,pnpm.store 规则)是两处。
         JunkRule(
@@ -475,7 +488,11 @@ public enum JunkRuleTable {
             id: "bun.cache",
             group: .globalToolCache,
             title: "Bun 缓存",
-            patterns: [JunkPathPattern(homeRelative: ".bun/install/cache")],
+            patterns: [
+                JunkPathPattern(homeRelative: ".bun/install/cache"),
+                // p7-cleaner/10 补:新版 Bun 把包缓存放在这里(本机实测,里面是 .pile 文件)
+                JunkPathPattern(homeRelative: "Library/Caches/bun"),
+            ],
             tier: .safe,
             rationale: "Bun 的包安装缓存;下次安装重新下载。",
             source: purgeApp,
@@ -517,6 +534,585 @@ public enum JunkRuleTable {
             source: purgeApp,
             symbolName: "iphone"
         ),
+        // —— p7-cleaner/10:自上游 DevScanner.globalCacheDefinitions 补差(路径逐字取自上游源码)——
+        // 上游标「先检查」(medium)的照搬是「先检查」;逐条的下落由 GlobalToolCachePortLedgerTests 的账本钉住。
+        // —— 上游全局缓存定义里有的(路径逐字取自上游源码;与上游档位不同的逐条注明)——
+        // 上游「Xcode Documentation Cache」
+        JunkRule(
+            id: "xcode.documentationCache",
+            group: .globalToolCache,
+            title: "Xcode 文档缓存",
+            patterns: [JunkPathPattern(homeRelative: "Library/Developer/Xcode/DocumentationCache")],
+            tier: .safe,
+            rationale: "Xcode 浏览过的开发者文档缓存;清了再浏览文档时重新下载。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "book"
+        ),
+        // 上游「CocoaPods」
+        JunkRule(
+            id: "cocoapods.specRepos",
+            group: .globalToolCache,
+            title: "CocoaPods 规格仓库",
+            patterns: [JunkPathPattern(homeRelative: ".cocoapods/repos")],
+            tier: .checkFirst,
+            rationale: "CocoaPods 用来查有哪些库的规格仓库;公共的那份下次 pod install 会重新拉,自己用 pod repo add 加的私有仓库要重新加。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 上游「npm Logs」
+        JunkRule(
+            id: "npm.logs",
+            group: .globalToolCache,
+            title: "npm 日志",
+            patterns: [JunkPathPattern(homeRelative: ".npm/_logs")],
+            tier: .safe,
+            rationale: "npm 命令写的日志;清了不影响已装的包。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "doc.text"
+        ),
+        // 上游「Dart Pub Cache」
+        JunkRule(
+            id: "dart.pubCache",
+            group: .globalToolCache,
+            title: "Dart Pub 缓存",
+            patterns: [
+                JunkPathPattern(homeRelative: ".pub-cache/hosted"),
+                JunkPathPattern(homeRelative: ".pub-cache/git"),
+            ],
+            tier: .safe,
+            rationale: "Dart / Flutter 下载的包(pub);下次 flutter pub get 时重新下载。dart pub global activate 装的工具不在这里。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 上游「pre-commit Environments」
+        JunkRule(
+            id: "precommit.environments",
+            group: .globalToolCache,
+            title: "pre-commit 环境",
+            patterns: [JunkPathPattern(homeRelative: ".cache/pre-commit")],
+            tier: .safe,
+            rationale: "pre-commit 为了跑 git 钩子搭的工具环境;清了下次提交时重新搭,那一次提交会慢。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 上游「prek Cache」
+        // 与上游的差异:上游要求 prek 空闲时清;在不在用我们这里不判,靠先检查
+        JunkRule(
+            id: "prek.cache",
+            group: .globalToolCache,
+            title: "prek 缓存",
+            patterns: [
+                JunkPathPattern(homeRelative: ".cache/prek/repos"),
+                JunkPathPattern(homeRelative: ".cache/prek/hooks"),
+                JunkPathPattern(homeRelative: ".cache/prek/tools"),
+                JunkPathPattern(homeRelative: ".cache/prek/cache"),
+            ],
+            tier: .checkFirst,
+            rationale: "prek(钩子管理工具)缓存的钩子仓库、环境与工具;要在它空闲时清,运行中的任务可能在用。下次运行时重建。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 上游「Expo Cache」
+        JunkRule(
+            id: "expo.cache",
+            group: .globalToolCache,
+            title: "Expo 缓存",
+            patterns: [
+                JunkPathPattern(homeRelative: ".expo/android-apk-cache"),
+                JunkPathPattern(homeRelative: ".expo/ios-simulator-app-cache"),
+                JunkPathPattern(homeRelative: ".expo/native-modules-cache"),
+                JunkPathPattern(homeRelative: ".expo/schema-cache"),
+                JunkPathPattern(homeRelative: ".expo/template-cache"),
+                JunkPathPattern(homeRelative: ".expo/versions-cache"),
+                JunkPathPattern(homeRelative: ".expo/expo-go"),
+            ],
+            tier: .safe,
+            rationale: "Expo 工具下载的应用构建、模板与 SDK 数据;Expo 的登录信息不在这里。清了 Expo 需要时重新下载。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "iphone"
+        ),
+        // 上游「pyenv and rbenv Downloads」
+        JunkRule(
+            id: "pyenv.rbenvDownloads",
+            group: .globalToolCache,
+            title: "pyenv / rbenv 下载缓存",
+            patterns: [
+                JunkPathPattern(homeRelative: ".pyenv/cache"),
+                JunkPathPattern(homeRelative: ".rbenv/cache"),
+            ],
+            tier: .safe,
+            rationale: "pyenv / rbenv 装完某个版本后留下的源码下载;已装好的版本不动。清了重装那个版本时重新下载。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 上游「Oh My Zsh Cache」
+        JunkRule(
+            id: "ohmyzsh.cache",
+            group: .globalToolCache,
+            title: "Oh My Zsh 缓存",
+            patterns: [JunkPathPattern(homeRelative: ".oh-my-zsh/cache")],
+            tier: .safe,
+            rationale: "Oh My Zsh 的补全与更新检查文件;开新终端窗口时重建。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "terminal"
+        ),
+        // 上游「opam Download Cache」
+        JunkRule(
+            id: "opam.downloads",
+            group: .globalToolCache,
+            title: "opam 下载缓存",
+            patterns: [JunkPathPattern(homeRelative: ".opam/download-cache")],
+            tier: .safe,
+            rationale: "opam 留着的 OCaml 包下载;已装的包不动,需要时重新下载。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 上游「Puppeteer Browsers」
+        JunkRule(
+            id: "puppeteer.browsers",
+            group: .globalToolCache,
+            title: "Puppeteer 浏览器",
+            patterns: [JunkPathPattern(homeRelative: ".cache/puppeteer")],
+            tier: .checkFirst,
+            rationale: "Puppeteer 为自动化测试下载的浏览器;清了脚本会失败,要重新 npm install 或 npx puppeteer browsers install。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "globe"
+        ),
+        // 上游「Dart Analysis Cache」
+        JunkRule(
+            id: "dart.analysisCache",
+            group: .globalToolCache,
+            title: "Dart 分析缓存",
+            patterns: [JunkPathPattern(homeRelative: ".dartServer/.analysis-driver")],
+            tier: .safe,
+            rationale: "Dart / Flutter 语言服务器的分析结果,让项目打开得快;清了分析器重建。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "doc.text"
+        ),
+        // 上游「Hermes Agent Cache」
+        // 与上游的差异:上游要求 Hermes 空闲时清(运行中的任务可能在用);在不在用我们这里不判,靠先检查
+        JunkRule(
+            id: "hermes.agentCache",
+            group: .globalToolCache,
+            title: "Hermes 智能体缓存",
+            patterns: [JunkPathPattern(homeRelative: ".hermes/cache")],
+            tier: .checkFirst,
+            rationale: "Hermes 智能体的下载与临时工作区;要在它空闲时清(运行中的任务可能在用)。设置、密钥、会话不在这里。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "sparkles"
+        ),
+        // 上游「opencode Cache」
+        // 与上游的差异:上游要求 opencode 空闲时清;在不在用我们这里不判,靠先检查
+        JunkRule(
+            id: "opencode.cache",
+            group: .globalToolCache,
+            title: "opencode 缓存",
+            patterns: [JunkPathPattern(homeRelative: ".cache/opencode")],
+            tier: .checkFirst,
+            rationale: "opencode 下载的包、工具与模型清单;要在它空闲时清,需要时重新获取。会话与登录信息不在这里。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "sparkles"
+        ),
+        // 上游「Conda Package Cache」
+        // 与上游的差异:上游的说明是「用 conda clean --all 更合适」;照列,档位先检查
+        JunkRule(
+            id: "conda.packageCache",
+            group: .globalToolCache,
+            title: "Conda 包缓存",
+            patterns: [
+                JunkPathPattern(homeRelative: ".conda/pkgs"),
+                JunkPathPattern(homeRelative: "anaconda3/pkgs"),
+                JunkPathPattern(homeRelative: "miniconda3/pkgs"),
+                JunkPathPattern(homeRelative: "miniforge3/pkgs"),
+                JunkPathPattern(homeRelative: "mambaforge/pkgs"),
+                JunkPathPattern(homeRelative: "opt/anaconda3/pkgs"),
+                JunkPathPattern(homeRelative: "opt/miniconda3/pkgs"),
+            ],
+            tier: .checkFirst,
+            rationale: "conda 解包出来供各环境链接使用的包;环境靠链接到这些文件工作,清了实际腾出的空间比显示的少。想瘦身请用 conda clean --all。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "cube"
+        ),
+        // 上游「nvm Download Cache」
+        JunkRule(
+            id: "nvm.downloads",
+            group: .globalToolCache,
+            title: "nvm 下载缓存",
+            patterns: [JunkPathPattern(homeRelative: ".nvm/.cache")],
+            tier: .safe,
+            rationale: "nvm 装完某个 Node 版本后留下的下载;已装的版本不动。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 上游「giget Template Cache」
+        JunkRule(
+            id: "giget.cache",
+            group: .globalToolCache,
+            title: "giget 模板缓存",
+            patterns: [JunkPathPattern(homeRelative: ".cache/giget")],
+            tier: .safe,
+            rationale: "giget 下载的项目模板(nuxi init 这类命令用的);下次建项目时重新下载。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "doc"
+        ),
+        // 上游「Firebase Emulators」
+        JunkRule(
+            id: "firebase.emulators",
+            group: .globalToolCache,
+            title: "Firebase 模拟器",
+            patterns: [JunkPathPattern(homeRelative: ".cache/firebase/emulators")],
+            tier: .safe,
+            rationale: "Firebase CLI 下载的模拟器文件;下次启动模拟器时重新下载。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "flame"
+        ),
+        // 上游「Hex Package Cache」
+        JunkRule(
+            id: "hex.packages",
+            group: .globalToolCache,
+            title: "Hex 包缓存",
+            patterns: [JunkPathPattern(homeRelative: ".hex/packages")],
+            tier: .safe,
+            rationale: "Hex 留着的 Elixir / Erlang 包下载,免得重复构建时重下;清了下次构建重新下载。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 上游「Rebar3 Cache」
+        JunkRule(
+            id: "rebar3.cache",
+            group: .globalToolCache,
+            title: "Rebar3 缓存",
+            patterns: [JunkPathPattern(homeRelative: ".cache/rebar3")],
+            tier: .safe,
+            rationale: "Rebar3 留着的包下载与构建插件;清了下次构建重新下载。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 上游「NuGet Packages」
+        JunkRule(
+            id: "nuget.packages",
+            group: .globalToolCache,
+            title: "NuGet 包",
+            patterns: [JunkPathPattern(homeRelative: ".nuget/packages")],
+            tier: .checkFirst,
+            rationale: ".NET 还原项目用的包;不丢东西,但下次还原要全部重新下载,需要联网。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 上游「Cabal Packages」
+        JunkRule(
+            id: "cabal.packages",
+            group: .globalToolCache,
+            title: "Cabal 包",
+            patterns: [JunkPathPattern(homeRelative: ".cabal/packages")],
+            tier: .checkFirst,
+            rationale: "Cabal 下载的 Haskell 包;不丢东西,但下次构建要重新下载、重新编译,可能很久。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 上游「Stack Cache」
+        JunkRule(
+            id: "stack.cache",
+            group: .globalToolCache,
+            title: "Stack 缓存",
+            patterns: [
+                JunkPathPattern(homeRelative: ".stack/pantry"),
+                JunkPathPattern(homeRelative: ".stack/snapshots"),
+            ],
+            tier: .checkFirst,
+            rationale: "Stack 跨项目共享的包与预编译库;设置与已装的编译器不动。下次构建要下载、重编很多。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 上游「Bazel Cache」
+        JunkRule(
+            id: "bazel.cache",
+            group: .globalToolCache,
+            title: "Bazel 缓存",
+            patterns: [JunkPathPattern(homeRelative: ".cache/bazel")],
+            tier: .checkFirst,
+            rationale: "Bazel 在多次构建之间缓存的产出;清了下次构建从头来,可能很慢。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "hammer"
+        ),
+        // 上游「Android Build Cache」
+        JunkRule(
+            id: "android.buildCache",
+            group: .globalToolCache,
+            title: "Android 构建缓存",
+            patterns: [
+                JunkPathPattern(homeRelative: ".android/cache"),
+                JunkPathPattern(homeRelative: ".android/build-cache"),
+            ],
+            tier: .safe,
+            rationale: "Android 构建工具的缓存,下次构建重建;模拟器、调试密钥与签名密钥不在这里。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "hammer"
+        ),
+        // 上游「Zed Cache」
+        JunkRule(
+            id: "zed.caches",
+            group: .globalToolCache,
+            title: "Zed 缓存",
+            patterns: [JunkPathPattern(homeRelative: "Library/Caches/Zed")],
+            tier: .safe,
+            rationale: "Zed 编辑器的临时文件;再次启动时重建。设置与扩展不在这里。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "chevron.left.forwardslash.chevron.right"
+        ),
+        // 上游「SBT Cache」
+        JunkRule(
+            id: "sbt.ivyCache",
+            group: .globalToolCache,
+            title: "sbt / Ivy 缓存",
+            patterns: [JunkPathPattern(homeRelative: ".ivy2/cache")],
+            tier: .checkFirst,
+            rationale: "sbt / Ivy 下载的 Java 与 Scala 库;不丢东西,但下次构建要全部重新下载,又慢又要联网。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 上游「Ruby Gems」,只取其中的目录 / 固定路径部分
+        JunkRule(
+            id: "rubygems.downloads",
+            group: .globalToolCache,
+            title: "RubyGems 下载缓存",
+            patterns: [JunkPathPattern(homeRelative: ".gem/specs")],
+            tier: .safe,
+            rationale: "RubyGems 装完 gem 后留下的规格索引;已装的 gem 不动,需要时重新下载。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 上游「Bundler Cache」
+        JunkRule(
+            id: "bundler.cache",
+            group: .globalToolCache,
+            title: "Bundler 缓存",
+            patterns: [JunkPathPattern(homeRelative: ".bundle/cache")],
+            tier: .safe,
+            rationale: "Bundler 下载的 Ruby gem 缓存;运行 bundle install 时重新下载。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 上游「Composer Cache」
+        JunkRule(
+            id: "composer.cache",
+            group: .globalToolCache,
+            title: "Composer 缓存",
+            patterns: [JunkPathPattern(homeRelative: ".composer/cache")],
+            tier: .safe,
+            rationale: "Composer 下载的 PHP 包缓存;运行 composer install 时重新下载。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 上游「Terraform Cache」
+        JunkRule(
+            id: "terraform.pluginCache",
+            group: .globalToolCache,
+            title: "Terraform 插件缓存",
+            patterns: [JunkPathPattern(homeRelative: ".terraform.d/plugin-cache")],
+            tier: .safe,
+            rationale: "Terraform 下载的提供者插件缓存;运行 terraform init 时重新下载。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 上游「GitHub Actions Cache」
+        JunkRule(
+            id: "githubActions.cache",
+            group: .globalToolCache,
+            title: "GitHub Actions 缓存",
+            patterns: [JunkPathPattern(homeRelative: ".cache/act")],
+            tier: .safe,
+            rationale: "在本地跑 GitHub Actions(act)用的缓存文件;自动重建。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 上游「Vagrant Cache」
+        JunkRule(
+            id: "vagrant.cache",
+            group: .globalToolCache,
+            title: "Vagrant 缓存",
+            patterns: [
+                JunkPathPattern(homeRelative: ".vagrant.d/boxes"),
+                JunkPathPattern(homeRelative: ".vagrant.d/tmp"),
+            ],
+            tier: .checkFirst,
+            rationale: "Vagrant 用的虚拟机镜像;不用了可以清——重新下载要一阵。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "square.stack.3d.up"
+        ),
+        // 上游「Zsh Cache」,只取其中的目录 / 固定路径部分
+        JunkRule(
+            id: "zsh.sessions",
+            group: .globalToolCache,
+            title: "终端会话记录",
+            patterns: [JunkPathPattern(homeRelative: ".zsh_sessions")],
+            tier: .safe,
+            rationale: "终端 shell 的会话恢复文件;开新终端窗口时重建。清了之后,重启终端时恢复不了上次的窗口与会话。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "terminal"
+        ),
+        // 上游「Go Module Cache」是 medium(要联网重下、缓存里改过的内容会丢);p6 时与构建缓存合成一条 go.caches
+        // 与上游的差异:上游要有「目录里只有模块」的证据才整目录列,否则只列下载子目录;我们整目录一条、恒先检查
+        JunkRule(
+            id: "go.moduleCache",
+            group: .globalToolCache,
+            title: "Go 模块缓存",
+            patterns: [JunkPathPattern(homeRelative: "go/pkg/mod")],
+            tier: .checkFirst,
+            rationale: "Go 项目下载的依赖模块;下次构建要联网重新下载。直接改过缓存里模块的话,改动会丢。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 上游「Go Build Cache」是 safe;与上面那条模块缓存在上游就是两行两档
+        JunkRule(
+            id: "go.buildCache",
+            group: .globalToolCache,
+            title: "Go 构建缓存",
+            patterns: [
+                JunkPathPattern(homeRelative: "Library/Caches/go-build"),
+                JunkPathPattern(homeRelative: ".cache/go-build"),
+            ],
+            tier: .safe,
+            rationale: "Go 的编译缓存;下次构建重新编译。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // —— 上游全局缓存定义里没有的路径:说明库里按名字登记的、上游动态行留下的固定部分、Pulse 自加——
+        // 每条路径的来历写在规则旁,并登记在账本测试的 pulseAdded 里(反查:来历不明的路径过不了账本)。
+        // 来历:
+        //   Library/Caches/com.apple.dt.Xcode.ITunesSoftwareService:说明库 xcode-itunes-service 条目登记的目录名
+        JunkRule(
+            id: "xcode.deviceSoftwareService",
+            group: .globalToolCache,
+            title: "Xcode 设备支持文件缓存",
+            patterns: [JunkPathPattern(homeRelative: "Library/Caches/com.apple.dt.Xcode.ITunesSoftwareService")],
+            tier: .checkFirst,
+            rationale: "Xcode 往连接的苹果设备上安装、调试应用用的临时文件;清了 Xcode 可能要重新下载设备支持文件。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "iphone"
+        ),
+        // 来历:
+        //   .cache/prisma:上游登记的路径
+        //   Library/Caches/prisma-nodejs:说明库 prisma-nodejs 条目登记的目录名
+        JunkRule(
+            id: "prisma.cache",
+            group: .globalToolCache,
+            title: "Prisma 缓存",
+            patterns: [
+                JunkPathPattern(homeRelative: ".cache/prisma"),
+                JunkPathPattern(homeRelative: "Library/Caches/prisma-nodejs"),
+            ],
+            tier: .safe,
+            rationale: "Prisma(数据库工具)的引擎下载与临时文件;下次使用时重新生成。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "cylinder"
+        ),
+        // 来历:
+        //   Library/Caches/ms-playwright:说明库 ms-playwright 条目的 key 就是目录名(上游按版本现算,只列没人用的)
+        //   Library/Caches/ms-playwright-go:说明库 ms-playwright 条目登记的别名(Go 版)
+        // 与上游的差异:上游只列没有任何项目在用的浏览器版本(读各项目的锁文件现算);我们整目录一条、恒先检查
+        JunkRule(
+            id: "playwright.browsers",
+            group: .globalToolCache,
+            title: "Playwright 浏览器",
+            patterns: [
+                JunkPathPattern(homeRelative: "Library/Caches/ms-playwright"),
+                JunkPathPattern(homeRelative: "Library/Caches/ms-playwright-go"),
+            ],
+            tier: .checkFirst,
+            rationale: "Playwright 为自动化测试下载的浏览器(含 Go 版);清了测试会失败,要重新 npx playwright install。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "globe"
+        ),
+        // 来历:
+        //   Library/Caches/typescript:说明库 typescript-type-cache 条目登记的目录名
+        JunkRule(
+            id: "typescript.typeCache",
+            group: .globalToolCache,
+            title: "TypeScript 类型缓存",
+            patterns: [JunkPathPattern(homeRelative: "Library/Caches/typescript")],
+            tier: .safe,
+            rationale: "编辑器为纯 JavaScript 项目下载的类型定义(自动补全用);需要时重新下载。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "chevron.left.forwardslash.chevron.right"
+        ),
+        // 来历:
+        //   Library/Caches/Cypress:说明库 cypress-cache 条目登记的目录名
+        JunkRule(
+            id: "cypress.binaries",
+            group: .globalToolCache,
+            title: "Cypress 测试程序",
+            patterns: [JunkPathPattern(homeRelative: "Library/Caches/Cypress")],
+            tier: .checkFirst,
+            rationale: "运行端到端测试的 Cypress 程序;清了测试会失败,要重新 npx cypress install。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "hammer"
+        ),
+        // 来历:
+        //   Library/Caches/mise:说明库 mise-cache 条目登记的目录名
+        //   Library/Caches/rtx:同上(Mise 的旧名)
+        JunkRule(
+            id: "mise.cache",
+            group: .globalToolCache,
+            title: "Mise 缓存",
+            patterns: [
+                JunkPathPattern(homeRelative: "Library/Caches/mise"),
+                JunkPathPattern(homeRelative: "Library/Caches/rtx"),
+            ],
+            tier: .safe,
+            rationale: "Mise(原 rtx,管理工具版本的)缓存的版本列表等数据;已装的工具不动,Mise 需要时重新拉取。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "shippingbox"
+        ),
+        // 来历:
+        //   Library/Caches/com.google.android.studio:说明库 android-studio 条目登记的目录名
+        JunkRule(
+            id: "androidStudio.caches",
+            group: .globalToolCache,
+            title: "Android Studio 缓存",
+            patterns: [JunkPathPattern(homeRelative: "Library/Caches/com.google.android.studio")],
+            tier: .safe,
+            rationale: "Android Studio 的临时文件;再次启动时重建。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "chevron.left.forwardslash.chevron.right"
+        ),
+        // 来历:
+        //   Library/Caches/com.apple.python:说明库 apple-python-cache 条目登记的目录名
+        JunkRule(
+            id: "apple.pythonCache",
+            group: .globalToolCache,
+            title: "系统 Python 编译缓存",
+            patterns: [JunkPathPattern(homeRelative: "Library/Caches/com.apple.python")],
+            tier: .checkFirst,
+            rationale: "macOS 开发者工具自带的 Python 的编译文件;下次运行时重建。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "chevron.left.forwardslash.chevron.right"
+        ),
+        // 来历:
+        //   Library/Caches/com.apple.iphonesimulator:说明库 simulator-cache 条目登记的目录名
+        JunkRule(
+            id: "simulator.runtimeCache",
+            group: .globalToolCache,
+            title: "模拟器运行时缓存",
+            patterns: [JunkPathPattern(homeRelative: "Library/Caches/com.apple.iphonesimulator")],
+            tier: .checkFirst,
+            rationale: "iOS 模拟器跑应用时产生的临时文件;下次启动模拟器时重建。",
+            source: JunkRuleTable.purgeApp,
+            symbolName: "ipad"
+        ),
+        // 来历:
+        //   Library/Caches/pulse-swiftpm:Pulse 自定:本机构建用的 SwiftPM 包缓存
+        JunkRule(
+            id: "pulse.swiftpmCache",
+            group: .globalToolCache,
+            title: "Pulse 构建依赖缓存",
+            patterns: [JunkPathPattern(homeRelative: "Library/Caches/pulse-swiftpm")],
+            tier: .checkFirst,
+            rationale: "Pulse 自己构建时缓存的 SwiftPM 依赖包;清了下次构建 Pulse 要联网重新拉取。",
+            source: JunkRuleTable.pulseCustom,
+            symbolName: "swift"
+        ),
+        // —— p7-cleaner/10 补差结束 ——
     ]
 
     /// 固定路径的应用缓存条目(不在 ~/Library/Caches 一级,进不了知识库)。
@@ -531,6 +1127,25 @@ public enum JunkRuleTable {
             rationale: "各 App 的运行日志与崩溃报告;排障时有用,平时可清,需要时自动重新生成。",
             source: purgeAppExplanations,
             symbolName: "doc.text"
+        ),
+        // p7-cleaner/10:上游把这一行放在「开发工具」里,说的却是应用的网页缓存;我们归应用缓存组。
+        // 路径逐字取自上游 DevScanner.globalCacheDefinitions「Electron App Caches」。
+        JunkRule(
+            id: "appcache.electronApps",
+            group: .appCache,
+            title: "Electron 应用缓存",
+            patterns: [
+                JunkPathPattern(homeRelative: "Library/Application Support/Slack/Cache"),
+                JunkPathPattern(homeRelative: "Library/Application Support/Slack/Code Cache"),
+                JunkPathPattern(homeRelative: "Library/Application Support/discord/Cache"),
+                JunkPathPattern(homeRelative: "Library/Application Support/discord/Code Cache"),
+                JunkPathPattern(homeRelative: "Library/Application Support/Notion/Cache"),
+                JunkPathPattern(homeRelative: "Library/Application Support/Figma/Cache"),
+            ],
+            tier: .safe,
+            rationale: "Slack、Discord、Notion、Figma 这些用 Electron 做的应用的网页与代码缓存;应用打开时重建。登录与聊天记录不在这里。",
+            source: JunkRuleTable.purgeAppExplanations,
+            symbolName: "cube"
         ),
     ]
 

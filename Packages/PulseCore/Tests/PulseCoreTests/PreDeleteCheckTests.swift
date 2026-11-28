@@ -95,8 +95,15 @@ final class PreDeleteCheckTests: XCTestCase {
             name: "Library", path: home + "/Library", kind: .directory,
             accountedBytes: 300, children: [caches]
         )
+        // 家目录下再放一个项目产物(node_modules,旁边有 package.json):家目录自己就是扫描根那个「项目」。
+        // 标记探测不再「一律存在」——规则表里有 Library / Temp / bin 这类通用的目录名(p7-cleaner/10),
+        // 全判存在的话家目录下的 Library 会被当成 Unity 工程的产物。
+        let artifactsNode = SpaceNode(
+            name: "node_modules", path: home + "/node_modules", kind: .directory,
+            accountedBytes: 50, ownModifiedEpoch: 333.0
+        )
         let tree = SpaceNode(
-            name: "me", path: home, kind: .directory, accountedBytes: 300, children: [library]
+            name: "me", path: home, kind: .directory, accountedBytes: 350, children: [library, artifactsNode]
         )
         let global = JunkMatcher.candidates(in: [tree], home: home, excludedPathPrefixes: [])
         XCTAssertEqual(global.first?.modifiedAtScan, 111.0, "工具缓存候选带节点快照")
@@ -107,12 +114,10 @@ final class PreDeleteCheckTests: XCTestCase {
         XCTAssertEqual(orphans.first?.modifiedAtScan, 222.0, "孤儿候选带节点快照")
 
         let artifacts = ProjectArtifactMatcher.artifacts(
-            in: [tree], roots: [home], excludedPathPrefixes: [], fileExists: { _ in true }
+            in: [tree], roots: [home], excludedPathPrefixes: [], fileExists: { $0.hasSuffix("/package.json") }
         )
-        XCTAssertTrue(
-            artifacts.allSatisfy { $0.modifiedAtScan != nil || $0.group != .projectArtifacts },
-            "项目产物候选(命中时)同样带快照"
-        )
+        XCTAssertEqual(artifacts.map(\.ruleID), ["artifact.node_modules"], "只认旁边有工程文件的产物")
+        XCTAssertEqual(artifacts.first?.modifiedAtScan, 333.0, "项目产物候选(命中时)同样带快照")
     }
 
     // MARK: 缓存 v3:快照往返 + v2 兼容读

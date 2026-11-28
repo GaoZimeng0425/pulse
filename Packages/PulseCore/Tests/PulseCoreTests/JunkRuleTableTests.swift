@@ -33,7 +33,6 @@ final class JunkRuleTableTests: XCTestCase {
         "maven.repository": (".m2/repository", 150),
         "cargo.registry": (".cargo/registry", 1800),
         "uv.cache": (".cache/uv", 1600),
-        "go.caches": ("go/pkg/mod", 340),
         "pnpm.metadataCache": ("Library/Caches/pnpm", 800),
         "corepack.cache": (".cache/node/corepack", 30),
         "yarn.cache": ("Library/Caches/Yarn", 40),
@@ -178,6 +177,54 @@ final class JunkRuleTableTests: XCTestCase {
         "appcache.ssu": ("Library/Caches/ssu", 56),
         "appcache.storekitagent": ("Library/Caches/com.apple.storekitagent", 43),
         "appcache.ams-migrator": ("Library/Caches/AMSDataMigratorTool", 30),
+        // p7-cleaner/10:自上游补差的开发工具规则与 Electron 应用缓存条目,一条规则一行正例
+        "xcode.documentationCache": ("Library/Developer/Xcode/DocumentationCache", 20),
+        "xcode.deviceSoftwareService": ("Library/Caches/com.apple.dt.Xcode.ITunesSoftwareService", 13),
+        "cocoapods.specRepos": (".cocoapods/repos", 13),
+        "npm.logs": (".npm/_logs", 33),
+        "dart.pubCache": (".pub-cache/hosted", 42),
+        "precommit.environments": (".cache/pre-commit", 28),
+        "prek.cache": (".cache/prek/repos", 26),
+        "prisma.cache": (".cache/prisma", 39),
+        "expo.cache": (".expo/android-apk-cache", 24),
+        "pyenv.rbenvDownloads": (".pyenv/cache", 26),
+        "ohmyzsh.cache": (".oh-my-zsh/cache", 15),
+        "opam.downloads": (".opam/download-cache", 55),
+        "puppeteer.browsers": (".cache/puppeteer", 27),
+        "dart.analysisCache": (".dartServer/.analysis-driver", 33),
+        "hermes.agentCache": (".hermes/cache", 33),
+        "opencode.cache": (".cache/opencode", 16),
+        "conda.packageCache": (".conda/pkgs", 32),
+        "nvm.downloads": (".nvm/.cache", 56),
+        "giget.cache": (".cache/giget", 38),
+        "firebase.emulators": (".cache/firebase/emulators", 43),
+        "hex.packages": (".hex/packages", 21),
+        "rebar3.cache": (".cache/rebar3", 39),
+        "nuget.packages": (".nuget/packages", 34),
+        "cabal.packages": (".cabal/packages", 57),
+        "stack.cache": (".stack/pantry", 37),
+        "bazel.cache": (".cache/bazel", 41),
+        "android.buildCache": (".android/cache", 39),
+        "zed.caches": ("Library/Caches/Zed", 29),
+        "sbt.ivyCache": (".ivy2/cache", 40),
+        "rubygems.downloads": (".gem/specs", 29),
+        "bundler.cache": (".bundle/cache", 53),
+        "composer.cache": (".composer/cache", 48),
+        "terraform.pluginCache": (".terraform.d/plugin-cache", 41),
+        "githubActions.cache": (".cache/act", 24),
+        "vagrant.cache": (".vagrant.d/boxes", 47),
+        "zsh.sessions": (".zsh_sessions", 52),
+        "playwright.browsers": ("Library/Caches/ms-playwright", 38),
+        "typescript.typeCache": ("Library/Caches/typescript", 43),
+        "cypress.binaries": ("Library/Caches/Cypress", 39),
+        "mise.cache": ("Library/Caches/mise", 19),
+        "androidStudio.caches": ("Library/Caches/com.google.android.studio", 38),
+        "apple.pythonCache": ("Library/Caches/com.apple.python", 55),
+        "simulator.runtimeCache": ("Library/Caches/com.apple.iphonesimulator", 57),
+        "pulse.swiftpmCache": ("Library/Caches/pulse-swiftpm", 55),
+        "go.moduleCache": ("go/pkg/mod", 32),
+        "go.buildCache": ("Library/Caches/go-build", 19),
+        "appcache.electronApps": ("Library/Application Support/Slack/Cache", 29),
         "appcache.logs": ("Library/Logs", 100),
         // p6-cleaner/02:AI 模型四存储位(全「先检查」)
         "ai.ollama": (".ollama/models", 1100),
@@ -327,16 +374,59 @@ final class JunkRuleTableTests: XCTestCase {
             "npm.cache",
             "pnpm.store",
             "cocoapods.cache",
-            "gradle.caches",
             "vscode.cache",
             "cursor.cache",
         ] {
             XCTAssertEqual(JunkRuleTable.rule(id: id)?.tier, .safe, id)
         }
+        // p7-cleaner/10 对齐上游档位:上游 medium 的一律「先检查」(p6 时 Gradle / Maven / uv 判了
+        // 「可安全清理」);Go 的两处缓存拆开,模块缓存先检查、构建缓存可安全清理。
+        for id in ["gradle.caches", "maven.repository", "uv.cache", "go.moduleCache", "xcode.deviceSoftwareService"] {
+            XCTAssertEqual(JunkRuleTable.rule(id: id)?.tier, .checkFirst, id)
+        }
+        XCTAssertEqual(JunkRuleTable.rule(id: "go.buildCache")?.tier, .safe)
         XCTAssertTrue(
             JunkRuleTable.builtin.allSatisfy { $0.source.contains("MIT") || $0.source.contains("Pulse 自定") },
             "每条规则注明出处:移植标 MIT 来源,自定标 Pulse 自定"
         )
+    }
+
+    /// p7-cleaner/10 验收 1:每条规则说明非空、出处注明。开发工具规则没有单独的「重建说明」字段,
+    /// 重建办法写在说明那一句里(「清了下次……重新下载」)。
+    func testEveryRuleExplainsItselfAndNamesItsSource() {
+        for rule in JunkRuleTable.builtin {
+            XCTAssertFalse(rule.rationale.isEmpty, "\(rule.id):说明非空")
+            XCTAssertFalse(rule.source.isEmpty, "\(rule.id):出处非空")
+            XCTAssertTrue(
+                rule.source.contains("MIT") || rule.source.contains("Pulse 自定"),
+                "\(rule.id):出处要么标 MIT 来源,要么标 Pulse 自定,现在是「\(rule.source)」"
+            )
+        }
+    }
+
+    /// com.apple.* 的缓存不自动勾(票 09 给应用缓存定的规矩;这里覆盖**整张规则表**——开发工具、
+    /// 固定路径、知识库、AI 模型)。常驻的进程没有可靠的「在运行」信号。例外只有 Safari 的缓存
+    /// (浏览器一组同档,p6 的既有决定)。按模式最后一段的目录名判归属,与保护名单同一个判法。
+    func testAppleOwnedCachesAreNeverAutoSelectedAcrossTheWholeTable() {
+        var appleRules: [String] = []
+        var offenders: [String] = []
+        for rule in JunkRuleTable.builtin {
+            let leafNames = rule.patterns.compactMap { pattern -> String? in
+                guard let last = pattern.components.last, case let .literal(name) = last else { return nil }
+                return name
+            }
+            guard leafNames.contains(where: DiscoveryProtectionList.isSystemOwned(name:)) else { continue }
+            appleRules.append(rule.id)
+            if rule.id != "browser.safari", rule.tier == .safe {
+                offenders.append(rule.id)
+            }
+        }
+        XCTAssertGreaterThan(appleRules.count, 10, "护栏在空转")
+        XCTAssertTrue(JunkRuleTable.builtin.contains { $0.id == "browser.safari" }, "例外里的条目 browser.safari 已不存在,把例外删掉")
+        XCTAssertEqual(offenders, [], "苹果自家的缓存不能进「可安全清理」")
+        for id in ["xcode.caches", "apple.pythonCache", "simulator.runtimeCache", "xcode.deviceSoftwareService"] {
+            XCTAssertEqual(JunkRuleTable.rule(id: id)?.tier, .checkFirst, id)
+        }
     }
 
     /// p6-cleaner/01 组序与归属(spec 定案 8):CaseIterable 序即 UI / 总览品类序。
