@@ -429,9 +429,25 @@ public protocol AgentSessionReading: Sendable {
     func claudeTranscriptTail(cwd: String, sessionId: String) -> Data?
     /// 会话目录 `subagents/` 下 agent 文件计数;目录不存在返回 0。
     func claudeSubagentCount(cwd: String, sessionId: String) -> Int
-    /// `~/.zcode/cli/agents/` 下近 `lookback` 秒有更新的会话的 metadata 文件
-    /// (session 名 + 文件内容;会话数与每会话 agent 数由实现按上限封顶)。
-    func zcodeAgentMetadataFiles(lookback: TimeInterval, now: Date) -> [(session: String, data: Data)]
+    /// `~/.zcode/cli/agents/` 下近 `lookback` 秒有更新的 metadata 文件清单:只列目录 + 取
+    /// 修改时间,**不读内容**(会话数与每会话 agent 数由实现按上限封顶)。内容按需走
+    /// `zcodeAgentMetadata(atPath:)`——编排器按修改时间增量,没变的文件不重读。
+    func zcodeAgentMetadataCandidates(lookback: TimeInterval, now: Date) -> [ZCodeMetadataCandidate]
+    /// 单个 metadata 文件内容;缺失/不可读返回 nil。
+    func zcodeAgentMetadata(atPath path: String) -> Data?
+}
+
+/// 一份 ZCode agent metadata 的位置与修改时间(清单项,不含内容)。
+public struct ZCodeMetadataCandidate: Equatable, Sendable {
+    public let session: String
+    public let path: String
+    public let modifiedAt: Date
+
+    public init(session: String, path: String, modifiedAt: Date) {
+        self.session = session
+        self.path = path
+        self.modifiedAt = modifiedAt
+    }
 }
 
 // MARK: - 编排器
@@ -441,7 +457,10 @@ public protocol AgentSessionReading: Sendable {
 /// - 两轮刷新之间不再碰文件:每轮只用心跳快照的 pid 集合过滤缓存读数并重算时长——
 ///   实例退出 ≤1 轮内下榜;新实例要等下一轮刷新才上榜(注册表是 Claude 写的,
 ///   追新不如追退急);
-/// - ZCode 会话只看 `zcodeLookback` 窗内有更新的,读数上限封顶防目录膨胀。
+/// - ZCode 会话只看 `zcodeLookback` 窗内有更新的,读数上限封顶防目录膨胀;
+///   metadata 按「路径 + 修改时间」增量:清单里时间没变的沿用上次解析结果不重读,
+///   掉出清单的从缓存删掉(agent-scan-cost,2026-11-28:本机 1146 个 agent 目录、
+///   近 24h 有更新的 29 个,原先每轮全量重读)。
 public struct AgentSessionCatalog: Sendable {
     public static let zcodeLookback: TimeInterval = 24 * 3600
     public static let maxZCodeSessions = 12
@@ -454,11 +473,18 @@ public struct AgentSessionCatalog: Sendable {
         let subagentCount: Int
     }
 
+    /// metadata 增量缓存项:修改时间 + 解析结果(畸形文件记 nil,时间不变就不再重试)。
+    private struct ZCodeCacheEntry: Sendable {
+        let modifiedAt: Date
+        let meta: ZCodeAgentMeta?
+    }
+
     private let refreshInterval: TimeInterval
     private var lastRefreshAt: Date?
     private var cachedClaude: [ClaudeReading] = []
     private var cachedUsage: ClaudeUsageSnapshot?
     private var cachedZCode: [ZCodeSessionStatus] = []
+    private var zcodeCache: [String: ZCodeCacheEntry] = [:]
 
     public init(refreshInterval: TimeInterval = 5) {
         self.refreshInterval = refreshInterval
@@ -488,7 +514,7 @@ public struct AgentSessionCatalog: Sendable {
             )
         }
         cachedUsage = reader.claudeUsageSnapshotFile().flatMap(ClaudeUsageSnapshot.parse)
-        cachedZCode = zcodeRows(reader: reader, now: now)
+        cachedZCode = zcodeRows(agents: refreshZCodeMetas(reader: reader, now: now), now: now)
         return AgentSnapshot(
             claudeSessions: claudeRows(alivePids: alivePids, now: now),
             usage: cachedUsage,
@@ -521,14 +547,41 @@ public struct AgentSessionCatalog: Sendable {
             }
     }
 
+    /// 清单 → (session, 解析结果):修改时间与缓存一致的沿用,其余读盘重解析;
+    /// 缓存整体换成本轮清单(掉出近窗 / 被删的 agent 随之出缓存,不无限增长)。
+    private mutating func refreshZCodeMetas(
+        reader: any AgentSessionReading,
+        now: Date
+    ) -> [(session: String, meta: ZCodeAgentMeta)] {
+        var nextCache: [String: ZCodeCacheEntry] = [:]
+        var agents: [(session: String, meta: ZCodeAgentMeta)] = []
+        for candidate in reader.zcodeAgentMetadataCandidates(lookback: Self.zcodeLookback, now: now) {
+            let entry: ZCodeCacheEntry
+            if let cached = zcodeCache[candidate.path], cached.modifiedAt == candidate.modifiedAt {
+                entry = cached
+            } else if let data = reader.zcodeAgentMetadata(atPath: candidate.path) {
+                entry = ZCodeCacheEntry(modifiedAt: candidate.modifiedAt, meta: ZCodeAgentMetadata.parse(data))
+            } else {
+                // 读失败(stat 与读之间被替换 / 无权限)不进缓存:下轮按同一时间重试,
+                // 不把一次失败记成「坏文件」藏到它下次被改写为止。
+                continue
+            }
+            nextCache[candidate.path] = entry
+            if let meta = entry.meta {
+                agents.append((candidate.session, meta))
+            }
+        }
+        zcodeCache = nextCache
+        return agents
+    }
+
     /// ZCode 行:metadata 按 session 聚合——每会话 agent 数封顶(更新近的优先),
     /// 工作区取最新 agent 的,token 合计(全部缺失则 nil 不出 0),最近更新在前。
-    private func zcodeRows(reader: any AgentSessionReading, now: Date) -> [ZCodeSessionStatus] {
-        var bySession: [String: [ZCodeAgentMeta]] = [:]
-        for file in reader.zcodeAgentMetadataFiles(lookback: Self.zcodeLookback, now: now) {
-            guard let meta = ZCodeAgentMetadata.parse(file.data) else { continue }
-            bySession[file.session, default: []].append(meta)
-        }
+    private func zcodeRows(
+        agents: [(session: String, meta: ZCodeAgentMeta)],
+        now: Date
+    ) -> [ZCodeSessionStatus] {
+        let bySession = Dictionary(grouping: agents, by: \.session).mapValues { $0.map(\.meta) }
         return bySession
             .map { session, agents -> ZCodeSessionStatus in
                 let capped = agents

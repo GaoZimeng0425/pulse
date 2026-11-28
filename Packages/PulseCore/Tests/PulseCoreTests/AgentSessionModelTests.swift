@@ -195,8 +195,23 @@ final class AgentSessionModelTests: XCTestCase {
         var usage: Data?
         var tails: [String: Data] = [:]
         var subagents: [String: Int] = [:]
-        var zcode: [(session: String, data: Data)] = []
+        /// ZCode 清单夹具:路径 → (session, 修改时间, 内容)。`zcode` 便捷写法按序生成路径、
+        /// 修改时间统一取 epoch(只关心聚合口径的老用例用它)。
+        var zcodeFiles: [(path: String, session: String, modifiedAt: Date, data: Data)] = []
+        var zcode: [(session: String, data: Data)] {
+            get { zcodeFiles.map { ($0.session, $0.data) } }
+            set {
+                zcodeFiles = newValue.enumerated().map { index, file in
+                    ("\(file.session)/agent_\(index)", file.session, Date(timeIntervalSince1970: 0), file.data)
+                }
+            }
+        }
+
         private(set) var ioCalls = 0
+        /// metadata 内容读次数(增量断言点:清单里时间没变的不得重读)。
+        private(set) var zcodeReads: [String] = []
+        /// 读失败夹具:这些路径读内容返回 nil(stat 与读之间被替换 / 无权限)。
+        var unreadable: Set<String> = []
 
         func claudeRegistryFiles() -> [Data] {
             ioCalls += 1
@@ -218,9 +233,17 @@ final class AgentSessionModelTests: XCTestCase {
             return subagents["\(cwd)|\(sessionId)"] ?? 0
         }
 
-        func zcodeAgentMetadataFiles(lookback: TimeInterval, now: Date) -> [(session: String, data: Data)] {
+        func zcodeAgentMetadataCandidates(lookback: TimeInterval, now: Date) -> [ZCodeMetadataCandidate] {
             ioCalls += 1
-            return zcode
+            return zcodeFiles
+                .map { ZCodeMetadataCandidate(session: $0.session, path: $0.path, modifiedAt: $0.modifiedAt) }
+        }
+
+        func zcodeAgentMetadata(atPath path: String) -> Data? {
+            ioCalls += 1
+            zcodeReads.append(path)
+            guard !unreadable.contains(path) else { return nil }
+            return zcodeFiles.first { $0.path == path }?.data
         }
     }
 
@@ -313,5 +336,82 @@ final class AgentSessionModelTests: XCTestCase {
         var catalog = AgentSessionCatalog()
         let snapshot = catalog.update(reader: reader, alivePids: [], now: Date(timeIntervalSince1970: 0))
         XCTAssertEqual(snapshot.zcodeSessions.count, AgentSessionCatalog.maxZCodeSessions)
+    }
+
+    // MARK: - ZCode 增量(agent-scan-cost)
+
+    func testZCodeUnchangedMtimeIsNotReread() {
+        let reader = FakeReader()
+        let t0 = Date(timeIntervalSince1970: 1000)
+        reader.zcodeFiles = [
+            ("s/a1", "sess_a", t0, zcodeMeta(status: "running", updatedAt: "2026-11-12T08:00:00.000Z", tokens: 100)),
+            ("s/a2", "sess_a", t0, zcodeMeta(updatedAt: "2026-11-12T07:00:00.000Z", tokens: 200)),
+        ]
+        var catalog = AgentSessionCatalog(refreshInterval: 5)
+        let first = catalog.update(reader: reader, alivePids: [], now: t0)
+        XCTAssertEqual(Set(reader.zcodeReads), ["s/a1", "s/a2"])
+        XCTAssertEqual(first.zcodeSessions.first?.totalTokens, 300)
+
+        // 越过节流窗、清单时间都没变:一份内容都不重读,聚合照旧。
+        let second = catalog.update(reader: reader, alivePids: [], now: t0.addingTimeInterval(6))
+        XCTAssertEqual(reader.zcodeReads.count, 2, "修改时间没变的 metadata 不得重读")
+        XCTAssertEqual(second.zcodeSessions.map(\.sessionId), ["sess_a"])
+        XCTAssertEqual(second.zcodeSessions.first?.totalTokens, 300)
+        XCTAssertEqual(second.zcodeSessions.first?.activeAgents, 1)
+    }
+
+    func testZCodeChangedMtimeIsRereadAndVanishedIsDropped() {
+        let reader = FakeReader()
+        let t0 = Date(timeIntervalSince1970: 1000)
+        reader.zcodeFiles = [
+            ("s/a1", "sess_a", t0, zcodeMeta(status: "running", tokens: 100)),
+            ("s/b1", "sess_b", t0, zcodeMeta(tokens: 50)),
+        ]
+        var catalog = AgentSessionCatalog(refreshInterval: 5)
+        _ = catalog.update(reader: reader, alivePids: [], now: t0)
+
+        // a1 被改写(时间前进 + 内容变),b1 掉出清单。
+        reader.zcodeFiles = [
+            ("s/a1", "sess_a", t0.addingTimeInterval(3), zcodeMeta(status: "completed", tokens: 900)),
+        ]
+        let snapshot = catalog.update(reader: reader, alivePids: [], now: t0.addingTimeInterval(6))
+        XCTAssertEqual(reader.zcodeReads.filter { $0 == "s/a1" }.count, 2, "时间变了的要重读")
+        XCTAssertEqual(snapshot.zcodeSessions.map(\.sessionId), ["sess_a"], "掉出清单的会话下榜")
+        XCTAssertEqual(snapshot.zcodeSessions.first?.totalTokens, 900)
+        XCTAssertEqual(snapshot.zcodeSessions.first?.activeAgents, 0)
+
+        // b1 再回到清单(同一修改时间):缓存已删,必须重读而不是用陈旧项。
+        reader.zcodeFiles.append(("s/b1", "sess_b", t0, zcodeMeta(tokens: 50)))
+        _ = catalog.update(reader: reader, alivePids: [], now: t0.addingTimeInterval(12))
+        XCTAssertEqual(reader.zcodeReads.filter { $0 == "s/b1" }.count, 2)
+    }
+
+    func testZCodeMalformedFileIsNotReparsedUntilItChanges() {
+        let reader = FakeReader()
+        let t0 = Date(timeIntervalSince1970: 1000)
+        reader.zcodeFiles = [("s/bad", "sess_a", t0, Data("junk".utf8))]
+        var catalog = AgentSessionCatalog(refreshInterval: 5)
+        _ = catalog.update(reader: reader, alivePids: [], now: t0)
+        _ = catalog.update(reader: reader, alivePids: [], now: t0.addingTimeInterval(6))
+        XCTAssertEqual(reader.zcodeReads, ["s/bad"], "畸形但没变的文件不该每轮重读")
+
+        reader.zcodeFiles = [("s/bad", "sess_a", t0.addingTimeInterval(7), zcodeMeta(tokens: 42))]
+        let snapshot = catalog.update(reader: reader, alivePids: [], now: t0.addingTimeInterval(12))
+        XCTAssertEqual(snapshot.zcodeSessions.first?.totalTokens, 42, "改写后应重读并上榜")
+    }
+
+    func testZCodeFailedReadIsRetriedNextRefresh() {
+        let reader = FakeReader()
+        let t0 = Date(timeIntervalSince1970: 1000)
+        reader.zcodeFiles = [("s/a1", "sess_a", t0, zcodeMeta(tokens: 7))]
+        reader.unreadable = ["s/a1"]
+        var catalog = AgentSessionCatalog(refreshInterval: 5)
+        let first = catalog.update(reader: reader, alivePids: [], now: t0)
+        XCTAssertTrue(first.zcodeSessions.isEmpty)
+
+        // 同一修改时间、这次读得到:必须重试,而不是把上次失败当「坏文件」缓存住。
+        reader.unreadable = []
+        let second = catalog.update(reader: reader, alivePids: [], now: t0.addingTimeInterval(6))
+        XCTAssertEqual(second.zcodeSessions.first?.totalTokens, 7)
     }
 }
