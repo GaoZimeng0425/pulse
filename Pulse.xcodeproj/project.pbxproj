@@ -27,6 +27,7 @@
 		1069B0AC6FD05BFF476483F6 /* MetricAccent.swift in Sources */ = {isa = PBXBuildFile; fileRef = D764FB1CFE74208F7730C4FA /* MetricAccent.swift */; };
 		114C6C63ADBC73CF7E07FFEB /* DiskFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C75CB2BD11EEDA12D6C898D /* DiskFixture.swift */; };
 		1373C9B67FAC501E4118ACD4 /* DiskCardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75143473F1438552A6B29F53 /* DiskCardViews.swift */; };
+		13860D6D8DC3B191C7D82D02 /* PopoverVisibilitySignalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A8DFBB0F631CD39DBB247AC /* PopoverVisibilitySignalTests.swift */; };
 		19967FBCE1389CE20A6150B4 /* AgentProjectRankingMetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EAA97CEDAFBC994C63C20D0 /* AgentProjectRankingMetricsTests.swift */; };
 		1A6FBBAA8FFC5AB748E47788 /* BundleDisplayNameReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B5633EC929F85A22B2BB45E /* BundleDisplayNameReaderTests.swift */; };
 		1C5A865136AB22A28BB0D947 /* NettopProcessRateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A98A79159A39E317CC43DA0 /* NettopProcessRateTests.swift */; };
@@ -301,6 +302,7 @@
 		16D71F0A473C1329AEE02FF2 /* DevServerViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevServerViews.swift; sourceTree = "<group>"; };
 		16E122CDE8CB7A49B14C617E /* MonitorAssembly.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorAssembly.swift; sourceTree = "<group>"; };
 		18902C5B107303C6D1E30137 /* AgentUsageFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentUsageFeature.swift; sourceTree = "<group>"; };
+		1A8DFBB0F631CD39DBB247AC /* PopoverVisibilitySignalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverVisibilitySignalTests.swift; sourceTree = "<group>"; };
 		1AF42F49FFB85D97F2B8C74D /* BatteryFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryFixture.swift; sourceTree = "<group>"; };
 		1B3E17EDB4CF9D22C9DDBAC4 /* EnergyHelperGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyHelperGate.swift; sourceTree = "<group>"; };
 		1B7ADC75304AC8AC8EF1CED3 /* GroupCategoryDisplayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupCategoryDisplayTests.swift; sourceTree = "<group>"; };
@@ -869,6 +871,7 @@
 				6A98A79159A39E317CC43DA0 /* NettopProcessRateTests.swift */,
 				DE62A3533CA867B81B4B903B /* NettopWatchdogTests.swift */,
 				D594128FBC10276D6F62A60E /* NetworkSensorTests.swift */,
+				1A8DFBB0F631CD39DBB247AC /* PopoverVisibilitySignalTests.swift */,
 				6A9DD984A73F2C57684332F7 /* PreDeleteLiveConsistencyTests.swift */,
 				922EBEDDF974C9C5C567A5C8 /* ProcArgsParserTests.swift */,
 				992A92032D0B982D3C0006EB /* ProcessRankingSensorTests.swift */,
@@ -1063,6 +1066,7 @@
 				E51ED75C0AB66949E0707600 /* NettopWatchdogTests.swift in Sources */,
 				5052F645F62C479429754080 /* NetworkFixture.swift in Sources */,
 				B13A211B9FD087858718B9AE /* NetworkSensorTests.swift in Sources */,
+				13860D6D8DC3B191C7D82D02 /* PopoverVisibilitySignalTests.swift in Sources */,
 				3442790CDC0CC18BF8A6E7B7 /* PreDeleteLiveConsistencyTests.swift in Sources */,
 				616D7878CF54B2A29104277C /* ProcArgsParserTests.swift in Sources */,
 				A1307D0D5CDA410E84C9AA0D /* ProcessRankingSensorTests.swift in Sources */,
